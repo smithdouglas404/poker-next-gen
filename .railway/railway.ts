@@ -18,7 +18,7 @@ export default defineRailway(() => {
     healthcheckTimeout: 300,
     env: {
       DATABASE_ADDRESS: db.env.DATABASE_URL,
-      ENGINE_MATH_URL: `http://${engineMath.env.RAILWAY_PRIVATE_DOMAIN}:8080`,
+      ENGINE_MATH_URL: "http://engine-math.railway.internal:8080",
       NAKAMA_LOG_LEVEL: "INFO",
     },
   });
@@ -30,11 +30,11 @@ export default defineRailway(() => {
     healthcheck: "/",
     healthcheckTimeout: 300,
     env: {
-      NAKAMA_HOST: `http://${backendCore.env.RAILWAY_PRIVATE_DOMAIN}:7350`,
+      NAKAMA_HOST: "http://backend-core.railway.internal:7350",
       NAKAMA_SERVER_KEY: "defaultkey",
-      NEXT_PUBLIC_NAKAMA_HOST: `https://${backendCore.env.RAILWAY_PUBLIC_DOMAIN}`,
-      ENGINE_MATH_URL: `http://${engineMath.env.RAILWAY_PRIVATE_DOMAIN}:8080`,
-      NEXT_PUBLIC_ENGINE_MATH_URL: `https://${engineMath.env.RAILWAY_PUBLIC_DOMAIN}`,
+      NEXT_PUBLIC_NAKAMA_HOST: backendCore.env.RAILWAY_PUBLIC_DOMAIN,
+      ENGINE_MATH_URL: "http://engine-math.railway.internal:8080",
+      NEXT_PUBLIC_ENGINE_MATH_URL: engineMath.env.RAILWAY_PUBLIC_DOMAIN,
     },
   });
 
