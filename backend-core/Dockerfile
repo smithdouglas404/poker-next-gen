@@ -24,6 +24,7 @@ FROM heroiclabs/nakama:3.31.0
 
 COPY --from=builder /backend/backend-core.so /nakama/data/modules/backend-core.so
 COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh && /nakama/nakama check --runtime.path /nakama/data/modules
 
 EXPOSE 7349 7350 7351
 

@@ -58,10 +58,10 @@ services:
       - "7351:7351"
     healthcheck:
       test: ["CMD", "/nakama/nakama", "healthcheck"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 90s
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
     restart: unless-stopped
     networks:
       - poker-net
@@ -87,7 +87,9 @@ services:
       - "3000:3000"
     depends_on:
       backend-core:
-        condition: service_healthy
+        condition: service_started
+      engine-math:
+        condition: service_started
     networks:
       - poker-net
 
