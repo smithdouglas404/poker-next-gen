@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { GameProvider, useGame } from "@/features/game/GameProvider";
 import { TableHud } from "@/features/hud/TableHud";
 import { drawTableLayer } from "@/features/table/drawTableScene";
+import { runDealAnimation } from "@/features/table/dealAnimation";
 import { getCanvasResolution } from "@/features/table/rendererQuality";
 import { heroSeatIndex, syncGameToCanvas } from "@/features/table/syncGameToCanvas";
 import type { TableLayout } from "@/features/table/tableLayout";
@@ -17,7 +18,8 @@ function TableCanvas() {
   const cardsLayerRef = useRef<import("pixi.js").Container | null>(null);
   const [backend, setBackend] = useState<Backend>("unknown");
 
-  const { snapshot, holeCards, profile } = useGame();
+  const { snapshot, holeCards, profile, dealTrigger } = useGame();
+  const dealAnimRef = useRef<ReturnType<typeof runDealAnimation> | null>(null);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -77,6 +79,19 @@ function TableCanvas() {
       if (cleanup) cleanup();
     };
   }, []);
+
+  useEffect(() => {
+    const cardsLayer = cardsLayerRef.current;
+    const layout = layoutRef.current;
+    if (!cardsLayer || !layout || dealTrigger === 0) return;
+
+    dealAnimRef.current?.cancel();
+    dealAnimRef.current = runDealAnimation(cardsLayer, layout);
+    void dealAnimRef.current.promise.then(() => {
+      const seatIdx = snapshot ? heroSeatIndex(snapshot.seats, profile.userId) : -1;
+      syncGameToCanvas(cardsLayer, layout, snapshot, holeCards, seatIdx);
+    });
+  }, [dealTrigger, snapshot, holeCards, profile.userId]);
 
   useEffect(() => {
     const cardsLayer = cardsLayerRef.current;

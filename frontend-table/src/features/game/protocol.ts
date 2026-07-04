@@ -106,4 +106,5 @@ export interface GameState {
   gameLog: GameLogEntry[];
   matchmakerSearching: boolean;
   openTables: TableListItem[];
+  dealTrigger: number;
 }

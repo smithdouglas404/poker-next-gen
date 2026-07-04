@@ -48,6 +48,8 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"wallet_get":           rpc.WalletGet,
 		"profile_get":          rpc.ProfileGet,
 		"matchmaker_enqueue":   rpc.MatchmakerEnqueue,
+		"equity_estimate":      rpc.EquityEstimate,
+		"hand_rank":            rpc.HandRank,
 	}
 	for id, fn := range rpcs {
 		if err := initializer.RegisterRpc(id, fn); err != nil {

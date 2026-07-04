@@ -1,0 +1,3 @@
+[submodule "oddslingers"]
+	path = oddslingers
+	url = https://github.com/Monadical-SAS/oddslingers.poker.git

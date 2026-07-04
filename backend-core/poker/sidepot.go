@@ -97,6 +97,32 @@ func winnersAmong(eligible []int, holeCards map[string][2]Card, community []Card
 	if len(eligible) == 0 {
 		return nil
 	}
+	if enginemath.Available() && len(eligible) > 1 {
+		holes := make([]string, len(eligible))
+		board := ""
+		for _, c := range community {
+			board += c.Code()
+		}
+		for i, seat := range eligible {
+			if seats[seat] == nil {
+				continue
+			}
+			hole := holeCards[seats[seat].UserID]
+			holes[i] = handCardString(hole[:], nil)
+		}
+		if winIdx, _, err := enginemath.ResolveShowdown(holes, board); err == nil && len(winIdx) > 0 {
+			out := make([]int, 0, len(winIdx))
+			for _, idx := range winIdx {
+				if idx >= 0 && idx < len(eligible) {
+					out = append(out, eligible[idx])
+				}
+			}
+			if len(out) > 0 {
+				sort.Ints(out)
+				return out
+			}
+		}
+	}
 	winners := []int{eligible[0]}
 	for _, seat := range eligible[1:] {
 		cmp := compareSeatHands(seat, winners[0], holeCards, community, seats)

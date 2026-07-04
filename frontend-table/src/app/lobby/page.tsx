@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { GameProvider, formatCents, useGame } from "@/features/game/GameProvider";
 import { BuyInSlider } from "@/features/hud/TableLog";
+import { TableCard } from "@/features/hud/TableCard";
 
 function LobbyContent() {
   const { listTables, openTables, joinRoom, createRoom, findMatch, matchmakerSearching, connected, buyInCents } =
@@ -37,6 +38,9 @@ function LobbyContent() {
           </div>
           <Link href="/table" className="text-sm text-emerald-400 hover:underline">
             Open Table →
+          </Link>
+          <Link href="/" className="text-sm text-neutral-400 hover:underline">
+            Command Center
           </Link>
         </div>
       </header>
@@ -71,33 +75,30 @@ function LobbyContent() {
           </button>
         </div>
 
-        <section className="rounded-2xl border border-white/10 bg-black/30 p-6">
+        <section>
           <h2 className="text-lg font-semibold">Open Tables</h2>
-          <div className="mt-4 space-y-2">
+          <p className="mt-1 text-sm text-neutral-500">
+            OddSlingers-style lobby · powered by Nakama match list
+          </p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {openTables.length === 0 && (
-              <p className="text-sm text-neutral-500">No tables yet — create one or use Quick Match.</p>
+              <p className="col-span-full text-sm text-neutral-500">
+                No tables yet — create one or use Quick Match.
+              </p>
             )}
             {openTables.map((t) => (
-              <div
+              <TableCard
                 key={t.match_id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-4"
-              >
-                <div>
-                  <p className="font-medium">{t.room_id ?? t.label ?? "Hold'em Table"}</p>
-                  <p className="font-mono text-[10px] text-neutral-500">{t.match_id}</p>
-                </div>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => run(async () => {
+                table={t}
+                buyInLabel={formatCents(buyInCents)}
+                busy={busy}
+                onJoin={() =>
+                  run(async () => {
                     await joinRoom(t.match_id);
                     window.location.href = "/table";
-                  })}
-                  className="rounded-full bg-emerald-700 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider hover:bg-emerald-600"
-                >
-                  Join
-                </button>
-              </div>
+                  })
+                }
+              />
             ))}
           </div>
         </section>

@@ -5,17 +5,20 @@ import { PlayerHeader } from "@/features/hud/PlayerHeader";
 import { RoomPanel } from "@/features/hud/RoomPanel";
 import { SeatHud } from "@/features/hud/SeatHud";
 import { ActionBar } from "@/features/hud/ActionBar";
+import { ActionTimer } from "@/features/hud/ActionTimer";
+import { EquityPanel } from "@/features/hud/EquityPanel";
 import { BuyInSlider, TableLog } from "@/features/hud/TableLog";
+import { usePokerKeyboard } from "@/features/hud/usePokerKeyboard";
 import { useGame } from "@/features/game/GameProvider";
 
 export function TableHud({ children }: { children: React.ReactNode }) {
   const { error, snapshot } = useGame();
+  usePokerKeyboard();
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-neutral-950">
       {children}
 
-      {/* HUD layers */}
       <div className="pointer-events-none absolute inset-0 z-20 flex flex-col p-4">
         <PlayerHeader />
 
@@ -23,15 +26,20 @@ export function TableHud({ children }: { children: React.ReactNode }) {
           <div className="flex w-full max-w-xs flex-col gap-3">
             <RoomPanel />
             <BuyInSlider />
+            <EquityPanel />
             <TableLog />
           </div>
           <div className="relative flex-1">
             <SeatHud />
+            <ActionTimer />
             <CommunityCards board={snapshot?.board ?? []} phase={snapshot?.phase ?? "waiting"} />
           </div>
         </div>
 
-        <div className="mt-auto flex justify-end pb-2 pr-2">
+        <div className="mt-auto flex flex-col items-end gap-2 pb-2 pr-2">
+          <p className="pointer-events-none text-[10px] uppercase tracking-wider text-neutral-600">
+            Keys: F fold · C check/call · R raise
+          </p>
           <ActionBar />
         </div>
 
