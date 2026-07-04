@@ -57,6 +57,8 @@ services:
     command: sh -c "npm install && npm run dev -- -H 0.0.0.0"
     environment:
       NEXT_PUBLIC_NAKAMA_HOST: http://localhost:7350
+      NAKAMA_HOST: http://backend-core:7350
+      NAKAMA_SERVER_KEY: defaultkey
     volumes:
       - ./frontend-table:/app
       - /app/node_modules

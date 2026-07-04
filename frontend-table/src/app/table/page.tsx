@@ -8,6 +8,7 @@
  * deep-green vector elliptical poker table with deal animations for hole cards.
  */
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { runDealAnimation } from "@/features/table/dealAnimation";
@@ -131,6 +132,12 @@ export default function TablePage() {
       <div ref={hostRef} className="absolute inset-0" aria-label="Poker table surface" />
 
       <div className="absolute bottom-6 left-1/2 z-10 flex w-[min(92vw,28rem)] -translate-x-1/2 flex-col items-center gap-3">
+        <Link
+          href="/"
+          className="text-xs uppercase tracking-widest text-emerald-300/70 underline-offset-2 hover:text-emerald-200 hover:underline"
+        >
+          ← Command Center
+        </Link>
         <button
           type="button"
           onClick={handleDeal}

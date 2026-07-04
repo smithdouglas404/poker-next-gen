@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Poker Next-Gen — Table",
-  description: "WebGPU-accelerated Texas Hold'em table rendering engine",
+  title: "Poker Next-Gen — Command Center",
+  description: "Create communities, games, tournaments, and open the live poker table",
 };
 
 export default function RootLayout({
