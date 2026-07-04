@@ -9,12 +9,14 @@ interface ServiceStatus {
   url: string;
   ok: boolean;
   error?: string;
+  hint?: string;
 }
 
 interface StackHealth {
   ok: boolean;
   services: ServiceStatus[];
   live: Record<string, string>;
+  boot?: Record<string, string>;
   at: string;
 }
 
@@ -93,9 +95,29 @@ export default function LiveStackPage() {
                 </span>
               </div>
               <p className="mt-2 break-all font-mono text-[10px] text-neutral-500">{svc.url}</p>
-              {svc.error && <p className="mt-2 text-xs text-red-300">{svc.error}</p>}
+              {svc.error && (
+                <p className="mt-2 text-xs text-red-300">
+                  Down{svc.error.includes("refused") ? " (needs Docker)" : ""}: {svc.error}
+                </p>
+              )}
+              {svc.hint && <p className="mt-2 text-xs text-amber-200/90">{svc.hint}</p>}
             </article>
           ))}
+        </section>
+
+        <section className="rounded-2xl border border-white/10 p-6">
+          <h2 className="text-lg font-semibold">Boot the full stack</h2>
+          <p className="mt-2 text-sm text-neutral-400">
+            If Nakama or OddSlingers show &ldquo;needs Docker&rdquo;, the UI is up but those containers are not
+            listening yet. From the repo root:
+          </p>
+          <pre className="mt-4 overflow-x-auto rounded-xl bg-black/50 p-4 font-mono text-xs text-emerald-200">
+            {health?.boot?.full_stack ?? "./scripts/live-up.sh"}
+          </pre>
+          <p className="mt-3 text-xs text-neutral-500">
+            Then check:{" "}
+            <code className="text-neutral-300">{health?.boot?.verify ?? "./scripts/stack-status.sh"}</code>
+          </p>
         </section>
 
         <section className="rounded-2xl border border-white/10 p-6">
