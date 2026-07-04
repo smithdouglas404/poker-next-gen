@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { runDealAnimation } from "@/features/table/dealAnimation";
 import { drawTableLayer } from "@/features/table/drawTableScene";
+import { getCanvasResolution } from "@/features/table/rendererQuality";
 import type { TableLayout } from "@/features/table/tableLayout";
 
 type Backend = "webgpu" | "webgl" | "unknown";
@@ -50,7 +51,7 @@ export default function TablePage() {
         autoStart: true,
         backgroundColor: 0x0a1712,
         backgroundAlpha: 1,
-        resolution: window.devicePixelRatio || 1,
+        resolution: getCanvasResolution(),
         autoDensity: true,
       });
 
