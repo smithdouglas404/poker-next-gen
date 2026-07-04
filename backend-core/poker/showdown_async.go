@@ -17,6 +17,8 @@ type ShowdownPlan struct {
 	HandNo            int
 	MatchID           string
 	Board             []Card
+	DeckOrder         []string
+	DeckCommitment    string
 	HoleCards         map[string][2]Card
 	Seats             [MaxSeats]*Seat
 	Pots              []SidePot
@@ -34,10 +36,12 @@ type ShowdownResult struct {
 // BuildShowdownPlan captures everything needed to resolve pots off the hot path.
 func BuildShowdownPlan(t *Table, matchID string) ShowdownPlan {
 	plan := ShowdownPlan{
-		HandNo:    t.HandNo,
-		MatchID:   matchID,
-		Board:     append([]Card(nil), t.Board...),
-		HoleCards: copyHoleCards(t.HoleCards),
+		HandNo:         t.HandNo,
+		MatchID:        matchID,
+		Board:          append([]Card(nil), t.Board...),
+		DeckOrder:      append([]string(nil), t.DeckOrder...),
+		DeckCommitment: t.DeckCommitment,
+		HoleCards:      copyHoleCards(t.HoleCards),
 		TotalPot:  t.Pot,
 	}
 	for i, s := range t.Seats {

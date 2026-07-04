@@ -5,6 +5,10 @@ export type CommandCategory =
   | "community"
   | "game"
   | "tournament"
+  | "math"
+  | "coaching"
+  | "security"
+  | "audit"
   | "table";
 
 export interface CommandDefinition {
@@ -51,6 +55,26 @@ export const CATEGORY_META: Record<
     label: "Tournaments",
     subtitle: "MTT brackets, blinds, and prize pools",
     accent: "border-violet-500/40 bg-violet-950/30",
+  },
+  math: {
+    label: "Math & GTO",
+    subtitle: "rs_poker equity, Omaha, and GTO advice",
+    accent: "border-cyan-500/40 bg-cyan-950/30",
+  },
+  coaching: {
+    label: "Coaching",
+    subtitle: "Smart HUD tips and mistake alerts",
+    accent: "border-yellow-500/40 bg-yellow-950/20",
+  },
+  security: {
+    label: "Security",
+    subtitle: "Anti-bot pattern monitoring",
+    accent: "border-rose-500/40 bg-rose-950/30",
+  },
+  audit: {
+    label: "Audit & Verify",
+    subtitle: "Hand history, hash chain, deck proofs",
+    accent: "border-orange-500/40 bg-orange-950/30",
   },
   table: {
     label: "Table Canvas",

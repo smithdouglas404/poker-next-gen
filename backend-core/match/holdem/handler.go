@@ -67,7 +67,10 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	state := &MatchState{
 		Table:        poker.NewTable(),
 		Phase:        poker.PhaseWaiting,
-		Audit:        audit.NewPostgresEmitter(db),
+		Audit: audit.MultiEmitter{Sinks: []audit.Emitter{
+			audit.NewPostgresEmitter(db),
+			audit.NewArweaveEmitter(),
+		}},
 		RoomID:       roomID,
 		ClubID:       clubID,
 		TournamentID: tournamentID,
@@ -194,6 +197,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				sendError(dispatcher, presence, "action_failed", err.Error())
 				continue
 			}
+			emitPlayerAction(ctx, s, userID, req.Type, req.Amount)
 			broadcastSnapshot(ctx, db, dispatcher, s, nil)
 
 			if _, uncontested := s.Table.UncontestedWinner(); uncontested {
@@ -285,11 +289,12 @@ func emitHandStarted(ctx context.Context, s *MatchState) {
 		boardCodes = append(boardCodes, c.Code())
 	}
 	payload := map[string]any{
-		"hand_no":     s.Table.HandNo,
-		"small_blind": s.SmallBlind,
-		"big_blind":   s.BigBlind,
-		"seated":      s.Table.SeatedCount(),
-		"board":       boardCodes,
+		"hand_no":           s.Table.HandNo,
+		"small_blind":       s.SmallBlind,
+		"big_blind":         s.BigBlind,
+		"seated":            s.Table.SeatedCount(),
+		"board":             boardCodes,
+		"deck_commit_hash":  s.Table.DeckCommitment,
 	}
 	_ = s.Audit.Emit(ctx, audit.Event{
 		Type:        "hand_started",
@@ -349,14 +354,43 @@ func emitHandSettled(ctx context.Context, s *MatchState, res poker.ShowdownResul
 		boardCodes = append(boardCodes, c.Code())
 	}
 	payload := map[string]any{
-		"hand_no":   s.Table.HandNo,
-		"pot":       potBefore,
-		"payouts":   payouts,
-		"board":     boardCodes,
-		"engine":    "rs_poker",
+		"hand_no":          s.Table.HandNo,
+		"pot":              potBefore,
+		"payouts":          payouts,
+		"board":            boardCodes,
+		"engine":           "rs_poker",
+		"deck_order":       plan.DeckOrder,
+		"deck_commit_hash": plan.DeckCommitment,
 	}
 	return s.Audit.Emit(ctx, audit.Event{
 		Type:        "hand_settled",
+		MatchID:     matchIDForAudit(s),
+		HandNo:      s.Table.HandNo,
+		RoomID:      s.RoomID,
+		ClubID:      s.ClubID,
+		Payload:     payload,
+		PayloadHash: audit.HashPayload(payload),
+	})
+}
+
+func emitPlayerAction(ctx context.Context, s *MatchState, userID, action string, amount int64) {
+	if s.Audit == nil {
+		return
+	}
+	pot := s.Table.Pot
+	if pot <= 0 {
+		pot = 1
+	}
+	payload := map[string]any{
+		"hand_no":   s.Table.HandNo,
+		"user_id":   userID,
+		"action":    action,
+		"amount":    amount,
+		"pot_ratio": float64(amount) / float64(pot),
+		"street":    string(s.Table.Street),
+	}
+	_ = s.Audit.Emit(ctx, audit.Event{
+		Type:        "player_action",
 		MatchID:     matchIDForAudit(s),
 		HandNo:      s.Table.HandNo,
 		RoomID:      s.RoomID,
@@ -514,19 +548,20 @@ func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) 
 	}
 	heroWallet, _ := store.NewWalletStore(db).Get(ctx, heroID)
 	return protocol.TableSnapshot{
-		MatchID:    s.MatchID,
-		RoomID:     s.RoomID,
-		Phase:      poker.HandPhaseForTable(s.Table, s.Phase),
-		Seats:      seats,
-		Board:      board,
-		Pot:        s.Table.Pot,
-		CurrentBet: s.Table.CurrentBet,
-		ActionSeat: s.Table.ActionSeat,
-		ButtonSeat: s.Table.ButtonSeat,
-		SmallBlind: s.SmallBlind,
-		BigBlind:   s.BigBlind,
-		HeroWallet: heroWallet,
-		HandNo:     s.Table.HandNo,
+		MatchID:        s.MatchID,
+		RoomID:         s.RoomID,
+		Phase:          poker.HandPhaseForTable(s.Table, s.Phase),
+		Seats:          seats,
+		Board:          board,
+		Pot:            s.Table.Pot,
+		CurrentBet:     s.Table.CurrentBet,
+		ActionSeat:     s.Table.ActionSeat,
+		ButtonSeat:     s.Table.ButtonSeat,
+		SmallBlind:     s.SmallBlind,
+		BigBlind:       s.BigBlind,
+		HeroWallet:     heroWallet,
+		HandNo:         s.Table.HandNo,
+		DeckCommitHash: s.Table.DeckCommitment,
 	}
 }
 

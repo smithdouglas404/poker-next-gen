@@ -6,21 +6,20 @@ import (
 	"github.com/smithdouglas404/poker-next-gen/backend-core/poker/enginemath"
 )
 
-// NewSecureDeck returns a shuffled 52-card deck from engine-math (rs_poker CSPRNG).
-// There is no local fallback — engine-math must be reachable.
-func NewSecureDeck() ([]Card, error) {
-	codes, err := enginemath.ShuffleDeck()
+// NewSecureDeck returns a shuffled 52-card deck and commitment hash from engine-math.
+func NewSecureDeck() ([]Card, string, []string, error) {
+	result, err := enginemath.ShuffleDeck()
 	if err != nil {
-		return nil, fmt.Errorf("engine-math shuffle: %w", err)
+		return nil, "", nil, fmt.Errorf("engine-math shuffle: %w", err)
 	}
-	if len(codes) != 52 {
-		return nil, fmt.Errorf("engine-math shuffle: expected 52 cards, got %d", len(codes))
+	if len(result.Cards) != 52 {
+		return nil, "", nil, fmt.Errorf("engine-math shuffle: expected 52 cards, got %d", len(result.Cards))
 	}
-	deck, err := codesToDeck(codes)
+	deck, err := codesToDeck(result.Cards)
 	if err != nil {
-		return nil, err
+		return nil, "", nil, err
 	}
-	return deck, nil
+	return deck, result.DeckHash, append([]string(nil), result.Cards...), nil
 }
 
 func codesToDeck(codes []string) ([]Card, error) {

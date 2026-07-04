@@ -50,6 +50,13 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"matchmaker_enqueue":   rpc.MatchmakerEnqueue,
 		"equity_estimate":      rpc.EquityEstimate,
 		"hand_rank":            rpc.HandRank,
+		"audit_list":           rpc.AuditList,
+		"audit_verify_hand":    rpc.AuditVerifyHand,
+		"omaha_rank":           rpc.OmahaRank,
+		"omaha_showdown":       rpc.OmahaShowdown,
+		"gto_advise":           rpc.GtoAdvise,
+		"coaching_tip":         rpc.CoachingTip,
+		"antibot_score":        rpc.AntibotScore,
 	}
 	for id, fn := range rpcs {
 		if err := initializer.RegisterRpc(id, fn); err != nil {

@@ -18,6 +18,7 @@ type Event struct {
 	ClubID      string
 	Payload     map[string]any
 	PayloadHash string
+	PrevHash    string
 	Timestamp   time.Time
 }
 

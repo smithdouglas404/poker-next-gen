@@ -19,7 +19,7 @@ func (c Card) Code() string {
 	return r + suits[c.Suit]
 }
 
-func NewDeck() ([]Card, error) {
+func NewDeck() ([]Card, string, []string, error) {
 	return NewSecureDeck()
 }
 
@@ -57,9 +57,11 @@ const (
 )
 
 type Table struct {
-	Seats       [MaxSeats]*Seat
-	Deck        []Card
-	Board       []Card
+	Seats          [MaxSeats]*Seat
+	Deck           []Card
+	DeckOrder      []string
+	DeckCommitment string
+	Board          []Card
 	HoleCards   map[string][2]Card
 	Pot         int64
 	CurrentBet  int64
@@ -115,11 +117,13 @@ func (t *Table) StandUp(seat int) {
 
 func (t *Table) StartHand(sb, bb int64) error {
 	t.HandNo++
-	deck, err := NewDeck()
+	deck, deckHash, deckOrder, err := NewDeck()
 	if err != nil {
 		return err
 	}
 	t.Deck = deck
+	t.DeckOrder = deckOrder
+	t.DeckCommitment = deckHash
 	t.Board = nil
 	t.HoleCards = map[string][2]Card{}
 	t.Pot = 0

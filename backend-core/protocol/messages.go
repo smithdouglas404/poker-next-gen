@@ -44,7 +44,8 @@ type TableSnapshot struct {
 	SmallBlind   int64      `json:"small_blind"`
 	BigBlind     int64      `json:"big_blind"`
 	HeroWallet   int64      `json:"hero_wallet_cents"`
-	HandNo       int         `json:"hand_no"`
+	HandNo         int         `json:"hand_no"`
+	DeckCommitHash string      `json:"deck_commit_hash,omitempty"`
 }
 
 type DealPrivateMessage struct {
