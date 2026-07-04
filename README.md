@@ -1,9 +1,21 @@
 # Poker Next-Gen
 
 A state-of-the-art, multi-service web poker network (Texas Hold'em first). The
-repository is a hybrid monorepo that runs locally via Docker Compose **and**
-deploys as independent services on [Railway](https://railway.app) using
-per-service `railway.json` manifests.
+repository is a monorepo deployed on [Railway](https://railway.app) via a single
+`.railway/railway.ts` Infrastructure-as-Code file — no local Docker required.
+
+## Quick start — Railway
+
+**Copy-paste guide:** **[docs/DEPLOY.md](./docs/DEPLOY.md)** (4 commands, ~5 min)
+
+```bash
+npm install
+npm run railway:login    # browser opens — you authorize once
+npm run railway:link     # create or pick a project
+npm run deploy             # creates Postgres + all 3 services
+```
+
+Full walkthrough: **[docs/RAILWAY.md](./docs/RAILWAY.md)**.
 
 ## Architecture
 
@@ -12,79 +24,46 @@ per-service `railway.json` manifests.
 | `frontend-table` | `./frontend-table`| Next.js 15 · TypeScript · Tailwind · Pixi.js v8 | WebGPU-accelerated poker table renderer          |
 | `backend-core`   | `./backend-core`  | Go · Heroic Labs Nakama game server     | Authoritative game/club/tournament orchestration |
 | `engine-math`    | `./engine-math`   | Rust library · `rs_poker`               | Hand evaluation / poker mathematics              |
-| `oddslingers`    | `./oddslingers`   | Django + React (submodule, **live in compose**) | Full OSS poker platform at :8888                   |
-| `postgres`       | (compose only)    | PostgreSQL 16                           | Nakama persistence layer                         |
+| `postgres`       | Railway plugin    | PostgreSQL 16                           | Nakama persistence layer                         |
+| `oddslingers`    | `./oddslingers`   | Django + React (submodule, optional)    | Reference OSS platform — not on Railway yet      |
 
 ```
-frontend-table (Next.js :3000)
+frontend-table (Next.js)
         │  HTTP / WebSocket
         ▼
 backend-core (Nakama :7350 API, :7351 console, :7349 gRPC)
         │  SQL
         ▼
-postgres (:5432)
+postgres (Railway plugin)
 
-engine-math (Rust) — required rs_poker sidecar (:8080). No Go fallbacks for shuffle or hand eval.
-
-engine-math (Rust) — required rs_poker sidecar (:8080). No Go fallbacks for shuffle or hand eval.
-
-oddslingers (Django + React) — live at :8888; see docs/ODDSLINGERS.md.
+engine-math (Rust) — required rs_poker sidecar (:8080). No Go fallbacks.
 ```
 
 ## Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/) + Docker Compose v2
-- Git submodules: `git submodule update --init --depth 1 oddslingers`
-- For working on individual services outside containers:
+- [Railway CLI](https://docs.railway.com/guides/cli) 5.2+ (for `railway config apply`)
+- For working on individual services locally (no containers):
   - Node.js 20+ / npm (frontend)
-  - Go 1.25+ (backend)
+  - Go 1.25+ (backend plugin compile check)
   - Rust 1.85+ / Cargo (engine)
 
-## Local development — Docker Compose
+## Railway config
 
-> **Don't want Docker?** Use **[docs/RAILWAY.md](./docs/RAILWAY.md)** — deploy three services + Postgres on Railway, no Docker Desktop.
-
-Boot the **core stack** (rs_poker + Nakama + Next.js):
-
-```bash
-./scripts/core-up.sh
-```
-
-Boot **OddSlingers** separately (optional, long first build):
+| Path | Purpose |
+|------|---------|
+| `.railway/railway.ts` | **One file for the whole stack** — Postgres, services, env vars |
+| `infra/railway/env.example` | Reference variables (mirrors IaC wiring) |
+| `.railway/README.md` | Short IaC reference |
 
 ```bash
-./scripts/oddslingers-up.sh
-# or everything: ./scripts/live-up.sh --with-oddslingers
+railway login && railway link && railway config apply
 ```
 
-If services show down on http://localhost:3000/stack:
+> Nakama healthcheck: `/healthcheck`. App RPC: `/v2/rpc/healthz`.
 
-```bash
-./scripts/doctor.sh
-./scripts/stack-status.sh
-```
+## Running services individually (local, no Docker)
 
-Boot order: `postgres` → `engine-math` (health) → `backend-core` → `frontend-table`; OddSlingers uses compose profile `oddslingers`.
-
-> **Mac note:** Nakama Postgres binds host port **5433** (not 5432) to avoid conflicting with a local Postgres install.
-
-Once up:
-
-| Service                  | URL                              |
-| ------------------------ | -------------------------------- |
-| Command Center           | http://localhost:3000            |
-| **Live stack dashboard** | http://localhost:3000/stack      |
-| Poker table              | http://localhost:3000/table      |
-| Table lobby              | http://localhost:3000/lobby      |
-| Nakama HTTP API          | http://localhost:7350            |
-| Nakama Console           | http://localhost:7351            |
-| **rs_poker engine-math** | http://localhost:8080/health     |
-| **OddSlingers platform** | http://localhost:8888            |
-
-Tear down (keep data): `docker compose down`
-Tear down + wipe DB volume: `docker compose down -v`
-
-## Running services individually
+Useful when editing one service against a Railway-deployed stack, or for unit work.
 
 ### frontend-table
 
@@ -92,23 +71,24 @@ Tear down + wipe DB volume: `docker compose down -v`
 cd frontend-table
 npm install
 npm run dev      # http://localhost:3000/table
-npm run build    # production build
-npm run start    # serve production build
+npm run build
+npm run start
+```
+
+Point env at Railway (or a shared dev environment):
+
+```bash
+export NEXT_PUBLIC_NAKAMA_HOST=https://<backend-core-domain>
+export NAKAMA_HOST=http://backend-core.railway.internal:7350   # if tunneled/VPN
+export NEXT_PUBLIC_ENGINE_MATH_URL=https://<engine-math-domain>
 ```
 
 ### backend-core
 
-The Nakama runtime module is a Go **plugin** (`buildmode=plugin`) and must be
-compiled with a Go toolchain/`nakama-common` version matching the Nakama server
-(pinned to **3.31.0** / `nakama-common v1.41.0`). Building via the provided
-`Dockerfile` guarantees this:
+The Nakama runtime module is a Go **plugin** pinned to **Nakama 3.31.0** /
+`nakama-common v1.41.0`. On Railway it builds from `backend-core/Dockerfile`.
 
-```bash
-cd backend-core
-docker build -t poker-backend-core .
-```
-
-To iterate on the Go code locally:
+Local compile check only:
 
 ```bash
 cd backend-core
@@ -122,38 +102,23 @@ go build -buildmode=plugin -trimpath -o backend-core.so .
 cd engine-math
 cargo build
 cargo test
+cargo run    # listens on $PORT (default 8080)
 ```
 
-## Production / cloud — Railway
+## Optional — local Docker Compose
 
-**Config is synced in the repo.** See **[.railway/README.md](./.railway/README.md)** and **[docs/RAILWAY.md](./docs/RAILWAY.md)**.
-
-**Fastest setup** (creates Postgres + all services from `.railway/railway.ts`):
-
-```bash
-railway login && railway link && railway config apply
-```
-
-**Manual setup** (attach repo per service): set Root Directory + config path `/…/railway.json` per `.railway/README.md`.
-
-| Service | Config file |
-|---------|-------------|
-| `engine-math` | `/engine-math/railway.json` |
-| `backend-core` | `/backend-core/railway.json` |
-| `frontend-table` | `/frontend-table/railway.json` |
-
-Env templates: **`infra/railway/env.example`**.
-
-> Nakama healthcheck: `/healthcheck` (in `backend-core/railway.json`). App RPC: `/v2/rpc/healthz`.
+Docker Compose is **legacy / optional** for fully offline development. See
+**[docs/DOCKER.md](./docs/DOCKER.md)** if you still want containers locally.
 
 ## Repository layout
 
 ```
 poker-next-gen/
-├── frontend-table/     # Next.js 15 + Pixi.js v8 table renderer
-├── backend-core/       # Go Nakama runtime module + Dockerfile
-├── engine-math/        # Rust poker-math library (rs_poker)
-├── docker-compose.yml  # local multi-container dev stack
-├── README.md
-└── CLAUDE.md           # container boot-up workflow notes for AI agents
+├── .railway/railway.ts   # Railway IaC — entire stack
+├── frontend-table/       # Next.js 15 + Pixi.js v8 table renderer
+├── backend-core/         # Go Nakama runtime module
+├── engine-math/          # Rust poker-math library (rs_poker)
+├── docs/RAILWAY.md       # Deploy guide
+├── docker-compose.yml    # optional local dev only
+└── CLAUDE.md             # agent notes
 ```

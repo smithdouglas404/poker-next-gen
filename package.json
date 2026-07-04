@@ -1,0 +1,15 @@
+{
+  "name": "poker-next-gen",
+  "private": true,
+  "description": "Railway IaC — deploy the whole stack with npm run deploy",
+  "scripts": {
+    "railway:login": "railway login",
+    "railway:link": "railway link",
+    "deploy:plan": "railway config plan",
+    "deploy": "railway config apply"
+  },
+  "devDependencies": {
+    "@railway/cli": "^5.23.3",
+    "railway": "3.4.1"
+  }
+}
