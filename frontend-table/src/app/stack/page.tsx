@@ -18,6 +18,7 @@ interface StackHealth {
   services: ServiceStatus[];
   live: Record<string, string>;
   boot?: Record<string, string>;
+  runtime?: { in_compose?: boolean; note?: string };
   at: string;
 }
 
@@ -88,8 +89,13 @@ export default function LiveStackPage() {
               ? health.allOk
                 ? "All services live"
                 : "Core live (OddSlingers optional)"
-              : "Core services down — start Docker"}
+              : health?.runtime?.in_compose
+                ? "Sibling containers down"
+                : "Core services down"}
           </p>
+          {health?.runtime?.note && (
+            <p className="mt-2 text-sm text-neutral-400">{health.runtime.note}</p>
+          )}
           {health?.at && <p className="mt-1 text-xs text-neutral-500">Last check {new Date(health.at).toLocaleString()}</p>}
           {health === null && !busy && (
             <p className="mt-2 text-sm text-red-300">
@@ -121,7 +127,7 @@ export default function LiveStackPage() {
               <p className="mt-2 break-all font-mono text-[10px] text-neutral-500">{svc.url}</p>
               {svc.error && (
                 <p className="mt-2 text-xs text-red-300">
-                  Down{svc.error.includes("refused") ? " (needs Docker)" : ""}: {svc.error}
+                  {svc.error}
                 </p>
               )}
               {svc.hint && <p className="mt-2 text-xs text-amber-200/90">{svc.hint}</p>}
@@ -132,7 +138,7 @@ export default function LiveStackPage() {
         <section className="rounded-2xl border border-white/10 p-6">
           <h2 className="text-lg font-semibold">Fix missing services</h2>
           <p className="mt-2 text-sm text-neutral-400">
-            From the repo root in Terminal (not inside a container):
+            Run these from your Mac terminal in the repo root (same machine as Docker Desktop):
           </p>
           <div className="mt-4 space-y-3 font-mono text-xs">
             <div className="rounded-xl bg-black/50 p-4">

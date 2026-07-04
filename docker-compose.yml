@@ -77,6 +77,7 @@ services:
       NAKAMA_SERVER_KEY: defaultkey
       ENGINE_MATH_URL: http://engine-math:8080
       ODDSLINGERS_URL: http://oddslingers-nginx:80
+      RUNNING_IN_COMPOSE: "1"
       NEXT_PUBLIC_ODDSLINGERS_URL: http://localhost:8888
       NEXT_PUBLIC_ENGINE_MATH_URL: http://localhost:8080
       NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}

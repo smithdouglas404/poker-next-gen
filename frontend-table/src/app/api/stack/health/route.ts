@@ -29,7 +29,7 @@ async function probe(url: string, init?: RequestInit): Promise<{ ok: boolean; de
       message.includes("Failed to fetch");
     return {
       ok: false,
-      error: refused ? "not running (connection refused)" : message,
+      error: refused ? "container not reachable" : message,
     };
   }
 }
@@ -61,23 +61,35 @@ function nakamaProbeUrls(): string[] {
   return urls;
 }
 
-function downHint(id: string, error?: string): string | undefined {
-  const refused = error?.includes("refused") || error === "unreachable";
+function downHint(id: string, error?: string, inCompose?: boolean): string | undefined {
+  const refused = error?.includes("refused") || error?.includes("unreachable");
   if (!refused) return undefined;
 
+  const where = inCompose
+    ? "This container is up, but the sibling service is not running or not healthy yet."
+    : "Service is not listening on localhost.";
+
   if (id === "nakama") {
-    return "Nakama container not running. Run: ./scripts/core-up.sh — then ./scripts/doctor.sh if still down. Common blocker: port 5432 already in use (compose uses host :5433 for postgres).";
+    return `${where} Start Nakama: docker compose up -d backend-core (or ./scripts/core-up.sh from your Mac terminal). If unhealthy: docker compose logs backend-core --tail 50`;
   }
   if (id === "oddslingers") {
-    return "OddSlingers is optional. Run: ./scripts/oddslingers-up.sh (first build ~10 min). Needs port 8888 free.";
+    return `${where} OddSlingers is optional: ./scripts/oddslingers-up.sh`;
   }
   if (id === "engine-math") {
-    return "Start engine-math: docker compose up --build engine-math (or cargo run --release --bin engine-math-server in engine-math/).";
+    return `${where} Start engine-math: docker compose up -d engine-math`;
   }
   return undefined;
 }
 
+function detectInCompose(): boolean {
+  if (process.env.RUNNING_IN_COMPOSE === "1") return true;
+  const host = process.env.NAKAMA_HOST ?? "";
+  return host.includes("backend-core") || host.includes("engine-math");
+}
+
 export async function GET() {
+  const inCompose = detectInCompose();
+
   const engine = await probeFirst(
     [
       process.env.ENGINE_MATH_URL ?? "http://engine-math:8080",
@@ -100,7 +112,7 @@ export async function GET() {
     { id: "oddslingers", name: "OddSlingers (Django)", ...oddslingers },
   ].map((svc) => ({
     ...svc,
-    hint: svc.ok ? undefined : downHint(svc.id, svc.error),
+    hint: svc.ok ? undefined : downHint(svc.id, svc.error, inCompose),
   }));
 
   const coreOk = checks.filter((c) => c.id !== "oddslingers").every((c) => c.ok);
@@ -109,6 +121,12 @@ export async function GET() {
   return NextResponse.json({
     ok: coreOk,
     allOk,
+    runtime: {
+      in_compose: inCompose,
+      note: inCompose
+        ? "You are inside Docker Compose. A service marked down means that container is not running or not healthy — not that Docker is missing."
+        : "Running outside Compose; probes fall back to localhost.",
+    },
     services: checks,
     live: {
       command_center: "http://localhost:3000",
