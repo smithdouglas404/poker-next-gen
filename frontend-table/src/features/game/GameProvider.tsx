@@ -76,6 +76,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [gameLog, setGameLog] = useState<GameLogEntry[]>([]);
   const [matchmakerSearching, setMatchmakerSearching] = useState(false);
   const [openTables, setOpenTables] = useState<TableListItem[]>([]);
+  const [dealTrigger, setDealTrigger] = useState(0);
   const [profile, setProfile] = useState({
     userId: "",
     username: "Guest",
@@ -113,6 +114,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           case OpHandStart:
             pushLog(`Hand #${(payload as TableSnapshot)?.hand_no ?? "?"} started`, "action");
             setShowdown(null);
+            setDealTrigger((n) => n + 1);
             break;
           case OpDealPrivate:
             setHoleCards((payload as DealPrivateMessage).cards);
@@ -325,6 +327,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       gameLog,
       matchmakerSearching,
       openTables,
+      dealTrigger,
       connect,
       refreshWallet,
       listTables,
@@ -351,6 +354,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       gameLog,
       matchmakerSearching,
       openTables,
+      dealTrigger,
       connect,
       refreshWallet,
       listTables,

@@ -12,6 +12,7 @@ per-service `railway.toml` manifests.
 | `frontend-table` | `./frontend-table`| Next.js 15 · TypeScript · Tailwind · Pixi.js v8 | WebGPU-accelerated poker table renderer          |
 | `backend-core`   | `./backend-core`  | Go · Heroic Labs Nakama game server     | Authoritative game/club/tournament orchestration |
 | `engine-math`    | `./engine-math`   | Rust library · `rs_poker`               | Hand evaluation / poker mathematics              |
+| `oddslingers`    | `./oddslingers`   | Django + React (submodule, reference)   | Upstream OSS poker platform — patterns ported    |
 | `postgres`       | (compose only)    | PostgreSQL 16                           | Nakama persistence layer                         |
 
 ```
@@ -23,7 +24,9 @@ backend-core (Nakama :7350 API, :7351 console, :7349 gRPC)
         ▼
 postgres (:5432)
 
-engine-math (Rust) — poker math library, embedded/linked by services.
+engine-math (Rust) — poker math sidecar (:8080), embedded/linked by services.
+
+oddslingers (submodule) — reference only; see docs/ODDSLINGERS.md.
 ```
 
 ## Prerequisites

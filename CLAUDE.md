@@ -11,6 +11,7 @@ Railway**. Three first-class services live in their own top-level directories:
 - `frontend-table/` — Next.js 15 (App Router, TypeScript, Tailwind) + Pixi.js v8.
 - `backend-core/` — Go module compiled as a Nakama runtime **plugin**.
 - `engine-math/` — Rust library wrapping `rs_poker`.
+- `oddslingers/` — git submodule ([Monadical-SAS/oddslingers.poker](https://github.com/Monadical-SAS/oddslingers.poker)) for reference; UI/engine patterns are ported into `frontend-table` and `backend-core`. See `docs/ODDSLINGERS.md`.
 
 ## Golden rules
 

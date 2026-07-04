@@ -7,7 +7,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use engine_math::{compare_hands, rank_hand, shuffle_deck};
+use engine_math::{batch_rank, compare_hands, estimate_equity, rank_hand, showdown_winners, shuffle_deck};
 use serde::{Deserialize, Serialize};
 use std::{cmp::Ordering, net::SocketAddr, sync::Arc};
 use tower_http::cors::CorsLayer;
@@ -97,6 +97,75 @@ async fn compare(Json(req): Json<CompareRequest>) -> Result<Json<CompareResponse
     }))
 }
 
+#[derive(Deserialize)]
+struct EquityRequest {
+    holes: Vec<String>,
+    board: String,
+    #[serde(default = "default_iterations")]
+    iterations: usize,
+}
+
+fn default_iterations() -> usize {
+    2000
+}
+
+#[derive(Serialize)]
+struct EquityResponse {
+    equity: Vec<f32>,
+    iterations: usize,
+}
+
+async fn equity(Json(req): Json<EquityRequest>) -> Result<Json<EquityResponse>, (StatusCode, String)> {
+    let holes: Vec<&str> = req.holes.iter().map(String::as_str).collect();
+    let eq = estimate_equity(&holes, &req.board, req.iterations)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(EquityResponse {
+        equity: eq,
+        iterations: req.iterations.clamp(100, 50_000),
+    }))
+}
+
+#[derive(Deserialize)]
+struct ShowdownRequest {
+    holes: Vec<String>,
+    board: String,
+}
+
+#[derive(Serialize)]
+struct ShowdownResponse {
+    winners: Vec<usize>,
+    categories: Vec<String>,
+}
+
+async fn showdown(Json(req): Json<ShowdownRequest>) -> Result<Json<ShowdownResponse>, (StatusCode, String)> {
+    let holes: Vec<&str> = req.holes.iter().map(String::as_str).collect();
+    let winners = showdown_winners(&holes, &req.board).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    let categories: Vec<String> = holes
+        .iter()
+        .map(|h| rank_hand(&format!("{h}{}", req.board)).map(|r| format!("{:?}", r.category())))
+        .collect::<Result<_, _>>()
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(ShowdownResponse { winners, categories }))
+}
+
+#[derive(Deserialize)]
+struct BatchRankRequest {
+    hands: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct BatchRankResponse {
+    categories: Vec<String>,
+}
+
+async fn batch_rank_handler(
+    Json(req): Json<BatchRankRequest>,
+) -> Result<Json<BatchRankResponse>, (StatusCode, String)> {
+    let hands: Vec<&str> = req.hands.iter().map(String::as_str).collect();
+    let categories = batch_rank(&hands).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(BatchRankResponse { categories }))
+}
+
 #[tokio::main]
 async fn main() {
     let state = Arc::new(AppState {
@@ -108,6 +177,9 @@ async fn main() {
         .route("/rank", post(rank))
         .route("/shuffle", post(shuffle))
         .route("/compare", post(compare))
+        .route("/equity", post(equity))
+        .route("/showdown", post(showdown))
+        .route("/batch_rank", post(batch_rank_handler))
         .layer(CorsLayer::permissive())
         .with_state(state);
 
