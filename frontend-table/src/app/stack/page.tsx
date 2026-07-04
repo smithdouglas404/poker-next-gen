@@ -16,9 +16,9 @@ interface StackHealth {
   ok: boolean;
   allOk?: boolean;
   services: ServiceStatus[];
-  live: Record<string, string>;
+  live: Record<string, string | undefined>;
   boot?: Record<string, string>;
-  runtime?: { in_compose?: boolean; note?: string };
+  runtime?: { mode?: string; note?: string };
   at: string;
 }
 
@@ -48,6 +48,9 @@ export default function LiveStackPage() {
     return () => window.clearInterval(id);
   }, [refresh]);
 
+  const onRailway = health?.runtime?.mode === "railway";
+  const onCompose = health?.runtime?.mode === "compose";
+
   return (
     <div className="min-h-screen bg-neutral-950 text-white">
       <header className="border-b border-white/10 px-6 py-10">
@@ -59,6 +62,11 @@ export default function LiveStackPage() {
             </h1>
             <p className="mt-2 text-sm text-neutral-400">
               Nakama + rs_poker are required · OddSlingers is optional
+              {health?.runtime?.mode && (
+                <span className="ml-2 rounded bg-white/10 px-2 py-0.5 text-[10px] uppercase tracking-wider">
+                  {health.runtime.mode}
+                </span>
+              )}
             </p>
           </div>
           <div className="flex gap-3">
@@ -89,18 +97,18 @@ export default function LiveStackPage() {
               ? health.allOk
                 ? "All services live"
                 : "Core live (OddSlingers optional)"
-              : health?.runtime?.in_compose
-                ? "Sibling containers down"
-                : "Core services down"}
+              : onRailway
+                ? "Railway services down"
+                : onCompose
+                  ? "Sibling containers down"
+                  : "Core services down"}
           </p>
           {health?.runtime?.note && (
             <p className="mt-2 text-sm text-neutral-400">{health.runtime.note}</p>
           )}
           {health?.at && <p className="mt-1 text-xs text-neutral-500">Last check {new Date(health.at).toLocaleString()}</p>}
           {health === null && !busy && (
-            <p className="mt-2 text-sm text-red-300">
-              Could not reach /api/stack/health — is the Next.js container running?
-            </p>
+            <p className="mt-2 text-sm text-red-300">Could not reach /api/stack/health.</p>
           )}
         </section>
 
@@ -125,34 +133,31 @@ export default function LiveStackPage() {
                 </span>
               </div>
               <p className="mt-2 break-all font-mono text-[10px] text-neutral-500">{svc.url}</p>
-              {svc.error && (
-                <p className="mt-2 text-xs text-red-300">
-                  {svc.error}
-                </p>
-              )}
+              {svc.error && <p className="mt-2 text-xs text-red-300">{svc.error}</p>}
               {svc.hint && <p className="mt-2 text-xs text-amber-200/90">{svc.hint}</p>}
             </article>
           ))}
         </section>
 
         <section className="rounded-2xl border border-white/10 p-6">
-          <h2 className="text-lg font-semibold">Fix missing services</h2>
+          <h2 className="text-lg font-semibold">
+            {onRailway ? "Fix on Railway" : onCompose ? "Fix missing services (Docker)" : "Deploy the stack"}
+          </h2>
           <p className="mt-2 text-sm text-neutral-400">
-            Run these from your Mac terminal in the repo root (same machine as Docker Desktop):
+            {onRailway
+              ? "Check deploy logs in Railway or from your terminal:"
+              : onCompose
+                ? "Run these from your terminal in the repo root:"
+                : "Deploy everything on Railway (no Docker). See docs/RAILWAY.md:"}
           </p>
           <div className="mt-4 space-y-3 font-mono text-xs">
-            <div className="rounded-xl bg-black/50 p-4">
-              <p className="text-neutral-500"># 1 — Nakama + engine-math + UI (required)</p>
-              <p className="text-emerald-200">{health?.boot?.core ?? "./scripts/core-up.sh"}</p>
-            </div>
-            <div className="rounded-xl bg-black/50 p-4">
-              <p className="text-neutral-500"># 2 — OddSlingers (optional, slow first build)</p>
-              <p className="text-emerald-200">{health?.boot?.oddslingers ?? "./scripts/oddslingers-up.sh"}</p>
-            </div>
-            <div className="rounded-xl bg-black/50 p-4">
-              <p className="text-neutral-500"># diagnose</p>
-              <p className="text-emerald-200">{health?.boot?.doctor ?? "./scripts/doctor.sh"}</p>
-            </div>
+            {health?.boot &&
+              Object.entries(health.boot).map(([key, cmd]) => (
+                <div key={key} className="rounded-xl bg-black/50 p-4">
+                  <p className="text-neutral-500"># {key.replace(/_/g, " ")}</p>
+                  <p className="text-emerald-200">{cmd}</p>
+                </div>
+              ))}
           </div>
         </section>
 
@@ -160,14 +165,16 @@ export default function LiveStackPage() {
           <h2 className="text-lg font-semibold">Open in browser</h2>
           <ul className="mt-4 space-y-2 text-sm">
             {health &&
-              Object.entries(health.live).map(([key, url]) => (
-                <li key={key} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-black/30 px-3 py-2">
-                  <span className="capitalize text-neutral-300">{key.replace(/_/g, " ")}</span>
-                  <a href={url} className="font-mono text-emerald-400 hover:underline" target="_blank" rel="noreferrer">
-                    {url}
-                  </a>
-                </li>
-              ))}
+              Object.entries(health.live)
+                .filter(([, url]) => url)
+                .map(([key, url]) => (
+                  <li key={key} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-black/30 px-3 py-2">
+                    <span className="capitalize text-neutral-300">{key.replace(/_/g, " ")}</span>
+                    <a href={url} className="font-mono text-emerald-400 hover:underline" target="_blank" rel="noreferrer">
+                      {url}
+                    </a>
+                  </li>
+                ))}
           </ul>
         </section>
       </main>

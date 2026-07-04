@@ -1,29 +1,24 @@
 # Railway — one config file for the whole stack
 
-Railway has two config systems:
+**Primary deployment path.** No local Docker required.
 
-| System | Scope | File |
-|--------|-------|------|
-| Config as Code | **One service** | `service/railway.json` |
-| **Infrastructure as Code** | **Entire project** | **`.railway/railway.ts`** |
-
-This repo uses **one file for everything**: `.railway/railway.ts`.
-
-It defines Postgres, all three services, build settings, healthchecks, and env wiring.
-
-> Railway does **not** support a single root `railway.json` for multi-service projects. The whole-project format is TypeScript-only (for now). See [Railway IaC docs](https://docs.railway.com/infrastructure-as-code).
+| Path | Purpose |
+|------|---------|
+| `.railway/railway.ts` | Postgres + all services + env wiring |
+| `docs/RAILWAY.md` | Full deploy guide |
+| `infra/railway/env.example` | Reference variables |
 
 ## Deploy
 
 ```bash
-npm i -g @railway/cli   # CLI 5.2+ for IaC
+npm i -g @railway/cli
 railway login
-railway link            # pick/create project + environment
-railway config plan     # preview changes
-railway config apply    # create/update Postgres + all services
+railway link
+railway config plan
+railway config apply
 ```
 
-Do **not** set per-service “Config-as-code file path” in the Railway dashboard when using IaC. That field is for single-service `railway.json` only.
+Do **not** set per-service “Config-as-code file path” in the dashboard.
 
 ## What gets created
 
@@ -32,12 +27,8 @@ Do **not** set per-service “Config-as-code file path” in the Railway dashboa
 | PostgreSQL | Railway plugin | — |
 | `engine-math` | Dockerfile | `/health` |
 | `backend-core` | Dockerfile | `/healthcheck` |
-| `frontend-table` | Railpack (`npm ci && npm run build`) | `/` |
+| `frontend-table` | Railpack | `/` |
 
-Private networking uses `*.railway.internal`. Browser-facing URLs use each service’s public Railway domain.
+## Local Docker (optional)
 
-## Reference env vars
-
-See `infra/railway/env.example` for the same variables in dashboard reference syntax (useful when reading logs or debugging).
-
-Full walkthrough: [docs/RAILWAY.md](../docs/RAILWAY.md).
+See [docs/DOCKER.md](../docs/DOCKER.md) — legacy offline dev only.
