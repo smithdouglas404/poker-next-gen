@@ -37,7 +37,11 @@ async function probe(url: string, init?: RequestInit): Promise<{ ok: boolean; de
 }
 
 async function probeFirst(urls: string[]): Promise<{ url: string; ok: boolean; detail?: unknown; error?: string }> {
-  let last = { url: urls[0] ?? "", ok: false, error: "unreachable" };
+  let last: { url: string; ok: boolean; detail?: unknown; error?: string } = {
+    url: urls.find(Boolean) ?? "",
+    ok: false,
+    error: "unreachable",
+  };
   for (const url of urls) {
     if (!url) continue;
     const result = await probe(url);
@@ -47,8 +51,8 @@ async function probeFirst(urls: string[]): Promise<{ url: string; ok: boolean; d
   return last;
 }
 
-function uniqueUrls(urls: string[]): string[] {
-  return [...new Set(urls.filter(Boolean))];
+function uniqueUrls(urls: Array<string | undefined>): string[] {
+  return [...new Set(urls.filter((u): u is string => Boolean(u)))];
 }
 
 function nakamaProbeUrls(): string[] {
