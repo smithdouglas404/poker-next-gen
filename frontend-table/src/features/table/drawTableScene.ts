@@ -114,8 +114,36 @@ export function drawTableScene(stage: Container, width: number, height: number):
     });
   stage.addChild(goldAccent);
 
+  drawLayoutBoundaries(stage, layout);
   drawPlayerSeats(stage, layout);
   drawCenterLabel(stage, layout);
+}
+
+/** Betting line, community-card zone, and seat-orbit guides. */
+function drawLayoutBoundaries(stage: Container, layout: TableLayout): void {
+  const { cx, cy, feltRx, feltRy, railThickness } = layout;
+  const lineWidth = Math.max(1.5, railThickness * 0.06);
+
+  // Betting boundary — players push chips across this inner ellipse.
+  const bettingLine = new Graphics();
+  bettingLine
+    .ellipse(cx, cy, feltRx * 0.72, feltRy * 0.72)
+    .stroke({ color: 0xf3f4f6, width: lineWidth, alpha: 0.35 });
+  stage.addChild(bettingLine);
+
+  // Community-card / pot action zone.
+  const actionZone = new Graphics();
+  actionZone
+    .ellipse(cx, cy, feltRx * 0.28, feltRy * 0.28)
+    .stroke({ color: TABLE_COLORS.gold, width: lineWidth, alpha: 0.45 });
+  stage.addChild(actionZone);
+
+  // Seat-orbit guide — symmetric layout ring for the six player placeholders.
+  const seatOrbit = new Graphics();
+  seatOrbit
+    .ellipse(cx, cy, feltRx * 0.88, feltRy * 0.88)
+    .stroke({ color: 0xffffff, width: 1, alpha: 0.12 });
+  stage.addChild(seatOrbit);
 }
 
 function drawPlayerSeats(stage: Container, layout: TableLayout): void {

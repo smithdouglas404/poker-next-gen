@@ -5,8 +5,8 @@
  *
  * A responsive, React-wrapped <canvas> driven by Pixi.js v8. The renderer
  * prefers the WebGPU backend (falling back to WebGL) and paints a stylized,
- * deep-green vector elliptical poker table with a gold inner border and six
- * symmetric player-seat placeholders.
+ * deep-green vector elliptical poker table with a gold inner border, layout
+ * boundaries, six symmetric player-seat placeholders, and a center dev banner.
  */
 
 import { useEffect, useRef, useState } from "react";
