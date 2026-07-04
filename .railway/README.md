@@ -1,56 +1,60 @@
 # Railway — synced from repo
 
-This repo ships **two** Railway configuration styles. Pick **one** — Railway does not allow the same service to use both.
+## ⚠️ Common error: wrong config file
 
-## Option A — Full project from repo (recommended)
+Railway **Config-as-code file path** (in service Settings) accepts **only**:
 
-Uses [Infrastructure as Code](https://docs.railway.com/infrastructure-as-code): `.railway/railway.ts`
+- `/backend-core/railway.json` ✅
+- `/backend-core/railway.toml` ✅
 
-Creates Postgres + `engine-math` + `backend-core` + `frontend-table` with env vars wired.
+It does **NOT** accept:
+
+- `.railway/railway.ts` ❌ (that file is for `railway config apply` CLI only)
+- `backend-core/railway.json` ❌ (missing leading `/`)
+- `/railway.toml` at repo root ❌ (does not exist — this is a monorepo)
+
+## Option A — CLI project setup (`.railway/railway.ts`)
+
+Creates Postgres + all 3 services. **Do not** set Config file path in dashboard.
 
 ```bash
-npm i -g @railway/cli   # or brew install railway
+npm i -g @railway/cli
 railway login
-railway link            # pick / create project
-railway config plan     # preview
-railway config apply    # create services + postgres
+railway link
+railway config plan
+railway config apply
 ```
 
-Then connect GitHub deploy on each service (IaC sets source to this repo).
+## Option B — Attach GitHub repo per service (`railway.json`)
 
-**Do not** set per-service Config File paths in the dashboard when using IaC.
+Create **3 separate services** + **PostgreSQL** in one Railway project.
 
-## Option B — Per-service `railway.toml` (attach repo manually)
+For **each** service, in Settings set:
 
-Each deployable service has its own `railway.toml`. Railway reads it when you set **Config-as-code file path** to the **absolute repo path** (config does **not** follow Root Directory):
+| Service | Root Directory | Config-as-code file path |
+|---------|----------------|--------------------------|
+| engine-math | `engine-math` | `/engine-math/railway.json` |
+| backend-core | `backend-core` | `/backend-core/railway.json` |
+| frontend-table | `frontend-table` | `/frontend-table/railway.json` |
 
-| Service | Root Directory | Config file path |
-|---------|----------------|------------------|
-| `engine-math` | `engine-math` | `/engine-math/railway.toml` |
-| `backend-core` | `backend-core` | `/backend-core/railway.toml` |
-| `frontend-table` | `frontend-table` | `/frontend-table/railway.toml` |
+Path must start with `/` and be from **repo root** (not relative to Root Directory).
 
-Steps:
+Variables: copy from `infra/railway/env.example`.
 
-1. Create Railway project
-2. Add **PostgreSQL** plugin
-3. Add **three empty services**, connect this GitHub repo
-4. For each service: Settings → Root Directory + Config file path (table above)
-5. Set variables from `infra/railway/env.example`
-6. Deploy
+Then click **Deploy**.
 
-**Do not** run `railway config apply` if using Option B (conflicts with TOML).
+## Files in this repo
 
-## What each TOML configures
+| File | Used by |
+|------|---------|
+| `engine-math/railway.json` | Option B — engine-math service |
+| `backend-core/railway.json` | Option B — Nakama service |
+| `frontend-table/railway.json` | Option B — Next.js UI |
+| `*/railway.toml` | Same as `.json` (TOML format alternative) |
+| `.railway/railway.ts` | Option A — `railway config apply` only |
 
-| File | Builder | Healthcheck |
-|------|---------|-------------|
-| `engine-math/railway.toml` | Dockerfile | `/health` |
-| `backend-core/railway.toml` | Dockerfile | `/healthcheck` |
-| `frontend-table/railway.toml` | Railpack | `/` |
-
-All include `watchPatterns` so changes in one service folder do not rebuild the others.
+Use **either** `.json` **or** `.toml` in the config path — not both for the same service.
 
 ## More detail
 
-See [docs/RAILWAY.md](../docs/RAILWAY.md).
+[docs/RAILWAY.md](../docs/RAILWAY.md)

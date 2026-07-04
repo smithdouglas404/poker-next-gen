@@ -138,9 +138,9 @@ railway login && railway link && railway config apply
 
 | Service | Config file |
 |---------|-------------|
-| `engine-math` | `/engine-math/railway.toml` |
-| `backend-core` | `/backend-core/railway.toml` |
-| `frontend-table` | `/frontend-table/railway.toml` |
+| `engine-math` | `/engine-math/railway.json` |
+| `backend-core` | `/backend-core/railway.json` |
+| `frontend-table` | `/frontend-table/railway.json` |
 
 Env templates: **`infra/railway/env.example`**.
 
