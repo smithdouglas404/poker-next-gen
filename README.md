@@ -3,7 +3,7 @@
 A state-of-the-art, multi-service web poker network (Texas Hold'em first). The
 repository is a hybrid monorepo that runs locally via Docker Compose **and**
 deploys as independent services on [Railway](https://railway.app) using
-per-service `railway.toml` manifests.
+per-service `railway.json` manifests.
 
 ## Architecture
 
@@ -134,7 +134,7 @@ cargo test
 railway login && railway link && railway config apply
 ```
 
-**Manual setup** (attach repo per service): set Root Directory + Config file path per `.railway/README.md` — each service reads its `railway.toml`.
+**Manual setup** (attach repo per service): set Root Directory + config path `/…/railway.json` per `.railway/README.md`.
 
 | Service | Config file |
 |---------|-------------|
@@ -144,7 +144,7 @@ railway login && railway link && railway config apply
 
 Env templates: **`infra/railway/env.example`**.
 
-> Nakama healthcheck: `/healthcheck` (in `backend-core/railway.toml`). App RPC: `/v2/rpc/healthz`.
+> Nakama healthcheck: `/healthcheck` (in `backend-core/railway.json`). App RPC: `/v2/rpc/healthz`.
 
 ## Repository layout
 
