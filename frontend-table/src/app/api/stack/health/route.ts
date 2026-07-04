@@ -25,36 +25,42 @@ async function probe(url: string, init?: RequestInit): Promise<{ ok: boolean; de
   }
 }
 
+async function probeFirst(urls: string[]): Promise<{ url: string; ok: boolean; detail?: unknown; error?: string }> {
+  let last = { url: urls[0], ok: false, error: "unreachable" };
+  for (const url of urls) {
+    const result = await probe(url);
+    last = { url, ...result };
+    if (result.ok) return last;
+  }
+  return last;
+}
+
 export async function GET() {
-  const nakamaHost = process.env.NAKAMA_HOST ?? "http://backend-core:7350";
-  const engineUrl = process.env.ENGINE_MATH_URL ?? "http://engine-math:8080";
-  const oddslingersUrl = process.env.ODDSLINGERS_URL ?? "http://oddslingers-nginx:80";
+  const engine = await probeFirst(
+    [
+      process.env.ENGINE_MATH_URL ?? "http://engine-math:8080",
+      "http://127.0.0.1:8080",
+      "http://localhost:8080",
+    ].map((u) => `${u.replace(/\/$/, "")}/health`),
+  );
 
-  const checks: ServiceStatus[] = [];
+  const nakama = await probeFirst([
+    `${process.env.NAKAMA_HOST ?? "http://backend-core:7350"}/v2/healthcheck`,
+    "http://127.0.0.1:7350/v2/healthcheck",
+    "http://localhost:7350/v2/healthcheck",
+  ]);
 
-  const engine = await probe(`${engineUrl}/health`);
-  checks.push({
-    id: "engine-math",
-    name: "rs_poker engine-math",
-    url: engineUrl,
-    ...engine,
-  });
+  const oddslingers = await probeFirst([
+    process.env.ODDSLINGERS_URL ?? "http://oddslingers-nginx:80",
+    "http://127.0.0.1:8888",
+    "http://localhost:8888",
+  ]);
 
-  const nakama = await probe(`${nakamaHost}/v2/healthcheck`);
-  checks.push({
-    id: "nakama",
-    name: "Nakama backend-core",
-    url: nakamaHost,
-    ...nakama,
-  });
-
-  const oddslingers = await probe(oddslingersUrl);
-  checks.push({
-    id: "oddslingers",
-    name: "OddSlingers (Django)",
-    url: oddslingersUrl,
-    ...oddslingers,
-  });
+  const checks: ServiceStatus[] = [
+    { id: "engine-math", name: "rs_poker engine-math", ...engine },
+    { id: "nakama", name: "Nakama backend-core", ...nakama },
+    { id: "oddslingers", name: "OddSlingers (Django)", ...oddslingers },
+  ];
 
   const allOk = checks.every((c) => c.ok);
 
