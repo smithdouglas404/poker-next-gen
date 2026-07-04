@@ -1,6 +1,6 @@
 # OddSlingers in Poker Next-Gen
 
-[OddSlingers](https://github.com/Monadical-SAS/oddslingers.poker) is vendored as a **git submodule** at `./oddslingers/` for reference and incremental porting. It is **not** the runtime stack for this monorepo — production traffic flows through Nakama + rs_poker + Next.js/Pixi.
+[OddSlingers](https://github.com/Monadical-SAS/oddslingers.poker) runs **live** in docker compose at **http://localhost:8888** alongside the Nakama + rs_poker stack. The submodule at `./oddslingers/` is the upstream Django/React codebase.
 
 ## Submodule
 
@@ -8,12 +8,12 @@
 git submodule update --init --depth 1 oddslingers
 ```
 
-Run the upstream stack locally (separate from poker-next-gen compose):
+Run the upstream stack standalone (optional):
 
 ```bash
 cd oddslingers
 docker compose up
-# → http://localhost (Django + React reference UI)
+# → http://localhost (when not using poker-next-gen compose)
 ```
 
 ## Architecture mapping

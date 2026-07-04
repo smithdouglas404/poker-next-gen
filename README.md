@@ -12,7 +12,7 @@ per-service `railway.toml` manifests.
 | `frontend-table` | `./frontend-table`| Next.js 15 · TypeScript · Tailwind · Pixi.js v8 | WebGPU-accelerated poker table renderer          |
 | `backend-core`   | `./backend-core`  | Go · Heroic Labs Nakama game server     | Authoritative game/club/tournament orchestration |
 | `engine-math`    | `./engine-math`   | Rust library · `rs_poker`               | Hand evaluation / poker mathematics              |
-| `oddslingers`    | `./oddslingers`   | Django + React (submodule, reference)   | Upstream OSS poker platform — patterns ported    |
+| `oddslingers`    | `./oddslingers`   | Django + React (submodule, **live in compose**) | Full OSS poker platform at :8888                   |
 | `postgres`       | (compose only)    | PostgreSQL 16                           | Nakama persistence layer                         |
 
 ```
@@ -26,12 +26,15 @@ postgres (:5432)
 
 engine-math (Rust) — required rs_poker sidecar (:8080). No Go fallbacks for shuffle or hand eval.
 
-oddslingers (submodule) — reference only; see docs/ODDSLINGERS.md.
+engine-math (Rust) — required rs_poker sidecar (:8080). No Go fallbacks for shuffle or hand eval.
+
+oddslingers (Django + React) — live at :8888; see docs/ODDSLINGERS.md.
 ```
 
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) + Docker Compose v2
+- Git submodules: `git submodule update --init --depth 1 oddslingers`
 - For working on individual services outside containers:
   - Node.js 20+ / npm (frontend)
   - Go 1.25+ (backend)
@@ -39,23 +42,27 @@ oddslingers (submodule) — reference only; see docs/ODDSLINGERS.md.
 
 ## Local development — Docker Compose
 
-Boot the whole stack (Postgres → Nakama → Next.js):
+Boot the **full live stack** (rs_poker + Nakama + Next.js + OddSlingers):
 
 ```bash
-docker compose up --build
+./scripts/live-up.sh
+# or: git submodule update --init --depth 1 oddslingers && docker compose up --build
 ```
 
-Boot order is handled for you: `postgres` starts first and is health-checked
-(`pg_isready`); `backend-core` waits for it, runs `nakama migrate up`, then
-serves; `frontend-table` waits for the backend and runs the Next.js dev server.
+Boot order: `postgres` → `engine-math` (health) → `backend-core` → `frontend-table`; OddSlingers postgres/redis → django migrate → webpack + nginx.
 
 Once up:
 
-| Service                | URL                              |
-| ---------------------- | -------------------------------- |
-| Poker table (frontend) | http://localhost:3000/table      |
-| Nakama HTTP API        | http://localhost:7350            |
-| Nakama Console         | http://localhost:7351            |
+| Service                  | URL                              |
+| ------------------------ | -------------------------------- |
+| Command Center           | http://localhost:3000            |
+| **Live stack dashboard** | http://localhost:3000/stack      |
+| Poker table              | http://localhost:3000/table      |
+| Table lobby              | http://localhost:3000/lobby      |
+| Nakama HTTP API          | http://localhost:7350            |
+| Nakama Console           | http://localhost:7351            |
+| **rs_poker engine-math** | http://localhost:8080/health     |
+| **OddSlingers platform** | http://localhost:8888            |
 
 Tear down (keep data): `docker compose down`
 Tear down + wipe DB volume: `docker compose down -v`

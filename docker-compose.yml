@@ -1,5 +1,8 @@
 name: poker-next-gen
 
+include:
+  - docker-compose.oddslingers.yml
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -66,6 +69,10 @@ services:
       NEXT_PUBLIC_NAKAMA_HOST: http://localhost:7350
       NAKAMA_HOST: http://backend-core:7350
       NAKAMA_SERVER_KEY: defaultkey
+      ENGINE_MATH_URL: http://engine-math:8080
+      ODDSLINGERS_URL: http://oddslingers-nginx:80
+      NEXT_PUBLIC_ODDSLINGERS_URL: http://localhost:8888
+      NEXT_PUBLIC_ENGINE_MATH_URL: http://localhost:8080
       NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
     volumes:
       - ./frontend-table:/app

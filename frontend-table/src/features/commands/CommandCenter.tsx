@@ -202,11 +202,25 @@ export function CommandCenter() {
           </div>
           <div className="flex flex-wrap gap-3">
             <Link
+              href="/stack"
+              className="rounded-xl border border-violet-500/40 bg-violet-950/40 px-5 py-3 text-sm font-semibold text-violet-200 hover:bg-violet-900/40"
+            >
+              Live Stack →
+            </Link>
+            <Link
               href="/lobby"
               className="rounded-xl border border-sky-500/40 bg-sky-950/40 px-5 py-3 text-sm font-semibold text-sky-200 hover:bg-sky-900/40"
             >
               Table Lobby →
             </Link>
+            <a
+              href={process.env.NEXT_PUBLIC_ODDSLINGERS_URL ?? "http://localhost:8888"}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-xl border border-amber-500/40 bg-amber-950/30 px-5 py-3 text-sm font-semibold text-amber-200 hover:bg-amber-900/30"
+            >
+              OddSlingers →
+            </a>
             <Link
               href="/table"
               className="rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-5 py-3 text-sm font-semibold text-emerald-200 hover:bg-emerald-900/40"
