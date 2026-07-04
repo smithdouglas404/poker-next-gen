@@ -1,29 +1,37 @@
-// Package main is the Nakama Go runtime plugin for the Poker Next-Gen network.
-//
-// Nakama loads this package as a shared object (buildmode=plugin) and invokes
-// InitModule at boot. Here we register server-authoritative RPCs and surface
-// the persistence models for the private club and global tournament systems.
 package main
 
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"time"
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
+	"github.com/smithdouglas404/poker-next-gen/backend-core/match/holdem"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/models"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/protocol"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/rpc"
 )
 
-// InitModule is the entrypoint Nakama calls when loading this Go plugin.
 func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, initializer runtime.Initializer) error {
 	start := time.Now()
 
-	if err := initializer.RegisterRpc("healthz", rpcHealthz); err != nil {
+	if err := initializer.RegisterRpc("healthz", rpc.Healthz); err != nil {
 		return err
 	}
-	if err := initializer.RegisterRpc("club_create", rpcClubCreate); err != nil {
+	if err := initializer.RegisterRpc("club_create", rpc.ClubCreate); err != nil {
+		return err
+	}
+	if err := initializer.RegisterRpc("table_create", rpc.TableCreate); err != nil {
+		return err
+	}
+	if err := initializer.RegisterRpc("table_list", rpc.TableList); err != nil {
+		return err
+	}
+
+	if err := initializer.RegisterMatch(protocol.MatchModule, func(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule) (runtime.Match, error) {
+		return &holdem.Handler{}, nil
+	}); err != nil {
 		return err
 	}
 
@@ -34,41 +42,4 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		models.TournamentBracket{}, models.MultiTableBalancingRule{}, models.BlindTimer{}, models.PrizeDistributionPool{},
 	)
 	return nil
-}
-
-// rpcHealthz is a lightweight liveness probe exposed to clients and load
-// balancers via the Nakama RPC gateway.
-func rpcHealthz(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
-	resp, err := json.Marshal(map[string]any{
-		"status":  "ok",
-		"service": "backend-core",
-		"time":    time.Now().UTC().Format(time.RFC3339),
-	})
-	if err != nil {
-		return "", err
-	}
-	return string(resp), nil
-}
-
-// rpcClubCreate is a minimal example RPC demonstrating use of the Club model.
-func rpcClubCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
-	var club models.Club
-	if payload != "" {
-		if err := json.Unmarshal([]byte(payload), &club); err != nil {
-			return "", err
-		}
-	}
-	now := time.Now().UTC()
-	club.CreatedAt = now
-	club.UpdatedAt = now
-	if club.Currency == "" {
-		club.Currency = "USD"
-	}
-	club.IsActive = true
-
-	out, err := json.Marshal(club)
-	if err != nil {
-		return "", err
-	}
-	return string(out), nil
 }
