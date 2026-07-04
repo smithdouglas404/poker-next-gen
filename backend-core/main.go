@@ -55,6 +55,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"omaha_rank":           rpc.OmahaRank,
 		"omaha_showdown":       rpc.OmahaShowdown,
 		"gto_advise":           rpc.GtoAdvise,
+		"gto_solve":            rpc.GtoSolve,
 		"coaching_tip":         rpc.CoachingTip,
 		"antibot_score":        rpc.AntibotScore,
 	}
