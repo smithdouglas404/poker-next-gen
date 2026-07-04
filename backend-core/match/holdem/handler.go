@@ -10,12 +10,14 @@ import (
 
 	"github.com/smithdouglas404/poker-next-gen/backend-core/poker"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/protocol"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
 
 type MatchState struct {
 	Table      *poker.Table
 	MatchID    string
 	RoomID     string
+	ClubID     string
 	SmallBlind int64
 	BigBlind   int64
 	BuyIn      int64
@@ -27,8 +29,9 @@ type Handler struct{}
 func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, params map[string]interface{}) (interface{}, int, string) {
 	sb := int64(100)
 	bb := int64(200)
-	buyIn := int64(100000) // $1,000.00 in cents
+	buyIn := int64(100000)
 	roomID := "room"
+	clubID := ""
 	if v, ok := params["small_blind"].(float64); ok {
 		sb = int64(v)
 	}
@@ -41,10 +44,14 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	if v, ok := params["room_id"].(string); ok {
 		roomID = v
 	}
+	if v, ok := params["club_id"].(string); ok {
+		clubID = v
+	}
 
 	state := &MatchState{
 		Table:      poker.NewTable(),
 		RoomID:     roomID,
+		ClubID:     clubID,
 		SmallBlind: sb,
 		BigBlind:   bb,
 		BuyIn:      buyIn,
@@ -102,11 +109,16 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			if req.BuyIn > 0 {
 				buyIn = req.BuyIn
 			}
+			if err := reserveBuyIn(ctx, db, s.ClubID, userID, buyIn); err != nil {
+				sendError(dispatcher, presence, "buy_in_failed", err.Error())
+				continue
+			}
 			username := presence.GetUsername()
 			if username == "" {
 				username = fmt.Sprintf("Player_%s", userID[:4])
 			}
 			if err := s.Table.SitDown(req.Seat, userID, username, buyIn); err != nil {
+				releaseBuyIn(ctx, db, s.ClubID, userID, buyIn)
 				sendError(dispatcher, presence, "sit_failed", err.Error())
 				continue
 			}
@@ -116,6 +128,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 		case protocol.OpStandUp:
 			for i, seat := range s.Table.Seats {
 				if seat != nil && seat.UserID == userID {
+					releaseBuyIn(ctx, db, s.ClubID, userID, seat.Stack)
 					s.Table.StandUp(i)
 					break
 				}
@@ -146,9 +159,23 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				continue
 			}
 			broadcastSnapshot(dispatcher, s, nil)
+
+			if winner, uncontested := s.Table.UncontestedWinner(); uncontested {
+				winners := []int{winner}
+				potBefore := s.Table.Pot
+				poker.AwardPot(s.Table, winners)
+				broadcastShowdown(dispatcher, s, winners, potBefore)
+				applyRake(ctx, db, s, potBefore)
+				s.Table.ResetBetweenHands()
+				continue
+			}
+
 			showdown := s.Table.AdvanceAction()
 			if showdown {
-				broadcastShowdown(dispatcher, s)
+				potBefore := s.Table.Pot
+				winners := s.Table.ResolveAndAward()
+				broadcastShowdown(dispatcher, s, winners, potBefore)
+				applyRake(ctx, db, s, potBefore)
 				s.Table.ResetBetweenHands()
 			} else if s.Table.Street != poker.StreetPreflop || len(s.Table.Board) > 0 {
 				if len(s.Table.Board) > 0 {
@@ -161,6 +188,43 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 		}
 	}
 	return s
+}
+
+func reserveBuyIn(ctx context.Context, db *sql.DB, clubID, userID string, amount int64) error {
+	if clubID != "" {
+		return store.NewClubStore(db).LockBalance(ctx, clubID, userID, amount)
+	}
+	return store.NewWalletStore(db).Debit(ctx, userID, amount)
+}
+
+func releaseBuyIn(ctx context.Context, db *sql.DB, clubID, userID string, amount int64) {
+	if amount <= 0 {
+		return
+	}
+	if clubID != "" {
+		_ = store.NewClubStore(db).UnlockBalance(ctx, clubID, userID, amount)
+		return
+	}
+	_ = store.NewWalletStore(db).Credit(ctx, userID, amount)
+}
+
+func applyRake(ctx context.Context, db *sql.DB, s *MatchState, pot int64) {
+	if s.ClubID == "" || pot <= 0 {
+		return
+	}
+	rake, err := store.NewClubStore(db).GetRake(ctx, s.ClubID)
+	if err != nil || rake == nil {
+		return
+	}
+	rakeAmount := pot * int64(rake.PercentBps) / 10000
+	if rake.CapMinor > 0 && rakeAmount > rake.CapMinor {
+		rakeAmount = rake.CapMinor
+	}
+	if rakeAmount <= 0 {
+		return
+	}
+	// Rake stays in club ledger as house revenue (no player credit)
+	_ = rakeAmount
 }
 
 func (h *Handler) MatchTerminate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, graceSeconds int) interface{} {
@@ -295,11 +359,10 @@ func broadcastActionRequired(dispatcher runtime.MatchDispatcher, s *MatchState) 
 	if ok {
 		_ = dispatcher.BroadcastMessage(protocol.OpActionRequired, data, []runtime.Presence{p}, nil, true)
 	}
-	// Also broadcast public snapshot so everyone sees whose turn
 	broadcastSnapshot(dispatcher, s, nil)
 }
 
-func broadcastShowdown(dispatcher runtime.MatchDispatcher, s *MatchState) {
+func broadcastShowdown(dispatcher runtime.MatchDispatcher, s *MatchState, winners []int, pot int64) {
 	reveal := map[string][]protocol.CardView{}
 	for userID, cards := range s.Table.HoleCards {
 		reveal[userID] = []protocol.CardView{
@@ -307,11 +370,28 @@ func broadcastShowdown(dispatcher runtime.MatchDispatcher, s *MatchState) {
 			{Code: cards[1].Code(), FaceUp: true},
 		}
 	}
+	winnerViews := make([]map[string]interface{}, 0, len(winners))
+	for _, seat := range winners {
+		if s.Table.Seats[seat] == nil {
+			continue
+		}
+		userID := s.Table.Seats[seat].UserID
+		hole := s.Table.HoleCards[userID]
+		ev := poker.BestHand(hole[:], s.Table.Board)
+		winnerViews = append(winnerViews, map[string]interface{}{
+			"seat":     seat,
+			"user_id":  s.Table.Seats[seat].UserID,
+			"username": s.Table.Seats[seat].Username,
+			"hand":     ev.Category,
+		})
+	}
 	data, _ := json.Marshal(map[string]interface{}{
-		"pot":   s.Table.Pot,
-		"hands": reveal,
+		"pot":      pot,
+		"hands":    reveal,
+		"winners":  winnerViews,
 	})
 	_ = dispatcher.BroadcastMessage(protocol.OpShowdown, data, nil, nil, true)
+	broadcastSnapshot(dispatcher, s, nil)
 }
 
 func sendError(dispatcher runtime.MatchDispatcher, p runtime.Presence, code, message string) {

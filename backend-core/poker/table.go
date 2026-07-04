@@ -387,3 +387,32 @@ func (t *Table) ResetBetweenHands() {
 		}
 	}
 }
+
+func (t *Table) NonFoldedSeats() []int {
+	out := []int{}
+	for i, s := range t.Seats {
+		if s != nil && s.Status != SeatFolded && s.Status != SeatEmpty {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
+func (t *Table) UncontestedWinner() (int, bool) {
+	active := t.NonFoldedSeats()
+	if len(active) == 1 {
+		return active[0], true
+	}
+	return -1, false
+}
+
+func (t *Table) ResolveAndAward() []int {
+	if winner, ok := t.UncontestedWinner(); ok {
+		AwardPot(t, []int{winner})
+		return []int{winner}
+	}
+	eligible := EligibleShowdownSeats(t)
+	winners := ResolveShowdown(t.HoleCards, t.Board, eligible, t.Seats)
+	AwardPot(t, winners)
+	return winners
+}

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useGame } from "@/features/game/GameProvider";
 
 export function RoomPanel() {
-  const { createRoom, joinRoom, matchId, startHand, snapshot } = useGame();
+  const { createRoom, joinRoom, matchId, startHand, snapshot, findMatch } = useGame();
   const [joinId, setJoinId] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -33,6 +33,15 @@ export function RoomPanel() {
           className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold uppercase tracking-wider text-white hover:bg-emerald-600 disabled:opacity-50"
         >
           Create Room
+        </button>
+
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => run(() => findMatch())}
+          className="rounded-xl border border-sky-400/40 bg-sky-950/40 px-4 py-2.5 text-sm font-semibold uppercase tracking-wider text-sky-200 hover:bg-sky-900/40 disabled:opacity-50"
+        >
+          Find Match
         </button>
 
         <div className="flex gap-2">

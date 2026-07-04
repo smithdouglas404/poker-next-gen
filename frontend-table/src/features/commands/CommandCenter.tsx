@@ -6,6 +6,7 @@ import { useCallback, useMemo, useState } from "react";
 import { COMMAND_REGISTRY, commandsByCategory, getCommand } from "./commandRegistry";
 import type { CommandCategory, CommandDefinition, CommandResult } from "./types";
 import { CATEGORY_META } from "./types";
+import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 
 const CATEGORY_ORDER: CommandCategory[] = [
   "platform",
@@ -15,58 +16,63 @@ const CATEGORY_ORDER: CommandCategory[] = [
   "table",
 ];
 
+const NO_PAYLOAD_COMMANDS = new Set(["healthz", "club_list", "table_list", "tournament_list", "wallet_get", "profile_get"]);
+
 async function runLiveCommand(
   command: CommandDefinition,
   payload?: Record<string, unknown>,
 ): Promise<CommandResult> {
   const at = new Date().toISOString();
 
-  if (command.id === "healthz") {
-    const res = await fetch("/api/nakama/health", { method: "POST" });
-    const json = await res.json();
+  if (!command.rpc) {
     return {
-      ok: res.ok && json.ok,
+      ok: true,
       commandId: command.id,
-      message: res.ok && json.ok ? "Backend is online." : "Backend check failed.",
-      data: json.data ?? json.error,
+      message: `Open ${command.href} to use this command.`,
       at,
     };
   }
 
-  if (command.id === "club_create") {
-    const res = await fetch("/api/nakama/club", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload ?? command.example ?? {}),
-    });
-    const json = await res.json();
+  try {
+    let body: unknown = payload ?? command.example ?? {};
+    if (NO_PAYLOAD_COMMANDS.has(command.id)) {
+      body = {};
+    }
+
+    if (command.id === "healthz") {
+      const res = await fetch("/api/nakama/health", { method: "POST" });
+      const json = await res.json();
+      return {
+        ok: res.ok && json.ok,
+        commandId: command.id,
+        message: res.ok && json.ok ? "Backend is online." : "Backend check failed.",
+        data: json.data ?? json.error,
+        at,
+      };
+    }
+
+    const data = await callSessionRpc(command.rpc, body as Record<string, unknown>);
     return {
-      ok: res.ok && json.ok,
+      ok: true,
       commandId: command.id,
-      message: res.ok && json.ok ? "Community created (demo — not yet persisted)." : "Create community failed.",
-      data: json.data ?? json.error,
+      message: `${command.title} completed successfully.`,
+      data,
+      at,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      commandId: command.id,
+      message: error instanceof Error ? error.message : "Command failed.",
       at,
     };
   }
-
-  return {
-    ok: false,
-    commandId: command.id,
-    message: "Unknown live command.",
-    at,
-  };
 }
 
-function StatusBadge({ status }: { status: CommandDefinition["status"] }) {
+function StatusBadge() {
   return (
-    <span
-      className={
-        status === "live"
-          ? "rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-300"
-          : "rounded-full bg-neutral-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-400"
-      }
-    >
-      {status === "live" ? "Live" : "Coming Soon"}
+    <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
+      Live
     </span>
   );
 }
@@ -80,13 +86,13 @@ function CommandCard({
   busy: boolean;
   onRun: (command: CommandDefinition) => void;
 }) {
-  const isLink = Boolean(command.href);
+  const isLink = Boolean(command.href) && !command.rpc;
 
   const inner = (
     <>
       <div className="flex items-start justify-between gap-3">
         <span className="text-2xl leading-none text-amber-300/90">{command.icon}</span>
-        <StatusBadge status={command.status} />
+        <StatusBadge />
       </div>
       <h3 className="mt-4 text-base font-semibold text-white">{command.title}</h3>
       <p className="mt-2 text-sm leading-relaxed text-neutral-400">{command.description}</p>
@@ -94,7 +100,7 @@ function CommandCard({
         <p className="mt-3 font-mono text-[10px] text-emerald-400/80">rpc/{command.rpc}</p>
       )}
       <div className="mt-4 text-xs font-semibold uppercase tracking-wider text-amber-200/80">
-        {isLink ? "Open →" : command.status === "live" ? "Run Command →" : "Preview →"}
+        {isLink ? "Open →" : "Run Command →"}
       </div>
     </>
   );
@@ -130,41 +136,31 @@ export function CommandCenter() {
 
   const stats = useMemo(() => {
     const live = COMMAND_REGISTRY.filter((c) => c.status === "live").length;
-    const planned = COMMAND_REGISTRY.filter((c) => c.status === "planned").length;
-    return { live, planned, total: COMMAND_REGISTRY.length };
+    return { live, total: COMMAND_REGISTRY.length };
   }, []);
 
-  const handleRun = useCallback(async (command: CommandDefinition) => {
-    if (command.status === "planned") {
-      setActiveCommand(command);
-      setFormJson(JSON.stringify(command.example ?? {}, null, 2));
-      setResults((prev) => [
-        {
-          ok: false,
-          commandId: command.id,
-          message: `"${command.title}" is on the roadmap. Backend RPC not wired yet.`,
-          data: command.example,
-          at: new Date().toISOString(),
-        },
-        ...prev.slice(0, 9),
-      ]);
-      return;
-    }
-
-    if (command.id === "club_create") {
-      setActiveCommand(command);
-      setFormJson(JSON.stringify(command.example ?? {}, null, 2));
-      return;
-    }
-
-    setBusyId(command.id);
-    try {
-      const result = await runLiveCommand(command);
-      setResults((prev) => [result, ...prev.slice(0, 9)]);
-    } finally {
-      setBusyId(null);
-    }
+  const needsModal = useCallback((command: CommandDefinition) => {
+    return Boolean(command.rpc) && !NO_PAYLOAD_COMMANDS.has(command.id) && command.id !== "healthz";
   }, []);
+
+  const handleRun = useCallback(
+    async (command: CommandDefinition) => {
+      if (needsModal(command)) {
+        setActiveCommand(command);
+        setFormJson(JSON.stringify(command.example ?? {}, null, 2));
+        return;
+      }
+
+      setBusyId(command.id);
+      try {
+        const result = await runLiveCommand(command);
+        setResults((prev) => [result, ...prev.slice(0, 9)]);
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [needsModal],
+  );
 
   const submitModal = useCallback(async () => {
     if (!activeCommand) return;
@@ -194,29 +190,38 @@ export function CommandCenter() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white">
-      {/* Hero */}
       <header className="border-b border-white/10 bg-gradient-to-b from-emerald-950/40 to-neutral-950 px-6 py-10">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.4em] text-amber-300/80">Poker Next-Gen</p>
             <h1 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">Command Center</h1>
             <p className="mt-3 max-w-2xl text-neutral-400">
-              Every action you can run on the network — create communities, games, tournaments, and
-              open the live table canvas.
+              Every platform action — communities, wallets, cash games, tournaments, and the live table.
+              All {stats.live} commands are wired to live Nakama RPCs.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
+            <Link
+              href="/table"
+              className="rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-5 py-3 text-sm font-semibold text-emerald-200 hover:bg-emerald-900/40"
+            >
+              Open Table →
+            </Link>
+            <Link
+              href="/tournaments"
+              className="rounded-xl border border-violet-500/40 bg-violet-950/30 px-5 py-3 text-sm font-semibold text-violet-200 hover:bg-violet-900/30"
+            >
+              Tournaments →
+            </Link>
+            <Link
+              href="/admin"
+              className="rounded-xl border border-amber-500/40 bg-amber-950/20 px-5 py-3 text-sm font-semibold text-amber-200 hover:bg-amber-900/20"
+            >
+              Admin →
+            </Link>
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-4 py-3 text-center">
               <p className="text-2xl font-bold text-emerald-300">{stats.live}</p>
-              <p className="text-[10px] uppercase tracking-wider text-neutral-400">Live Now</p>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center">
-              <p className="text-2xl font-bold text-neutral-200">{stats.planned}</p>
-              <p className="text-[10px] uppercase tracking-wider text-neutral-400">Coming Soon</p>
-            </div>
-            <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 px-4 py-3 text-center">
-              <p className="text-2xl font-bold text-amber-200">{stats.total}</p>
-              <p className="text-[10px] uppercase tracking-wider text-neutral-400">Total Commands</p>
+              <p className="text-[10px] uppercase tracking-wider text-neutral-400">Live Commands</p>
             </div>
           </div>
         </div>
@@ -246,17 +251,14 @@ export function CommandCenter() {
           );
         })}
 
-        {/* Results log */}
         <section className="rounded-2xl border border-white/10 bg-black/30 p-6">
           <h2 className="text-lg font-semibold text-white">Command Log</h2>
-          <p className="mt-1 text-sm text-neutral-500">
-            Responses from live RPCs appear here. Planned commands show example payloads.
-          </p>
+          <p className="mt-1 text-sm text-neutral-500">Responses from live RPCs appear here.</p>
           <div className="mt-4 space-y-3">
             {results.length === 0 && (
               <p className="text-sm text-neutral-500">
                 Run <strong className="text-emerald-400">Check Backend Health</strong> or{" "}
-                <strong className="text-emerald-400">Create Community</strong> to get started.
+                <strong className="text-emerald-400">View Player Profile</strong> to get started.
               </p>
             )}
             {results.map((result, i) => {
@@ -287,18 +289,15 @@ export function CommandCenter() {
         </section>
       </main>
 
-      {/* Modal for club create / planned preview */}
       {activeCommand && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-neutral-900 p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs uppercase tracking-wider text-amber-300/80">
-                  {activeCommand.status === "live" ? "Run Command" : "Coming Soon"}
-                </p>
+                <p className="text-xs uppercase tracking-wider text-amber-300/80">Run Command</p>
                 <h3 className="mt-1 text-xl font-semibold">{activeCommand.title}</h3>
               </div>
-              <StatusBadge status={activeCommand.status} />
+              <StatusBadge />
             </div>
             <p className="mt-3 text-sm text-neutral-400">{activeCommand.description}</p>
 
@@ -308,22 +307,19 @@ export function CommandCenter() {
             <textarea
               value={formJson}
               onChange={(e) => setFormJson(e.target.value)}
-              readOnly={activeCommand.status === "planned"}
               rows={10}
               className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 p-3 font-mono text-xs text-emerald-100 outline-none focus:border-emerald-500/50"
             />
 
             <div className="mt-5 flex flex-wrap gap-3">
-              {activeCommand.status === "live" && activeCommand.id === "club_create" && (
-                <button
-                  type="button"
-                  disabled={busyId !== null}
-                  onClick={submitModal}
-                  className="rounded-full bg-emerald-700 px-6 py-2.5 text-sm font-semibold uppercase tracking-wider text-white hover:bg-emerald-600 disabled:opacity-50"
-                >
-                  Create Community
-                </button>
-              )}
+              <button
+                type="button"
+                disabled={busyId !== null}
+                onClick={submitModal}
+                className="rounded-full bg-emerald-700 px-6 py-2.5 text-sm font-semibold uppercase tracking-wider text-white hover:bg-emerald-600 disabled:opacity-50"
+              >
+                Run
+              </button>
               <button
                 type="button"
                 onClick={() => setActiveCommand(null)}

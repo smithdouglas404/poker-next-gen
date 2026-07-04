@@ -29,6 +29,7 @@ import {
   type TableSnapshot,
 } from "./protocol";
 import { createNakamaClient, type Session, type Socket } from "@/lib/nakama/client";
+import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 
 interface GameContextValue extends GameState {
   connect: () => Promise<void>;
@@ -38,6 +39,7 @@ interface GameContextValue extends GameState {
   standUp: () => Promise<void>;
   startHand: () => Promise<void>;
   sendAction: (type: string, amount: number) => Promise<void>;
+  findMatch: () => Promise<void>;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);
@@ -102,10 +104,24 @@ export function GameProvider({ children }: { children: ReactNode }) {
     const client = clientRef.current;
     const session = await client.authenticateDevice(deviceId(), true);
     sessionRef.current = session;
+
+    let walletCents = INITIAL_WALLET_CENTS;
+    let username = session.username ?? "Player";
+    try {
+      const profile = (await callSessionRpc("profile_get", {})) as {
+        balance_cents?: number;
+        username?: string;
+      };
+      if (profile.balance_cents !== undefined) walletCents = profile.balance_cents;
+      if (profile.username) username = profile.username;
+    } catch {
+      // fallback to defaults if RPC unavailable
+    }
+
     setProfile({
       userId: session.user_id ?? "",
-      username: session.username ?? "Player",
-      walletCents: INITIAL_WALLET_CENTS,
+      username,
+      walletCents,
     });
     const socket = client.createSocket(client.useSSL, false);
     await socket.connect(session, true);
@@ -147,8 +163,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [matchId]);
 
   const sitDown = useCallback(async (seat: number) => {
-    await sendMatch(OpSitDown, { seat, buy_in: INITIAL_WALLET_CENTS });
-  }, [sendMatch]);
+    await sendMatch(OpSitDown, { seat, buy_in: profile.walletCents || INITIAL_WALLET_CENTS });
+  }, [sendMatch, profile.walletCents]);
 
   const standUp = useCallback(async () => {
     await sendMatch(OpStandUp, {});
@@ -163,6 +179,39 @@ export function GameProvider({ children }: { children: ReactNode }) {
     await sendMatch(OpAction, { type, amount });
     setActionRequired(null);
   }, [sendMatch]);
+
+  const findMatch = useCallback(async () => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    const params = (await callSessionRpc("matchmaker_enqueue", {
+      min_players: 2,
+      max_players: 6,
+      buy_in_cents: profile.walletCents > 0 ? Math.min(profile.walletCents, INITIAL_WALLET_CENTS) : INITIAL_WALLET_CENTS,
+    })) as {
+      query?: string;
+      min_count?: number;
+      max_count?: number;
+      string_properties?: Record<string, string>;
+    };
+    const ticket = await socket.addMatchmaker(
+      params.query ?? "+properties.mode:holdem_cash_6max",
+      params.min_count ?? 2,
+      params.max_count ?? 6,
+      params.string_properties ?? { mode: "holdem_cash_6max" },
+    );
+    const ticketId = typeof ticket === "string" ? ticket : ticket.ticket;
+    socket.onmatchmakermatched = async (matched) => {
+      const matchId = matched.match_id;
+      if (matchId) {
+        await joinRoom(matchId);
+      }
+      try {
+        await socket.removeMatchmaker(ticketId);
+      } catch {
+        // ticket may already be consumed
+      }
+    };
+  }, [joinRoom, profile.walletCents]);
 
   const value = useMemo<GameContextValue>(
     () => ({
@@ -181,6 +230,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       standUp,
       startHand,
       sendAction,
+      findMatch,
     }),
     [
       connected,
@@ -198,6 +248,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       standUp,
       startHand,
       sendAction,
+      findMatch,
     ],
   );
 
