@@ -47,6 +47,7 @@ export default function TablePage() {
         preference: "webgpu",
         resizeTo: host,
         antialias: true,
+        autoStart: true,
         backgroundColor: 0x0a1712,
         backgroundAlpha: 1,
         resolution: window.devicePixelRatio || 1,
@@ -59,14 +60,21 @@ export default function TablePage() {
       }
 
       host.appendChild(app.canvas);
+      app.ticker.start();
       setBackend(app.renderer.type === RendererType.WEBGL ? "webgl" : "webgpu");
 
+      app.stage.sortableChildren = true;
+
       const tableLayer = new Container();
+      tableLayer.zIndex = 1;
+
       const cardsLayer = new Container();
+      cardsLayer.zIndex = 10;
+
       app.stage.addChild(tableLayer, cardsLayer);
 
       const renderTable = () => {
-        layout = drawTableLayer(tableLayer, app.renderer.width, app.renderer.height);
+        layout = drawTableLayer(tableLayer, app.screen.width, app.screen.height);
       };
 
       renderTable();
@@ -83,7 +91,7 @@ export default function TablePage() {
         deal: async () => {
           if (!layout || cancelDeal) return;
           setIsDealing(true);
-          const handle = runDealAnimation(app, cardsLayer, layout);
+          const handle = runDealAnimation(cardsLayer, layout);
           cancelDeal = handle.cancel;
           try {
             await handle.promise;
@@ -130,6 +138,9 @@ export default function TablePage() {
         >
           {isDealing ? "Dealing…" : "Deal"}
         </button>
+        <p className="pointer-events-none select-none text-[10px] uppercase tracking-widest text-emerald-200/50">
+          Click Deal to animate hole cards
+        </p>
         <div className="pointer-events-none select-none rounded-full bg-black/40 px-3 py-1 text-[10px] uppercase tracking-widest text-neutral-300">
           Renderer: {backend}
         </div>

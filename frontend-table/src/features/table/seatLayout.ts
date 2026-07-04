@@ -31,7 +31,7 @@ export function getSeatPositions(layout: TableLayout): SeatPosition[] {
 }
 
 export function getCardDimensions(layout: TableLayout): { width: number; height: number } {
-  const width = Math.max(36, layout.feltRx * 0.08);
+  const width = Math.max(44, layout.feltRx * 0.11);
   return { width, height: width * 1.4 };
 }
 

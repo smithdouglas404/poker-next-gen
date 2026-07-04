@@ -1,4 +1,4 @@
-import type { Application, Container, Ticker } from "pixi.js";
+import type { Container } from "pixi.js";
 
 import { createCardBack } from "./createCardBack";
 import {
@@ -9,9 +9,9 @@ import {
 } from "./seatLayout";
 import type { TableLayout } from "./tableLayout";
 
-const DEAL_DURATION_MS = 680;
-const SEAT_STAGGER_MS = 130;
-const CARD_STAGGER_MS = 70;
+const DEAL_DURATION_MS = 720;
+const SEAT_STAGGER_MS = 140;
+const CARD_STAGGER_MS = 80;
 
 function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
@@ -41,7 +41,6 @@ export interface DealAnimationHandle {
  * (Seat 1 → Seat 6) with a slight stagger between seats and cards.
  */
 export function runDealAnimation(
-  app: Application,
   cardsLayer: Container,
   layout: TableLayout,
 ): DealAnimationHandle {
@@ -50,7 +49,6 @@ export function runDealAnimation(
   const { width, height } = getCardDimensions(layout);
   const seats = getSeatPositions(layout);
   const animations: SlideAnimation[] = [];
-  const ticker: Ticker = app.ticker;
   const startedAt = performance.now();
 
   for (let seatIndex = 0; seatIndex < seats.length; seatIndex++) {
@@ -64,7 +62,8 @@ export function runDealAnimation(
 
       card.position.set(layout.cx, layout.cy);
       card.rotation = 0;
-      card.scale.set(0.35);
+      card.scale.set(0.85);
+      card.visible = true;
       cardsLayer.addChild(card);
 
       animations.push({
@@ -75,7 +74,7 @@ export function runDealAnimation(
         toY: target.y,
         fromRotation: 0,
         toRotation: target.rotation,
-        fromScale: 0.35,
+        fromScale: 0.85,
         toScale: 1,
         startMs: startedAt + cardDelay,
         durationMs: DEAL_DURATION_MS,
@@ -84,13 +83,18 @@ export function runDealAnimation(
   }
 
   let resolvePromise!: () => void;
+  let rafId = 0;
+  let cancelled = false;
+
   const promise = new Promise<void>((resolve) => {
     resolvePromise = resolve;
   });
 
-  const onTick = () => {
+  const tick = () => {
+    if (cancelled) return;
+
     const now = performance.now();
-    let allComplete = true;
+    let allComplete = animations.length === 0;
 
     for (const anim of animations) {
       const elapsed = now - anim.startMs;
@@ -114,15 +118,18 @@ export function runDealAnimation(
     }
 
     if (allComplete) {
-      ticker.remove(onTick);
       resolvePromise();
+      return;
     }
+
+    rafId = requestAnimationFrame(tick);
   };
 
-  ticker.add(onTick);
+  rafId = requestAnimationFrame(tick);
 
   const cancel = () => {
-    ticker.remove(onTick);
+    cancelled = true;
+    cancelAnimationFrame(rafId);
     cardsLayer.removeChildren();
     resolvePromise();
   };
