@@ -66,10 +66,10 @@ function downHint(id: string, error?: string): string | undefined {
   if (!refused) return undefined;
 
   if (id === "nakama") {
-    return "Start Nakama: ./scripts/live-up.sh (or docker compose up --build backend-core). Needs ports 7350–7351 and postgres :5432 free.";
+    return "Nakama container not running. Run: ./scripts/core-up.sh — then ./scripts/doctor.sh if still down. Common blocker: port 5432 already in use (compose uses host :5433 for postgres).";
   }
   if (id === "oddslingers") {
-    return "Start OddSlingers: git submodule update --init oddslingers && ./scripts/live-up.sh. First build can take several minutes; needs port 8888 free.";
+    return "OddSlingers is optional. Run: ./scripts/oddslingers-up.sh (first build ~10 min). Needs port 8888 free.";
   }
   if (id === "engine-math") {
     return "Start engine-math: docker compose up --build engine-math (or cargo run --release --bin engine-math-server in engine-math/).";
@@ -103,10 +103,12 @@ export async function GET() {
     hint: svc.ok ? undefined : downHint(svc.id, svc.error),
   }));
 
+  const coreOk = checks.filter((c) => c.id !== "oddslingers").every((c) => c.ok);
   const allOk = checks.every((c) => c.ok);
 
   return NextResponse.json({
-    ok: allOk,
+    ok: coreOk,
+    allOk,
     services: checks,
     live: {
       command_center: "http://localhost:3000",
@@ -118,9 +120,10 @@ export async function GET() {
       oddslingers: process.env.NEXT_PUBLIC_ODDSLINGERS_URL ?? "http://localhost:8888",
     },
     boot: {
-      full_stack: "./scripts/live-up.sh",
+      core: "./scripts/core-up.sh",
+      oddslingers: "./scripts/oddslingers-up.sh",
+      doctor: "./scripts/doctor.sh",
       verify: "./scripts/stack-status.sh",
-      logs: "docker compose logs backend-core oddslingers-django --tail 50",
     },
     at: new Date().toISOString(),
   });

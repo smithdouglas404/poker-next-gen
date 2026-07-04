@@ -16,11 +16,16 @@ warn() { printf "${YELLOW}!${NC} %s\n" "$1"; }
 probe() {
   local label="$1"
   local url="$2"
+  local required="${3:-1}"
   if curl -sf --max-time 5 "$url" >/dev/null 2>&1; then
     ok "$label — $url"
     return 0
   fi
-  fail "$label — $url"
+  if [[ "$required" == "1" ]]; then
+    fail "$label — $url"
+  else
+    warn "$label — $url (optional)"
+  fi
   return 1
 }
 
@@ -33,23 +38,22 @@ fi
 
 echo ""
 echo "==> HTTP probes"
-failed=0
-probe "engine-math" "http://localhost:8080/health" || failed=$((failed + 1))
-probe "Nakama" "http://localhost:7350/healthcheck" || failed=$((failed + 1))
-probe "OddSlingers" "http://localhost:8888/" || failed=$((failed + 1))
-probe "Next.js UI" "http://localhost:3000/" || failed=$((failed + 1))
+core_failed=0
+probe "engine-math" "http://localhost:8080/health" 1 || core_failed=$((core_failed + 1))
+probe "Nakama" "http://localhost:7350/healthcheck" 1 || core_failed=$((core_failed + 1))
+probe "Next.js UI" "http://localhost:3000/" 1 || core_failed=$((core_failed + 1))
+probe "OddSlingers" "http://localhost:8888/" 0 || true
 
 echo ""
-if [[ "$failed" -eq 0 ]]; then
-  ok "All services reachable"
+if [[ "$core_failed" -eq 0 ]]; then
+  ok "Core stack reachable"
   echo "  Stack dashboard: http://localhost:3000/stack"
-else
-  fail "$failed service(s) unreachable"
-  echo ""
-  echo "Common fixes:"
-  echo "  1. Boot full stack:  ./scripts/live-up.sh"
-  echo "  2. Port conflicts:   ss -tlnp | grep -E ':(5432|7350|8080|8888|3000) '"
-  echo "  3. Nakama logs:      docker compose logs backend-core --tail 50"
-  echo "  4. OddSlingers logs: docker compose logs oddslingers-django oddslingers-nginx --tail 50"
-  exit 1
+  exit 0
 fi
+
+fail "Core stack incomplete ($core_failed required service(s) down)"
+echo ""
+echo "Run from repo root:"
+echo "  ./scripts/core-up.sh"
+echo "  ./scripts/doctor.sh"
+exit 1
