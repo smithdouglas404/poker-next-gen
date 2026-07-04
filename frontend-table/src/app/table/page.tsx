@@ -87,21 +87,26 @@ export default function TablePage() {
       };
       app.renderer.on("resize", onResize);
 
-      runtimeRef.current = {
-        deal: async () => {
-          if (!layout || cancelDeal) return;
-          setIsDealing(true);
-          const handle = runDealAnimation(cardsLayer, layout);
-          cancelDeal = handle.cancel;
-          try {
-            await handle.promise;
-          } finally {
-            cancelDeal = null;
-            setIsDealing(false);
-          }
-        },
+      const dealCards = async () => {
+        if (!layout || cancelDeal) return;
+        setIsDealing(true);
+        const handle = runDealAnimation(cardsLayer, layout);
+        cancelDeal = handle.cancel;
+        try {
+          await handle.promise;
+        } finally {
+          cancelDeal = null;
+          setIsDealing(false);
+        }
       };
+
+      runtimeRef.current = { deal: dealCards };
       setReady(true);
+
+      // Auto-deal once on load so cards are visible without hunting for the button.
+      window.setTimeout(() => {
+        if (!destroyed) void dealCards();
+      }, 800);
 
       cleanup = () => {
         runtimeRef.current = null;
@@ -129,20 +134,22 @@ export default function TablePage() {
     <main className="relative h-screen w-screen overflow-hidden bg-neutral-950">
       <div ref={hostRef} className="absolute inset-0" aria-label="Poker table surface" />
 
-      <div className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-3">
+      <div className="absolute bottom-6 left-1/2 z-10 flex w-[min(92vw,28rem)] -translate-x-1/2 flex-col items-center gap-3">
         <button
           type="button"
           onClick={handleDeal}
           disabled={!ready || isDealing}
-          className="rounded-full border border-amber-400/60 bg-emerald-900/90 px-8 py-2.5 text-sm font-semibold uppercase tracking-[0.2em] text-amber-200 shadow-lg shadow-black/40 transition hover:border-amber-300 hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-full border-2 border-amber-400/70 bg-emerald-800 px-8 py-4 text-base font-bold uppercase tracking-[0.18em] text-amber-100 shadow-lg shadow-black/40 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isDealing ? "Dealing…" : "Deal"}
+          {isDealing ? "Dealing Cards…" : "Deal Again"}
         </button>
-        <p className="pointer-events-none select-none text-[10px] uppercase tracking-widest text-emerald-200/50">
-          Click Deal to animate hole cards
+        <p className="pointer-events-none select-none text-center text-xs leading-relaxed text-emerald-100/70">
+          {ready
+            ? "Cards deal automatically on load. Click Deal Again to re-deal."
+            : "Loading table… wait a moment."}
         </p>
         <div className="pointer-events-none select-none rounded-full bg-black/40 px-3 py-1 text-[10px] uppercase tracking-widest text-neutral-300">
-          Renderer: {backend}
+          Renderer: {backend} · Table v2
         </div>
       </div>
     </main>
