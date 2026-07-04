@@ -75,12 +75,6 @@ func CompareHands(a, b string) (int, error) {
 	}
 }
 
-// Available pings the engine-math sidecar.
 func Available() bool {
-	resp, err := httpClient.Get(baseURL() + "/health")
-	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-	return resp.StatusCode == http.StatusOK
+	return cachedAvailable()
 }

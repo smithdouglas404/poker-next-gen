@@ -13,7 +13,15 @@ const SEAT_POSITIONS = [
   { left: "86%", top: "72%", transform: "translate(-50%, -50%)" },
 ];
 
-function SeatCard({ seat, onSit }: { seat: SeatView; onSit: () => void }) {
+function SeatCard({
+  seat,
+  buyInLabel,
+  onSit,
+}: {
+  seat: SeatView;
+  buyInLabel: string;
+  onSit: () => void;
+}) {
   const empty = seat.status === "empty" || !seat.user_id;
 
   if (empty) {
@@ -26,6 +34,7 @@ function SeatCard({ seat, onSit }: { seat: SeatView; onSit: () => void }) {
         <span className="text-2xl leading-none">+</span>
         <span className="text-xs font-bold uppercase tracking-wider">Sit Here</span>
         <span className="text-[10px] text-neutral-500">Seat {seat.index + 1}</span>
+        <span className="text-[10px] font-medium text-emerald-400/80">{buyInLabel}</span>
       </button>
     );
   }
@@ -51,7 +60,8 @@ function SeatCard({ seat, onSit }: { seat: SeatView; onSit: () => void }) {
 }
 
 export function SeatHud() {
-  const { snapshot, sitDown, profile } = useGame();
+  const { snapshot, sitDown, profile, buyInCents } = useGame();
+  const buyInLabel = formatCents(buyInCents);
   const seats: SeatView[] =
     snapshot?.seats ??
     Array.from({ length: 6 }, (_, index) => ({ index, stack: 0, status: "empty" }));
@@ -75,7 +85,8 @@ export function SeatHud() {
               ...seat,
               is_hero: seat.index === heroSeat,
             }}
-            onSit={() => void sitDown(seat.index)}
+            buyInLabel={buyInLabel}
+            onSit={() => void sitDown(seat.index, buyInCents)}
           />
         </div>
       ))}

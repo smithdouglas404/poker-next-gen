@@ -12,6 +12,11 @@ export const OpActionRequired = 105;
 export const OpShowdown = 106;
 export const OpSeatUpdate = 107;
 export const OpError = 108;
+export const OpBlindUpdate = 109;
+
+export const MIN_BUY_IN_CENTS = 10_000;
+export const MAX_BUY_IN_CENTS = 100_000;
+export const INITIAL_WALLET_CENTS = 100_000;
 
 export interface CardView {
   code: string;
@@ -41,6 +46,7 @@ export interface TableSnapshot {
   small_blind: number;
   big_blind: number;
   hand_no: number;
+  hero_wallet_cents?: number;
 }
 
 export interface DealPrivateMessage {
@@ -58,6 +64,28 @@ export interface ActionRequiredMessage {
   deadline_tick: number;
 }
 
+export interface ShowdownMessage {
+  pot: number;
+  winners?: Array<{ seat: number; username?: string; hand?: string; pot?: number }>;
+  side_pots?: number;
+  hands?: Record<string, CardView[]>;
+}
+
+export interface TableListItem {
+  match_id: string;
+  room_id?: string;
+  label?: string;
+  seated?: number;
+  open_seats?: number;
+}
+
+export interface GameLogEntry {
+  id: string;
+  at: string;
+  message: string;
+  level: "info" | "action" | "pot" | "error";
+}
+
 export interface PlayerProfile {
   userId: string;
   username: string;
@@ -72,7 +100,10 @@ export interface GameState {
   snapshot: TableSnapshot | null;
   holeCards: CardView[];
   actionRequired: ActionRequiredMessage | null;
+  showdown: ShowdownMessage | null;
   error: string | null;
+  buyInCents: number;
+  gameLog: GameLogEntry[];
+  matchmakerSearching: boolean;
+  openTables: TableListItem[];
 }
-
-export const INITIAL_WALLET_CENTS = 100_000; // $1,000.00

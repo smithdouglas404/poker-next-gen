@@ -34,6 +34,22 @@ pub fn compare_hands(a: &str, b: &str) -> Result<std::cmp::Ordering, String> {
     Ok(rank_hand(a)?.cmp(&rank_hand(b)?))
 }
 
+const RANKS: [char; 13] = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
+const SUITS: [char; 4] = ['s', 'h', 'd', 'c'];
+
+/// Cryptographically secure 52-card deck as two-char codes (e.g. "As", "Td").
+pub fn shuffle_deck() -> Vec<String> {
+    use rand::seq::SliceRandom;
+    let mut cards: Vec<String> = Vec::with_capacity(52);
+    for &r in &RANKS {
+        for &s in &SUITS {
+            cards.push(format!("{r}{s}"));
+        }
+    }
+    cards.shuffle(&mut rand::rngs::OsRng);
+    cards
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
