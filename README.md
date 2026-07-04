@@ -42,6 +42,8 @@ oddslingers (Django + React) — live at :8888; see docs/ODDSLINGERS.md.
 
 ## Local development — Docker Compose
 
+> **Don't want Docker?** Use **[docs/RAILWAY.md](./docs/RAILWAY.md)** — deploy three services + Postgres on Railway, no Docker Desktop.
+
 Boot the **core stack** (rs_poker + Nakama + Next.js):
 
 ```bash
@@ -122,22 +124,22 @@ cargo build
 cargo test
 ```
 
-## Production deployment — Railway
+## Production / cloud — Railway
 
-Each service carries its own `railway.toml`, so create one Railway service per
-directory and set the root/config path accordingly:
+**Recommended if local Docker is fighting you.** Step-by-step: **[docs/RAILWAY.md](./docs/RAILWAY.md)**.
 
+Each service carries its own `railway.toml` (set Railway **Root Directory** to that folder):
+
+- **`engine-math/railway.toml`** — Dockerfile builder, health check `/health`.
 - **`frontend-table/railway.toml`** — NIXPACKS builder, `npm run build` /
   `npm run start`, restart `ON_FAILURE`.
 - **`backend-core/railway.toml`** — Dockerfile builder, health check
-  `/healthz`, restart `ALWAYS`. Attach a Railway PostgreSQL plugin and set
+  `/healthcheck`, restart `ALWAYS`. Attach a Railway PostgreSQL plugin and set
   `DATABASE_ADDRESS=user:password@host:port/dbname`.
 
-> **Health-check note:** the `backend-core` manifest requests `/healthz` as
-> specified. Nakama's built-in liveness endpoint is `/healthcheck`; a `healthz`
-> RPC is also registered (reachable at `/v2/rpc/healthz`). If Railway reports an
-> unhealthy deploy, point `healthcheckPath` at `/healthcheck` or expose a proxy
-> route mapping `/healthz` → the RPC.
+Env var templates: **`infra/railway/env.example`**.
+
+> **Health-check note:** Nakama's built-in liveness endpoint is `/healthcheck` (configured in `backend-core/railway.toml`). A `healthz` RPC is also registered at `/v2/rpc/healthz` for app-level checks.
 
 ## Repository layout
 
