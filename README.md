@@ -6,19 +6,16 @@ repository is a monorepo deployed on [Railway](https://railway.app) via a single
 
 ## Quick start — Railway
 
+**Copy-paste guide:** **[docs/DEPLOY.md](./docs/DEPLOY.md)** (4 commands, ~5 min)
+
 ```bash
-npm i -g @railway/cli
-railway login
-railway link
-railway config plan
-railway config apply
+npm install
+npm run railway:login    # browser opens — you authorize once
+npm run railway:link     # create or pick a project
+npm run deploy             # creates Postgres + all 3 services
 ```
 
-That creates Postgres plus `engine-math`, `backend-core`, and `frontend-table`
-with all env wiring. Full walkthrough: **[docs/RAILWAY.md](./docs/RAILWAY.md)**.
-
-After deploy, open your `frontend-table` Railway URL for the Command Center and
-`/stack` for live health checks.
+Full walkthrough: **[docs/RAILWAY.md](./docs/RAILWAY.md)**.
 
 ## Architecture
 
