@@ -24,8 +24,17 @@ func splitSQL(raw string) []string {
 	parts := strings.Split(raw, ";")
 	out := make([]string, 0, len(parts))
 	for _, part := range parts {
-		stmt := strings.TrimSpace(part)
-		if stmt == "" || strings.HasPrefix(stmt, "--") {
+		// Strip full-line SQL comments before checking if the statement is empty.
+		var lines []string
+		for _, line := range strings.Split(part, "\n") {
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "" || strings.HasPrefix(trimmed, "--") {
+				continue
+			}
+			lines = append(lines, line)
+		}
+		stmt := strings.TrimSpace(strings.Join(lines, "\n"))
+		if stmt == "" {
 			continue
 		}
 		out = append(out, stmt)
@@ -55,3 +64,4 @@ func randomUint32() uint32 {
 	lcgState = lcgState*1664525 + 1013904223
 	return lcgState
 }
+
