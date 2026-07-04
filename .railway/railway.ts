@@ -41,6 +41,11 @@ export default defineRailway(() => {
     },
     env: {
       DATABASE_ADDRESS: db.env.DATABASE_URL,
+      PGHOST: db.env.PGHOST,
+      PGPORT: db.env.PGPORT,
+      PGUSER: db.env.PGUSER,
+      PGPASSWORD: db.env.PGPASSWORD,
+      PGDATABASE: db.env.PGDATABASE,
       ENGINE_MATH_URL: "http://engine-math.railway.internal:8080",
       NAKAMA_LOG_LEVEL: "INFO",
     },
