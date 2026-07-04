@@ -7,7 +7,10 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use engine_math::{batch_rank, compare_hands, estimate_equity, rank_hand, showdown_winners, shuffle_deck};
+use engine_math::{
+    batch_rank, compare_hands, deck_commitment, estimate_equity, gto_advise, omaha_showdown_winners,
+    rank_hand, rank_omaha, showdown_winners, shuffle_deck,
+};
 use serde::{Deserialize, Serialize};
 use std::{cmp::Ordering, net::SocketAddr, sync::Arc};
 use tower_http::cors::CorsLayer;
@@ -67,12 +70,15 @@ async fn rank(Json(req): Json<RankRequest>) -> Result<Json<RankResponse>, (Statu
 #[derive(Serialize)]
 struct ShuffleResponse {
     cards: Vec<String>,
+    deck_hash: String,
     source: &'static str,
 }
 
 async fn shuffle() -> Json<ShuffleResponse> {
+    let cards = shuffle_deck();
     Json(ShuffleResponse {
-        cards: shuffle_deck(),
+        deck_hash: deck_commitment(&cards),
+        cards,
         source: "csprng_os",
     })
 }
@@ -166,6 +172,85 @@ async fn batch_rank_handler(
     Ok(Json(BatchRankResponse { categories }))
 }
 
+#[derive(Deserialize)]
+struct OmahaRankRequest {
+    hole: String,
+    board: String,
+}
+
+async fn omaha_rank(
+    Json(req): Json<OmahaRankRequest>,
+) -> Result<Json<RankResponse>, (StatusCode, String)> {
+    let rank = rank_omaha(&req.hole, &req.board).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(RankResponse {
+        category: format!("{:?}", rank.category()),
+        cards: format!("{}{}", req.hole, req.board),
+    }))
+}
+
+async fn omaha_showdown(
+    Json(req): Json<ShowdownRequest>,
+) -> Result<Json<ShowdownResponse>, (StatusCode, String)> {
+    let holes: Vec<&str> = req.holes.iter().map(String::as_str).collect();
+    let winners =
+        omaha_showdown_winners(&holes, &req.board).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    let categories: Vec<String> = holes
+        .iter()
+        .map(|h| rank_omaha(h, &req.board).map(|r| format!("{:?}", r.category())))
+        .collect::<Result<_, _>>()
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(ShowdownResponse { winners, categories }))
+}
+
+#[derive(Deserialize)]
+struct GtoAdviseRequest {
+    hero_hole: String,
+    villain_holes: Vec<String>,
+    board: String,
+    pot: f64,
+    to_call: f64,
+    #[serde(default = "default_iterations")]
+    iterations: usize,
+}
+
+async fn gto_advise_handler(
+    Json(req): Json<GtoAdviseRequest>,
+) -> Result<Json<engine_math::GtoAdvice>, (StatusCode, String)> {
+    let villains: Vec<&str> = req.villain_holes.iter().map(String::as_str).collect();
+    let advice = gto_advise(
+        &req.hero_hole,
+        &villains,
+        &req.board,
+        req.pot,
+        req.to_call,
+        req.iterations,
+    )
+    .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(advice))
+}
+
+#[derive(Deserialize)]
+struct DeckVerifyRequest {
+    cards: Vec<String>,
+    deck_hash: String,
+}
+
+#[derive(Serialize)]
+struct DeckVerifyResponse {
+    valid: bool,
+    computed_hash: String,
+}
+
+async fn deck_verify(
+    Json(req): Json<DeckVerifyRequest>,
+) -> Result<Json<DeckVerifyResponse>, (StatusCode, String)> {
+    let computed = deck_commitment(&req.cards);
+    Ok(Json(DeckVerifyResponse {
+        valid: computed == req.deck_hash,
+        computed_hash: computed,
+    }))
+}
+
 #[tokio::main]
 async fn main() {
     let state = Arc::new(AppState {
@@ -180,6 +265,10 @@ async fn main() {
         .route("/equity", post(equity))
         .route("/showdown", post(showdown))
         .route("/batch_rank", post(batch_rank_handler))
+        .route("/omaha/rank", post(omaha_rank))
+        .route("/omaha/showdown", post(omaha_showdown))
+        .route("/gto/advise", post(gto_advise_handler))
+        .route("/deck/verify", post(deck_verify))
         .layer(CorsLayer::permissive())
         .with_state(state);
 

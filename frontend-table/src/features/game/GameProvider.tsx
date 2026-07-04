@@ -113,6 +113,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
           }
           case OpHandStart:
             pushLog(`Hand #${(payload as TableSnapshot)?.hand_no ?? "?"} started`, "action");
+            const commit = (payload as TableSnapshot)?.deck_commit_hash;
+            if (commit) {
+              pushLog(`Deck commit ${commit.slice(0, 10)}…`, "info");
+            }
             setShowdown(null);
             setDealTrigger((n) => n + 1);
             break;

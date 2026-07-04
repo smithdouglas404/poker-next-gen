@@ -159,3 +159,6 @@ CREATE TABLE IF NOT EXISTS poker_audit_event (
 );
 
 CREATE INDEX IF NOT EXISTS poker_audit_event_match_hand_idx ON poker_audit_event (match_id, hand_no);
+
+ALTER TABLE poker_audit_event ADD COLUMN IF NOT EXISTS prev_hash TEXT NOT NULL DEFAULT '';
+ALTER TABLE poker_audit_event ADD COLUMN IF NOT EXISTS anchor_ref TEXT NOT NULL DEFAULT '';

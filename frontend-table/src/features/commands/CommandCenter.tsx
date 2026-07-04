@@ -13,6 +13,10 @@ const CATEGORY_ORDER: CommandCategory[] = [
   "community",
   "game",
   "tournament",
+  "math",
+  "coaching",
+  "security",
+  "audit",
   "table",
 ];
 

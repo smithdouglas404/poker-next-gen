@@ -7,6 +7,7 @@ import { SeatHud } from "@/features/hud/SeatHud";
 import { ActionBar } from "@/features/hud/ActionBar";
 import { ActionTimer } from "@/features/hud/ActionTimer";
 import { EquityPanel } from "@/features/hud/EquityPanel";
+import { HandVerifyPanel } from "@/features/hud/HandVerifyPanel";
 import { BuyInSlider, TableLog } from "@/features/hud/TableLog";
 import { usePokerKeyboard } from "@/features/hud/usePokerKeyboard";
 import { useGame } from "@/features/game/GameProvider";
@@ -27,6 +28,7 @@ export function TableHud({ children }: { children: React.ReactNode }) {
             <RoomPanel />
             <BuyInSlider />
             <EquityPanel />
+            <HandVerifyPanel />
             <TableLog />
           </div>
           <div className="relative flex-1">

@@ -47,6 +47,7 @@ export interface TableSnapshot {
   big_blind: number;
   hand_no: number;
   hero_wallet_cents?: number;
+  deck_commit_hash?: string;
 }
 
 export interface DealPrivateMessage {
