@@ -29,7 +29,13 @@ export default function LiveStackPage() {
     setBusy(true);
     try {
       const res = await fetch("/api/stack/health", { cache: "no-store" });
+      if (!res.ok) {
+        setHealth(null);
+        return;
+      }
       setHealth(await res.json());
+    } catch {
+      setHealth(null);
     } finally {
       setBusy(false);
     }
@@ -85,6 +91,11 @@ export default function LiveStackPage() {
               : "Core services down — start Docker"}
           </p>
           {health?.at && <p className="mt-1 text-xs text-neutral-500">Last check {new Date(health.at).toLocaleString()}</p>}
+          {health === null && !busy && (
+            <p className="mt-2 text-sm text-red-300">
+              Could not reach /api/stack/health — is the Next.js container running?
+            </p>
+          )}
         </section>
 
         <section className="grid gap-4 sm:grid-cols-2">

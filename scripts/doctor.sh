@@ -46,15 +46,8 @@ probe "Nakama" "http://localhost:7350/healthcheck"
 probe "OddSlingers" "http://localhost:8888/"
 probe "Next.js" "http://localhost:3000/"
 
-echo ""
-echo "==> Recent logs (if containers exist)"
-for svc in postgres backend-core oddslingers-django; do
-  if docker compose ps -a --format '{{.Name}}' 2>/dev/null | grep -q "poker-${svc//-/_}" 2>/dev/null || \
-     docker compose ps -a --format '{{.Service}}' 2>/dev/null | grep -q "$svc"; then
-    echo "--- $svc (last 15 lines) ---"
-    docker compose logs "$svc" --tail 15 2>/dev/null || true
-  fi
-done
+echo "==> Recent backend-core logs"
+docker compose logs backend-core --tail 40 2>/dev/null || true
 
 echo ""
 echo "==> Fixes"
