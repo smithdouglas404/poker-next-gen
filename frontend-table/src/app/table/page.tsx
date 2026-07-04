@@ -103,11 +103,6 @@ export default function TablePage() {
       runtimeRef.current = { deal: dealCards };
       setReady(true);
 
-      // Auto-deal once on load so cards are visible without hunting for the button.
-      window.setTimeout(() => {
-        if (!destroyed) void dealCards();
-      }, 800);
-
       cleanup = () => {
         runtimeRef.current = null;
         cancelDeal?.();
@@ -141,12 +136,10 @@ export default function TablePage() {
           disabled={!ready || isDealing}
           className="w-full rounded-full border-2 border-amber-400/70 bg-emerald-800 px-8 py-4 text-base font-bold uppercase tracking-[0.18em] text-amber-100 shadow-lg shadow-black/40 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isDealing ? "Dealing Cards…" : "Deal Again"}
+          {isDealing ? "Dealing Cards…" : "Deal Cards"}
         </button>
         <p className="pointer-events-none select-none text-center text-xs leading-relaxed text-emerald-100/70">
-          {ready
-            ? "Cards deal automatically on load. Click Deal Again to re-deal."
-            : "Loading table… wait a moment."}
+          {ready ? "Click Deal Cards to slide two hole cards to every seat." : "Loading table…"}
         </p>
         <div className="pointer-events-none select-none rounded-full bg-black/40 px-3 py-1 text-[10px] uppercase tracking-widest text-neutral-300">
           Renderer: {backend} · Table v2
