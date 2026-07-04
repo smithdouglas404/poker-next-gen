@@ -8,12 +8,14 @@ export default defineRailway(() => {
 
   const engineMath = service("engine-math", {
     source: github(REPO, { rootDirectory: "engine-math" }),
+    build: "Dockerfile",
     healthcheck: "/health",
     healthcheckTimeout: 300,
   });
 
   const backendCore = service("backend-core", {
     source: github(REPO, { rootDirectory: "backend-core" }),
+    build: "Dockerfile",
     healthcheck: "/healthcheck",
     healthcheckTimeout: 300,
     env: {
@@ -25,8 +27,6 @@ export default defineRailway(() => {
 
   const frontendTable = service("frontend-table", {
     source: github(REPO, { rootDirectory: "frontend-table" }),
-    build: "npm ci && npm run build",
-    start: "npm run start",
     healthcheck: "/",
     healthcheckTimeout: 300,
     env: {
@@ -42,3 +42,4 @@ export default defineRailway(() => {
     resources: [group("Core stack", [db, engineMath, backendCore, frontendTable])],
   });
 });
+
