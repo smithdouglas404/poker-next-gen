@@ -1,0 +1,102 @@
+# OddSlingers live stack — merged with root docker-compose.yml
+# Full platform: Django + Redis + Postgres + webpack watcher + nginx
+
+services:
+  oddslingers-postgres:
+    image: postgres:12-alpine
+    container_name: poker-oddslingers-postgres
+    environment:
+      POSTGRES_DB: oddslingers
+      POSTGRES_USER: oddslingers
+      POSTGRES_PASSWORD: localodds
+    volumes:
+      - oddslingers-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oddslingers -d oddslingers"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - poker-net
+
+  oddslingers-redis:
+    image: redis:5-alpine
+    container_name: poker-oddslingers-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - oddslingers-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - poker-net
+
+  oddslingers-django:
+    build:
+      context: ./oddslingers
+      dockerfile: Dockerfile
+    image: poker-oddslingers:django
+    container_name: poker-oddslingers-django
+    working_dir: /opt/oddslingers.poker/core/
+    command: >
+      sh -c "./manage.py migrate --noinput &&
+             ./manage.py runserver --http_timeout 120 0.0.0.0:8000"
+    depends_on:
+      oddslingers-postgres:
+        condition: service_healthy
+      oddslingers-redis:
+        condition: service_healthy
+    environment:
+      ODDSLINGERS_ENV: DEV
+      IS_DOCKER: 1
+      POSTGRES_HOST: oddslingers-postgres
+      REDIS_HOST: oddslingers-redis
+    env_file:
+      - ./oddslingers/.env
+      - ./infra/oddslingers/compose.env
+      - ./infra/oddslingers/compose.secrets.env
+    volumes:
+      - ./oddslingers/data:/opt/oddslingers.poker/data
+      - ./oddslingers/core:/opt/oddslingers.poker/core
+      - ./oddslingers/bin:/opt/oddslingers.poker/bin
+    expose:
+      - "8000"
+    networks:
+      - poker-net
+
+  oddslingers-webpack:
+    build:
+      context: ./oddslingers
+      dockerfile: Dockerfile.webpack
+    image: poker-oddslingers:webpack
+    container_name: poker-oddslingers-webpack
+    command: >
+      sh -c "(webpack --mode development --watch --info-verbosity verbose &
+              saas --watch scss/ -o ../static/css 2>&1 &)| cat"
+    environment:
+      ODDSLINGERS_ENV: DEV
+    volumes:
+      - ./oddslingers/core/js:/opt/oddslingers.poker/core/js
+      - ./oddslingers/core/static:/opt/oddslingers.poker/core/static
+      - ./oddslingers/core/js/node_modules:/src/node_modules
+    networks:
+      - poker-net
+
+  oddslingers-nginx:
+    image: nginx:alpine
+    container_name: poker-oddslingers-nginx
+    depends_on:
+      - oddslingers-django
+    ports:
+      - "8888:80"
+    volumes:
+      - ./infra/oddslingers/nginx-poker-next-gen.conf:/etc/nginx/nginx.conf:ro
+      - ./oddslingers/core:/opt/oddslingers.poker/core:ro
+    networks:
+      - poker-net
+
+volumes:
+  oddslingers-postgres-data:
+  oddslingers-redis-data:

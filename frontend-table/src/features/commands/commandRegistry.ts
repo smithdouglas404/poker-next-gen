@@ -13,6 +13,15 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
     icon: "◉",
   },
   {
+    id: "stack_health",
+    title: "Live Stack Health",
+    description: "Check Nakama, rs_poker engine-math, and OddSlingers in one request.",
+    category: "platform",
+    status: "live",
+    href: "/stack",
+    icon: "⬡",
+  },
+  {
     id: "auth_sign_in",
     title: "Sign In / Create Account",
     description: "Authenticate with Nakama using device credentials (auto on first visit).",
