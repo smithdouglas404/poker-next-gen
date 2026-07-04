@@ -1,0 +1,49 @@
+# ---- Node.js / Next.js ----
+node_modules/
+.next/
+out/
+build/
+dist/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ---- Go ----
+# Compiled binaries and build targets
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+backend-core/backend-core
+backend-core/server
+
+# ---- Rust ----
+target/
+**/*.rs.bk
+Cargo.lock.orig
+
+# ---- Environment / secrets ----
+.env
+.env.*
+!.env.example
+*.local
+
+# ---- Editor / OS ----
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db
+
+# ---- Docker / data volumes ----
+data/
+postgres-data/
