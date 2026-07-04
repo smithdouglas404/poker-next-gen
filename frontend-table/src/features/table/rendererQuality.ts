@@ -10,8 +10,8 @@ export function getCanvasResolution(): number {
   const inEmbeddedPreview = window.self !== window.top;
 
   if (inEmbeddedPreview) {
-    // Boost sharpness inside iframe previews without going overboard.
-    return Math.min(Math.max(dpr, 2), 3);
+    // Replit/CodeSandbox iframes often report DPR 1 — render at 2x minimum.
+    return Math.min(Math.max(dpr, 2.5), 3);
   }
 
   // Cap native DPR to keep performance reasonable on 3x mobile screens.
