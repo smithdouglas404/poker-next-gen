@@ -1,27 +1,10 @@
 import { Session } from "@heroiclabs/nakama-js";
 
-import { authenticateDevice, createNakamaClient } from "./client";
-
-function deviceId(): string {
-  if (typeof window === "undefined") return "ssr";
-  const key = "png-device-id";
-  let id = localStorage.getItem(key);
-  if (!id) {
-    id = `dev-${Math.random().toString(36).slice(2, 10)}`;
-    localStorage.setItem(key, id);
-  }
-  return id;
-}
-
-let sessionCache: Session | null = null;
+import { ensureSession as ensureAuthSession } from "./auth";
+import { createNakamaClient } from "./client";
 
 export async function ensureNakamaSession(): Promise<Session> {
-  if (sessionCache && !sessionCache.isexpired(Date.now() / 1000)) {
-    return sessionCache;
-  }
-  const client = createNakamaClient();
-  sessionCache = await authenticateDevice(client, deviceId());
-  return sessionCache;
+  return ensureAuthSession();
 }
 
 export async function callSessionRpc(rpcId: string, payload: Record<string, unknown> = {}): Promise<unknown> {
@@ -40,5 +23,12 @@ export async function callSessionRpc(rpcId: string, payload: Record<string, unkn
 }
 
 export function getSessionToken(): string | null {
-  return sessionCache?.token ?? null;
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem("png-nakama-session");
+  if (!raw) return null;
+  try {
+    return (JSON.parse(raw) as { token: string }).token;
+  } catch {
+    return null;
+  }
 }

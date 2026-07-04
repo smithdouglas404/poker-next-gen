@@ -9,6 +9,7 @@ import (
 	"github.com/heroiclabs/nakama-common/runtime"
 
 	"github.com/smithdouglas404/poker-next-gen/backend-core/match/holdem"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/match/tournament"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/models"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/protocol"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/rpc"
@@ -32,11 +33,13 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"balance_get":          rpc.BalanceGet,
 		"rake_config_set":      rpc.RakeConfigSet,
 		"rake_config_get":      rpc.RakeConfigGet,
+		"rake_ledger_get":      rpc.RakeLedgerGet,
 		"table_create":         rpc.TableCreate,
 		"table_list":           rpc.TableList,
 		"tournament_create":    rpc.TournamentCreate,
 		"tournament_list":      rpc.TournamentList,
 		"tournament_register":  rpc.TournamentRegister,
+		"tournament_start":     rpc.TournamentStart,
 		"blind_level_add":      rpc.BlindLevelAdd,
 		"blind_level_list":     rpc.BlindLevelList,
 		"prize_pool_add":       rpc.PrizePoolAdd,
@@ -58,11 +61,17 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		return err
 	}
 
+	if err := initializer.RegisterMatch(protocol.TournamentModule, func(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule) (runtime.Match, error) {
+		return &tournament.Handler{}, nil
+	}); err != nil {
+		return err
+	}
+
 	if err := initializer.RegisterMatchmakerMatched(onMatchmakerMatched); err != nil {
 		return err
 	}
 
-	logger.Info("poker-next-gen backend-core loaded in %s", time.Since(start))
+	logger.Info("poker-next-gen backend-core loaded in %s (engine-math/rs_poker sidecar expected)", time.Since(start))
 	logger.Info(
 		"registered schemas: clubs=%T owners=%T balances=%T rake=%T brackets=%T balancing=%T blinds=%T prizes=%T",
 		models.Club{}, models.Owner{}, models.PlayerAllocatedBalance{}, models.CustomRakeConfiguration{},

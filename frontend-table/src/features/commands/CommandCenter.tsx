@@ -214,6 +214,12 @@ export function CommandCenter() {
               Tournaments →
             </Link>
             <Link
+              href="/login"
+              className="rounded-xl border border-sky-500/40 bg-sky-950/30 px-5 py-3 text-sm font-semibold text-sky-200 hover:bg-sky-900/30"
+            >
+              Sign In →
+            </Link>
+            <Link
               href="/admin"
               className="rounded-xl border border-amber-500/40 bg-amber-950/20 px-5 py-3 text-sm font-semibold text-amber-200 hover:bg-amber-900/20"
             >

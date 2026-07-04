@@ -115,3 +115,33 @@ CREATE TABLE IF NOT EXISTS poker_global_wallet (
 CREATE INDEX IF NOT EXISTS idx_poker_owner_club ON poker_owner(club_id);
 CREATE INDEX IF NOT EXISTS idx_poker_balance_club_user ON poker_player_balance(club_id, user_id);
 CREATE INDEX IF NOT EXISTS idx_poker_tournament_status ON poker_tournament(status);
+
+CREATE TABLE IF NOT EXISTS poker_club_house_balance (
+    club_id TEXT PRIMARY KEY REFERENCES poker_club(id) ON DELETE CASCADE,
+    balance BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS poker_rake_ledger (
+    id TEXT PRIMARY KEY,
+    club_id TEXT NOT NULL REFERENCES poker_club(id) ON DELETE CASCADE,
+    amount BIGINT NOT NULL,
+    match_id TEXT NOT NULL DEFAULT '',
+    hand_no INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS poker_tournament_table (
+    id TEXT PRIMARY KEY,
+    tournament_id TEXT NOT NULL REFERENCES poker_tournament(id) ON DELETE CASCADE,
+    match_id TEXT NOT NULL,
+    seated_count INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS director_match_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS current_level INT NOT NULL DEFAULT 0;
+ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS level_started_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+ALTER TABLE poker_tournament_registration ADD COLUMN IF NOT EXISTS match_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE poker_tournament_registration ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();

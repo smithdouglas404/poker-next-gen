@@ -146,3 +146,26 @@ func RakeConfigGet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 	out, _ := json.Marshal(rake)
 	return string(out), nil
 }
+
+func RakeLedgerGet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	var req struct {
+		ClubID string `json:"club_id"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil {
+		return "", runtime.NewError("invalid payload", 3)
+	}
+	rakeStore := store.NewRakeStore(db)
+	balance, err := rakeStore.HouseBalance(ctx, req.ClubID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	ledger, err := rakeStore.Ledger(ctx, req.ClubID, 50)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	out, _ := json.Marshal(map[string]interface{}{
+		"house_balance": balance,
+		"ledger":        ledger,
+	})
+	return string(out), nil
+}

@@ -3,5 +3,18 @@ name = "engine-math"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "engine_math"
+path = "src/lib.rs"
+
+[[bin]]
+name = "engine-math-server"
+path = "src/server.rs"
+
 [dependencies]
 rs_poker = "5.0.0"
+axum = "0.7"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tower-http = { version = "0.5", features = ["cors"] }

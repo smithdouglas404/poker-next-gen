@@ -57,6 +57,25 @@ export default function TournamentsPage() {
     }
   }, []);
 
+  const startTournament = useCallback(async (id: string) => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const result = (await callSessionRpc("tournament_start", { tournament_id: id })) as {
+        table_match_ids?: string[];
+        director_match_id?: string;
+      };
+      setMessage(
+        `Tournament started! ${result.table_match_ids?.length ?? 0} tables · director ${result.director_match_id ?? ""}`,
+      );
+      await loadTournaments();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Start failed");
+    } finally {
+      setBusy(false);
+    }
+  }, [loadTournaments]);
+
   const register = useCallback(async (id: string) => {
     setBusy(true);
     setMessage(null);
@@ -130,16 +149,28 @@ export default function TournamentsPage() {
                       {t.starting_stack.toLocaleString()} · {t.status}
                     </p>
                   </button>
+                  <div className="flex gap-2">
                   {t.status === "registering" && (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void register(t.id)}
-                      className="rounded-full bg-violet-700 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider hover:bg-violet-600 disabled:opacity-50"
-                    >
-                      Register
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void register(t.id)}
+                        className="rounded-full bg-violet-700 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider hover:bg-violet-600 disabled:opacity-50"
+                      >
+                        Register
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void startTournament(t.id)}
+                        className="rounded-full border border-emerald-400/50 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-200 hover:bg-emerald-950/40 disabled:opacity-50"
+                      >
+                        Start MTT
+                      </button>
+                    </>
                   )}
+                  </div>
                 </div>
               </div>
             ))}

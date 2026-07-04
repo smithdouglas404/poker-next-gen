@@ -19,11 +19,14 @@ const (
 	OpShowdown        int64 = 106
 	OpSeatUpdate      int64 = 107
 	OpError           int64 = 108
+	OpBlindUpdate     int64 = 109
+	OpTournamentInfo  int64 = 110
 )
 
 const (
-	MatchModule = "holdem_cash_6max"
-	MaxSeats    = 6
+	MatchModule           = "holdem_cash_6max"
+	TournamentModule      = "tournament_director"
+	MaxSeats              = 6
 )
 
 const (

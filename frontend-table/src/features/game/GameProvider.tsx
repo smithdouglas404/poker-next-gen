@@ -28,6 +28,7 @@ import {
   type GameState,
   type TableSnapshot,
 } from "./protocol";
+import { ensureSession } from "@/lib/nakama/auth";
 import { createNakamaClient, type Session, type Socket } from "@/lib/nakama/client";
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 
@@ -102,7 +103,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const connect = useCallback(async () => {
     const client = clientRef.current;
-    const session = await client.authenticateDevice(deviceId(), true);
+    const session = await ensureSession();
     sessionRef.current = session;
 
     let walletCents = INITIAL_WALLET_CENTS;

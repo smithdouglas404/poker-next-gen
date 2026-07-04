@@ -45,13 +45,14 @@ const (
 )
 
 type Seat struct {
-	Index      int
-	UserID     string
-	Username   string
-	Stack      int64
-	Bet        int64
-	Status     SeatStatus
-	LastAction string
+	Index            int
+	UserID           string
+	Username         string
+	Stack            int64
+	Bet              int64
+	TotalContributed int64
+	Status           SeatStatus
+	LastAction       string
 }
 
 type Street string
@@ -163,6 +164,16 @@ func (t *Table) StartHand(sb, bb int64) {
 	t.ActionSeat = t.nextActiveSeat(bbSeat)
 }
 
+func (t *Table) addContribution(seat int, amount int64) {
+	if amount <= 0 {
+		return
+	}
+	t.Pot += amount
+	if t.Seats[seat] != nil {
+		t.Seats[seat].TotalContributed += amount
+	}
+}
+
 func (t *Table) postBlind(seat int, amount int64, label string) {
 	s := t.Seats[seat]
 	if s == nil {
@@ -174,7 +185,7 @@ func (t *Table) postBlind(seat int, amount int64, label string) {
 	}
 	s.Stack -= pay
 	s.Bet = pay
-	t.Pot += pay
+	t.addContribution(seat, pay)
 	s.LastAction = label
 }
 
@@ -247,7 +258,7 @@ func (t *Table) ApplyAction(seat int, action string, amount int64) error {
 		}
 		s.Stack -= pay
 		s.Bet += pay
-		t.Pot += pay
+		t.addContribution(seat, pay)
 		s.LastAction = "call"
 		if s.Stack == 0 {
 			s.Status = SeatAllIn
@@ -265,12 +276,12 @@ func (t *Table) ApplyAction(seat int, action string, amount int64) error {
 		}
 		add := amount - s.Bet
 		s.Stack -= add
-		t.Pot += add
+		s.Bet = amount
+		t.addContribution(seat, add)
 		if amount > t.CurrentBet {
 			t.MinRaise = amount - t.CurrentBet
 			t.CurrentBet = amount
 		}
-		s.Bet = amount
 		s.LastAction = action
 		if s.Stack == 0 {
 			s.Status = SeatAllIn
@@ -382,6 +393,7 @@ func (t *Table) ResetBetweenHands() {
 	for _, s := range t.Seats {
 		if s != nil {
 			s.Bet = 0
+			s.TotalContributed = 0
 			s.Status = SeatSeated
 			s.LastAction = ""
 		}
@@ -406,13 +418,7 @@ func (t *Table) UncontestedWinner() (int, bool) {
 	return -1, false
 }
 
-func (t *Table) ResolveAndAward() []int {
-	if winner, ok := t.UncontestedWinner(); ok {
-		AwardPot(t, []int{winner})
-		return []int{winner}
-	}
-	eligible := EligibleShowdownSeats(t)
-	winners := ResolveShowdown(t.HoleCards, t.Board, eligible, t.Seats)
-	AwardPot(t, winners)
+func (t *Table) ResolveAndAward() [][]int {
+	winners, _ := AwardSidePots(t)
 	return winners
 }

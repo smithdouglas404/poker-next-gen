@@ -8,6 +8,7 @@ import (
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
+	"github.com/smithdouglas404/poker-next-gen/backend-core/match/tournament"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/models"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
@@ -173,5 +174,27 @@ func BalancingRuleSet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	out, _ := json.Marshal(req)
+	return string(out), nil
+}
+
+func TournamentStart(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	var req struct {
+		TournamentID string `json:"tournament_id"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil {
+		return "", runtime.NewError("invalid payload", 3)
+	}
+	if req.TournamentID == "" {
+		return "", runtime.NewError("tournament_id required", 3)
+	}
+	directorID, tables, err := tournament.StartTournament(ctx, nk, db, req.TournamentID)
+	if err != nil {
+		return "", err
+	}
+	out, _ := json.Marshal(map[string]interface{}{
+		"director_match_id": directorID,
+		"table_match_ids":   tables,
+		"status":            "running",
+	})
 	return string(out), nil
 }

@@ -175,3 +175,132 @@ func (s *TournamentStore) SetBalancingRule(ctx context.Context, r *models.MultiT
 		r.ID, r.TournamentID, r.MaxSeatDifference, r.BreakTableAtOrBelow, r.Strategy, r.CreatedAt)
 	return err
 }
+
+type TournamentPlayer struct {
+	UserID   string
+	Username string
+	Stack    int64
+	MatchID  string
+	Status   string
+}
+
+func (s *TournamentStore) ListRegistered(ctx context.Context, tournamentID string) ([]TournamentPlayer, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT user_id, username, stack, COALESCE(match_id,''), status
+		FROM poker_tournament_registration WHERE tournament_id=$1 AND status IN ('registered','playing')`,
+		tournamentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []TournamentPlayer
+	for rows.Next() {
+		var p TournamentPlayer
+		if err := rows.Scan(&p.UserID, &p.Username, &p.Stack, &p.MatchID, &p.Status); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+func (s *TournamentStore) SetDirectorMatch(ctx context.Context, tournamentID, directorMatchID string) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE poker_tournament SET director_match_id=$2, status='running', current_level=1, level_started_at=NOW(), updated_at=NOW()
+		WHERE id=$1`, tournamentID, directorMatchID)
+	return err
+}
+
+func (s *TournamentStore) AddTableMatch(ctx context.Context, tournamentID, matchID string) error {
+	id := NewID("ttbl")
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO poker_tournament_table (id, tournament_id, match_id, seated_count, created_at)
+		VALUES ($1, $2, $3, 0, NOW())`, id, tournamentID, matchID)
+	return err
+}
+
+func (s *TournamentStore) ListTableMatches(ctx context.Context, tournamentID string) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT match_id FROM poker_tournament_table WHERE tournament_id=$1`, tournamentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
+func (s *TournamentStore) AssignPlayerTable(ctx context.Context, tournamentID, userID, matchID string) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE poker_tournament_registration SET match_id=$3, status='playing', updated_at=NOW()
+		WHERE tournament_id=$1 AND user_id=$2`, tournamentID, userID, matchID)
+	return err
+}
+
+func (s *TournamentStore) MarkBusted(ctx context.Context, tournamentID, userID string) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE poker_tournament_registration SET status='busted', stack=0, updated_at=NOW()
+		WHERE tournament_id=$1 AND user_id=$2 AND status='playing'`, tournamentID, userID)
+	return err
+}
+
+func (s *TournamentStore) UpdatePlayerStack(ctx context.Context, tournamentID, userID string, stack int64) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE poker_tournament_registration SET stack=$3, updated_at=NOW()
+		WHERE tournament_id=$1 AND user_id=$2`, tournamentID, userID, stack)
+	return err
+}
+
+func (s *TournamentStore) CountPlaying(ctx context.Context, tournamentID string) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM poker_tournament_registration WHERE tournament_id=$1 AND status='playing'`, tournamentID).Scan(&n)
+	return n, err
+}
+
+func (s *TournamentStore) GetRuntime(ctx context.Context, tournamentID string) (currentLevel int, levelStarted time.Time, err error) {
+	err = s.db.QueryRowContext(ctx, `
+		SELECT COALESCE(current_level,1), COALESCE(level_started_at,NOW())
+		FROM poker_tournament WHERE id=$1`, tournamentID).Scan(&currentLevel, &levelStarted)
+	return
+}
+
+func (s *TournamentStore) AdvanceLevel(ctx context.Context, tournamentID string, level int) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE poker_tournament SET current_level=$2, level_started_at=NOW(), updated_at=NOW()
+		WHERE id=$1`, tournamentID, level)
+	return err
+}
+
+func (s *TournamentStore) Finish(ctx context.Context, tournamentID string) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE poker_tournament SET status='finished', updated_at=NOW() WHERE id=$1`, tournamentID)
+	return err
+}
+
+func (s *TournamentStore) GetBalancingRule(ctx context.Context, tournamentID string) (*models.MultiTableBalancingRule, error) {
+	var r models.MultiTableBalancingRule
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id,tournament_id,max_seat_difference,break_table_at_or_below,strategy,created_at
+		FROM poker_balance_rule WHERE tournament_id=$1 ORDER BY created_at DESC LIMIT 1`, tournamentID).
+		Scan(&r.ID, &r.TournamentID, &r.MaxSeatDifference, &r.BreakTableAtOrBelow, &r.Strategy, &r.CreatedAt)
+	if err == sql.ErrNoRows {
+		return &models.MultiTableBalancingRule{MaxSeatDifference: 1, BreakTableAtOrBelow: 2, Strategy: "balanced"}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+func (s *TournamentStore) PayWinner(ctx context.Context, tournamentID, userID string, amount int64) error {
+	w := NewWalletStore(s.db)
+	return w.Credit(ctx, userID, amount)
+}
