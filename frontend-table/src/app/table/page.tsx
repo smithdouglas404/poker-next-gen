@@ -5,19 +5,27 @@
  *
  * A responsive, React-wrapped <canvas> driven by Pixi.js v8. The renderer
  * prefers the WebGPU backend (falling back to WebGL) and paints a stylized,
- * deep-green vector elliptical poker table with a gold inner border, layout
- * boundaries, six symmetric player-seat placeholders, and a center dev banner.
+ * deep-green vector elliptical poker table with deal animations for hole cards.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { drawTableScene } from "@/features/table/drawTableScene";
+import { runDealAnimation } from "@/features/table/dealAnimation";
+import { drawTableLayer } from "@/features/table/drawTableScene";
+import type { TableLayout } from "@/features/table/tableLayout";
 
 type Backend = "webgpu" | "webgl" | "unknown";
 
+interface TableRuntime {
+  deal: () => Promise<void>;
+}
+
 export default function TablePage() {
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const runtimeRef = useRef<TableRuntime | null>(null);
   const [backend, setBackend] = useState<Backend>("unknown");
+  const [ready, setReady] = useState(false);
+  const [isDealing, setIsDealing] = useState(false);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -25,6 +33,8 @@ export default function TablePage() {
 
     let destroyed = false;
     let cleanup: (() => void) | null = null;
+    let cancelDeal: (() => void) | null = null;
+    let layout: TableLayout | null = null;
 
     (async () => {
       const PIXI = await import("pixi.js");
@@ -37,6 +47,7 @@ export default function TablePage() {
         preference: "webgpu",
         resizeTo: host,
         antialias: true,
+        autoStart: true,
         backgroundColor: 0x0a1712,
         backgroundAlpha: 1,
         resolution: window.devicePixelRatio || 1,
@@ -49,20 +60,52 @@ export default function TablePage() {
       }
 
       host.appendChild(app.canvas);
+      app.ticker.start();
       setBackend(app.renderer.type === RendererType.WEBGL ? "webgl" : "webgpu");
 
-      const stage = new Container();
-      app.stage.addChild(stage);
+      app.stage.sortableChildren = true;
 
-      const render = () => {
-        drawTableScene(stage, app.renderer.width, app.renderer.height);
+      const tableLayer = new Container();
+      tableLayer.zIndex = 1;
+
+      const cardsLayer = new Container();
+      cardsLayer.zIndex = 10;
+
+      app.stage.addChild(tableLayer, cardsLayer);
+
+      const renderTable = () => {
+        layout = drawTableLayer(tableLayer, app.screen.width, app.screen.height);
       };
 
-      render();
-      const onResize = () => render();
+      renderTable();
+      const onResize = () => {
+        cancelDeal?.();
+        cancelDeal = null;
+        cardsLayer.removeChildren();
+        setIsDealing(false);
+        renderTable();
+      };
       app.renderer.on("resize", onResize);
 
+      runtimeRef.current = {
+        deal: async () => {
+          if (!layout || cancelDeal) return;
+          setIsDealing(true);
+          const handle = runDealAnimation(cardsLayer, layout);
+          cancelDeal = handle.cancel;
+          try {
+            await handle.promise;
+          } finally {
+            cancelDeal = null;
+            setIsDealing(false);
+          }
+        },
+      };
+      setReady(true);
+
       cleanup = () => {
+        runtimeRef.current = null;
+        cancelDeal?.();
         app.renderer.off("resize", onResize);
         app.destroy(true, { children: true });
         if (app.canvas.parentNode) app.canvas.parentNode.removeChild(app.canvas);
@@ -71,15 +114,36 @@ export default function TablePage() {
 
     return () => {
       destroyed = true;
+      setReady(false);
+      runtimeRef.current = null;
       if (cleanup) cleanup();
     };
   }, []);
 
+  const handleDeal = useCallback(async () => {
+    if (!ready || isDealing) return;
+    await runtimeRef.current?.deal();
+  }, [isDealing, ready]);
+
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-neutral-950">
       <div ref={hostRef} className="absolute inset-0" aria-label="Poker table surface" />
-      <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 select-none rounded-full bg-black/40 px-3 py-1 text-[10px] uppercase tracking-widest text-neutral-300">
-        Renderer: {backend}
+
+      <div className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-3">
+        <button
+          type="button"
+          onClick={handleDeal}
+          disabled={!ready || isDealing}
+          className="rounded-full border border-amber-400/60 bg-emerald-900/90 px-8 py-2.5 text-sm font-semibold uppercase tracking-[0.2em] text-amber-200 shadow-lg shadow-black/40 transition hover:border-amber-300 hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isDealing ? "Dealing…" : "Deal"}
+        </button>
+        <p className="pointer-events-none select-none text-[10px] uppercase tracking-widest text-emerald-200/50">
+          Click Deal to animate hole cards
+        </p>
+        <div className="pointer-events-none select-none rounded-full bg-black/40 px-3 py-1 text-[10px] uppercase tracking-widest text-neutral-300">
+          Renderer: {backend}
+        </div>
       </div>
     </main>
   );
