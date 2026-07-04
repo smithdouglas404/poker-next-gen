@@ -20,8 +20,8 @@ Railway**. Three first-class services live in their own top-level directories:
    The pairing is pinned to **Nakama 3.31.0 ⇄ nakama-common v1.41.0** in both
    `backend-core/go.mod` and `backend-core/Dockerfile`. Bump them together.
 2. **Keep the two run targets in sync.** Local dev = `docker-compose.yml`.
-   Production = per-service `railway.json`. A change to build/start behavior
-   usually needs updating in both.
+   Production = `.railway/railway.ts` (`railway config apply`). A change to build/start
+   behavior usually needs updating in both.
 3. **Frontend rendering is client-only.** Pixi.js touches WebGPU/WebGL and must
    never be imported during SSR. `src/app/table/page.tsx` is a `"use client"`
    component that lazily `import()`s Pixi inside a `useEffect`.

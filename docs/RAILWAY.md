@@ -1,57 +1,51 @@
-# Deploy on Railway (config synced in repo)
+# Deploy on Railway (one config file)
 
-Skip local Docker. This repo contains everything Railway needs:
+Skip local Docker. The **entire stack** is defined in a single file:
 
-| Path | Purpose |
-|------|---------|
-| `.railway/railway.ts` | **Full project** — Postgres + 3 services + env wiring (`railway config apply`) |
-| `engine-math/railway.json` | Per-service build/deploy for Rust sidecar |
-| `backend-core/railway.json` | Per-service build/deploy for Nakama |
-| `frontend-table/railway.json` | Per-service build/deploy for Next.js UI |
-| `infra/railway/env.example` | Reference variables for manual wiring |
-| `.railway/README.md` | Choose Option A (IaC) vs Option B (JSON config) |
+```
+.railway/railway.ts
+```
 
-## Important: how Railway reads config
+That file creates Postgres plus `engine-math`, `backend-core`, and `frontend-table`, including build commands, healthchecks, and environment variables.
 
-- **One config file = one service.** Attaching the repo once does not auto-create all services.
-- **Config file path must be absolute** from repo root, e.g. `/backend-core/railway.json` — it does **not** follow Root Directory.
-- **`.railway/railway.ts` is NOT a config-as-code path** — only for `railway config apply` CLI.
+## Why not one `railway.json`?
 
-## Option A — One command project setup (recommended)
+Railway’s [Config as Code](https://docs.railway.com/config-as-code) (`railway.json`) applies to **one service at a time**. A multi-service monorepo needs [Infrastructure as Code](https://docs.railway.com/infrastructure-as-code) (`.railway/railway.ts`).
+
+| Feature | Scope | File |
+|---------|-------|------|
+| Config as Code | One service | `*/railway.json` |
+| **Infrastructure as Code** | **Whole project** | **`.railway/railway.ts`** |
+
+> TypeScript is currently the only supported language for whole-project config.
+
+## Setup (recommended)
 
 ```bash
+npm i -g @railway/cli
 railway login
 railway link
 railway config plan
 railway config apply
 ```
 
-This reads `.railway/railway.ts` and creates:
+1. `railway link` — connect this repo directory to a Railway project and environment.
+2. `railway config plan` — preview what will be created or changed.
+3. `railway config apply` — apply after confirming the plan.
 
-- PostgreSQL
-- `engine-math` (Dockerfile, `/health`)
-- `backend-core` (Dockerfile, `/healthcheck`, DB + engine-math URLs)
-- `frontend-table` (Railpack, `/`, public Nakama URL for browser)
+After apply, Railway deploys from GitHub using each service’s `rootDirectory` (`engine-math`, `backend-core`, `frontend-table`).
 
-Do **not** set Config File paths in the dashboard when using IaC.
+**Do not** set “Config-as-code file path” on individual services in the dashboard. IaC owns those settings.
 
-## Option B — Attach repo per service (railway.json)
+## Already have services on Railway?
 
-For each service in Railway:
+If services were previously managed by per-service `railway.json` files:
 
-1. **Root Directory** → service folder (`engine-math`, `backend-core`, or `frontend-table`)
-2. **Config-as-code file path** → absolute path (must start with `/`):
-
-   | Service | Config file path |
-   |---------|------------------|
-   | engine-math | `/engine-math/railway.json` |
-   | backend-core | `/backend-core/railway.json` |
-   | frontend-table | `/frontend-table/railway.json` |
-
-3. Add **PostgreSQL** plugin to the project
-4. Paste variables from `infra/railway/env.example` (use Railway reference syntax `${{Service.VAR}}`)
-
-Do **not** run `railway config apply` if using Option B.
+1. Pull current state (optional): `railway config pull --force`
+2. Ensure `.railway/railway.ts` matches what you want
+3. Remove any `*/railway.json` from the repo (Railway blocks IaC while those exist)
+4. Clear config-as-code paths in the dashboard for each service
+5. Run `railway config plan` then `railway config apply`
 
 ## Verify
 
@@ -61,10 +55,23 @@ curl https://<backend-core-domain>/healthcheck
 open https://<frontend-table-domain>/
 ```
 
+Domains appear in the Railway dashboard after the first successful deploy.
+
+## Environment variables
+
+All cross-service wiring lives in `.railway/railway.ts`. For reference (or manual debugging), see `infra/railway/env.example`.
+
+Key wiring:
+
+- `backend-core` → Postgres via `DATABASE_ADDRESS`
+- `backend-core` → `engine-math` at `http://engine-math.railway.internal:8080`
+- `frontend-table` → Nakama privately at `http://backend-core.railway.internal:7350`
+- Browser → public HTTPS domains for `NEXT_PUBLIC_*` vars
+
 ## Local Docker vs Railway
 
 | | Docker Compose | Railway |
 |---|----------------|---------|
-| Use when | Full offline, OddSlingers submodule | Cloud env, no local containers |
-| Config in repo | `docker-compose.yml` | `.railway/railway.ts` + `*/railway.json` |
+| Use when | Full offline dev, optional OddSlingers | Cloud, no local containers |
+| Config in repo | `docker-compose.yml` | `.railway/railway.ts` |
 | Postgres | Container | Railway plugin |

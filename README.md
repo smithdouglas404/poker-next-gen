@@ -3,7 +3,7 @@
 A state-of-the-art, multi-service web poker network (Texas Hold'em first). The
 repository is a hybrid monorepo that runs locally via Docker Compose **and**
 deploys as independent services on [Railway](https://railway.app) using
-per-service `railway.json` manifests.
+a single `.railway/railway.ts` Infrastructure-as-Code file.
 
 ## Architecture
 
@@ -126,25 +126,20 @@ cargo test
 
 ## Production / cloud — Railway
 
-**Config is synced in the repo.** See **[.railway/README.md](./.railway/README.md)** and **[docs/RAILWAY.md](./docs/RAILWAY.md)**.
+**One config file for the whole stack:** `.railway/railway.ts`
 
-**Fastest setup** (creates Postgres + all services from `.railway/railway.ts`):
+See **[docs/RAILWAY.md](./docs/RAILWAY.md)** and **[.railway/README.md](./.railway/README.md)**.
 
 ```bash
+npm i -g @railway/cli
 railway login && railway link && railway config apply
 ```
 
-**Manual setup** (attach repo per service): set Root Directory + config path `/…/railway.json` per `.railway/README.md`.
+That creates Postgres + all three services with env wiring. Do not use per-service `railway.json` paths in the dashboard.
 
-| Service | Config file |
-|---------|-------------|
-| `engine-math` | `/engine-math/railway.json` |
-| `backend-core` | `/backend-core/railway.json` |
-| `frontend-table` | `/frontend-table/railway.json` |
+Env reference: **`infra/railway/env.example`**.
 
-Env templates: **`infra/railway/env.example`**.
-
-> Nakama healthcheck: `/healthcheck` (in `backend-core/railway.json`). App RPC: `/v2/rpc/healthz`.
+> Nakama healthcheck: `/healthcheck`. App RPC: `/v2/rpc/healthz`.
 
 ## Repository layout
 

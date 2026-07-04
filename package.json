@@ -1,0 +1,8 @@
+{
+  "name": "poker-next-gen",
+  "private": true,
+  "description": "Railway IaC types for .railway/railway.ts (authoring only; deploy via Railway CLI)",
+  "devDependencies": {
+    "railway": "3.4.1"
+  }
+}

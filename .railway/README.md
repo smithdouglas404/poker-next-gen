@@ -1,45 +1,43 @@
-# Railway — synced from repo (JSON config-as-code)
+# Railway — one config file for the whole stack
 
-## Config file path (per service)
+Railway has two config systems:
 
-In Railway → Service → Settings → **Config-as-code file path**, use **JSON only**:
+| System | Scope | File |
+|--------|-------|------|
+| Config as Code | **One service** | `service/railway.json` |
+| **Infrastructure as Code** | **Entire project** | **`.railway/railway.ts`** |
 
-| Service | Root Directory | Config-as-code file path |
-|---------|----------------|--------------------------|
-| engine-math | `engine-math` | `/engine-math/railway.json` |
-| backend-core | `backend-core` | `/backend-core/railway.json` |
-| frontend-table | `frontend-table` | `/frontend-table/railway.json` |
+This repo uses **one file for everything**: `.railway/railway.ts`.
 
-Path must start with `/` (absolute from repo root).
+It defines Postgres, all three services, build settings, healthchecks, and env wiring.
 
-**Do not use:** `.railway/railway.ts` in this field — that is CLI IaC only.
+> Railway does **not** support a single root `railway.json` for multi-service projects. The whole-project format is TypeScript-only (for now). See [Railway IaC docs](https://docs.railway.com/infrastructure-as-code).
 
-## Option A — CLI (`railway config apply`)
+## Deploy
 
 ```bash
-npm i -g @railway/cli
+npm i -g @railway/cli   # CLI 5.2+ for IaC
 railway login
-railway link
-railway config apply
+railway link            # pick/create project + environment
+railway config plan     # preview changes
+railway config apply    # create/update Postgres + all services
 ```
 
-Uses `.railway/railway.ts` — creates Postgres + all 3 services. No JSON path needed in dashboard.
+Do **not** set per-service “Config-as-code file path” in the Railway dashboard when using IaC. That field is for single-service `railway.json` only.
 
-## Option B — Dashboard (attach GitHub repo)
+## What gets created
 
-1. Create Railway project + **PostgreSQL** plugin
-2. Add 3 services, connect this repo
-3. Set Root Directory + config path (table above) for each
-4. Variables from `infra/railway/env.example`
-5. Deploy
+| Resource | Build | Healthcheck |
+|----------|-------|-------------|
+| PostgreSQL | Railway plugin | — |
+| `engine-math` | Dockerfile | `/health` |
+| `backend-core` | Dockerfile | `/healthcheck` |
+| `frontend-table` | Railpack (`npm ci && npm run build`) | `/` |
 
-## Files
+Private networking uses `*.railway.internal`. Browser-facing URLs use each service’s public Railway domain.
 
-| File | Purpose |
-|------|---------|
-| `engine-math/railway.json` | Rust rs_poker sidecar |
-| `backend-core/railway.json` | Nakama plugin |
-| `frontend-table/railway.json` | Next.js UI |
-| `.railway/railway.ts` | Full project IaC (CLI only) |
+## Reference env vars
 
-See [docs/RAILWAY.md](../docs/RAILWAY.md).
+See `infra/railway/env.example` for the same variables in dashboard reference syntax (useful when reading logs or debugging).
+
+Full walkthrough: [docs/RAILWAY.md](../docs/RAILWAY.md).
