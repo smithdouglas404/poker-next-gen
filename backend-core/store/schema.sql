@@ -145,3 +145,17 @@ ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS level_started_at TIMESTAMP
 
 ALTER TABLE poker_tournament_registration ADD COLUMN IF NOT EXISTS match_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE poker_tournament_registration ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+CREATE TABLE IF NOT EXISTS poker_audit_event (
+    id TEXT PRIMARY KEY,
+    match_id TEXT NOT NULL DEFAULT '',
+    room_id TEXT NOT NULL DEFAULT '',
+    club_id TEXT NOT NULL DEFAULT '',
+    hand_no INT NOT NULL DEFAULT 0,
+    event_type TEXT NOT NULL,
+    payload_hash TEXT NOT NULL,
+    payload_json JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS poker_audit_event_match_hand_idx ON poker_audit_event (match_id, hand_no);
