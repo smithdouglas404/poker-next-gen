@@ -73,7 +73,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		return err
 	}
 
-	logger.Info("poker-next-gen backend-core loaded in %s (engine-math/rs_poker sidecar expected)", time.Since(start))
+	logger.Info("poker-next-gen backend-core loaded in %s (engine-math/rs_poker required — no local fallbacks)", time.Since(start))
 	logger.Info(
 		"registered schemas: clubs=%T owners=%T balances=%T rake=%T brackets=%T balancing=%T blinds=%T prizes=%T",
 		models.Club{}, models.Owner{}, models.PlayerAllocatedBalance{}, models.CustomRakeConfiguration{},

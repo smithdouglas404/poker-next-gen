@@ -145,7 +145,10 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 
 		case protocol.OpStartHand:
 			if s.Table.SeatedCount() >= 2 && s.Table.Street == poker.StreetWaiting {
-				s.Table.StartHand(s.SmallBlind, s.BigBlind)
+				if err := s.Table.StartHand(s.SmallBlind, s.BigBlind); err != nil {
+					sendError(dispatcher, presence, "engine_unavailable", err.Error())
+					continue
+				}
 				broadcastHandStart(ctx, db, dispatcher, s)
 				dealPrivateCards(dispatcher, s)
 				broadcastActionRequired(ctx, db, dispatcher, s)
@@ -170,8 +173,14 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			if winner, uncontested := s.Table.UncontestedWinner(); uncontested {
 				winners := [][]int{{winner}}
 				potBefore := s.Table.Pot
-				poker.AwardSidePots(s.Table)
-				broadcastShowdown(ctx, db, dispatcher, s, winners, potBefore)
+				if _, _, err := poker.AwardSidePots(s.Table); err != nil {
+					sendError(dispatcher, presence, "showdown_failed", err.Error())
+					continue
+				}
+				if err := broadcastShowdown(ctx, db, dispatcher, s, winners, potBefore); err != nil {
+					sendError(dispatcher, presence, "showdown_failed", err.Error())
+					continue
+				}
 				creditRake(ctx, db, s, potBefore)
 				s.Table.ResetBetweenHands()
 				reportTournamentBusts(ctx, db, nk, s)
@@ -181,8 +190,15 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			showdown := s.Table.AdvanceAction()
 			if showdown {
 				potBefore := s.Table.Pot
-				winners := s.Table.ResolveAndAward()
-				broadcastShowdown(ctx, db, dispatcher, s, winners, potBefore)
+				winners, err := s.Table.ResolveAndAward()
+				if err != nil {
+					sendError(dispatcher, presence, "showdown_failed", err.Error())
+					continue
+				}
+				if err := broadcastShowdown(ctx, db, dispatcher, s, winners, potBefore); err != nil {
+					sendError(dispatcher, presence, "showdown_failed", err.Error())
+					continue
+				}
 				creditRake(ctx, db, s, potBefore)
 				s.Table.ResetBetweenHands()
 				reportTournamentBusts(ctx, db, nk, s)
@@ -431,7 +447,7 @@ func broadcastActionRequired(ctx context.Context, db *sql.DB, dispatcher runtime
 	broadcastSnapshot(ctx, db, dispatcher, s, nil)
 }
 
-func broadcastShowdown(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, winnerGroups [][]int, pot int64) {
+func broadcastShowdown(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, winnerGroups [][]int, pot int64) error {
 	reveal := map[string][]protocol.CardView{}
 	for userID, cards := range s.Table.HoleCards {
 		reveal[userID] = []protocol.CardView{
@@ -445,24 +461,29 @@ func broadcastShowdown(ctx context.Context, db *sql.DB, dispatcher runtime.Match
 			if s.Table.Seats[seat] == nil {
 				continue
 			}
+			handCat, err := poker.HandCategory(seat, s.Table)
+			if err != nil {
+				return err
+			}
 			winnerViews = append(winnerViews, map[string]interface{}{
 				"seat":     seat,
 				"pot":      potIdx,
 				"user_id":  s.Table.Seats[seat].UserID,
 				"username": s.Table.Seats[seat].Username,
-				"hand":     poker.HandCategory(seat, s.Table),
+				"hand":     handCat,
 				"engine":   "rs_poker",
 			})
 		}
 	}
 	data, _ := json.Marshal(map[string]interface{}{
-		"pot":      pot,
-		"hands":    reveal,
-		"winners":  winnerViews,
+		"pot":       pot,
+		"hands":     reveal,
+		"winners":   winnerViews,
 		"side_pots": len(winnerGroups),
 	})
 	_ = dispatcher.BroadcastMessage(protocol.OpShowdown, data, nil, nil, true)
 	broadcastSnapshot(ctx, db, dispatcher, s, nil)
+	return nil
 }
 
 func sendError(dispatcher runtime.MatchDispatcher, p runtime.Presence, code, message string) {

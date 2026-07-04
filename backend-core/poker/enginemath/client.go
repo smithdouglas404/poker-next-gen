@@ -74,7 +74,3 @@ func CompareHands(a, b string) (int, error) {
 		return 0, nil
 	}
 }
-
-func Available() bool {
-	return cachedAvailable()
-}

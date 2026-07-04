@@ -25,6 +25,9 @@ Railway**. Three first-class services live in their own top-level directories:
 3. **Frontend rendering is client-only.** Pixi.js touches WebGPU/WebGL and must
    never be imported during SSR. `src/app/table/page.tsx` is a `"use client"`
    component that lazily `import()`s Pixi inside a `useEffect`.
+4. **No math fallbacks.** Shuffle, hand rank, showdown, and equity always go
+   through `engine-math` (rs_poker). If the sidecar is down, operations fail —
+   the Go backend must not silently use local eval or `crypto/rand` shuffles.
 
 ## Container boot-up workflow
 
