@@ -13,19 +13,26 @@ import {
 
 import {
   INITIAL_WALLET_CENTS,
+  MAX_BUY_IN_CENTS,
+  MIN_BUY_IN_CENTS,
   OpAction,
-  OpDealPrivate,
   OpBoard,
-  OpActionRequired,
-  OpSnapshot,
-  OpStartHand,
-  OpSitDown,
-  OpStandUp,
+  OpDealPrivate,
   OpError,
+  OpHandStart,
+  OpShowdown,
+  OpSitDown,
+  OpSnapshot,
+  OpStandUp,
+  OpStartHand,
+  OpActionRequired,
   type ActionRequiredMessage,
   type CardView,
   type DealPrivateMessage,
+  type GameLogEntry,
   type GameState,
+  type ShowdownMessage,
+  type TableListItem,
   type TableSnapshot,
 } from "./protocol";
 import { ensureSession } from "@/lib/nakama/auth";
@@ -34,26 +41,22 @@ import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 
 interface GameContextValue extends GameState {
   connect: () => Promise<void>;
-  createRoom: (name?: string) => Promise<void>;
+  refreshWallet: () => Promise<void>;
+  listTables: () => Promise<void>;
+  createRoom: (opts?: { name?: string; buyIn?: number }) => Promise<void>;
   joinRoom: (matchId: string) => Promise<void>;
-  sitDown: (seat: number) => Promise<void>;
+  sitDown: (seat: number, buyIn?: number) => Promise<void>;
   standUp: () => Promise<void>;
   startHand: () => Promise<void>;
   sendAction: (type: string, amount: number) => Promise<void>;
   findMatch: () => Promise<void>;
+  setBuyInCents: (cents: number) => void;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);
 
-function deviceId(): string {
-  if (typeof window === "undefined") return "ssr";
-  const key = "png-device-id";
-  let id = localStorage.getItem(key);
-  if (!id) {
-    id = `dev-${Math.random().toString(36).slice(2, 10)}`;
-    localStorage.setItem(key, id);
-  }
-  return id;
+function logEntry(message: string, level: GameLogEntry["level"] = "info"): GameLogEntry {
+  return { id: `${Date.now()}-${Math.random()}`, at: new Date().toISOString(), message, level };
 }
 
 export function GameProvider({ children }: { children: ReactNode }) {
@@ -67,39 +70,81 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [snapshot, setSnapshot] = useState<TableSnapshot | null>(null);
   const [holeCards, setHoleCards] = useState<CardView[]>([]);
   const [actionRequired, setActionRequired] = useState<ActionRequiredMessage | null>(null);
+  const [showdown, setShowdown] = useState<ShowdownMessage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [buyInCents, setBuyInCentsState] = useState(INITIAL_WALLET_CENTS);
+  const [gameLog, setGameLog] = useState<GameLogEntry[]>([]);
+  const [matchmakerSearching, setMatchmakerSearching] = useState(false);
+  const [openTables, setOpenTables] = useState<TableListItem[]>([]);
   const [profile, setProfile] = useState({
     userId: "",
     username: "Guest",
     walletCents: INITIAL_WALLET_CENTS,
   });
 
-  const wireSocket = useCallback((socket: Socket) => {
-    socket.onmatchdata = (md) => {
-      const payload = md.data ? JSON.parse(new TextDecoder().decode(md.data)) : null;
-      switch (md.op_code) {
-        case OpSnapshot:
-          setSnapshot(payload as TableSnapshot);
-          break;
-        case OpDealPrivate:
-          setHoleCards((payload as DealPrivateMessage).cards);
-          break;
-        case OpBoard:
-          setSnapshot((prev) =>
-            prev ? { ...prev, board: payload.board, phase: payload.phase } : prev,
-          );
-          break;
-        case OpActionRequired:
-          setActionRequired(payload as ActionRequiredMessage);
-          break;
-        case OpError:
-          setError(payload.message ?? "Game error");
-          break;
-        default:
-          break;
-      }
-    };
+  const pushLog = useCallback((message: string, level: GameLogEntry["level"] = "info") => {
+    setGameLog((prev) => [logEntry(message, level), ...prev.slice(0, 49)]);
   }, []);
+
+  const refreshWallet = useCallback(async () => {
+    try {
+      const data = (await callSessionRpc("wallet_get", {})) as { balance_cents?: number };
+      if (data.balance_cents !== undefined) {
+        setProfile((p) => ({ ...p, walletCents: data.balance_cents! }));
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const wireSocket = useCallback(
+    (socket: Socket) => {
+      socket.onmatchdata = (md) => {
+        const payload = md.data ? JSON.parse(new TextDecoder().decode(md.data)) : null;
+        switch (md.op_code) {
+          case OpSnapshot: {
+            const snap = payload as TableSnapshot;
+            setSnapshot(snap);
+            if (snap.hero_wallet_cents !== undefined) {
+              setProfile((p) => ({ ...p, walletCents: snap.hero_wallet_cents! }));
+            }
+            break;
+          }
+          case OpHandStart:
+            pushLog(`Hand #${(payload as TableSnapshot)?.hand_no ?? "?"} started`, "action");
+            setShowdown(null);
+            break;
+          case OpDealPrivate:
+            setHoleCards((payload as DealPrivateMessage).cards);
+            pushLog("Hole cards dealt", "info");
+            break;
+          case OpBoard:
+            pushLog(`Board: ${(payload.phase as string)?.toUpperCase()}`, "pot");
+            setSnapshot((prev) =>
+              prev ? { ...prev, board: payload.board, phase: payload.phase } : prev,
+            );
+            break;
+          case OpActionRequired:
+            setActionRequired(payload as ActionRequiredMessage);
+            break;
+          case OpShowdown: {
+            const sd = payload as ShowdownMessage;
+            setShowdown(sd);
+            const winners = sd.winners?.map((w) => w.username ?? `Seat ${w.seat}`).join(", ");
+            pushLog(`Showdown — pot ${formatCents(sd.pot)}${winners ? ` · ${winners} wins` : ""}`, "pot");
+            break;
+          }
+          case OpError:
+            setError(payload.message ?? "Game error");
+            pushLog(payload.message ?? "Error", "error");
+            break;
+          default:
+            break;
+        }
+      };
+    },
+    [pushLog],
+  );
 
   const connect = useCallback(async () => {
     const client = clientRef.current;
@@ -109,110 +154,161 @@ export function GameProvider({ children }: { children: ReactNode }) {
     let walletCents = INITIAL_WALLET_CENTS;
     let username = session.username ?? "Player";
     try {
-      const profile = (await callSessionRpc("profile_get", {})) as {
+      const prof = (await callSessionRpc("profile_get", {})) as {
         balance_cents?: number;
         username?: string;
       };
-      if (profile.balance_cents !== undefined) walletCents = profile.balance_cents;
-      if (profile.username) username = profile.username;
+      if (prof.balance_cents !== undefined) walletCents = prof.balance_cents;
+      if (prof.username) username = prof.username;
     } catch {
-      // fallback to defaults if RPC unavailable
+      /* fallback */
     }
 
-    setProfile({
-      userId: session.user_id ?? "",
-      username,
-      walletCents,
-    });
+    setProfile({ userId: session.user_id ?? "", username, walletCents });
     const socket = client.createSocket(client.useSSL, false);
     await socket.connect(session, true);
     socketRef.current = socket;
     wireSocket(socket);
     setConnected(true);
-  }, [wireSocket]);
+    pushLog("Connected to Nakama realtime", "info");
+  }, [wireSocket, pushLog]);
 
   useEffect(() => {
     void connect().catch((e) => setError(e instanceof Error ? e.message : "Connect failed"));
   }, [connect]);
 
-  const joinRoom = useCallback(async (id: string) => {
-    const socket = socketRef.current;
-    if (!socket) return;
-    await socket.joinMatch(id);
-    setMatchId(id);
-    setHoleCards([]);
-    setActionRequired(null);
-  }, []);
+  const listTables = useCallback(async () => {
+    try {
+      const data = (await callSessionRpc("table_list", {})) as { matches?: TableListItem[] };
+      setOpenTables(data.matches ?? []);
+      pushLog(`Found ${data.matches?.length ?? 0} open tables`, "info");
+    } catch (e) {
+      pushLog(e instanceof Error ? e.message : "List tables failed", "error");
+    }
+  }, [pushLog]);
 
-  const createRoom = useCallback(async (name?: string) => {
-    const res = await fetch("/api/nakama/table/create", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name ?? "Hold'em Table" }),
-    });
-    const json = await res.json();
-    if (!json.ok) throw new Error(json.error ?? "Create room failed");
-    setRoomId(json.data.room_id);
-    await joinRoom(json.data.match_id);
-  }, [joinRoom]);
+  const joinRoom = useCallback(
+    async (id: string) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      await socket.joinMatch(id);
+      setMatchId(id);
+      setHoleCards([]);
+      setActionRequired(null);
+      setShowdown(null);
+      pushLog(`Joined match ${id.slice(0, 8)}…`, "info");
+    },
+    [pushLog],
+  );
 
-  const sendMatch = useCallback(async (opCode: number, body: unknown) => {
-    const socket = socketRef.current;
-    if (!socket || !matchId) return;
-    const data = new TextEncoder().encode(JSON.stringify(body));
-    await socket.sendMatchState(matchId, opCode, data);
-  }, [matchId]);
+  const createRoom = useCallback(
+    async (opts?: { name?: string; buyIn?: number }) => {
+      const buyIn = opts?.buyIn ?? buyInCents;
+      const res = await fetch("/api/nakama/table/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: opts?.name ?? "Hold'em Table",
+          small_blind: 100,
+          big_blind: 200,
+          buy_in: buyIn,
+        }),
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error ?? "Create room failed");
+      setRoomId(json.data.room_id);
+      pushLog(`Room created · buy-in ${formatCents(buyIn)}`, "info");
+      await joinRoom(json.data.match_id);
+    },
+    [buyInCents, joinRoom, pushLog],
+  );
 
-  const sitDown = useCallback(async (seat: number) => {
-    await sendMatch(OpSitDown, { seat, buy_in: profile.walletCents || INITIAL_WALLET_CENTS });
-  }, [sendMatch, profile.walletCents]);
+  const sendMatch = useCallback(
+    async (opCode: number, body: unknown) => {
+      const socket = socketRef.current;
+      if (!socket || !matchId) return;
+      const data = new TextEncoder().encode(JSON.stringify(body));
+      await socket.sendMatchState(matchId, opCode, data);
+    },
+    [matchId],
+  );
+
+  const sitDown = useCallback(
+    async (seat: number, buyIn?: number) => {
+      const amount = Math.min(
+        MAX_BUY_IN_CENTS,
+        Math.max(MIN_BUY_IN_CENTS, buyIn ?? buyInCents),
+        profile.walletCents,
+      );
+      await sendMatch(OpSitDown, { seat, buy_in: amount });
+      pushLog(`Sitting seat ${seat + 1} with ${formatCents(amount)}`, "action");
+      await refreshWallet();
+    },
+    [sendMatch, buyInCents, profile.walletCents, pushLog, refreshWallet],
+  );
 
   const standUp = useCallback(async () => {
     await sendMatch(OpStandUp, {});
     setHoleCards([]);
-  }, [sendMatch]);
+    pushLog("Stood up from table", "action");
+    await refreshWallet();
+  }, [sendMatch, pushLog, refreshWallet]);
 
   const startHand = useCallback(async () => {
     await sendMatch(OpStartHand, {});
-  }, [sendMatch]);
+    pushLog("Starting hand…", "action");
+  }, [sendMatch, pushLog]);
 
-  const sendAction = useCallback(async (type: string, amount: number) => {
-    await sendMatch(OpAction, { type, amount });
-    setActionRequired(null);
-  }, [sendMatch]);
+  const sendAction = useCallback(
+    async (type: string, amount: number) => {
+      await sendMatch(OpAction, { type, amount });
+      pushLog(`${type.toUpperCase()}${amount ? ` ${formatCents(amount)}` : ""}`, "action");
+      setActionRequired(null);
+    },
+    [sendMatch, pushLog],
+  );
 
   const findMatch = useCallback(async () => {
     const socket = socketRef.current;
     if (!socket) return;
-    const params = (await callSessionRpc("matchmaker_enqueue", {
-      min_players: 2,
-      max_players: 6,
-      buy_in_cents: profile.walletCents > 0 ? Math.min(profile.walletCents, INITIAL_WALLET_CENTS) : INITIAL_WALLET_CENTS,
-    })) as {
-      query?: string;
-      min_count?: number;
-      max_count?: number;
-      string_properties?: Record<string, string>;
-    };
-    const ticket = await socket.addMatchmaker(
-      params.query ?? "+properties.mode:holdem_cash_6max",
-      params.min_count ?? 2,
-      params.max_count ?? 6,
-      params.string_properties ?? { mode: "holdem_cash_6max" },
-    );
-    const ticketId = typeof ticket === "string" ? ticket : ticket.ticket;
-    socket.onmatchmakermatched = async (matched) => {
-      const matchId = matched.match_id;
-      if (matchId) {
-        await joinRoom(matchId);
-      }
-      try {
-        await socket.removeMatchmaker(ticketId);
-      } catch {
-        // ticket may already be consumed
-      }
-    };
-  }, [joinRoom, profile.walletCents]);
+    setMatchmakerSearching(true);
+    pushLog("Searching for match…", "info");
+    try {
+      const params = (await callSessionRpc("matchmaker_enqueue", {
+        min_players: 2,
+        max_players: 6,
+        buy_in_cents: Math.min(buyInCents, profile.walletCents),
+      })) as {
+        query?: string;
+        min_count?: number;
+        max_count?: number;
+        string_properties?: Record<string, string>;
+      };
+      const ticket = await socket.addMatchmaker(
+        params.query ?? "+properties.mode:holdem_cash_6max",
+        params.min_count ?? 2,
+        params.max_count ?? 6,
+        params.string_properties ?? { mode: "holdem_cash_6max" },
+      );
+      const ticketId = typeof ticket === "string" ? ticket : ticket.ticket;
+      socket.onmatchmakermatched = async (matched) => {
+        setMatchmakerSearching(false);
+        if (matched.match_id) await joinRoom(matched.match_id);
+        try {
+          await socket.removeMatchmaker(ticketId);
+        } catch {
+          /* consumed */
+        }
+      };
+    } catch (e) {
+      setMatchmakerSearching(false);
+      pushLog(e instanceof Error ? e.message : "Matchmaker failed", "error");
+    }
+  }, [buyInCents, profile.walletCents, joinRoom, pushLog]);
+
+  const setBuyInCents = useCallback((cents: number) => {
+    setBuyInCentsState(Math.min(MAX_BUY_IN_CENTS, Math.max(MIN_BUY_IN_CENTS, cents)));
+  }, []);
 
   const value = useMemo<GameContextValue>(
     () => ({
@@ -223,8 +319,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
       snapshot,
       holeCards,
       actionRequired,
+      showdown,
       error,
+      buyInCents,
+      gameLog,
+      matchmakerSearching,
+      openTables,
       connect,
+      refreshWallet,
+      listTables,
       createRoom,
       joinRoom,
       sitDown,
@@ -232,6 +335,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       startHand,
       sendAction,
       findMatch,
+      setBuyInCents,
     }),
     [
       connected,
@@ -241,8 +345,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
       snapshot,
       holeCards,
       actionRequired,
+      showdown,
       error,
+      buyInCents,
+      gameLog,
+      matchmakerSearching,
+      openTables,
       connect,
+      refreshWallet,
+      listTables,
       createRoom,
       joinRoom,
       sitDown,
@@ -250,6 +361,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       startHand,
       sendAction,
       findMatch,
+      setBuyInCents,
     ],
   );
 

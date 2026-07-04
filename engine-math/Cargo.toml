@@ -13,6 +13,7 @@ path = "src/server.rs"
 
 [dependencies]
 rs_poker = "5.0.0"
+rand = "0.8"
 axum = "0.7"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 serde = { version = "1", features = ["derive"] }

@@ -202,6 +202,12 @@ export function CommandCenter() {
           </div>
           <div className="flex flex-wrap gap-3">
             <Link
+              href="/lobby"
+              className="rounded-xl border border-sky-500/40 bg-sky-950/40 px-5 py-3 text-sm font-semibold text-sky-200 hover:bg-sky-900/40"
+            >
+              Table Lobby →
+            </Link>
+            <Link
               href="/table"
               className="rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-5 py-3 text-sm font-semibold text-emerald-200 hover:bg-emerald-900/40"
             >

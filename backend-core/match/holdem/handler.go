@@ -77,7 +77,7 @@ func (h *Handler) MatchJoin(ctx context.Context, logger runtime.Logger, db *sql.
 	for _, p := range presences {
 		s.Presences[p.GetUserId()] = p
 	}
-	broadcastSnapshot(dispatcher, s, nil)
+	broadcastSnapshot(ctx, db, dispatcher, s, nil)
 	return s
 }
 
@@ -92,7 +92,7 @@ func (h *Handler) MatchLeave(ctx context.Context, logger runtime.Logger, db *sql
 		}
 	}
 	dispatcher.MatchLabelUpdate(buildLabel(s))
-	broadcastSnapshot(dispatcher, s, nil)
+	broadcastSnapshot(ctx, db, dispatcher, s, nil)
 	return s
 }
 
@@ -112,11 +112,11 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				sendError(dispatcher, presence, "invalid_payload", err.Error())
 				continue
 			}
-			buyIn := s.BuyIn
+			buyIn := poker.ClampBuyIn(s.BuyIn)
 			if req.BuyIn > 0 {
-				buyIn = req.BuyIn
+				buyIn = poker.ClampBuyIn(req.BuyIn)
 			}
-			if err := reserveBuyIn(ctx, db, s.ClubID, userID, buyIn); err != nil {
+			if err := reserveBuyIn(ctx, db, s, userID, buyIn); err != nil {
 				sendError(dispatcher, presence, "buy_in_failed", err.Error())
 				continue
 			}
@@ -130,7 +130,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				continue
 			}
 			dispatcher.MatchLabelUpdate(buildLabel(s))
-			broadcastSnapshot(dispatcher, s, nil)
+			broadcastSnapshot(ctx, db, dispatcher, s, nil)
 
 		case protocol.OpStandUp:
 			for i, seat := range s.Table.Seats {
@@ -141,14 +141,14 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				}
 			}
 			dispatcher.MatchLabelUpdate(buildLabel(s))
-			broadcastSnapshot(dispatcher, s, nil)
+			broadcastSnapshot(ctx, db, dispatcher, s, nil)
 
 		case protocol.OpStartHand:
 			if s.Table.SeatedCount() >= 2 && s.Table.Street == poker.StreetWaiting {
 				s.Table.StartHand(s.SmallBlind, s.BigBlind)
-				broadcastHandStart(dispatcher, s)
+				broadcastHandStart(ctx, db, dispatcher, s)
 				dealPrivateCards(dispatcher, s)
-				broadcastActionRequired(dispatcher, s)
+				broadcastActionRequired(ctx, db, dispatcher, s)
 			}
 
 		case protocol.OpAction:
@@ -165,13 +165,13 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				sendError(dispatcher, presence, "action_failed", err.Error())
 				continue
 			}
-			broadcastSnapshot(dispatcher, s, nil)
+			broadcastSnapshot(ctx, db, dispatcher, s, nil)
 
 			if winner, uncontested := s.Table.UncontestedWinner(); uncontested {
 				winners := [][]int{{winner}}
 				potBefore := s.Table.Pot
 				poker.AwardSidePots(s.Table)
-				broadcastShowdown(dispatcher, s, winners, potBefore)
+				broadcastShowdown(ctx, db, dispatcher, s, winners, potBefore)
 				creditRake(ctx, db, s, potBefore)
 				s.Table.ResetBetweenHands()
 				reportTournamentBusts(ctx, db, nk, s)
@@ -182,7 +182,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			if showdown {
 				potBefore := s.Table.Pot
 				winners := s.Table.ResolveAndAward()
-				broadcastShowdown(dispatcher, s, winners, potBefore)
+				broadcastShowdown(ctx, db, dispatcher, s, winners, potBefore)
 				creditRake(ctx, db, s, potBefore)
 				s.Table.ResetBetweenHands()
 				reportTournamentBusts(ctx, db, nk, s)
@@ -190,18 +190,22 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				if len(s.Table.Board) > 0 {
 					broadcastBoard(dispatcher, s)
 				}
-				broadcastActionRequired(dispatcher, s)
+				broadcastActionRequired(ctx, db, dispatcher, s)
 			} else {
-				broadcastActionRequired(dispatcher, s)
+				broadcastActionRequired(ctx, db, dispatcher, s)
 			}
 		}
 	}
 	return s
 }
 
-func reserveBuyIn(ctx context.Context, db *sql.DB, clubID, userID string, amount int64) error {
-	if clubID != "" {
-		return store.NewClubStore(db).LockBalance(ctx, clubID, userID, amount)
+func reserveBuyIn(ctx context.Context, db *sql.DB, s *MatchState, userID string, amount int64) error {
+	amount = poker.ClampBuyIn(amount)
+	if s.TournamentID != "" {
+		return nil
+	}
+	if s.ClubID != "" {
+		return store.NewClubStore(db).LockBalance(ctx, s.ClubID, userID, amount)
 	}
 	return store.NewWalletStore(db).Debit(ctx, userID, amount)
 }
@@ -293,7 +297,7 @@ func (h *Handler) MatchSignal(ctx context.Context, logger runtime.Logger, db *sq
 				s.Table.StandUp(i)
 			}
 		}
-		broadcastSnapshot(dispatcher, s, nil)
+		broadcastSnapshot(ctx, db, dispatcher, s, nil)
 	}
 	return s, ""
 }
@@ -321,7 +325,7 @@ func buildLabel(s *MatchState) string {
 	return string(label)
 }
 
-func snapshotFor(s *MatchState, heroID string) protocol.TableSnapshot {
+func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) protocol.TableSnapshot {
 	seats := make([]protocol.SeatView, protocol.MaxSeats)
 	for i := 0; i < protocol.MaxSeats; i++ {
 		seats[i] = protocol.SeatView{Index: i, Status: "empty"}
@@ -342,6 +346,7 @@ func snapshotFor(s *MatchState, heroID string) protocol.TableSnapshot {
 	for _, c := range s.Table.Board {
 		board = append(board, protocol.CardView{Code: c.Code(), FaceUp: true})
 	}
+	heroWallet, _ := store.NewWalletStore(db).Get(ctx, heroID)
 	return protocol.TableSnapshot{
 		MatchID:    s.MatchID,
 		RoomID:     s.RoomID,
@@ -354,20 +359,21 @@ func snapshotFor(s *MatchState, heroID string) protocol.TableSnapshot {
 		ButtonSeat: s.Table.ButtonSeat,
 		SmallBlind: s.SmallBlind,
 		BigBlind:   s.BigBlind,
+		HeroWallet: heroWallet,
 		HandNo:     s.Table.HandNo,
 	}
 }
 
-func broadcastSnapshot(dispatcher runtime.MatchDispatcher, s *MatchState, sender runtime.Presence) {
+func broadcastSnapshot(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, sender runtime.Presence) {
 	for userID, p := range s.Presences {
-		snap := snapshotFor(s, userID)
+		snap := snapshotFor(ctx, db, s, userID)
 		data, _ := json.Marshal(snap)
 		_ = dispatcher.BroadcastMessage(protocol.OpSnapshot, data, []runtime.Presence{p}, sender, true)
 	}
 }
 
-func broadcastHandStart(dispatcher runtime.MatchDispatcher, s *MatchState) {
-	payload, _ := json.Marshal(snapshotFor(s, ""))
+func broadcastHandStart(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
+	payload, _ := json.Marshal(snapshotFor(ctx, db, s, ""))
 	_ = dispatcher.BroadcastMessage(protocol.OpHandStart, payload, nil, nil, true)
 }
 
@@ -399,7 +405,7 @@ func broadcastBoard(dispatcher runtime.MatchDispatcher, s *MatchState) {
 	_ = dispatcher.BroadcastMessage(protocol.OpBoard, data, nil, nil, true)
 }
 
-func broadcastActionRequired(dispatcher runtime.MatchDispatcher, s *MatchState) {
+func broadcastActionRequired(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
 	seat := s.Table.ActionSeat
 	if seat < 0 {
 		return
@@ -422,10 +428,10 @@ func broadcastActionRequired(dispatcher runtime.MatchDispatcher, s *MatchState) 
 	if ok {
 		_ = dispatcher.BroadcastMessage(protocol.OpActionRequired, data, []runtime.Presence{p}, nil, true)
 	}
-	broadcastSnapshot(dispatcher, s, nil)
+	broadcastSnapshot(ctx, db, dispatcher, s, nil)
 }
 
-func broadcastShowdown(dispatcher runtime.MatchDispatcher, s *MatchState, winnerGroups [][]int, pot int64) {
+func broadcastShowdown(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, winnerGroups [][]int, pot int64) {
 	reveal := map[string][]protocol.CardView{}
 	for userID, cards := range s.Table.HoleCards {
 		reveal[userID] = []protocol.CardView{
@@ -456,7 +462,7 @@ func broadcastShowdown(dispatcher runtime.MatchDispatcher, s *MatchState, winner
 		"side_pots": len(winnerGroups),
 	})
 	_ = dispatcher.BroadcastMessage(protocol.OpShowdown, data, nil, nil, true)
-	broadcastSnapshot(dispatcher, s, nil)
+	broadcastSnapshot(ctx, db, dispatcher, s, nil)
 }
 
 func sendError(dispatcher runtime.MatchDispatcher, p runtime.Presence, code, message string) {

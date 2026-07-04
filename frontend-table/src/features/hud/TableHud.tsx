@@ -5,6 +5,7 @@ import { PlayerHeader } from "@/features/hud/PlayerHeader";
 import { RoomPanel } from "@/features/hud/RoomPanel";
 import { SeatHud } from "@/features/hud/SeatHud";
 import { ActionBar } from "@/features/hud/ActionBar";
+import { BuyInSlider, TableLog } from "@/features/hud/TableLog";
 import { useGame } from "@/features/game/GameProvider";
 
 export function TableHud({ children }: { children: React.ReactNode }) {
@@ -19,7 +20,11 @@ export function TableHud({ children }: { children: React.ReactNode }) {
         <PlayerHeader />
 
         <div className="mt-4 flex flex-1 gap-4">
-          <RoomPanel />
+          <div className="flex w-full max-w-xs flex-col gap-3">
+            <RoomPanel />
+            <BuyInSlider />
+            <TableLog />
+          </div>
           <div className="relative flex-1">
             <SeatHud />
             <CommunityCards board={snapshot?.board ?? []} phase={snapshot?.phase ?? "waiting"} />

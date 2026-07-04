@@ -2,8 +2,6 @@ package poker
 
 import (
 	"fmt"
-	"math/rand"
-	"time"
 )
 
 type Card struct {
@@ -22,15 +20,7 @@ func (c Card) Code() string {
 }
 
 func NewDeck() []Card {
-	deck := make([]Card, 0, 52)
-	for suit := 0; suit < 4; suit++ {
-		for rank := 2; rank <= 14; rank++ {
-			deck = append(deck, Card{Rank: rank, Suit: suit})
-		}
-	}
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	r.Shuffle(len(deck), func(i, j int) { deck[i], deck[j] = deck[j], deck[i] })
-	return deck
+	return NewSecureDeck()
 }
 
 const MaxSeats = 6
@@ -106,6 +96,7 @@ func (t *Table) SitDown(seat int, userID, username string, buyIn int64) error {
 	if t.Seats[seat] != nil {
 		return fmt.Errorf("seat taken")
 	}
+	buyIn = ClampBuyIn(buyIn)
 	t.Seats[seat] = &Seat{
 		Index:    seat,
 		UserID:   userID,
@@ -348,8 +339,27 @@ func (t *Table) advanceStreet() bool {
 	default:
 		return true
 	}
+	if t.onlyAllInRemaining() {
+		return t.advanceStreet()
+	}
 	t.ActionSeat = t.nextActiveSeat(t.ButtonSeat)
+	if t.ActionSeat < 0 {
+		return t.advanceStreet()
+	}
 	return false
+}
+
+func (t *Table) onlyAllInRemaining() bool {
+	canAct := 0
+	for _, s := range t.Seats {
+		if s == nil || s.Status == SeatFolded {
+			continue
+		}
+		if s.Status == SeatSeated && s.Stack > 0 {
+			canAct++
+		}
+	}
+	return canAct <= 1
 }
 
 func (t *Table) ValidActions(seat int) (actions []string, toCall, minRaise, maxRaise int64) {

@@ -7,7 +7,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use engine_math::{compare_hands, rank_hand};
+use engine_math::{compare_hands, rank_hand, shuffle_deck};
 use serde::{Deserialize, Serialize};
 use std::{cmp::Ordering, net::SocketAddr, sync::Arc};
 use tower_http::cors::CorsLayer;
@@ -64,6 +64,19 @@ async fn rank(Json(req): Json<RankRequest>) -> Result<Json<RankResponse>, (Statu
     }))
 }
 
+#[derive(Serialize)]
+struct ShuffleResponse {
+    cards: Vec<String>,
+    source: &'static str,
+}
+
+async fn shuffle() -> Json<ShuffleResponse> {
+    Json(ShuffleResponse {
+        cards: shuffle_deck(),
+        source: "csprng_os",
+    })
+}
+
 async fn compare(Json(req): Json<CompareRequest>) -> Result<Json<CompareResponse>, (StatusCode, String)> {
     let ord = compare_hands(&req.a, &req.b).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
     let a_cat = rank_hand(&req.a)
@@ -93,6 +106,7 @@ async fn main() {
     let app = Router::new()
         .route("/health", get(health))
         .route("/rank", post(rank))
+        .route("/shuffle", post(shuffle))
         .route("/compare", post(compare))
         .layer(CorsLayer::permissive())
         .with_state(state);
