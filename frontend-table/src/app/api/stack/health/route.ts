@@ -35,8 +35,13 @@ async function probe(url: string, init?: RequestInit): Promise<{ ok: boolean; de
 }
 
 async function probeFirst(urls: string[]): Promise<{ url: string; ok: boolean; detail?: unknown; error?: string }> {
-  let last = { url: urls[0], ok: false, error: "unreachable" };
+  let last: { url: string; ok: boolean; detail?: unknown; error?: string } = {
+    url: urls.find(Boolean) ?? "",
+    ok: false,
+    error: "unreachable",
+  };
   for (const url of urls) {
+    if (!url) continue;
     const result = await probe(url);
     last = { url, ...result };
     if (result.ok) return last;
