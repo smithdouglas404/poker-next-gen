@@ -51,7 +51,7 @@ For each service in Railway:
 3. Add **PostgreSQL** plugin to the project
 4. Paste variables from `infra/railway/env.example` (use Railway reference syntax `${{Service.VAR}}`)
 
-Do **not** run `railway config apply` if using TOML — Railway allows only one config source per service.
+Do **not** run `railway config apply` if using Option B.
 
 ## Verify
 
@@ -66,5 +66,5 @@ open https://<frontend-table-domain>/
 | | Docker Compose | Railway |
 |---|----------------|---------|
 | Use when | Full offline, OddSlingers submodule | Cloud env, no local containers |
-| Config in repo | `docker-compose.yml` | `.railway/railway.ts` + `*/railway.toml` |
+| Config in repo | `docker-compose.yml` | `.railway/railway.ts` + `*/railway.json` |
 | Postgres | Container | Railway plugin |

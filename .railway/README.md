@@ -1,35 +1,8 @@
-# Railway — synced from repo
+# Railway — synced from repo (JSON config-as-code)
 
-## ⚠️ Common error: wrong config file
+## Config file path (per service)
 
-Railway **Config-as-code file path** (in service Settings) accepts **only**:
-
-- `/backend-core/railway.json` ✅
-- `/backend-core/railway.toml` ✅
-
-It does **NOT** accept:
-
-- `.railway/railway.ts` ❌ (that file is for `railway config apply` CLI only)
-- `backend-core/railway.json` ❌ (missing leading `/`)
-- `/railway.toml` at repo root ❌ (does not exist — this is a monorepo)
-
-## Option A — CLI project setup (`.railway/railway.ts`)
-
-Creates Postgres + all 3 services. **Do not** set Config file path in dashboard.
-
-```bash
-npm i -g @railway/cli
-railway login
-railway link
-railway config plan
-railway config apply
-```
-
-## Option B — Attach GitHub repo per service (`railway.json`)
-
-Create **3 separate services** + **PostgreSQL** in one Railway project.
-
-For **each** service, in Settings set:
+In Railway → Service → Settings → **Config-as-code file path**, use **JSON only**:
 
 | Service | Root Directory | Config-as-code file path |
 |---------|----------------|--------------------------|
@@ -37,24 +10,36 @@ For **each** service, in Settings set:
 | backend-core | `backend-core` | `/backend-core/railway.json` |
 | frontend-table | `frontend-table` | `/frontend-table/railway.json` |
 
-Path must start with `/` and be from **repo root** (not relative to Root Directory).
+Path must start with `/` (absolute from repo root).
 
-Variables: copy from `infra/railway/env.example`.
+**Do not use:** `.railway/railway.ts` in this field — that is CLI IaC only.
 
-Then click **Deploy**.
+## Option A — CLI (`railway config apply`)
 
-## Files in this repo
+```bash
+npm i -g @railway/cli
+railway login
+railway link
+railway config apply
+```
 
-| File | Used by |
+Uses `.railway/railway.ts` — creates Postgres + all 3 services. No JSON path needed in dashboard.
+
+## Option B — Dashboard (attach GitHub repo)
+
+1. Create Railway project + **PostgreSQL** plugin
+2. Add 3 services, connect this repo
+3. Set Root Directory + config path (table above) for each
+4. Variables from `infra/railway/env.example`
+5. Deploy
+
+## Files
+
+| File | Purpose |
 |------|---------|
-| `engine-math/railway.json` | Option B — engine-math service |
-| `backend-core/railway.json` | Option B — Nakama service |
-| `frontend-table/railway.json` | Option B — Next.js UI |
-| `*/railway.toml` | Same as `.json` (TOML format alternative) |
-| `.railway/railway.ts` | Option A — `railway config apply` only |
+| `engine-math/railway.json` | Rust rs_poker sidecar |
+| `backend-core/railway.json` | Nakama plugin |
+| `frontend-table/railway.json` | Next.js UI |
+| `.railway/railway.ts` | Full project IaC (CLI only) |
 
-Use **either** `.json` **or** `.toml` in the config path — not both for the same service.
-
-## More detail
-
-[docs/RAILWAY.md](../docs/RAILWAY.md)
+See [docs/RAILWAY.md](../docs/RAILWAY.md).
