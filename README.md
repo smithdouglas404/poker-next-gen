@@ -126,20 +126,25 @@ cargo test
 
 ## Production / cloud — Railway
 
-**Recommended if local Docker is fighting you.** Step-by-step: **[docs/RAILWAY.md](./docs/RAILWAY.md)**.
+**Config is synced in the repo.** See **[.railway/README.md](./.railway/README.md)** and **[docs/RAILWAY.md](./docs/RAILWAY.md)**.
 
-Each service carries its own `railway.toml` (set Railway **Root Directory** to that folder):
+**Fastest setup** (creates Postgres + all services from `.railway/railway.ts`):
 
-- **`engine-math/railway.toml`** — Dockerfile builder, health check `/health`.
-- **`frontend-table/railway.toml`** — NIXPACKS builder, `npm run build` /
-  `npm run start`, restart `ON_FAILURE`.
-- **`backend-core/railway.toml`** — Dockerfile builder, health check
-  `/healthcheck`, restart `ALWAYS`. Attach a Railway PostgreSQL plugin and set
-  `DATABASE_ADDRESS=user:password@host:port/dbname`.
+```bash
+railway login && railway link && railway config apply
+```
 
-Env var templates: **`infra/railway/env.example`**.
+**Manual setup** (attach repo per service): set Root Directory + Config file path per `.railway/README.md` — each service reads its `railway.toml`.
 
-> **Health-check note:** Nakama's built-in liveness endpoint is `/healthcheck` (configured in `backend-core/railway.toml`). A `healthz` RPC is also registered at `/v2/rpc/healthz` for app-level checks.
+| Service | Config file |
+|---------|-------------|
+| `engine-math` | `/engine-math/railway.toml` |
+| `backend-core` | `/backend-core/railway.toml` |
+| `frontend-table` | `/frontend-table/railway.toml` |
+
+Env templates: **`infra/railway/env.example`**.
+
+> Nakama healthcheck: `/healthcheck` (in `backend-core/railway.toml`). App RPC: `/v2/rpc/healthz`.
 
 ## Repository layout
 

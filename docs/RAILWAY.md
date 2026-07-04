@@ -1,89 +1,70 @@
-# Deploy on Railway (skip local Docker)
+# Deploy on Railway (config synced in repo)
 
-Local Docker runs **7 containers** (Postgres, Nakama, Rust sidecar, Next.js, plus optional OddSlingers stack). That is useful for full offline dev, but it is not required to use the platform.
+Skip local Docker. This repo contains everything Railway needs:
 
-**Railway is the intended cloud path:** three services, managed Postgres, public URLs, no Docker Desktop on your Mac.
+| Path | Purpose |
+|------|---------|
+| `.railway/railway.ts` | **Full project** — Postgres + 3 services + env wiring (`railway config apply`) |
+| `engine-math/railway.toml` | Per-service build/deploy for Rust sidecar |
+| `backend-core/railway.toml` | Per-service build/deploy for Nakama |
+| `frontend-table/railway.toml` | Per-service build/deploy for Next.js UI |
+| `infra/railway/env.example` | Reference variables for manual wiring |
+| `.railway/README.md` | Choose Option A (IaC) vs Option B (TOML) |
 
-## Why Docker feels hard here
+## Important: how Railway reads config
 
-| Pain | Why |
-|------|-----|
-| Nakama Go plugin | Must match exact `protobuf` / Nakama version or build fails |
-| Boot order | Postgres → engine-math → Nakama → UI, each with healthchecks |
-| OddSlingers | Optional 5 extra containers, heavy first build |
-| Port conflicts | Mac Postgres on :5432, etc. |
+- **`railway.toml` applies to one service only.** Attaching the repo once does not auto-create all services.
+- **Config file path is absolute from repo root**, e.g. `/backend-core/railway.toml` — it does **not** follow the Root Directory setting ([Railway docs](https://docs.railway.com/config-as-code)).
+- **`watchPatterns`** in each TOML limit rebuilds to that service folder.
 
-On Railway, each service builds once in the cloud. You set env vars in the dashboard and open URLs.
+## Option A — One command project setup (recommended)
 
-## Services to create
+```bash
+railway login
+railway link
+railway config plan
+railway config apply
+```
 
-Create **one Railway project** with **four resources**:
+This reads `.railway/railway.ts` and creates:
 
-| # | Railway service | Repo root path | Builder |
-|---|-----------------|----------------|---------|
-| 1 | PostgreSQL | (Railway plugin) | managed |
-| 2 | `engine-math` | `engine-math/` | Dockerfile |
-| 3 | `backend-core` | `backend-core/` | Dockerfile |
-| 4 | `frontend-table` | `frontend-table/` | NIXPACKS |
+- PostgreSQL
+- `engine-math` (Dockerfile, `/health`)
+- `backend-core` (Dockerfile, `/healthcheck`, DB + engine-math URLs)
+- `frontend-table` (Railpack, `/`, public Nakama URL for browser)
 
-OddSlingers is **not** on Railway for this stack — it is reference/submodule only. The live product is Next.js + Nakama + rs_poker.
+Do **not** set Config File paths in the dashboard when using IaC.
 
-## Step-by-step
+## Option B — Attach repo per service (TOML)
 
-### 1. PostgreSQL
+For each service in Railway:
 
-- Add **PostgreSQL** to the project.
-- Railway exposes `PGHOST`, `PGUSER`, `PGPASSWORD`, `PGPORT`, `PGDATABASE`.
+1. **Root Directory** → service folder (`engine-math`, `backend-core`, or `frontend-table`)
+2. **Config-as-code file** → absolute path:
 
-### 2. engine-math
+   | Service | Config file path |
+   |---------|------------------|
+   | engine-math | `/engine-math/railway.toml` |
+   | backend-core | `/backend-core/railway.toml` |
+   | frontend-table | `/frontend-table/railway.toml` |
 
-- New service → connect repo → set **Root Directory** to `engine-math`.
-- Uses `engine-math/railway.toml` + `Dockerfile`.
-- After deploy, note the public URL (for browser checks) and private hostname `engine-math.railway.internal`.
+3. Add **PostgreSQL** plugin to the project
+4. Paste variables from `infra/railway/env.example` (use Railway reference syntax `${{Service.VAR}}`)
 
-### 3. backend-core (Nakama)
-
-- New service → **Root Directory** `backend-core`.
-- Variables (reference `infra/railway/env.example`):
-
-  ```
-  DATABASE_ADDRESS=${{Postgres.PGUSER}}:${{Postgres.PGPASSWORD}}@${{Postgres.PGHOST}}:${{Postgres.PGPORT}}/${{Postgres.PGDATABASE}}
-  ENGINE_MATH_URL=http://engine-math.railway.internal:8080
-  ```
-
-- Health check: `/healthcheck` (set in `backend-core/railway.toml`).
-- Public URL is your Nakama API (port 7350 inside the container).
-
-### 4. frontend-table
-
-- New service → **Root Directory** `frontend-table`.
-- Variables:
-
-  ```
-  NEXT_PUBLIC_NAKAMA_HOST=https://<backend-core-public-domain>
-  NAKAMA_HOST=http://backend-core.railway.internal:7350
-  NAKAMA_SERVER_KEY=defaultkey
-  ENGINE_MATH_URL=http://engine-math.railway.internal:8080
-  ```
-
-- Deploy → open the Railway-generated URL for the UI (`/table`, `/lobby`, `/stack`).
+Do **not** run `railway config apply` if using TOML — Railway allows only one config source per service.
 
 ## Verify
 
 ```bash
-curl https://<engine-math>/health
-curl https://<backend-core>/healthcheck
-open https://<frontend-table>/
+curl https://<engine-math-domain>/health
+curl https://<backend-core-domain>/healthcheck
+open https://<frontend-table-domain>/
 ```
 
-## Local vs cloud
+## Local Docker vs Railway
 
-| Goal | Use |
-|------|-----|
-| Full offline / OddSlingers submodule | `./scripts/core-up.sh` (Docker) |
-| Just use the product | **Railway** (this doc) |
-| Fix protobuf / plugin build errors | Pull latest `main`, redeploy `backend-core` on Railway |
-
-## Monorepo note
-
-Each `railway.toml` lives **inside** its service directory. In Railway service settings, set **Root Directory** to that folder — do not point the whole monorepo at one service.
+| | Docker Compose | Railway |
+|---|----------------|---------|
+| Use when | Full offline, OddSlingers submodule | Cloud env, no local containers |
+| Config in repo | `docker-compose.yml` | `.railway/railway.ts` + `*/railway.toml` |
+| Postgres | Container | Railway plugin |
