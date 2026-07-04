@@ -155,16 +155,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
     let walletCents = INITIAL_WALLET_CENTS;
     let username = session.username ?? "Player";
-    try {
-      const prof = (await callSessionRpc("profile_get", {})) as {
-        balance_cents?: number;
-        username?: string;
-      };
-      if (prof.balance_cents !== undefined) walletCents = prof.balance_cents;
-      if (prof.username) username = prof.username;
-    } catch {
-      /* fallback */
-    }
+    const prof = (await callSessionRpc("profile_get", {})) as {
+      balance_cents?: number;
+      username?: string;
+    };
+    if (prof.balance_cents !== undefined) walletCents = prof.balance_cents;
+    if (prof.username) username = prof.username;
 
     setProfile({ userId: session.user_id ?? "", username, walletCents });
     const socket = client.createSocket(client.useSSL, false);

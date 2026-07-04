@@ -19,7 +19,7 @@ func (c Card) Code() string {
 	return r + suits[c.Suit]
 }
 
-func NewDeck() []Card {
+func NewDeck() ([]Card, error) {
 	return NewSecureDeck()
 }
 
@@ -113,9 +113,13 @@ func (t *Table) StandUp(seat int) {
 	}
 }
 
-func (t *Table) StartHand(sb, bb int64) {
+func (t *Table) StartHand(sb, bb int64) error {
 	t.HandNo++
-	t.Deck = NewDeck()
+	deck, err := NewDeck()
+	if err != nil {
+		return err
+	}
+	t.Deck = deck
 	t.Board = nil
 	t.HoleCards = map[string][2]Card{}
 	t.Pot = 0
@@ -128,7 +132,7 @@ func (t *Table) StartHand(sb, bb int64) {
 	seated := t.seatedIndices()
 	if len(seated) < 2 {
 		t.Street = StreetWaiting
-		return
+		return nil
 	}
 	if t.ButtonSeat == 0 && t.HandNo == 1 {
 		t.ButtonSeat = seated[0]
@@ -153,6 +157,7 @@ func (t *Table) StartHand(sb, bb int64) {
 	t.postBlind(sbSeat, sb, "SB")
 	t.postBlind(bbSeat, bb, "BB")
 	t.ActionSeat = t.nextActiveSeat(bbSeat)
+	return nil
 }
 
 func (t *Table) addContribution(seat int, amount int64) {
@@ -428,7 +433,7 @@ func (t *Table) UncontestedWinner() (int, bool) {
 	return -1, false
 }
 
-func (t *Table) ResolveAndAward() [][]int {
-	winners, _ := AwardSidePots(t)
-	return winners
+func (t *Table) ResolveAndAward() ([][]int, error) {
+	winners, _, err := AwardSidePots(t)
+	return winners, err
 }

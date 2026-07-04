@@ -30,9 +30,6 @@ func EquityEstimate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 	if len(req.Holes) < 2 {
 		return "", runtime.NewError("need at least two hole hands", 3)
 	}
-	if !enginemath.Available() {
-		return "", runtime.NewError("engine-math sidecar unavailable", 14)
-	}
 	iters := req.Iterations
 	if iters <= 0 {
 		iters = 2000
@@ -57,9 +54,6 @@ func HandRank(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime
 	}
 	if req.Cards == "" {
 		return "", runtime.NewError("cards required", 3)
-	}
-	if !enginemath.Available() {
-		return "", runtime.NewError("engine-math sidecar unavailable", 14)
 	}
 	cat, err := enginemath.RankHand(req.Cards)
 	if err != nil {

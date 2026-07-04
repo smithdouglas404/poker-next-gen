@@ -1,42 +1,33 @@
 package poker
 
 import (
-	"crypto/rand"
-	"math/big"
+	"fmt"
+
+	"github.com/smithdouglas404/poker-next-gen/backend-core/poker/enginemath"
 )
 
-// NewSecureDeck returns a shuffled 52-card deck.
-// Prefers engine-math (CSPRNG sidecar); falls back to crypto/rand in Go.
-func NewSecureDeck() []Card {
-	if codes, ok := shuffleFromEngine(); ok {
-		return codesToDeck(codes)
+// NewSecureDeck returns a shuffled 52-card deck from engine-math (rs_poker CSPRNG).
+// There is no local fallback — engine-math must be reachable.
+func NewSecureDeck() ([]Card, error) {
+	codes, err := enginemath.ShuffleDeck()
+	if err != nil {
+		return nil, fmt.Errorf("engine-math shuffle: %w", err)
 	}
-	return shuffleCryptoFallback()
+	if len(codes) != 52 {
+		return nil, fmt.Errorf("engine-math shuffle: expected 52 cards, got %d", len(codes))
+	}
+	deck, err := codesToDeck(codes)
+	if err != nil {
+		return nil, err
+	}
+	return deck, nil
 }
 
-func shuffleCryptoFallback() []Card {
-	deck := make([]Card, 0, 52)
-	for suit := 0; suit < 4; suit++ {
-		for rank := 2; rank <= 14; rank++ {
-			deck = append(deck, Card{Rank: rank, Suit: suit})
-		}
-	}
-	for i := len(deck) - 1; i > 0; i-- {
-		n, err := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
-		if err != nil {
-			continue
-		}
-		j := int(n.Int64())
-		deck[i], deck[j] = deck[j], deck[i]
-	}
-	return deck
-}
-
-func codesToDeck(codes []string) []Card {
+func codesToDeck(codes []string) ([]Card, error) {
 	deck := make([]Card, 0, len(codes))
 	for _, code := range codes {
 		if len(code) < 2 {
-			continue
+			return nil, fmt.Errorf("invalid card code %q", code)
 		}
 		rankChar := string(code[0])
 		suitChar := string(code[len(code)-1])
@@ -68,12 +59,13 @@ func codesToDeck(codes []string) []Card {
 		case "c":
 			suit = 3
 		}
-		if rank > 0 {
-			deck = append(deck, Card{Rank: rank, Suit: suit})
+		if rank == 0 {
+			return nil, fmt.Errorf("invalid card rank in %q", code)
 		}
+		deck = append(deck, Card{Rank: rank, Suit: suit})
 	}
 	if len(deck) != 52 {
-		return shuffleCryptoFallback()
+		return nil, fmt.Errorf("engine-math shuffle: parsed %d cards", len(deck))
 	}
-	return deck
+	return deck, nil
 }

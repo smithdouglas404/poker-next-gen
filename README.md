@@ -24,7 +24,7 @@ backend-core (Nakama :7350 API, :7351 console, :7349 gRPC)
         ▼
 postgres (:5432)
 
-engine-math (Rust) — poker math sidecar (:8080), embedded/linked by services.
+engine-math (Rust) — required rs_poker sidecar (:8080). No Go fallbacks for shuffle or hand eval.
 
 oddslingers (submodule) — reference only; see docs/ODDSLINGERS.md.
 ```
