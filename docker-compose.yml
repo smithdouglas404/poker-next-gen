@@ -12,7 +12,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: localdb
     ports:
-      - "5432:5432"
+      - "5433:5432" # host 5433 avoids conflict with local Postgres on :5432
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -56,6 +56,12 @@ services:
       - "7349:7349"
       - "7350:7350"
       - "7351:7351"
+    healthcheck:
+      test: ["CMD", "/nakama/nakama", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
     restart: unless-stopped
     networks:
       - poker-net
@@ -80,7 +86,8 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - backend-core
+      backend-core:
+        condition: service_healthy
     networks:
       - poker-net
 

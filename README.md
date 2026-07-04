@@ -42,14 +42,29 @@ oddslingers (Django + React) — live at :8888; see docs/ODDSLINGERS.md.
 
 ## Local development — Docker Compose
 
-Boot the **full live stack** (rs_poker + Nakama + Next.js + OddSlingers):
+Boot the **core stack** (rs_poker + Nakama + Next.js):
 
 ```bash
-./scripts/live-up.sh
-# or: git submodule update --init --depth 1 oddslingers && docker compose up --build
+./scripts/core-up.sh
 ```
 
-Boot order: `postgres` → `engine-math` (health) → `backend-core` → `frontend-table`; OddSlingers postgres/redis → django migrate → webpack + nginx.
+Boot **OddSlingers** separately (optional, long first build):
+
+```bash
+./scripts/oddslingers-up.sh
+# or everything: ./scripts/live-up.sh --with-oddslingers
+```
+
+If services show down on http://localhost:3000/stack:
+
+```bash
+./scripts/doctor.sh
+./scripts/stack-status.sh
+```
+
+Boot order: `postgres` → `engine-math` (health) → `backend-core` → `frontend-table`; OddSlingers uses compose profile `oddslingers`.
+
+> **Mac note:** Nakama Postgres binds host port **5433** (not 5432) to avoid conflicting with a local Postgres install.
 
 Once up:
 

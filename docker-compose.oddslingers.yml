@@ -3,6 +3,7 @@
 
 services:
   oddslingers-postgres:
+    profiles: [oddslingers]
     image: postgres:12-alpine
     container_name: poker-oddslingers-postgres
     environment:
@@ -20,6 +21,7 @@ services:
       - poker-net
 
   oddslingers-redis:
+    profiles: [oddslingers]
     image: redis:5-alpine
     container_name: poker-oddslingers-redis
     command: redis-server --appendonly yes
@@ -34,6 +36,7 @@ services:
       - poker-net
 
   oddslingers-django:
+    profiles: [oddslingers]
     build:
       context: ./oddslingers
       dockerfile: Dockerfile
@@ -67,6 +70,7 @@ services:
       - poker-net
 
   oddslingers-webpack:
+    profiles: [oddslingers]
     build:
       context: ./oddslingers
       dockerfile: Dockerfile.webpack
@@ -85,6 +89,7 @@ services:
       - poker-net
 
   oddslingers-nginx:
+    profiles: [oddslingers]
     image: nginx:alpine
     container_name: poker-oddslingers-nginx
     depends_on:

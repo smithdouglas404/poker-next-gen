@@ -9,12 +9,15 @@ interface ServiceStatus {
   url: string;
   ok: boolean;
   error?: string;
+  hint?: string;
 }
 
 interface StackHealth {
   ok: boolean;
+  allOk?: boolean;
   services: ServiceStatus[];
   live: Record<string, string>;
+  boot?: Record<string, string>;
   at: string;
 }
 
@@ -44,9 +47,11 @@ export default function LiveStackPage() {
         <div className="mx-auto flex max-w-4xl flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.35em] text-emerald-300/80">Live Stack</p>
-            <h1 className="mt-2 text-3xl font-semibold">Everything running</h1>
+            <h1 className="mt-2 text-3xl font-semibold">
+              {health?.ok ? "Core stack live" : health ? "Stack incomplete" : "Live Stack"}
+            </h1>
             <p className="mt-2 text-sm text-neutral-400">
-              Nakama · rs_poker engine-math · OddSlingers · Next.js table UI
+              Nakama + rs_poker are required · OddSlingers is optional
             </p>
           </div>
           <div className="flex gap-3">
@@ -72,7 +77,13 @@ export default function LiveStackPage() {
           }`}
         >
           <p className="text-sm uppercase tracking-wider text-neutral-400">Overall</p>
-          <p className="mt-1 text-2xl font-semibold">{health?.ok ? "All services live" : "Some services down"}</p>
+          <p className="mt-1 text-2xl font-semibold">
+            {health?.ok
+              ? health.allOk
+                ? "All services live"
+                : "Core live (OddSlingers optional)"
+              : "Core services down — start Docker"}
+          </p>
           {health?.at && <p className="mt-1 text-xs text-neutral-500">Last check {new Date(health.at).toLocaleString()}</p>}
         </section>
 
@@ -86,16 +97,46 @@ export default function LiveStackPage() {
                 <h2 className="font-semibold">{svc.name}</h2>
                 <span
                   className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                    svc.ok ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"
+                    svc.ok
+                      ? "bg-emerald-500/20 text-emerald-300"
+                      : svc.id === "oddslingers"
+                        ? "bg-amber-500/20 text-amber-300"
+                        : "bg-red-500/20 text-red-300"
                   }`}
                 >
-                  {svc.ok ? "Live" : "Down"}
+                  {svc.ok ? "Live" : svc.id === "oddslingers" ? "Optional" : "Down"}
                 </span>
               </div>
               <p className="mt-2 break-all font-mono text-[10px] text-neutral-500">{svc.url}</p>
-              {svc.error && <p className="mt-2 text-xs text-red-300">{svc.error}</p>}
+              {svc.error && (
+                <p className="mt-2 text-xs text-red-300">
+                  Down{svc.error.includes("refused") ? " (needs Docker)" : ""}: {svc.error}
+                </p>
+              )}
+              {svc.hint && <p className="mt-2 text-xs text-amber-200/90">{svc.hint}</p>}
             </article>
           ))}
+        </section>
+
+        <section className="rounded-2xl border border-white/10 p-6">
+          <h2 className="text-lg font-semibold">Fix missing services</h2>
+          <p className="mt-2 text-sm text-neutral-400">
+            From the repo root in Terminal (not inside a container):
+          </p>
+          <div className="mt-4 space-y-3 font-mono text-xs">
+            <div className="rounded-xl bg-black/50 p-4">
+              <p className="text-neutral-500"># 1 — Nakama + engine-math + UI (required)</p>
+              <p className="text-emerald-200">{health?.boot?.core ?? "./scripts/core-up.sh"}</p>
+            </div>
+            <div className="rounded-xl bg-black/50 p-4">
+              <p className="text-neutral-500"># 2 — OddSlingers (optional, slow first build)</p>
+              <p className="text-emerald-200">{health?.boot?.oddslingers ?? "./scripts/oddslingers-up.sh"}</p>
+            </div>
+            <div className="rounded-xl bg-black/50 p-4">
+              <p className="text-neutral-500"># diagnose</p>
+              <p className="text-emerald-200">{health?.boot?.doctor ?? "./scripts/doctor.sh"}</p>
+            </div>
+          </div>
         </section>
 
         <section className="rounded-2xl border border-white/10 p-6">
