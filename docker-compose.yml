@@ -1,13 +1,5 @@
 name: poker-next-gen
 
-# Local, multi-container development topology.
-#
-#   frontend-table (Next.js) ──▶ backend-core (Nakama) ──▶ postgres
-#
-# All services share the `poker-net` bridge network so they can reach each
-# other by service name. Production deploys use the per-service railway.toml
-# files instead of this compose file.
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -28,6 +20,21 @@ services:
     networks:
       - poker-net
 
+  engine-math:
+    build:
+      context: ./engine-math
+      dockerfile: Dockerfile
+    container_name: poker-engine-math
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - poker-net
+
   backend-core:
     build:
       context: ./backend-core
@@ -36,14 +43,16 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      engine-math:
+        condition: service_healthy
     environment:
-      # user:password@host:port/dbname — points at the postgres service above.
       DATABASE_ADDRESS: postgres:localdb@postgres:5432/nakama
       NAKAMA_LOG_LEVEL: INFO
+      ENGINE_MATH_URL: http://engine-math:8080
     ports:
-      - "7349:7349" # gRPC API
-      - "7350:7350" # HTTP API + socket
-      - "7351:7351" # Nakama Console
+      - "7349:7349"
+      - "7350:7350"
+      - "7351:7351"
     restart: unless-stopped
     networks:
       - poker-net
@@ -52,13 +61,12 @@ services:
     image: node:22-alpine
     container_name: poker-frontend-table
     working_dir: /app
-    # Install deps against the mounted source, then run the Next.js dev server
-    # bound to all interfaces so it is reachable from the host.
     command: sh -c "npm install && npm run dev -- -H 0.0.0.0"
     environment:
       NEXT_PUBLIC_NAKAMA_HOST: http://localhost:7350
       NAKAMA_HOST: http://backend-core:7350
       NAKAMA_SERVER_KEY: defaultkey
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
     volumes:
       - ./frontend-table:/app
       - /app/node_modules

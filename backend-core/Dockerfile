@@ -16,6 +16,8 @@ COPY protocol ./protocol
 COPY poker ./poker
 COPY match ./match
 COPY rpc ./rpc
+COPY store ./store
+COPY migrations ./migrations
 RUN go build --trimpath --buildmode=plugin -o ./backend-core.so
 
 FROM heroiclabs/nakama:3.31.0
