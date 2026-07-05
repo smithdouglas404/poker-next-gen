@@ -10,11 +10,13 @@ import { EquityPanel } from "@/features/hud/EquityPanel";
 import { HandVerifyPanel } from "@/features/hud/HandVerifyPanel";
 import { BuyInSlider, TableLog } from "@/features/hud/TableLog";
 import { usePokerKeyboard } from "@/features/hud/usePokerKeyboard";
+import { useGameSounds } from "@/features/sound/useGameSounds";
 import { useGame } from "@/features/game/GameProvider";
 
 export function TableHud({ children }: { children: React.ReactNode }) {
   const { error, snapshot } = useGame();
   usePokerKeyboard();
+  useGameSounds();
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-neutral-950">

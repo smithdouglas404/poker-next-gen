@@ -74,10 +74,48 @@ The capability rs-poker was chosen for. Replaces the equity heuristic that
 - Verified: top set vs air → call/raise (never fold); trash vs AA → fold. Test
   `cfr_solver_runs_bounded_and_decides` (cargo test, green).
 
-**Follow-ups (Phase 1b):** mixed-strategy frequencies + `export_to_svg` tree visuals;
-range-vs-range via `RangeParser` + `OpponentRanges`; an `/outs` endpoint
-(`OutsCalculator`); ICM endpoint (`simulate_icm_tournament`). Latency note: a full
-solve is ~3s at the node cap — an "analyze spot" action, not per-decision live.
+Latency note: a full solve is ~3s at the node cap — an "analyze spot" action, not
+per-decision live.
+
+### ✅ Phase 1b — More rs_poker capabilities (DONE)
+- `POST /outs` — `holdem::OutsCalculator`: exact (enumerated) equity + outs/draws.
+- `POST /equity/range` — `holdem::RangeParser`: range-vs-range equity ("QQ+", "AKs").
+- `POST /icm` — `simulated_icm::simulate_icm_tournament`: per-stack $ equity.
+- 10 engine-math tests pass. Still open: mixed-strategy frequencies + `export_to_svg`
+  tree visuals, `OpponentRanges` for CFR-vs-range.
+
+### ✅ Phase 2 — Agentic MCP layer (BUILT; needs API key to run)
+`mcp-coach/` — a TypeScript MCP server (`@modelcontextprotocol/sdk`) exposing:
+- `analyze_spot` — calls engine-math (`/gto/solve`, `/equity`, `/gto/advise`) then has
+  Claude (`claude-opus-4-8`) explain + flag mistakes. Grounded in the real engine —
+  never invents math.
+- `flag_bot` — Claude reasons over timing/sizing/frequency for bot-likelihood.
+Builds clean (`npm run build`). Runtime needs `ANTHROPIC_API_KEY` + a reachable
+engine-math. Next: wire from the frontend HUD and a Nakama `RegisterBeforeRt` hook.
+
+### ✅ Phase 3 — Native Nakama + money-safety (DONE, this pass)
+- **Wallet**: `Debit`/`Credit` now transactional + append-only ledger
+  (`poker_wallet_ledger`), with a `wallet_ledger` RPC. Fixes the non-atomic,
+  unledgered money path.
+- **Authorization**: club/rake/balance RPCs now require an owner/configurer
+  (`requireClubConfigurer`) — closes the broken-access-control hole (self-minting
+  chips, adding yourself as owner, reading any ledger). `balance_get` is self-or-owner.
+- **ID generator**: replaced the constant-seeded LCG (predictable, restart-colliding
+  PKs, data race) with `crypto/rand`.
+- **Leaderboards** (`social` pkg): native `global_winnings` board created on init,
+  written on every hand settle.
+- **Notifications**: hand-won, tournament-won/cashed, knockout via `NotificationSend`.
+- **Full prize ladder**: real pool = entrants × buy-in; pays every prize tier by
+  tracked `finish_place` (was: top place only, hardcoded pool).
+Still open: clubs→Groups, custom tournaments→native Tournaments, storage engine,
+chat channels, friends, streams/spectators.
+
+### ✅ Phase 4 (partial) — OddSlingers UX (sound + bet presets DONE)
+- **Sound**: `src/features/sound/` — Web-Audio-synthesized cues (deal/check/bet/call/
+  fold/win/turn), mute toggle persisted, wired to existing opcodes. Zero assets/deps.
+- **Bet-sizing**: ½/⅔/pot presets + slider, clamped to legal bounds, in `ActionBar`.
+Frontend `npm run build` passes. Still open: table chat + play-by-play, chip-movement
+animations, hand-history replay UI, rich tournament lobby.
 
 ### Phase 2 — Agentic MCP layer (live coach + anti-bot)
 The "X-factor." Replace the heuristic `coaching/tip.go` and `antibot/score.go` with a

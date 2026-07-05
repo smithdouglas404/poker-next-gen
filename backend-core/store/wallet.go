@@ -29,31 +29,90 @@ func (s *WalletStore) Get(ctx context.Context, userID string) (int64, error) {
 	return s.Ensure(ctx, userID)
 }
 
-func (s *WalletStore) Debit(ctx context.Context, userID string, amount int64) error {
+// Debit atomically removes funds and records a ledger entry in one transaction.
+// The balance check and the ledger write either both apply or neither does.
+func (s *WalletStore) Debit(ctx context.Context, userID string, amount int64, reason string) error {
 	if amount <= 0 {
 		return nil
 	}
 	if _, err := s.Ensure(ctx, userID); err != nil {
 		return err
 	}
-	res, err := s.db.ExecContext(ctx, `
-		UPDATE poker_global_wallet SET balance=balance-$2, updated_at=NOW()
-		WHERE user_id=$1 AND balance>=$2`, userID, amount)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
+	defer tx.Rollback()
+	var after int64
+	err = tx.QueryRowContext(ctx, `
+		UPDATE poker_global_wallet SET balance=balance-$2, updated_at=NOW()
+		WHERE user_id=$1 AND balance>=$2 RETURNING balance`, userID, amount).Scan(&after)
+	if err == sql.ErrNoRows {
 		return fmt.Errorf("insufficient balance")
 	}
-	return nil
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO poker_wallet_ledger (id,user_id,delta,balance_after,reason,created_at)
+		VALUES ($1,$2,$3,$4,$5,NOW())`, NewID("wl"), userID, -amount, after, reason); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
-func (s *WalletStore) Credit(ctx context.Context, userID string, amount int64) error {
-	_, err := s.db.ExecContext(ctx, `
+// Credit atomically adds funds and records a ledger entry in one transaction.
+func (s *WalletStore) Credit(ctx context.Context, userID string, amount int64, reason string) error {
+	if amount <= 0 {
+		return nil
+	}
+	if _, err := s.Ensure(ctx, userID); err != nil {
+		return err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var after int64
+	if err := tx.QueryRowContext(ctx, `
 		UPDATE poker_global_wallet SET balance=balance+$2, updated_at=NOW()
-		WHERE user_id=$1`, userID, amount)
-	return err
+		WHERE user_id=$1 RETURNING balance`, userID, amount).Scan(&after); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO poker_wallet_ledger (id,user_id,delta,balance_after,reason,created_at)
+		VALUES ($1,$2,$3,$4,$5,NOW())`, NewID("wl"), userID, amount, after, reason); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// LedgerList returns recent wallet movements for a user (newest first).
+func (s *WalletStore) LedgerList(ctx context.Context, userID string, limit int) ([]map[string]interface{}, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, delta, balance_after, reason, created_at
+		FROM poker_wallet_ledger WHERE user_id=$1 ORDER BY created_at DESC LIMIT $2`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []map[string]interface{}
+	for rows.Next() {
+		var id, reason string
+		var delta, after int64
+		var created time.Time
+		if err := rows.Scan(&id, &delta, &after, &reason, &created); err != nil {
+			return nil, err
+		}
+		out = append(out, map[string]interface{}{
+			"id": id, "delta": delta, "balance_after": after, "reason": reason, "created_at": created,
+		})
+	}
+	return out, rows.Err()
 }
 
 type TournamentStore struct{ db *sql.DB }
@@ -245,10 +304,58 @@ func (s *TournamentStore) AssignPlayerTable(ctx context.Context, tournamentID, u
 }
 
 func (s *TournamentStore) MarkBusted(ctx context.Context, tournamentID, userID string) error {
+	// finish_place = number of players still playing at bust time (the subquery
+	// sees the pre-update snapshot, so the buster gets the correct place).
 	_, err := s.db.ExecContext(ctx, `
-		UPDATE poker_tournament_registration SET status='busted', stack=0, updated_at=NOW()
+		UPDATE poker_tournament_registration SET status='busted', stack=0,
+		  finish_place=(SELECT COUNT(*) FROM poker_tournament_registration
+		                WHERE tournament_id=$1 AND status='playing'),
+		  updated_at=NOW()
 		WHERE tournament_id=$1 AND user_id=$2 AND status='playing'`, tournamentID, userID)
 	return err
+}
+
+// SetFinishPlace records a player's finishing position (used for the winner).
+func (s *TournamentStore) SetFinishPlace(ctx context.Context, tournamentID, userID string, place int) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE poker_tournament_registration SET finish_place=$3, updated_at=NOW()
+		WHERE tournament_id=$1 AND user_id=$2`, tournamentID, userID, place)
+	return err
+}
+
+// Finisher is a player with a recorded finishing position.
+type Finisher struct {
+	UserID      string
+	Username    string
+	FinishPlace int
+}
+
+// ListFinishers returns players with a recorded finish place, best first.
+func (s *TournamentStore) ListFinishers(ctx context.Context, tournamentID string) ([]Finisher, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT user_id, username, finish_place FROM poker_tournament_registration
+		WHERE tournament_id=$1 AND finish_place > 0 ORDER BY finish_place ASC`, tournamentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Finisher
+	for rows.Next() {
+		var f Finisher
+		if err := rows.Scan(&f.UserID, &f.Username, &f.FinishPlace); err != nil {
+			return nil, err
+		}
+		out = append(out, f)
+	}
+	return out, rows.Err()
+}
+
+// CountEntrants returns the total number of registrations (for prize-pool calc).
+func (s *TournamentStore) CountEntrants(ctx context.Context, tournamentID string) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM poker_tournament_registration WHERE tournament_id=$1`, tournamentID).Scan(&n)
+	return n, err
 }
 
 func (s *TournamentStore) UpdatePlayerStack(ctx context.Context, tournamentID, userID string, stack int64) error {
@@ -302,5 +409,5 @@ func (s *TournamentStore) GetBalancingRule(ctx context.Context, tournamentID str
 
 func (s *TournamentStore) PayWinner(ctx context.Context, tournamentID, userID string, amount int64) error {
 	w := NewWalletStore(s.db)
-	return w.Credit(ctx, userID, amount)
+	return w.Credit(ctx, userID, amount, "tournament_prize")
 }

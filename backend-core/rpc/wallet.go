@@ -26,6 +26,27 @@ func WalletGet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtim
 	return string(out), nil
 }
 
+// WalletLedger returns the caller's recent wallet movements (the new
+// append-only ledger backing every debit/credit).
+func WalletLedger(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	userID, ok := ctx.Value(runtime.RUNTIME_CTX_USER_ID).(string)
+	if !ok || userID == "" {
+		return "", runtime.NewError("unauthorized", 16)
+	}
+	var req struct {
+		Limit int `json:"limit"`
+	}
+	if payload != "" {
+		_ = json.Unmarshal([]byte(payload), &req)
+	}
+	entries, err := store.NewWalletStore(db).LedgerList(ctx, userID, req.Limit)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	out, _ := json.Marshal(map[string]interface{}{"user_id": userID, "ledger": entries})
+	return string(out), nil
+}
+
 func ProfileGet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	userID, ok := ctx.Value(runtime.RUNTIME_CTX_USER_ID).(string)
 	if !ok || userID == "" {

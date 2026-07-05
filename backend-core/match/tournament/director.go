@@ -12,6 +12,7 @@ import (
 
 	"github.com/smithdouglas404/poker-next-gen/backend-core/models"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/protocol"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/social"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
 
@@ -132,16 +133,57 @@ func (h *Handler) checkFinish(ctx context.Context, logger runtime.Logger, db *sq
 	if err != nil || playing > 1 {
 		return
 	}
+	// The last player still 'playing' is the champion — finish place 1.
 	players, _ := tStore.ListRegistered(ctx, s.TournamentID)
 	for _, p := range players {
 		if p.Status == "playing" {
-			prizes, _ := tStore.ListPrizes(ctx, s.TournamentID)
-			if len(prizes) > 0 {
-				pool := int64(playing) * 10000 // simplified; real pool from buy-ins
-				_ = tStore.PayWinner(ctx, s.TournamentID, p.UserID, pool*int64(prizes[0].PayoutBps)/10000)
+			_ = tStore.SetFinishPlace(ctx, s.TournamentID, p.UserID, 1)
+		}
+	}
+
+	// Real prize pool = entrants × buy-in (was a hardcoded placeholder).
+	entrants, _ := tStore.CountEntrants(ctx, s.TournamentID)
+	var buyIn int64
+	if tours, err := tStore.List(ctx); err == nil {
+		for _, t := range tours {
+			if t.ID == s.TournamentID {
+				buyIn = t.BuyInMinor
+				break
 			}
 		}
 	}
+	pool := int64(entrants) * buyIn
+
+	// Pay the full prize ladder: each tier's basis-point share is split evenly
+	// across the finishing positions it covers.
+	prizes, _ := tStore.ListPrizes(ctx, s.TournamentID)
+	finishers, _ := tStore.ListFinishers(ctx, s.TournamentID)
+	for _, prize := range prizes {
+		places := int(prize.RankTo - prize.RankFrom + 1)
+		if places <= 0 {
+			places = 1
+		}
+		perPlace := pool * int64(prize.PayoutBps) / 10000 / int64(places)
+		if perPlace <= 0 {
+			continue
+		}
+		for _, f := range finishers {
+			if f.FinishPlace < int(prize.RankFrom) || f.FinishPlace > int(prize.RankTo) {
+				continue
+			}
+			_ = tStore.PayWinner(ctx, s.TournamentID, f.UserID, perPlace)
+			subject, code := "tournament_cashed", social.CodeTournamentInfo
+			if f.FinishPlace == 1 {
+				subject, code = "tournament_won", social.CodeTournamentWon
+			}
+			social.Notify(ctx, nk, f.UserID, subject, map[string]interface{}{
+				"tournament_id": s.TournamentID,
+				"place":         f.FinishPlace,
+				"amount":        perPlace,
+			}, code)
+		}
+	}
+
 	_ = tStore.Finish(ctx, s.TournamentID)
 	payload, _ := json.Marshal(map[string]interface{}{"tournament_id": s.TournamentID, "status": "finished"})
 	_ = dispatcher.BroadcastMessage(protocol.OpTournamentInfo, payload, nil, nil, true)

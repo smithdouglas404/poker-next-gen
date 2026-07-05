@@ -11,6 +11,7 @@ import (
 	"github.com/smithdouglas404/poker-next-gen/backend-core/audit"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/poker"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/protocol"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/social"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
 
@@ -263,6 +264,7 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		if err := broadcastShowdownFromResult(ctx, db, dispatcher, s, winners, res, potBefore); err != nil {
 			logger.Error("broadcast showdown: %v", err)
 		}
+		recordWinnings(ctx, nk, s, res)
 		creditRake(ctx, db, s, potBefore)
 		s.Table.ResetBetweenHands()
 		s.Phase = poker.PhaseWaiting
@@ -408,7 +410,7 @@ func reserveBuyIn(ctx context.Context, db *sql.DB, s *MatchState, userID string,
 	if s.ClubID != "" {
 		return store.NewClubStore(db).LockBalance(ctx, s.ClubID, userID, amount)
 	}
-	return store.NewWalletStore(db).Debit(ctx, userID, amount)
+	return store.NewWalletStore(db).Debit(ctx, userID, amount, "table_buyin")
 }
 
 func releaseBuyIn(ctx context.Context, db *sql.DB, clubID, userID string, amount int64) {
@@ -419,7 +421,7 @@ func releaseBuyIn(ctx context.Context, db *sql.DB, clubID, userID string, amount
 		_ = store.NewClubStore(db).UnlockBalance(ctx, clubID, userID, amount)
 		return
 	}
-	_ = store.NewWalletStore(db).Credit(ctx, userID, amount)
+	_ = store.NewWalletStore(db).Credit(ctx, userID, amount, "table_cashout")
 }
 
 func creditRake(ctx context.Context, db *sql.DB, s *MatchState, pot int64) {
@@ -444,6 +446,32 @@ func creditRake(ctx context.Context, db *sql.DB, s *MatchState, pot int64) {
 		return
 	}
 	_ = store.NewRakeStore(db).Credit(ctx, s.ClubID, rakeAmount, s.MatchID, s.Table.HandNo)
+}
+
+// recordWinnings posts each pot winner's share to the global leaderboard and
+// sends them a "hand won" notification (native Nakama features).
+func recordWinnings(ctx context.Context, nk runtime.NakamaModule, s *MatchState, res poker.ShowdownResult) {
+	for _, r := range res.Resolutions {
+		if len(r.Winners) == 0 || r.Amount <= 0 {
+			continue
+		}
+		share := r.Amount / int64(len(r.Winners))
+		if share <= 0 {
+			continue
+		}
+		for _, seat := range r.Winners {
+			if seat < 0 || seat >= len(s.Table.Seats) || s.Table.Seats[seat] == nil {
+				continue
+			}
+			w := s.Table.Seats[seat]
+			social.RecordWinnings(ctx, nk, w.UserID, w.Username, share)
+			social.Notify(ctx, nk, w.UserID, "hand_won", map[string]interface{}{
+				"amount":  share,
+				"hand_no": s.Table.HandNo,
+				"room_id": s.RoomID,
+			}, social.CodeHandWon)
+		}
+	}
 }
 
 func reportTournamentBusts(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *MatchState) {

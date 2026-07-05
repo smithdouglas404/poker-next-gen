@@ -112,6 +112,18 @@ CREATE TABLE IF NOT EXISTS poker_global_wallet (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Append-only ledger for every wallet movement (audit trail + reconciliation).
+CREATE TABLE IF NOT EXISTS poker_wallet_ledger (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    delta BIGINT NOT NULL,
+    balance_after BIGINT NOT NULL,
+    reason TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_wallet_ledger_user ON poker_wallet_ledger(user_id, created_at DESC);
+
 CREATE INDEX IF NOT EXISTS idx_poker_owner_club ON poker_owner(club_id);
 CREATE INDEX IF NOT EXISTS idx_poker_balance_club_user ON poker_player_balance(club_id, user_id);
 CREATE INDEX IF NOT EXISTS idx_poker_tournament_status ON poker_tournament(status);
@@ -145,6 +157,7 @@ ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS level_started_at TIMESTAMP
 
 ALTER TABLE poker_tournament_registration ADD COLUMN IF NOT EXISTS match_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE poker_tournament_registration ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE poker_tournament_registration ADD COLUMN IF NOT EXISTS finish_place INT NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS poker_audit_event (
     id TEXT PRIMARY KEY,

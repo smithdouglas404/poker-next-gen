@@ -12,6 +12,39 @@ import (
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
 
+// callerID returns the authenticated user id, or an error if the call is not
+// user-authenticated (server-key/HTTP calls have no user context).
+func callerID(ctx context.Context) (string, error) {
+	userID, _ := ctx.Value(runtime.RUNTIME_CTX_USER_ID).(string)
+	if userID == "" {
+		return "", runtime.NewError("unauthorized", 16)
+	}
+	return userID, nil
+}
+
+// requireClubConfigurer authorizes the caller as an owner/configurer of the
+// club. Without this, any authenticated player could allocate themselves club
+// chips, add themselves as an owner, change rake, or read the house ledger.
+func requireClubConfigurer(ctx context.Context, db *sql.DB, clubID string) (string, error) {
+	userID, err := callerID(ctx)
+	if err != nil {
+		return "", err
+	}
+	if clubID == "" {
+		return "", runtime.NewError("club_id required", 3)
+	}
+	owners, err := store.NewClubStore(db).ListOwners(ctx, clubID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	for _, o := range owners {
+		if o.UserID == userID && (o.CanConfigure || o.Role == "owner") {
+			return userID, nil
+		}
+	}
+	return "", runtime.NewError("forbidden: not a club owner/configurer", 7)
+}
+
 func ClubCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	var club models.Club
 	if payload != "" {
@@ -69,6 +102,9 @@ func ClubOwnerAdd(ctx context.Context, logger runtime.Logger, db *sql.DB, nk run
 	if req.ClubID == "" || req.UserID == "" {
 		return "", runtime.NewError("club_id and user_id required", 3)
 	}
+	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+		return "", err
+	}
 	if req.Role == "" {
 		req.Role = "manager"
 	}
@@ -86,6 +122,11 @@ func BalanceAllocate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk 
 	}
 	if req.ClubID == "" || req.UserID == "" {
 		return "", runtime.NewError("club_id and user_id required", 3)
+	}
+	// Only a club owner/configurer may allocate chips — otherwise any player
+	// could mint themselves an unlimited buy-in bankroll.
+	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+		return "", err
 	}
 	if req.Currency == "" {
 		req.Currency = "USD"
@@ -105,6 +146,19 @@ func BalanceGet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 	if err := json.Unmarshal([]byte(payload), &req); err != nil {
 		return "", runtime.NewError("invalid payload", 3)
 	}
+	// A player may read their own balance; anyone else must be a club configurer.
+	caller, err := callerID(ctx)
+	if err != nil {
+		return "", err
+	}
+	if req.UserID == "" {
+		req.UserID = caller
+	}
+	if req.UserID != caller {
+		if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+			return "", err
+		}
+	}
 	bal, err := store.NewClubStore(db).GetBalance(ctx, req.ClubID, req.UserID)
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
@@ -120,6 +174,9 @@ func RakeConfigSet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 	}
 	if req.ClubID == "" {
 		return "", runtime.NewError("club_id required", 3)
+	}
+	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+		return "", err
 	}
 	if req.Name == "" {
 		req.Name = "Standard"
@@ -153,6 +210,9 @@ func RakeLedgerGet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 	}
 	if err := json.Unmarshal([]byte(payload), &req); err != nil {
 		return "", runtime.NewError("invalid payload", 3)
+	}
+	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+		return "", err
 	}
 	rakeStore := store.NewRakeStore(db)
 	balance, err := rakeStore.HouseBalance(ctx, req.ClubID)

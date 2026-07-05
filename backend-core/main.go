@@ -13,6 +13,7 @@ import (
 	"github.com/smithdouglas404/poker-next-gen/backend-core/models"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/protocol"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/rpc"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/social"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
 
@@ -23,6 +24,9 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		logger.Error("schema migration failed: %v", err)
 		return err
 	}
+
+	// Create native Nakama leaderboards (idempotent).
+	social.EnsureLeaderboards(ctx, nk)
 
 	rpcs := map[string]func(context.Context, runtime.Logger, *sql.DB, runtime.NakamaModule, string) (string, error){
 		"healthz":              rpc.Healthz,
@@ -46,6 +50,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"prize_pool_list":      rpc.PrizePoolList,
 		"balancing_rule_set":   rpc.BalancingRuleSet,
 		"wallet_get":           rpc.WalletGet,
+		"wallet_ledger":        rpc.WalletLedger,
 		"profile_get":          rpc.ProfileGet,
 		"matchmaker_enqueue":   rpc.MatchmakerEnqueue,
 		"equity_estimate":      rpc.EquityEstimate,

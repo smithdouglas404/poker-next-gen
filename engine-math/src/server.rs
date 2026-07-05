@@ -8,8 +8,8 @@ use axum::{
     Json, Router,
 };
 use engine_math::{
-    batch_rank, cfr_advise, compare_hands, deck_commitment, estimate_equity, gto_advise,
-    omaha_showdown_winners, rank_hand, rank_omaha, showdown_winners, shuffle_deck,
+    batch_rank, cfr_advise, compare_hands, deck_commitment, estimate_equity, gto_advise, icm, outs,
+    omaha_showdown_winners, range_equity, rank_hand, rank_omaha, showdown_winners, shuffle_deck,
 };
 use serde::{Deserialize, Serialize};
 use std::{cmp::Ordering, net::SocketAddr, sync::Arc};
@@ -275,6 +275,63 @@ async fn cfr_advise_handler(
 }
 
 #[derive(Deserialize)]
+struct OutsRequest {
+    hero_hole: String,
+    villain_holes: Vec<String>,
+    #[serde(default)]
+    board: String,
+}
+
+async fn outs_handler(
+    Json(req): Json<OutsRequest>,
+) -> Result<Json<engine_math::OutsReport>, (StatusCode, String)> {
+    let villains: Vec<&str> = req.villain_holes.iter().map(String::as_str).collect();
+    let report = outs(&req.hero_hole, &villains, &req.board).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(report))
+}
+
+#[derive(Deserialize)]
+struct RangeEquityRequest {
+    hero_range: String,
+    villain_range: String,
+    #[serde(default)]
+    board: String,
+    #[serde(default = "default_range_matchups")]
+    matchups: usize,
+}
+
+fn default_range_matchups() -> usize {
+    500
+}
+
+async fn range_equity_handler(
+    Json(req): Json<RangeEquityRequest>,
+) -> Result<Json<engine_math::RangeEquity>, (StatusCode, String)> {
+    let re = range_equity(&req.hero_range, &req.villain_range, &req.board, req.matchups)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(re))
+}
+
+#[derive(Deserialize)]
+struct IcmRequest {
+    chips: Vec<f64>,
+    payouts: Vec<f64>,
+    #[serde(default = "default_icm_trials")]
+    trials: usize,
+}
+
+fn default_icm_trials() -> usize {
+    5000
+}
+
+async fn icm_handler(
+    Json(req): Json<IcmRequest>,
+) -> Result<Json<engine_math::IcmResult>, (StatusCode, String)> {
+    let res = icm(req.chips, req.payouts, req.trials).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(res))
+}
+
+#[derive(Deserialize)]
 struct DeckVerifyRequest {
     cards: Vec<String>,
     deck_hash: String,
@@ -314,6 +371,9 @@ async fn main() {
         .route("/omaha/showdown", post(omaha_showdown))
         .route("/gto/advise", post(gto_advise_handler))
         .route("/gto/solve", post(cfr_advise_handler))
+        .route("/outs", post(outs_handler))
+        .route("/equity/range", post(range_equity_handler))
+        .route("/icm", post(icm_handler))
         .route("/deck/verify", post(deck_verify))
         .layer(CorsLayer::permissive())
         .with_state(state);
