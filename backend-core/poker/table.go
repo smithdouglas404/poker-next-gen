@@ -43,6 +43,7 @@ type Seat struct {
 	TotalContributed int64
 	Status           SeatStatus
 	LastAction       string
+	IsBot            bool
 }
 
 type Street string
@@ -113,6 +114,25 @@ func (t *Table) StandUp(seat int) {
 	if seat >= 0 && seat < MaxSeats {
 		t.Seats[seat] = nil
 	}
+}
+
+// SitDownBot seats an AI player (no wallet debit; not tied to a presence).
+func (t *Table) SitDownBot(seat int, userID, username string, buyIn int64) error {
+	if err := t.SitDown(seat, userID, username, buyIn); err != nil {
+		return err
+	}
+	t.Seats[seat].IsBot = true
+	return nil
+}
+
+// FirstEmptySeat returns the lowest empty seat index, or -1 if the table is full.
+func (t *Table) FirstEmptySeat() int {
+	for i := 0; i < MaxSeats; i++ {
+		if t.Seats[i] == nil {
+			return i
+		}
+	}
+	return -1
 }
 
 func (t *Table) StartHand(sb, bb int64) error {

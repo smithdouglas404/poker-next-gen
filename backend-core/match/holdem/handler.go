@@ -5,10 +5,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"time"
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
 	"github.com/smithdouglas404/poker-next-gen/backend-core/audit"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/bot"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/poker"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/protocol"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/social"
@@ -35,6 +38,8 @@ type MatchState struct {
 	Ante             int64
 	BuyIn            int64
 	Presences        map[string]runtime.Presence
+	BotCount         int
+	Rand             *rand.Rand
 }
 
 type Handler struct{}
@@ -79,6 +84,7 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		BigBlind:     bb,
 		BuyIn:        buyIn,
 		Presences:    map[string]runtime.Presence{},
+		Rand:         rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 	label := buildLabel(state)
 	return state, 1, label
@@ -221,7 +227,80 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			}
 		}
 	}
+
+	// After human input, let any bot(s) whose turn it is act.
+	driveBots(ctx, db, dispatcher, s)
 	return s
+}
+
+// driveBots plays out consecutive bot turns during the betting phase. Bot hand
+// strength comes from rs_poker (engine-math) inside bot.Decide; the loop applies
+// each decision through the same table logic a human action uses.
+func driveBots(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
+	for guard := 0; guard < poker.MaxSeats*4; guard++ {
+		if !s.Phase.AllowsPlayerActions() {
+			return
+		}
+		seatIdx := s.Table.ActionSeat
+		if seatIdx < 0 {
+			return
+		}
+		seat := s.Table.Seats[seatIdx]
+		if seat == nil || !seat.IsBot || seat.Status != poker.SeatSeated {
+			return
+		}
+
+		_, toCall, minRaise, maxRaise := s.Table.ValidActions(seatIdx)
+		hole, ok := s.Table.HoleCards[seat.UserID]
+		action, amount := "check", int64(0)
+		if toCall > 0 {
+			action = "fold"
+		}
+		if ok {
+			holeStr := hole[0].Code() + hole[1].Code()
+			if d, err := bot.Decide(holeStr, boardCodes(s.Table.Board), toCall, s.Table.Pot, minRaise, maxRaise, seat.Stack, s.Rand); err == nil {
+				action, amount = d.Action, d.Amount
+			}
+		}
+
+		if err := s.Table.ApplyAction(seatIdx, action, amount); err != nil {
+			// Fall back to the safest legal action if the policy pick was illegal.
+			fallback := "fold"
+			if toCall == 0 {
+				fallback = "check"
+			}
+			if err2 := s.Table.ApplyAction(seatIdx, fallback, 0); err2 != nil {
+				return
+			}
+			action, amount = fallback, 0
+		}
+
+		emitPlayerAction(ctx, s, seat.UserID, action, amount)
+		broadcastSnapshot(ctx, db, dispatcher, s, nil)
+
+		if _, uncontested := s.Table.UncontestedWinner(); uncontested {
+			beginShowdownResolution(ctx, s)
+			broadcastSnapshot(ctx, db, dispatcher, s, nil)
+			return
+		}
+		if s.Table.AdvanceAction() {
+			beginShowdownResolution(ctx, s)
+			broadcastSnapshot(ctx, db, dispatcher, s, nil)
+			return
+		}
+		if len(s.Table.Board) > 0 {
+			broadcastBoard(dispatcher, s)
+		}
+		broadcastActionRequired(ctx, db, dispatcher, s)
+	}
+}
+
+func boardCodes(board []poker.Card) string {
+	out := ""
+	for _, c := range board {
+		out += c.Code()
+	}
+	return out
 }
 
 func beginShowdownResolution(ctx context.Context, s *MatchState) {
@@ -526,6 +605,18 @@ func (h *Handler) MatchSignal(ctx context.Context, logger runtime.Logger, db *sq
 			}
 		}
 		broadcastSnapshot(ctx, db, dispatcher, s, nil)
+	case "add_bot":
+		seatIdx := s.Table.FirstEmptySeat()
+		if seatIdx >= 0 {
+			s.BotCount++
+			buyIn := poker.ClampBuyIn(s.BuyIn)
+			name := fmt.Sprintf("Bot_%d", s.BotCount)
+			botID := fmt.Sprintf("bot_%s_%d", s.RoomID, seatIdx)
+			if err := s.Table.SitDownBot(seatIdx, botID, name, buyIn); err == nil {
+				dispatcher.MatchLabelUpdate(buildLabel(s))
+				broadcastSnapshot(ctx, db, dispatcher, s, nil)
+			}
+		}
 	}
 	return s, ""
 }

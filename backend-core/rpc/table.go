@@ -56,6 +56,24 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 	return string(resp), nil
 }
 
+// TableAddBot seats an AI player at the given match (fills empty seats so a
+// player can play against bots). Signals the match to seat the bot.
+func TableAddBot(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	var req struct {
+		MatchID string `json:"match_id"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil {
+		return "", runtime.NewError("invalid payload", 3)
+	}
+	if req.MatchID == "" {
+		return "", runtime.NewError("match_id required", 3)
+	}
+	if _, err := nk.MatchSignal(ctx, req.MatchID, `{"type":"add_bot"}`); err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	return `{"ok":true}`, nil
+}
+
 func TableList(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	matches, err := nk.MatchList(ctx, 20, true, "", nil, nil, "+label.module:holdem_cash_6max")
 	if err != nil {

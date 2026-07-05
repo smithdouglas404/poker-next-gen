@@ -73,7 +73,46 @@ export default defineRailway(() => {
     },
   });
 
+  // --- OddSlingers (optional companion platform) --------------------------
+  // Deployed as its own service group with its own Postgres + Redis. The web
+  // service builds from oddslingers-deploy/Dockerfile, which git-clones the
+  // pinned upstream commit at build time (see that file's header). This is NOT
+  // the gameplay backend — Nakama + rs_poker remain authoritative. The build
+  // has not been validated from CI; expect one or two real build iterations.
+  const oddsDb = postgres("oddslingers-postgres");
+  const oddsRedis = service("oddslingers-redis", {
+    source: { image: "redis:5-alpine" },
+    deploy: { restartPolicyType: "ON_FAILURE" },
+  });
+  const oddslingers = service("oddslingers-web", {
+    source: github(REPO, { rootDirectory: "." }),
+    build: {
+      builder: "DOCKERFILE",
+      dockerfilePath: "oddslingers-deploy/Dockerfile",
+      watchPatterns: ["oddslingers-deploy/**"],
+    },
+    healthcheckTimeout: 600,
+    deploy: { restartPolicyType: "ON_FAILURE" },
+    env: {
+      ODDSLINGERS_ENV: "PROD",
+      IS_DOCKER: "1",
+      POSTGRES_HOST: oddsDb.env.PGHOST,
+      POSTGRES_PORT: oddsDb.env.PGPORT,
+      POSTGRES_DB: oddsDb.env.PGDATABASE,
+      POSTGRES_USER: oddsDb.env.PGUSER,
+      POSTGRES_PASSWORD: oddsDb.env.PGPASSWORD,
+      REDIS_HOST: "oddslingers-redis.railway.internal",
+      // SECRET_KEY must be set as a Railway secret (do not commit it).
+      ALLOWED_HOSTS: "${{oddslingers-web.RAILWAY_PUBLIC_DOMAIN}}",
+      DEFAULT_HOST: "${{oddslingers-web.RAILWAY_PUBLIC_DOMAIN}}",
+      SERVE_STATIC: "True",
+    },
+  });
+
   return project("poker-next-gen", {
-    resources: [group("Core stack", [db, engineMath, backendCore, frontendTable])],
+    resources: [
+      group("Core stack", [db, engineMath, backendCore, frontendTable]),
+      group("OddSlingers (optional)", [oddsDb, oddsRedis, oddslingers]),
+    ],
   });
 });

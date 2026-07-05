@@ -140,17 +140,25 @@ Rule-safe, high polish. Order: table **chat + play-by-play** → **sound** → f
 the audit chain) → rich **tournament lobby** → bet-sizing presets/slider →
 badges/achievements → side betting.
 
-### Phase 5 — Bots & new variants (engine work)
-- **Bots**: Nakama-side bot presences using rs_poker `arena` agents / Phase-1 CFR for
-  decisions; OddSlingers personalities as pure data. Fills tables, enables SNGs.
-- **Omaha / Bounty** as *playable* variants: new Go match handlers driving rs_poker
-  (which already evaluates Omaha) — not ports of OddSlingers' controllers.
+### ✅ Phase 5 (bots DONE; variants open)
+- **Bots** (`backend-core/bot/`): AI players whose hand strength comes from rs_poker
+  via engine-math (Golden Rule #4), with a local policy (pot odds + noise). Seated
+  via the `add_bot` match signal / `table_add_bot` RPC; driven in the match loop
+  (`driveBots`) so they act on their turn. Pure `policy` is unit-tested. Verified by
+  `go test ./bot` + plugin build; runtime behavior needs a live Nakama server.
+- Still open: OddSlingers bot **personalities** (pure data), and playable **Omaha /
+  Bounty** variants (new Go match handlers driving rs_poker — Omaha eval already
+  exists as `omaha_*` RPCs).
 
-### Phase 6 — OddSlingers on Railway (separate track)
-Deploy OddSlingers itself (multi-service Django/Channels app) — see the separate
-scoping needed: source strategy (upstream repo vs vendor vs submodule) and a prod
-Dockerfile (its current one is dev-only, bind-mount based). Standalone service; not
-the gameplay backend.
+### ✅ Phase 6 — OddSlingers on Railway (IaC + Dockerfile; deploy unverified)
+- `oddslingers-deploy/Dockerfile`: self-contained prod image that git-clones the
+  pinned upstream commit at build time (chosen over upstream-source / vendor /
+  submodule — see `oddslingers-deploy/README.md`).
+- `.railway/railway.ts`: `group("OddSlingers (optional)")` — its own Postgres +
+  Redis + `oddslingers-web`. Standalone; **not** the gameplay backend.
+- ⚠️ Not build/deploy-validated from CI (Python 3.7 EOL app); needs `SECRET_KEY` and
+  likely one or two real Railway build iterations. Workers (dramatiq/tablebeat) not
+  deployed — web process only.
 
 ### Cross-cutting — transport
 Current engine-math calls are HTTP REST. For live CFR/coaching, evaluate **gRPC or a
