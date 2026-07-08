@@ -51,35 +51,6 @@ export default defineRailway(() => {
     },
   });
 
-  const openprojectMcp = service("openproject-mcp", {
-    source: github(REPO, { rootDirectory: "openproject-mcp" }),
-    build: {
-      builder: "DOCKERFILE",
-      dockerfilePath: "Dockerfile",
-      watchPatterns: ["openproject-mcp/**"],
-    },
-    healthcheck: "/health",
-    healthcheckTimeout: 300,
-    deploy: {
-      restartPolicyType: "ALWAYS",
-    },
-    env: {
-      PORT: "8090",
-      OPENPROJECT_MCP_STATE_PATH: "/data/state.json",
-      OPENPROJECT_MCP_INTERVAL_SECONDS: "3600",
-      OPENPROJECT_MCP_MODEL: "claude-opus-4-8",
-      // Secrets — set these in the Railway dashboard (not committed here):
-      //   OPENPROJECT_MCP_ADMIN_TOKEN  shared bearer token (also referenced by frontend-table)
-      //   OPENPROJECT_MCP_URL          https://<your-openproject>/mcp
-      //   OPENPROJECT_MCP_TOKEN        OpenProject MCP auth token
-      //   OPENPROJECT_API_BASE_URL     https://<your-openproject>
-      //   OPENPROJECT_API_TOKEN        OpenProject API key (write-back)
-      //   ANTHROPIC_API_KEY            Claude API key
-      //   FALKORDB_URL                 redis://<host>:<port> (or FALKORDB_HOST/PORT/PASSWORD)
-      //   FALKORDB_GRAPH               graph name (default: openproject)
-    },
-  });
-
   const frontendTable = service("frontend-table", {
     source: github(REPO, { rootDirectory: "frontend-table" }),
     build: {
@@ -99,16 +70,10 @@ export default defineRailway(() => {
       NEXT_PUBLIC_NAKAMA_HOST: "https://${{backend-core.RAILWAY_PUBLIC_DOMAIN}}",
       ENGINE_MATH_URL: "http://engine-math.railway.internal:8080",
       NEXT_PUBLIC_ENGINE_MATH_URL: "https://${{engine-math.RAILWAY_PUBLIC_DOMAIN}}",
-      // OpenProject MCP review agent (server-side proxy target + shared token).
-      OPENPROJECT_MCP_SERVICE_URL: "http://openproject-mcp.railway.internal:8090",
-      OPENPROJECT_MCP_ADMIN_TOKEN: "${{openproject-mcp.OPENPROJECT_MCP_ADMIN_TOKEN}}",
     },
   });
 
   return project("poker-next-gen", {
-    resources: [
-      group("Core stack", [db, engineMath, backendCore, frontendTable]),
-      group("Integrations", [openprojectMcp]),
-    ],
+    resources: [group("Core stack", [db, engineMath, backendCore, frontendTable])],
   });
 });
