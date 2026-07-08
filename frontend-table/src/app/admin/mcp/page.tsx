@@ -46,6 +46,19 @@ interface ReviewRecord {
   error?: string;
 }
 
+const DEFAULT_CONFIG: SyncConfig = {
+  openProjectMcpUrl: "",
+  openProjectApiBaseUrl: "",
+  intervalSeconds: 3600,
+  enabled: true,
+  model: "claude-opus-4-8",
+  listToolName: "list_work_packages",
+  listToolArguments: {},
+  kgEnabled: true,
+  kgGraphName: "openproject",
+  kgRetrieveLimit: 25,
+};
+
 const READINESS_LABELS: Record<keyof Readiness, string> = {
   openProjectMcpUrl: "OpenProject MCP URL",
   openProjectMcpToken: "OpenProject MCP token (env)",
@@ -88,7 +101,12 @@ export default function McpConfigPage() {
       const r = await api<{ reviews: ReviewRecord[] }>("reviews");
       setReviews(r.reviews);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load MCP config");
+      // Still show the form (with defaults) so the MCP server details can be
+      // entered even when the backend service isn't reachable yet.
+      setConfig((c: SyncConfig | null) => c ?? DEFAULT_CONFIG);
+      setError(
+        `${e instanceof Error ? e.message : "Failed to load MCP config"} — the openproject-mcp service must be deployed and reachable before settings can be saved.`,
+      );
     }
   }, []);
 
