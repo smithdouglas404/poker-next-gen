@@ -1,6 +1,7 @@
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 
 import { sanitizeConfigPatch, type RuntimeConfig, type Secrets } from "./config.js";
+import { connectOpenProjectMcp } from "./mcpClient.js";
 import type { Scheduler } from "./scheduler.js";
 import type { Store } from "./store.js";
 
@@ -79,6 +80,26 @@ export function createApp(ctx: ApiContext): Express {
 
   app.get("/api/reviews", auth, (_req, res) => {
     res.json({ reviews: ctx.store.snapshot.reviews });
+  });
+
+  // Live check: connect to the configured OpenProject MCP server and list its
+  // tools. Confirms the adapter + credentials work before any review runs.
+  app.get("/api/mcp/tools", auth, async (_req, res) => {
+    const url = ctx.store.config.openProjectMcpUrl;
+    if (!url) {
+      res.status(400).json({ error: "OpenProject MCP URL is not configured" });
+      return;
+    }
+    let caller;
+    try {
+      caller = await connectOpenProjectMcp(url, ctx.secrets.openProjectMcpToken);
+      const tools = await caller.listToolNames();
+      res.json({ ok: true, url, tools });
+    } catch (e) {
+      res.status(502).json({ ok: false, error: e instanceof Error ? e.message : String(e) });
+    } finally {
+      await caller?.close().catch(() => {});
+    }
   });
 
   app.post("/api/review-now", auth, async (_req, res) => {

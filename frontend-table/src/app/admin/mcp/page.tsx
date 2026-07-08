@@ -70,6 +70,7 @@ export default function McpConfigPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [discoveredTools, setDiscoveredTools] = useState<string[] | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -128,6 +129,22 @@ export default function McpConfigPage() {
       setBusy(false);
     }
   }, [config, load]);
+
+  const testConnection = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    setDiscoveredTools(null);
+    try {
+      const { tools } = await api<{ tools: string[] }>("mcp/tools");
+      setDiscoveredTools(tools);
+      setNotice(`Connected. ${tools.length} tool(s) exposed by the OpenProject MCP server.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Test connection failed");
+    } finally {
+      setBusy(false);
+    }
+  }, []);
 
   const reviewNow = useCallback(async () => {
     setBusy(true);
@@ -204,6 +221,44 @@ export default function McpConfigPage() {
                   value={config.listToolName}
                   onChange={(v) => patch({ listToolName: v })}
                 />
+                <div>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void testConnection()}
+                    className="rounded-full border border-sky-500/40 bg-sky-950/30 px-4 py-2 text-sm font-semibold text-sky-200 hover:bg-sky-900/30 disabled:opacity-50"
+                  >
+                    Test connection
+                  </button>
+                  {discoveredTools && (
+                    <div className="mt-3">
+                      <p className="text-xs uppercase tracking-wider text-neutral-500">
+                        Tools exposed by your MCP server — click to use for listing:
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {discoveredTools.map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => patch({ listToolName: t })}
+                            className={`rounded-full border px-3 py-1 text-xs ${
+                              config.listToolName === t
+                                ? "border-emerald-500/50 bg-emerald-950/40 text-emerald-200"
+                                : "border-white/15 bg-white/[0.03] text-neutral-300 hover:border-emerald-400/40"
+                            }`}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                        {discoveredTools.length === 0 && (
+                          <span className="text-xs text-neutral-500">
+                            Connected, but the server reported no tools.
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </section>
 
