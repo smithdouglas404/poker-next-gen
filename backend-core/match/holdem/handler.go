@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/heroiclabs/nakama-common/runtime"
@@ -140,7 +141,10 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			continue
 		}
 
-		if !s.Phase.AllowsPlayerActions() && msg.GetOpCode() != protocol.OpStandUp {
+		// Chat and standing up are allowed at any time; game actions are gated
+		// to the betting phase.
+		if !s.Phase.AllowsPlayerActions() &&
+			msg.GetOpCode() != protocol.OpStandUp && msg.GetOpCode() != protocol.OpChatSend {
 			sendError(dispatcher, presence, "hand_busy", "showdown in progress")
 			continue
 		}
@@ -183,6 +187,28 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			dispatcher.MatchLabelUpdate(buildLabel(s))
 			broadcastSnapshot(ctx, db, dispatcher, s, nil)
 
+		case protocol.OpChatSend:
+			var req protocol.ChatSendRequest
+			if err := json.Unmarshal(msg.GetData(), &req); err != nil {
+				continue
+			}
+			text := sanitizeChat(req.Text)
+			if text == "" {
+				continue
+			}
+			username := presence.GetUsername()
+			if username == "" {
+				username = fmt.Sprintf("Player_%s", userID[:4])
+			}
+			broadcastChat(dispatcher, s, protocol.ChatMessage{
+				UserID:   userID,
+				Username: username,
+				Text:     text,
+				Kind:     "player",
+				Seat:     seatForUser(s, userID),
+				HandNo:   s.Table.HandNo,
+			})
+
 		case protocol.OpStartHand:
 			if s.Table.SeatedCount() >= 2 && s.Phase == poker.PhaseWaiting && s.Table.Street == poker.StreetWaiting {
 				if err := s.Table.StartHand(s.SmallBlind, s.BigBlind); err != nil {
@@ -191,6 +217,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				}
 				s.Phase = poker.PhaseBetting
 				emitHandStarted(ctx, s)
+				narrate(dispatcher, s, fmt.Sprintf("Hand #%d dealt — blinds $%d/$%d", s.Table.HandNo, s.SmallBlind/100, s.BigBlind/100))
 				broadcastHandStart(ctx, db, dispatcher, s)
 				dealPrivateCards(dispatcher, s)
 				broadcastActionRequired(ctx, db, dispatcher, s)
@@ -211,6 +238,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				continue
 			}
 			emitPlayerAction(ctx, s, userID, req.Type, req.Amount)
+			narrateAction(dispatcher, s, seatIdx, req.Type)
 			broadcastSnapshot(ctx, db, dispatcher, s, nil)
 
 			if _, uncontested := s.Table.UncontestedWinner(); uncontested {
@@ -282,6 +310,7 @@ func driveBots(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatch
 		}
 
 		emitPlayerAction(ctx, s, seat.UserID, action, amount)
+		narrateAction(dispatcher, s, seatIdx, action)
 		broadcastSnapshot(ctx, db, dispatcher, s, nil)
 
 		if _, uncontested := s.Table.UncontestedWinner(); uncontested {
@@ -806,8 +835,119 @@ func broadcastShowdownFromResult(ctx context.Context, db *sql.DB, dispatcher run
 		"side_pots": len(winnerGroups),
 	})
 	_ = dispatcher.BroadcastMessage(protocol.OpShowdown, data, nil, nil, true)
+
+	// Play-by-play: announce each pot's winner(s) and amount.
+	for _, r := range res.Resolutions {
+		if len(r.Winners) == 0 || r.Amount <= 0 {
+			continue
+		}
+		share := r.Amount / int64(len(r.Winners))
+		for _, seat := range r.Winners {
+			if seat < 0 || seat >= len(s.Table.Seats) || s.Table.Seats[seat] == nil {
+				continue
+			}
+			line := fmt.Sprintf("%s wins $%d", s.Table.Seats[seat].Username, share/100)
+			if cat := r.HandCats[seat]; cat != "" {
+				line += " with " + humanizeHand(cat)
+			}
+			narrate(dispatcher, s, line)
+		}
+	}
+
 	broadcastSnapshot(ctx, db, dispatcher, s, nil)
 	return nil
+}
+
+// humanizeHand turns an rs_poker category ("OnePair") into prose ("a pair").
+func humanizeHand(cat string) string {
+	switch strings.ToLower(strings.ReplaceAll(cat, " ", "")) {
+	case "highcard":
+		return "high card"
+	case "onepair", "pair":
+		return "a pair"
+	case "twopair":
+		return "two pair"
+	case "threeofakind", "trips", "set":
+		return "three of a kind"
+	case "straight":
+		return "a straight"
+	case "flush":
+		return "a flush"
+	case "fullhouse":
+		return "a full house"
+	case "fourofakind", "quads":
+		return "four of a kind"
+	case "straightflush":
+		return "a straight flush"
+	case "royalflush":
+		return "a royal flush"
+	default:
+		return cat
+	}
+}
+
+func sanitizeChat(s string) string {
+	s = strings.TrimSpace(s)
+	// Drop control characters (incl. newlines) and cap length.
+	s = strings.Map(func(r rune) rune {
+		if r < 0x20 {
+			return -1
+		}
+		return r
+	}, s)
+	if len(s) > 240 {
+		s = s[:240]
+	}
+	return s
+}
+
+func broadcastChat(dispatcher runtime.MatchDispatcher, s *MatchState, msg protocol.ChatMessage) {
+	data, _ := json.Marshal(msg)
+	_ = dispatcher.BroadcastMessage(protocol.OpChat, data, nil, nil, true)
+}
+
+// narrate emits a dealer play-by-play line to everyone at the table.
+func narrate(dispatcher runtime.MatchDispatcher, s *MatchState, text string) {
+	broadcastChat(dispatcher, s, protocol.ChatMessage{
+		Username: "Dealer",
+		Text:     text,
+		Kind:     "dealer",
+		HandNo:   s.Table.HandNo,
+	})
+}
+
+// narrateAction describes a player's action for the play-by-play feed. Call it
+// AFTER the action is applied (reads the seat's updated bet).
+func narrateAction(dispatcher runtime.MatchDispatcher, s *MatchState, seat int, action string) {
+	if seat < 0 || seat >= len(s.Table.Seats) || s.Table.Seats[seat] == nil {
+		return
+	}
+	name := s.Table.Seats[seat].Username
+	bet := s.Table.Seats[seat].Bet
+	var text string
+	switch action {
+	case "fold":
+		text = name + " folds"
+	case "check":
+		text = name + " checks"
+	case "call":
+		text = name + " calls"
+	case "raise":
+		text = fmt.Sprintf("%s raises to $%d", name, bet/100)
+	case "all_in":
+		text = fmt.Sprintf("%s is all-in ($%d)", name, bet/100)
+	default:
+		text = name + " " + action
+	}
+	narrate(dispatcher, s, text)
+}
+
+func boardCodesSpaced(board []poker.Card) string {
+	parts := make([]string, 0, len(board))
+	for _, c := range board {
+		parts = append(parts, c.Code())
+	}
+	return strings.Join(parts, " ")
 }
 
 func sendError(dispatcher runtime.MatchDispatcher, p runtime.Presence, code, message string) {
