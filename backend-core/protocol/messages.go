@@ -69,6 +69,22 @@ type ErrorMessage struct {
 	Message string `json:"message"`
 }
 
+// ChatSendRequest is a client → server chat message (OpChatSend).
+type ChatSendRequest struct {
+	Text string `json:"text"`
+}
+
+// ChatMessage is a server → client chat/play-by-play line (OpChat). Kind is
+// "player" for a seated player's message or "dealer" for auto play-by-play.
+type ChatMessage struct {
+	UserID   string `json:"user_id"`
+	Username string `json:"username"`
+	Text     string `json:"text"`
+	Kind     string `json:"kind"`
+	Seat     int    `json:"seat"`
+	HandNo   int    `json:"hand_no"`
+}
+
 type TableCreateRequest struct {
 	Name       string `json:"name"`
 	SmallBlind int64  `json:"small_blind"`

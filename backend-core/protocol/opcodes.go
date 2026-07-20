@@ -6,6 +6,7 @@ const (
 	OpStandUp  int64 = 2
 	OpAction   int64 = 3
 	OpStartHand int64 = 4
+	OpChatSend  int64 = 5
 )
 
 // Server → client match op codes.
@@ -21,6 +22,7 @@ const (
 	OpError           int64 = 108
 	OpBlindUpdate     int64 = 109
 	OpTournamentInfo  int64 = 110
+	OpChat            int64 = 111
 )
 
 const (
