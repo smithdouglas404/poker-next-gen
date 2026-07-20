@@ -58,3 +58,5 @@ export async function callNakamaRpc(rpcId: string, payload: unknown = ""): Promi
 
   return parsed;
 }
+
+// deploy trigger
