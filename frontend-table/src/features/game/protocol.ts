@@ -2,6 +2,9 @@ export const OpSitDown = 1;
 export const OpStandUp = 2;
 export const OpAction = 3;
 export const OpStartHand = 4;
+export const OpChatSend = 5;
+
+export const OpChat = 111;
 
 export const OpSnapshot = 100;
 export const OpHandStart = 101;
@@ -94,6 +97,15 @@ export interface GameLogEntry {
   level: "info" | "action" | "pot" | "error";
 }
 
+export interface ChatMessage {
+  user_id: string;
+  username: string;
+  text: string;
+  kind: "player" | "dealer";
+  seat: number;
+  hand_no: number;
+}
+
 export interface PlayerProfile {
   userId: string;
   username: string;
@@ -116,4 +128,5 @@ export interface GameState {
   openTables: TableListItem[];
   dealTrigger: number;
   maxSeats: number;
+  chatMessages: ChatMessage[];
 }

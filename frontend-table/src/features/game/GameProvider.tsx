@@ -22,6 +22,8 @@ import {
   MIN_SEATS,
   OpAction,
   OpBoard,
+  OpChat,
+  OpChatSend,
   OpDealPrivate,
   OpError,
   OpHandStart,
@@ -33,6 +35,7 @@ import {
   OpActionRequired,
   type ActionRequiredMessage,
   type CardView,
+  type ChatMessage,
   type DealPrivateMessage,
   type GameLogEntry,
   type GameState,
@@ -62,6 +65,7 @@ interface GameContextValue extends GameState {
   sendAction: (type: string, amount: number) => Promise<void>;
   findMatch: () => Promise<void>;
   setBuyInCents: (cents: number) => void;
+  sendChat: (text: string) => Promise<void>;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);
@@ -86,6 +90,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [buyInCents, setBuyInCentsState] = useState(INITIAL_WALLET_CENTS);
   const [maxSeats, setMaxSeats] = useState(DEFAULT_MAX_SEATS);
   const [gameLog, setGameLog] = useState<GameLogEntry[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [matchmakerSearching, setMatchmakerSearching] = useState(false);
   const [openTables, setOpenTables] = useState<TableListItem[]>([]);
   const [dealTrigger, setDealTrigger] = useState(0);
@@ -150,6 +155,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
             setShowdown(sd);
             const winners = sd.winners?.map((w) => w.username ?? `Seat ${w.seat}`).join(", ");
             pushLog(`Showdown — pot ${formatCents(sd.pot)}${winners ? ` · ${winners} wins` : ""}`, "pot");
+            break;
+          }
+          case OpChat: {
+            const chat = payload as ChatMessage;
+            setChatMessages((prev) => [...prev.slice(-99), chat]);
             break;
           }
           case OpError:
@@ -296,6 +306,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
     [sendMatch, pushLog],
   );
 
+  const sendChat = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || !matchId) return;
+      await sendMatch(OpChatSend, { text: trimmed });
+    },
+    [sendMatch, matchId],
+  );
+
   const findMatch = useCallback(async () => {
     const socket = socketRef.current;
     if (!socket) return;
@@ -355,6 +374,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       openTables,
       dealTrigger,
       maxSeats,
+      chatMessages,
       connect,
       refreshWallet,
       listTables,
@@ -366,6 +386,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       sendAction,
       findMatch,
       setBuyInCents,
+      sendChat,
     }),
     [
       connected,
@@ -383,6 +404,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       openTables,
       dealTrigger,
       maxSeats,
+      chatMessages,
       connect,
       refreshWallet,
       listTables,
@@ -394,6 +416,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       sendAction,
       findMatch,
       setBuyInCents,
+      sendChat,
     ],
   );
 
