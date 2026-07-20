@@ -69,9 +69,15 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	if v, ok := params["tournament_id"].(string); ok {
 		tournamentID = v
 	}
+	maxSeats := 6
+	if v, ok := params["max_seats"].(float64); ok && v >= 2 {
+		maxSeats = int(v)
+	}
 
+	table := poker.NewTable()
+	table.SetSeatCap(maxSeats)
 	state := &MatchState{
-		Table:        poker.NewTable(),
+		Table:        table,
 		Phase:        poker.PhaseWaiting,
 		Audit: audit.MultiEmitter{Sinks: []audit.Emitter{
 			audit.NewPostgresEmitter(db),
@@ -636,7 +642,7 @@ func buildLabel(s *MatchState) string {
 		"module":     protocol.MatchModule,
 		"room_id":    s.RoomID,
 		"seated":     seated,
-		"open_seats": protocol.MaxSeats - seated,
+		"open_seats": s.Table.Cap() - seated,
 		"sb":         s.SmallBlind,
 		"bb":         s.BigBlind,
 		"status":     poker.HandPhaseForTable(s.Table, s.Phase),
@@ -645,8 +651,9 @@ func buildLabel(s *MatchState) string {
 }
 
 func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) protocol.TableSnapshot {
-	seats := make([]protocol.SeatView, protocol.MaxSeats)
-	for i := 0; i < protocol.MaxSeats; i++ {
+	cap := s.Table.Cap()
+	seats := make([]protocol.SeatView, cap)
+	for i := 0; i < cap; i++ {
 		seats[i] = protocol.SeatView{Index: i, Status: "empty"}
 		if s.Table.Seats[i] != nil {
 			seat := s.Table.Seats[i]
@@ -678,6 +685,7 @@ func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) 
 		ButtonSeat:     s.Table.ButtonSeat,
 		SmallBlind:     s.SmallBlind,
 		BigBlind:       s.BigBlind,
+		MaxSeats:       s.Table.Cap(),
 		HeroWallet:     heroWallet,
 		HandNo:         s.Table.HandNo,
 		DeckCommitHash: s.Table.DeckCommitment,

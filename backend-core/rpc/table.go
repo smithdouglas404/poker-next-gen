@@ -34,12 +34,20 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 	if roomID == "" {
 		roomID = fmt.Sprintf("table-%d", sb)
 	}
+	maxSeats := 6
+	if req.MaxSeats >= 2 {
+		maxSeats = req.MaxSeats
+	}
+	if maxSeats > protocol.MaxSeats {
+		maxSeats = protocol.MaxSeats
+	}
 
 	matchID, err := nk.MatchCreate(ctx, protocol.MatchModule, map[string]interface{}{
 		"room_id":     roomID,
 		"small_blind": sb,
 		"big_blind":   bb,
 		"buy_in":      buyIn,
+		"max_seats":   maxSeats,
 	})
 	if err != nil {
 		return "", err
