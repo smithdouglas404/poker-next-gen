@@ -6,7 +6,9 @@ const DEFAULT_HOST = "http://localhost:7350";
 const DEFAULT_HTTP_KEY = "defaulthttpkey";
 
 function nakamaHost(): string {
-  return process.env.NAKAMA_HOST ?? process.env.NEXT_PUBLIC_NAKAMA_HOST ?? DEFAULT_HOST;
+  const raw = (process.env.NAKAMA_HOST ?? process.env.NEXT_PUBLIC_NAKAMA_HOST ?? DEFAULT_HOST).trim();
+  // Railway env vars may be bare domains; ensure a scheme so fetch() works.
+  return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
 }
 
 function nakamaHttpKey(): string {
