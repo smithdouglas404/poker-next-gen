@@ -18,7 +18,7 @@ export function syncGameToCanvas(
   if (!snapshot) return;
 
   const { width, height } = getCardDimensions(layout);
-  const seats = getSeatPositions(layout);
+  const seats = getSeatPositions(layout, snapshot.max_seats ?? snapshot.seats.length);
 
   // Hole cards per seated player
   for (const seatView of snapshot.seats) {

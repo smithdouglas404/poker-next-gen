@@ -1,17 +1,34 @@
 "use client";
 
+import { DEFAULT_MAX_SEATS, MAX_SEATS, MIN_SEATS, type SeatView } from "@/features/game/protocol";
 import { formatCents, useGame } from "@/features/game/GameProvider";
-import type { SeatView } from "@/features/game/protocol";
 
-/** Seat positions as % of viewport — clockwise from bottom (seat 0). */
-const SEAT_POSITIONS = [
-  { left: "50%", top: "88%", transform: "translate(-50%, -50%)" },
-  { left: "14%", top: "72%", transform: "translate(-50%, -50%)" },
-  { left: "10%", top: "38%", transform: "translate(-50%, -50%)" },
-  { left: "50%", top: "12%", transform: "translate(-50%, -50%)" },
-  { left: "90%", top: "38%", transform: "translate(-50%, -50%)" },
-  { left: "86%", top: "72%", transform: "translate(-50%, -50%)" },
-];
+interface SeatSlot {
+  left: string;
+  top: string;
+  transform: string;
+}
+
+// Elliptical seat ring, as % of the table viewport. Seat 0 sits bottom-center
+// and remaining seats spread clockwise. Recomputes for any N (2–9).
+const RING_CENTER_X = 50;
+const RING_CENTER_Y = 50;
+const RING_RADIUS_X = 40;
+const RING_RADIUS_Y = 38;
+
+function computeSeatSlots(count: number): SeatSlot[] {
+  const n = Math.min(MAX_SEATS, Math.max(MIN_SEATS, count));
+  return Array.from({ length: n }, (_, index) => {
+    const angle = (index / n) * Math.PI * 2 + Math.PI / 2;
+    const left = RING_CENTER_X + Math.cos(angle) * RING_RADIUS_X;
+    const top = RING_CENTER_Y + Math.sin(angle) * RING_RADIUS_Y;
+    return {
+      left: `${left}%`,
+      top: `${top}%`,
+      transform: "translate(-50%, -50%)",
+    };
+  });
+}
 
 function SeatCard({
   seat,
@@ -60,36 +77,42 @@ function SeatCard({
 }
 
 export function SeatHud() {
-  const { snapshot, sitDown, profile, buyInCents } = useGame();
+  const { snapshot, sitDown, profile, buyInCents, maxSeats } = useGame();
   const buyInLabel = formatCents(buyInCents);
+
+  // Drive the seat count from the authoritative snapshot when present,
+  // otherwise from the seat count the hero picked when creating the table.
+  const seatCount = snapshot?.max_seats ?? snapshot?.seats.length ?? maxSeats ?? DEFAULT_MAX_SEATS;
+  const slots = computeSeatSlots(seatCount);
+
   const seats: SeatView[] =
     snapshot?.seats ??
-    Array.from({ length: 6 }, (_, index) => ({ index, stack: 0, status: "empty" }));
+    Array.from({ length: slots.length }, (_, index) => ({ index, stack: 0, status: "empty" }));
 
   const heroSeat = seats.find((s) => s.user_id === profile.userId)?.index;
 
   return (
     <div className="pointer-events-none absolute inset-0">
-      {seats.map((seat, i) => (
-        <div
-          key={seat.index}
-          className="pointer-events-auto absolute"
-          style={{
-            left: SEAT_POSITIONS[i].left,
-            top: SEAT_POSITIONS[i].top,
-            transform: SEAT_POSITIONS[i].transform,
-          }}
-        >
-          <SeatCard
-            seat={{
-              ...seat,
-              is_hero: seat.index === heroSeat,
-            }}
-            buyInLabel={buyInLabel}
-            onSit={() => void sitDown(seat.index, buyInCents)}
-          />
-        </div>
-      ))}
+      {seats.map((seat) => {
+        const slot = slots[seat.index] ?? slots[seat.index % slots.length];
+        if (!slot) return null;
+        return (
+          <div
+            key={seat.index}
+            className="pointer-events-auto absolute"
+            style={{ left: slot.left, top: slot.top, transform: slot.transform }}
+          >
+            <SeatCard
+              seat={{
+                ...seat,
+                is_hero: seat.index === heroSeat,
+              }}
+              buyInLabel={buyInLabel}
+              onSit={() => void sitDown(seat.index, buyInCents)}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
