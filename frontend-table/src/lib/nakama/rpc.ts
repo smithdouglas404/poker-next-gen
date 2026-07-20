@@ -1,13 +1,16 @@
 const DEFAULT_HOST = "http://localhost:7350";
-const DEFAULT_KEY = "defaultkey";
+// Server-to-server RPC over HTTP authenticates with Nakama's runtime HTTP key
+// (via ?http_key=), NOT the client server_key over Basic auth. Using the
+// server_key here produced "HTTP key invalid" and broke every proxied RPC
+// (health check, table creation, clubs). Default matches Nakama's built-in.
+const DEFAULT_HTTP_KEY = "defaulthttpkey";
 
 function nakamaHost(): string {
   return process.env.NAKAMA_HOST ?? process.env.NEXT_PUBLIC_NAKAMA_HOST ?? DEFAULT_HOST;
 }
 
-function nakamaAuthHeader(): string {
-  const key = process.env.NAKAMA_SERVER_KEY ?? DEFAULT_KEY;
-  return `Basic ${Buffer.from(`:${key}`).toString("base64")}`;
+function nakamaHttpKey(): string {
+  return process.env.NAKAMA_HTTP_KEY ?? DEFAULT_HTTP_KEY;
 }
 
 /** Call a Nakama RPC through the server-side proxy (keeps keys off the client). */
@@ -19,10 +22,10 @@ export async function callNakamaRpc(rpcId: string, payload: unknown = ""): Promi
         ? payload
         : JSON.stringify(payload);
 
-  const response = await fetch(`${nakamaHost()}/v2/rpc/${rpcId}`, {
+  const url = `${nakamaHost()}/v2/rpc/${encodeURIComponent(rpcId)}?http_key=${encodeURIComponent(nakamaHttpKey())}`;
+  const response = await fetch(url, {
     method: "POST",
     headers: {
-      Authorization: nakamaAuthHeader(),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payloadStr),

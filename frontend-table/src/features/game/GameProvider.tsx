@@ -66,6 +66,7 @@ interface GameContextValue extends GameState {
   findMatch: () => Promise<void>;
   setBuyInCents: (cents: number) => void;
   sendChat: (text: string) => Promise<void>;
+  addBot: () => Promise<void>;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);
@@ -357,6 +358,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setBuyInCentsState(Math.min(MAX_BUY_IN_CENTS, Math.max(MIN_BUY_IN_CENTS, cents)));
   }, []);
 
+  const addBot = useCallback(async () => {
+    if (!matchId) {
+      pushLog("Join or create a table before adding a bot", "error");
+      return;
+    }
+    try {
+      await callSessionRpc("table_add_bot", { match_id: matchId });
+      pushLog("Added a bot to the table", "info");
+    } catch (e) {
+      pushLog(e instanceof Error ? e.message : "Add bot failed", "error");
+    }
+  }, [matchId, pushLog]);
+
   const value = useMemo<GameContextValue>(
     () => ({
       connected,
@@ -387,6 +401,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       findMatch,
       setBuyInCents,
       sendChat,
+      addBot,
     }),
     [
       connected,
@@ -417,6 +432,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       findMatch,
       setBuyInCents,
       sendChat,
+      addBot,
     ],
   );
 

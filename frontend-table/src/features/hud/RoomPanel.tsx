@@ -30,6 +30,7 @@ export function RoomPanel() {
     buyInCents,
     maxSeats,
     connected,
+    addBot,
   } = useGame();
   const [joinId, setJoinId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -215,6 +216,14 @@ export function RoomPanel() {
                 className="rounded-xl border border-violet-400/40 bg-violet-950/40 px-4 py-2.5 text-sm font-semibold uppercase tracking-wider text-violet-200 hover:bg-violet-900/40 disabled:opacity-50"
               >
                 Start Hand ({seated}/{seatCap} seated)
+              </button>
+              <button
+                type="button"
+                disabled={busy || seated >= seatCap}
+                onClick={() => run(() => addBot())}
+                className="rounded-xl border border-teal-400/40 bg-teal-950/40 px-4 py-2.5 text-sm font-semibold uppercase tracking-wider text-teal-200 hover:bg-teal-900/40 disabled:opacity-50"
+              >
+                + Add Bot
               </button>
               {heroSeated && (
                 <button
