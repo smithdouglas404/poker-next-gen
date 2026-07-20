@@ -9,6 +9,7 @@ import { ActionTimer } from "@/features/hud/ActionTimer";
 import { EquityPanel } from "@/features/hud/EquityPanel";
 import { HandVerifyPanel } from "@/features/hud/HandVerifyPanel";
 import { BuyInSlider, TableLog } from "@/features/hud/TableLog";
+import { ChatPanel } from "@/features/hud/ChatPanel";
 import { usePokerKeyboard } from "@/features/hud/usePokerKeyboard";
 import { useGameSounds } from "@/features/sound/useGameSounds";
 import { useGame } from "@/features/game/GameProvider";
@@ -32,6 +33,7 @@ export function TableHud({ children }: { children: React.ReactNode }) {
             <EquityPanel />
             <HandVerifyPanel />
             <TableLog />
+            <ChatPanel />
           </div>
           <div className="relative flex-1">
             <SeatHud />
