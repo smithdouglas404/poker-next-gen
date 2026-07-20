@@ -6,7 +6,12 @@ const DEFAULT_HOST = "http://localhost:7350";
 const DEFAULT_HTTP_KEY = "defaulthttpkey";
 
 function nakamaHost(): string {
-  return process.env.NAKAMA_HOST ?? process.env.NEXT_PUBLIC_NAKAMA_HOST ?? DEFAULT_HOST;
+  let host = process.env.NAKAMA_HOST ?? process.env.NEXT_PUBLIC_NAKAMA_HOST ?? DEFAULT_HOST;
+  // Ensure the host has a protocol
+  if (!host.startsWith("http://") && !host.startsWith("https://")) {
+    host = "https://" + host;
+  }
+  return host;
 }
 
 function nakamaHttpKey(): string {
