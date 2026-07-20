@@ -67,6 +67,9 @@ export default defineRailway(() => {
     env: {
       NAKAMA_HOST: "http://backend-core.railway.internal:7350",
       NAKAMA_SERVER_KEY: "defaultkey",
+      // Browser-exposed so the nakama-js client authenticates with the real key
+      // (must match backend-core's socket server key).
+      NEXT_PUBLIC_NAKAMA_SERVER_KEY: "defaultkey",
       NEXT_PUBLIC_NAKAMA_HOST: "https://${{backend-core.RAILWAY_PUBLIC_DOMAIN}}",
       ENGINE_MATH_URL: "http://engine-math.railway.internal:8080",
       NEXT_PUBLIC_ENGINE_MATH_URL: "https://${{engine-math.RAILWAY_PUBLIC_DOMAIN}}",

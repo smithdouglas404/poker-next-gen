@@ -10,14 +10,11 @@ WORKDIR /backend
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY main.go ./
-COPY models ./models
-COPY protocol ./protocol
-COPY poker ./poker
-COPY match ./match
-COPY rpc ./rpc
-COPY store ./store
-COPY migrations ./migrations
+# Copy the whole module. The previous hand-picked COPY list silently dropped
+# packages (audit, antibot, coaching — and later bot, social) that main.go
+# imports, breaking the plugin build on Railway. Copy everything so adding a
+# package never breaks the image again.
+COPY . ./
 RUN go build --trimpath --buildmode=plugin -o ./backend-core.so
 
 FROM heroiclabs/nakama:3.31.0
