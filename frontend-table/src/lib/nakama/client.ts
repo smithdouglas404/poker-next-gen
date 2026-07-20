@@ -1,6 +1,15 @@
 import { Client, Session, Socket } from "@heroiclabs/nakama-js";
 
-const host = process.env.NEXT_PUBLIC_NAKAMA_HOST ?? "http://localhost:7350";
+// Railway env vars are often set as a bare domain (no scheme). `new URL()`
+// throws on those, which crashed the Next.js build at prerender. Normalize to a
+// URL with a scheme (assume https for a bare public domain).
+function normalizeHost(raw: string | undefined): string {
+  const value = (raw ?? "http://localhost:7350").trim();
+  if (/^https?:\/\//i.test(value)) return value;
+  return `https://${value}`;
+}
+
+const host = normalizeHost(process.env.NEXT_PUBLIC_NAKAMA_HOST);
 // NEXT_PUBLIC_* is the only form exposed to the browser; fall back to the
 // server-only var (undefined client-side) and finally Nakama's default.
 const serverKey =
