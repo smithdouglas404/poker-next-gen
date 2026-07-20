@@ -31,6 +31,7 @@ export function RoomPanel() {
     maxSeats,
     connected,
     addBot,
+    setPreviewSeats,
   } = useGame();
   const [joinId, setJoinId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -148,11 +149,14 @@ export function RoomPanel() {
               min={MIN_SEATS}
               max={MAX_SEATS}
               value={seats}
-              onChange={(e) =>
-                setSeats(
-                  Math.min(MAX_SEATS, Math.max(MIN_SEATS, Math.round(Number(e.target.value) || MIN_SEATS))),
-                )
-              }
+              onChange={(e) => {
+                const n = Math.min(
+                  MAX_SEATS,
+                  Math.max(MIN_SEATS, Math.round(Number(e.target.value) || MIN_SEATS)),
+                );
+                setSeats(n);
+                setPreviewSeats(n); // live-update the seat ring before Create
+              }}
               className="w-16 rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-center text-xs text-white outline-none focus:border-emerald-500/50"
             />
           </label>

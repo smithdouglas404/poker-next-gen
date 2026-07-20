@@ -19,6 +19,7 @@ export function seatAngle(seatIndex: number, seatCount: number = SEAT_COUNT): nu
 export function getSeatPositions(
   layout: TableLayout,
   seatCount: number = SEAT_COUNT,
+  orbitScale: number = ORBIT_SCALE,
 ): SeatPosition[] {
   const { cx, cy, feltRx, feltRy } = layout;
 
@@ -26,8 +27,8 @@ export function getSeatPositions(
     const angle = seatAngle(index, seatCount);
     return {
       index,
-      x: cx + Math.cos(angle) * feltRx * ORBIT_SCALE,
-      y: cy + Math.sin(angle) * feltRy * ORBIT_SCALE,
+      x: cx + Math.cos(angle) * feltRx * orbitScale,
+      y: cy + Math.sin(angle) * feltRy * orbitScale,
       angle,
     };
   });

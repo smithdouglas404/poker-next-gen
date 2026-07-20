@@ -65,6 +65,7 @@ interface GameContextValue extends GameState {
   sendAction: (type: string, amount: number) => Promise<void>;
   findMatch: () => Promise<void>;
   setBuyInCents: (cents: number) => void;
+  setPreviewSeats: (n: number) => void;
   sendChat: (text: string) => Promise<void>;
   addBot: () => Promise<void>;
 }
@@ -358,6 +359,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setBuyInCentsState(Math.min(MAX_BUY_IN_CENTS, Math.max(MIN_BUY_IN_CENTS, cents)));
   }, []);
 
+  // Live table preview: updating the create-form seat count re-renders the seat
+  // ring immediately (before the table is created).
+  const setPreviewSeats = useCallback((n: number) => {
+    setMaxSeats(Math.min(MAX_SEATS, Math.max(MIN_SEATS, Math.round(n))));
+  }, []);
+
   const addBot = useCallback(async () => {
     if (!matchId) {
       pushLog("Join or create a table before adding a bot", "error");
@@ -400,6 +407,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       sendAction,
       findMatch,
       setBuyInCents,
+      setPreviewSeats,
       sendChat,
       addBot,
     }),
@@ -431,6 +439,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       sendAction,
       findMatch,
       setBuyInCents,
+      setPreviewSeats,
       sendChat,
       addBot,
     ],
