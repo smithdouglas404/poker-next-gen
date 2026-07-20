@@ -1,7 +1,6 @@
-import { Container, Graphics, Text } from "pixi.js";
+import { Container, Graphics } from "pixi.js";
 
 import { TABLE_COLORS } from "./colors";
-import { getSeatPositions } from "./seatLayout";
 import { computeTableLayout, type TableLayout } from "./tableLayout";
 
 export type { TableLayout } from "./tableLayout";
@@ -86,8 +85,6 @@ export function drawTableLayer(
   tableLayer.addChild(goldAccent);
 
   drawLayoutBoundaries(tableLayer, layout);
-  drawPlayerSeats(tableLayer, layout);
-  drawCenterLabel(tableLayer, layout);
 
   return layout;
 }
@@ -120,59 +117,3 @@ function drawLayoutBoundaries(stage: Container, layout: TableLayout): void {
   stage.addChild(seatOrbit);
 }
 
-function drawPlayerSeats(stage: Container, layout: TableLayout): void {
-  const { railThickness } = layout;
-  const seatWidth = Math.max(72, layout.feltRx * 0.18);
-  const seatHeight = Math.max(48, layout.feltRy * 0.14);
-  const seatRadius = Math.max(6, railThickness * 0.25);
-
-  for (const seat of getSeatPositions(layout)) {
-    const seatGraphic = new Graphics();
-    seatGraphic
-      .roundRect(-seatWidth / 2, -seatHeight / 2, seatWidth, seatHeight, seatRadius)
-      .fill({ color: TABLE_COLORS.seatFill, alpha: 0.72 })
-      .stroke({ color: TABLE_COLORS.seatStroke, width: 2, alpha: 0.85 });
-
-    seatGraphic.position.set(seat.x, seat.y);
-    seatGraphic.rotation = seat.angle + Math.PI / 2;
-    stage.addChild(seatGraphic);
-
-    const label = new Text({
-      text: `SEAT ${seat.index + 1}`,
-      style: {
-        fontFamily: "Arial, Helvetica, sans-serif",
-        fontSize: Math.max(10, seatHeight * 0.22),
-        fontWeight: "600",
-        fill: TABLE_COLORS.goldBright,
-        letterSpacing: 1,
-        align: "center",
-      },
-    });
-    label.anchor.set(0.5);
-    label.position.set(seat.x, seat.y);
-    label.rotation = seat.angle + Math.PI / 2;
-    stage.addChild(label);
-  }
-}
-
-function drawCenterLabel(stage: Container, layout: TableLayout): void {
-  const { cx, cy, feltRx, feltRy } = layout;
-  const fontSize = Math.max(16, Math.min(feltRx, feltRy) * 0.09);
-
-  const label = new Text({
-    text: "POKER NEXT-GEN DEV CANVAS",
-    style: {
-      fontFamily: "Arial, Helvetica, sans-serif",
-      fontSize,
-      fontWeight: "bold",
-      fill: TABLE_COLORS.centerText,
-      stroke: { color: TABLE_COLORS.centerTextStroke, width: Math.max(2, fontSize * 0.08) },
-      letterSpacing: 2,
-      align: "center",
-    },
-  });
-
-  label.anchor.set(0.5);
-  label.position.set(cx, cy);
-  stage.addChild(label);
-}

@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { formatCents, useGame } from "@/features/game/GameProvider";
+import { MuteToggle } from "@/features/sound/MuteToggle";
 
 export function PlayerHeader() {
   const { profile, matchId, roomId, connected } = useGame();
@@ -39,6 +40,7 @@ export function PlayerHeader() {
       </div>
 
       <div className="flex items-center gap-4">
+        <MuteToggle />
         <Link href="/lobby" className="text-xs uppercase tracking-wider text-sky-300/80 hover:text-sky-200">
           Lobby
         </Link>

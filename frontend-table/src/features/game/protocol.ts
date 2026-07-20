@@ -18,6 +18,12 @@ export const MIN_BUY_IN_CENTS = 10_000;
 export const MAX_BUY_IN_CENTS = 100_000;
 export const INITIAL_WALLET_CENTS = 100_000;
 
+export const DEFAULT_SMALL_BLIND_CENTS = 100;
+export const DEFAULT_BIG_BLIND_CENTS = 200;
+export const DEFAULT_MAX_SEATS = 6;
+export const MIN_SEATS = 2;
+export const MAX_SEATS = 9;
+
 export interface CardView {
   code: string;
   face_up: boolean;
@@ -45,6 +51,7 @@ export interface TableSnapshot {
   button_seat: number;
   small_blind: number;
   big_blind: number;
+  max_seats?: number;
   hand_no: number;
   hero_wallet_cents?: number;
   deck_commit_hash?: string;
@@ -108,4 +115,5 @@ export interface GameState {
   matchmakerSearching: boolean;
   openTables: TableListItem[];
   dealTrigger: number;
+  maxSeats: number;
 }

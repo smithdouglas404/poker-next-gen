@@ -43,6 +43,7 @@ type Seat struct {
 	TotalContributed int64
 	Status           SeatStatus
 	LastAction       string
+	IsBot            bool
 }
 
 type Street string
@@ -71,6 +72,7 @@ type Table struct {
 	ActionSeat  int
 	HandNo      int
 	ActedThisRound map[int]bool
+	SeatCap        int // configured active seats (2..MaxSeats); 0 => default 6
 }
 
 func NewTable() *Table {
@@ -78,8 +80,34 @@ func NewTable() *Table {
 		HoleCards:      map[string][2]Card{},
 		ActedThisRound: map[int]bool{},
 		Street:         StreetWaiting,
+		SeatCap:        6,
 	}
 }
+
+// cap returns the configured number of active seats, clamped to [2, MaxSeats].
+func (t *Table) cap() int {
+	if t.SeatCap < 2 {
+		return 6
+	}
+	if t.SeatCap > MaxSeats {
+		return MaxSeats
+	}
+	return t.SeatCap
+}
+
+// SetSeatCap configures how many seats (2..MaxSeats) this table exposes.
+func (t *Table) SetSeatCap(n int) {
+	if n < 2 {
+		n = 2
+	}
+	if n > MaxSeats {
+		n = MaxSeats
+	}
+	t.SeatCap = n
+}
+
+// Cap is the exported active-seat count for snapshots/labels.
+func (t *Table) Cap() int { return t.cap() }
 
 func (t *Table) SeatedCount() int {
 	n := 0
@@ -92,7 +120,7 @@ func (t *Table) SeatedCount() int {
 }
 
 func (t *Table) SitDown(seat int, userID, username string, buyIn int64) error {
-	if seat < 0 || seat >= MaxSeats {
+	if seat < 0 || seat >= t.cap() {
 		return fmt.Errorf("invalid seat")
 	}
 	if t.Seats[seat] != nil {
@@ -113,6 +141,25 @@ func (t *Table) StandUp(seat int) {
 	if seat >= 0 && seat < MaxSeats {
 		t.Seats[seat] = nil
 	}
+}
+
+// SitDownBot seats an AI player (no wallet debit; not tied to a presence).
+func (t *Table) SitDownBot(seat int, userID, username string, buyIn int64) error {
+	if err := t.SitDown(seat, userID, username, buyIn); err != nil {
+		return err
+	}
+	t.Seats[seat].IsBot = true
+	return nil
+}
+
+// FirstEmptySeat returns the lowest empty seat index, or -1 if the table is full.
+func (t *Table) FirstEmptySeat() int {
+	for i := 0; i < MaxSeats; i++ {
+		if t.Seats[i] == nil {
+			return i
+		}
+	}
+	return -1
 }
 
 func (t *Table) StartHand(sb, bb int64) error {

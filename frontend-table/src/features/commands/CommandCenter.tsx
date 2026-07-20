@@ -137,6 +137,11 @@ export function CommandCenter() {
   const [activeCommand, setActiveCommand] = useState<CommandDefinition | null>(null);
   const [formJson, setFormJson] = useState("");
   const [results, setResults] = useState<CommandResult[]>([]);
+  const [dismissedKey, setDismissedKey] = useState<string | null>(null);
+  const [bannerExpanded, setBannerExpanded] = useState(false);
+
+  const latest = results[0];
+  const bannerVisible = Boolean(latest) && latest.at !== dismissedKey;
 
   const stats = useMemo(() => {
     const live = COMMAND_REGISTRY.filter((c) => c.status === "live").length;
@@ -159,6 +164,7 @@ export function CommandCenter() {
       try {
         const result = await runLiveCommand(command);
         setResults((prev) => [result, ...prev.slice(0, 9)]);
+        setBannerExpanded(false);
       } finally {
         setBusyId(null);
       }
@@ -176,6 +182,7 @@ export function CommandCenter() {
       }
       const result = await runLiveCommand(activeCommand, payload);
       setResults((prev) => [result, ...prev.slice(0, 9)]);
+      setBannerExpanded(false);
       setActiveCommand(null);
     } catch {
       setResults((prev) => [
@@ -187,6 +194,7 @@ export function CommandCenter() {
         },
         ...prev.slice(0, 9),
       ]);
+      setBannerExpanded(false);
     } finally {
       setBusyId(null);
     }
@@ -194,6 +202,78 @@ export function CommandCenter() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white">
+      {bannerVisible && latest && (
+        <div className="pointer-events-none fixed inset-x-0 top-0 z-[60] flex justify-center px-4 pt-4">
+          <div
+            role="status"
+            aria-live="assertive"
+            className={`pointer-events-auto w-full max-w-2xl rounded-2xl border-2 shadow-2xl backdrop-blur-md ${
+              latest.ok
+                ? "border-emerald-400/70 bg-emerald-950/80"
+                : "border-red-500/70 bg-red-950/80"
+            }`}
+          >
+            <div className="flex items-start gap-3 p-4">
+              <span
+                className={`mt-0.5 text-xl leading-none ${
+                  latest.ok ? "text-emerald-300" : "text-red-300"
+                }`}
+              >
+                {latest.ok ? "✓" : "✕"}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                      latest.ok
+                        ? "bg-emerald-500/25 text-emerald-200"
+                        : "bg-red-500/25 text-red-200"
+                    }`}
+                  >
+                    {latest.ok ? "Success" : "Error"}
+                  </span>
+                  <p className="truncate text-sm font-semibold text-white">
+                    {getCommand(latest.commandId)?.title ?? latest.commandId}
+                  </p>
+                  <span className="ml-auto text-[10px] text-white/50">{latest.at}</span>
+                </div>
+                <p
+                  className={`mt-1 break-words text-sm ${
+                    latest.ok ? "text-emerald-100" : "text-red-100"
+                  }`}
+                >
+                  {latest.message}
+                </p>
+                {latest.data !== undefined && (
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setBannerExpanded((v) => !v)}
+                      className="text-[11px] font-semibold uppercase tracking-wider text-white/70 hover:text-white"
+                    >
+                      {bannerExpanded ? "Hide details ▲" : "Show details ▼"}
+                    </button>
+                    {bannerExpanded && (
+                      <pre className="mt-2 max-h-64 overflow-auto rounded-lg bg-black/50 p-3 text-xs text-emerald-100">
+                        {JSON.stringify(latest.data, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setDismissedKey(latest.at)}
+                aria-label="Dismiss"
+                className="shrink-0 rounded-lg px-2 py-1 text-lg leading-none text-white/60 hover:bg-white/10 hover:text-white"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="border-b border-white/10 bg-gradient-to-b from-emerald-950/40 to-neutral-950 px-6 py-10">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>

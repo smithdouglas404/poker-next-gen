@@ -12,15 +12,18 @@ export interface SeatPosition {
 }
 
 /** Seat angle in radians; index 0 is bottom center (Seat 1). */
-export function seatAngle(seatIndex: number): number {
-  return (seatIndex / SEAT_COUNT) * Math.PI * 2 + Math.PI / 2;
+export function seatAngle(seatIndex: number, seatCount: number = SEAT_COUNT): number {
+  return (seatIndex / seatCount) * Math.PI * 2 + Math.PI / 2;
 }
 
-export function getSeatPositions(layout: TableLayout): SeatPosition[] {
+export function getSeatPositions(
+  layout: TableLayout,
+  seatCount: number = SEAT_COUNT,
+): SeatPosition[] {
   const { cx, cy, feltRx, feltRy } = layout;
 
-  return Array.from({ length: SEAT_COUNT }, (_, index) => {
-    const angle = seatAngle(index);
+  return Array.from({ length: seatCount }, (_, index) => {
+    const angle = seatAngle(index, seatCount);
     return {
       index,
       x: cx + Math.cos(angle) * feltRx * ORBIT_SCALE,

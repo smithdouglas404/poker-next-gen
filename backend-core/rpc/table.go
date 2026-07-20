@@ -34,12 +34,20 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 	if roomID == "" {
 		roomID = fmt.Sprintf("table-%d", sb)
 	}
+	maxSeats := 6
+	if req.MaxSeats >= 2 {
+		maxSeats = req.MaxSeats
+	}
+	if maxSeats > protocol.MaxSeats {
+		maxSeats = protocol.MaxSeats
+	}
 
 	matchID, err := nk.MatchCreate(ctx, protocol.MatchModule, map[string]interface{}{
 		"room_id":     roomID,
 		"small_blind": sb,
 		"big_blind":   bb,
 		"buy_in":      buyIn,
+		"max_seats":   maxSeats,
 	})
 	if err != nil {
 		return "", err
@@ -54,6 +62,24 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		return "", err
 	}
 	return string(resp), nil
+}
+
+// TableAddBot seats an AI player at the given match (fills empty seats so a
+// player can play against bots). Signals the match to seat the bot.
+func TableAddBot(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	var req struct {
+		MatchID string `json:"match_id"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil {
+		return "", runtime.NewError("invalid payload", 3)
+	}
+	if req.MatchID == "" {
+		return "", runtime.NewError("match_id required", 3)
+	}
+	if _, err := nk.MatchSignal(ctx, req.MatchID, `{"type":"add_bot"}`); err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	return `{"ok":true}`, nil
 }
 
 func TableList(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {

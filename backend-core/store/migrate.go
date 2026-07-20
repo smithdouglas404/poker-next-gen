@@ -2,10 +2,13 @@ package store
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	_ "embed"
+	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 )
 
 //go:embed schema.sql
@@ -50,18 +53,16 @@ func truncate(s string, n int) string {
 	return s[:n] + "..."
 }
 
+// NewID returns a collision-resistant, unpredictable ID (prefix + 96 random
+// bits). The previous implementation used a constant-seeded LCG that reset on
+// every process restart — producing predictable, restart-colliding primary
+// keys, unsafe for a money system.
 func NewID(prefix string) string {
-	return fmt.Sprintf("%s_%d", prefix, mustRand())
-}
-
-func mustRand() int64 {
-	return int64(randomUint32())
-}
-
-var lcgState uint32 = 123456789
-
-func randomUint32() uint32 {
-	lcgState = lcgState*1664525 + 1013904223
-	return lcgState
+	var b [12]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		// crypto/rand should never fail; degrade to a time-based unique-ish id.
+		return fmt.Sprintf("%s_%d", prefix, time.Now().UnixNano())
+	}
+	return prefix + "_" + hex.EncodeToString(b[:])
 }
 

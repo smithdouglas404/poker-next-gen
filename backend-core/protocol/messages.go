@@ -43,6 +43,7 @@ type TableSnapshot struct {
 	ButtonSeat   int         `json:"button_seat"`
 	SmallBlind   int64      `json:"small_blind"`
 	BigBlind     int64      `json:"big_blind"`
+	MaxSeats     int        `json:"max_seats"`
 	HeroWallet   int64      `json:"hero_wallet_cents"`
 	HandNo         int         `json:"hand_no"`
 	DeckCommitHash string      `json:"deck_commit_hash,omitempty"`
@@ -73,6 +74,7 @@ type TableCreateRequest struct {
 	SmallBlind int64  `json:"small_blind"`
 	BigBlind   int64  `json:"big_blind"`
 	BuyIn      int64  `json:"buy_in"`
+	MaxSeats   int    `json:"max_seats"`
 }
 
 type TableCreateResponse struct {

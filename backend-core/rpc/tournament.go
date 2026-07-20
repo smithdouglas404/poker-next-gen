@@ -77,7 +77,7 @@ func TournamentRegister(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 			stack = t.StartingStack
 			if t.BuyInMinor > 0 {
 				wStore := store.NewWalletStore(db)
-				if err := wStore.Debit(ctx, userID, t.BuyInMinor); err != nil {
+				if err := wStore.Debit(ctx, userID, t.BuyInMinor, "tournament_buyin"); err != nil {
 					return "", runtime.NewError("insufficient wallet balance", 9)
 				}
 			}

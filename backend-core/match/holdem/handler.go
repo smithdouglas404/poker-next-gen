@@ -5,12 +5,16 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"time"
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
 	"github.com/smithdouglas404/poker-next-gen/backend-core/audit"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/bot"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/poker"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/protocol"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/social"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
 
@@ -34,6 +38,8 @@ type MatchState struct {
 	Ante             int64
 	BuyIn            int64
 	Presences        map[string]runtime.Presence
+	BotCount         int
+	Rand             *rand.Rand
 }
 
 type Handler struct{}
@@ -63,9 +69,15 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	if v, ok := params["tournament_id"].(string); ok {
 		tournamentID = v
 	}
+	maxSeats := 6
+	if v, ok := params["max_seats"].(float64); ok && v >= 2 {
+		maxSeats = int(v)
+	}
 
+	table := poker.NewTable()
+	table.SetSeatCap(maxSeats)
 	state := &MatchState{
-		Table:        poker.NewTable(),
+		Table:        table,
 		Phase:        poker.PhaseWaiting,
 		Audit: audit.MultiEmitter{Sinks: []audit.Emitter{
 			audit.NewPostgresEmitter(db),
@@ -78,6 +90,7 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		BigBlind:     bb,
 		BuyIn:        buyIn,
 		Presences:    map[string]runtime.Presence{},
+		Rand:         rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 	label := buildLabel(state)
 	return state, 1, label
@@ -220,7 +233,80 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			}
 		}
 	}
+
+	// After human input, let any bot(s) whose turn it is act.
+	driveBots(ctx, db, dispatcher, s)
 	return s
+}
+
+// driveBots plays out consecutive bot turns during the betting phase. Bot hand
+// strength comes from rs_poker (engine-math) inside bot.Decide; the loop applies
+// each decision through the same table logic a human action uses.
+func driveBots(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
+	for guard := 0; guard < poker.MaxSeats*4; guard++ {
+		if !s.Phase.AllowsPlayerActions() {
+			return
+		}
+		seatIdx := s.Table.ActionSeat
+		if seatIdx < 0 {
+			return
+		}
+		seat := s.Table.Seats[seatIdx]
+		if seat == nil || !seat.IsBot || seat.Status != poker.SeatSeated {
+			return
+		}
+
+		_, toCall, minRaise, maxRaise := s.Table.ValidActions(seatIdx)
+		hole, ok := s.Table.HoleCards[seat.UserID]
+		action, amount := "check", int64(0)
+		if toCall > 0 {
+			action = "fold"
+		}
+		if ok {
+			holeStr := hole[0].Code() + hole[1].Code()
+			if d, err := bot.Decide(holeStr, boardCodes(s.Table.Board), toCall, s.Table.Pot, minRaise, maxRaise, seat.Stack, s.Rand); err == nil {
+				action, amount = d.Action, d.Amount
+			}
+		}
+
+		if err := s.Table.ApplyAction(seatIdx, action, amount); err != nil {
+			// Fall back to the safest legal action if the policy pick was illegal.
+			fallback := "fold"
+			if toCall == 0 {
+				fallback = "check"
+			}
+			if err2 := s.Table.ApplyAction(seatIdx, fallback, 0); err2 != nil {
+				return
+			}
+			action, amount = fallback, 0
+		}
+
+		emitPlayerAction(ctx, s, seat.UserID, action, amount)
+		broadcastSnapshot(ctx, db, dispatcher, s, nil)
+
+		if _, uncontested := s.Table.UncontestedWinner(); uncontested {
+			beginShowdownResolution(ctx, s)
+			broadcastSnapshot(ctx, db, dispatcher, s, nil)
+			return
+		}
+		if s.Table.AdvanceAction() {
+			beginShowdownResolution(ctx, s)
+			broadcastSnapshot(ctx, db, dispatcher, s, nil)
+			return
+		}
+		if len(s.Table.Board) > 0 {
+			broadcastBoard(dispatcher, s)
+		}
+		broadcastActionRequired(ctx, db, dispatcher, s)
+	}
+}
+
+func boardCodes(board []poker.Card) string {
+	out := ""
+	for _, c := range board {
+		out += c.Code()
+	}
+	return out
 }
 
 func beginShowdownResolution(ctx context.Context, s *MatchState) {
@@ -263,6 +349,7 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		if err := broadcastShowdownFromResult(ctx, db, dispatcher, s, winners, res, potBefore); err != nil {
 			logger.Error("broadcast showdown: %v", err)
 		}
+		recordWinnings(ctx, nk, s, res)
 		creditRake(ctx, db, s, potBefore)
 		s.Table.ResetBetweenHands()
 		s.Phase = poker.PhaseWaiting
@@ -408,7 +495,7 @@ func reserveBuyIn(ctx context.Context, db *sql.DB, s *MatchState, userID string,
 	if s.ClubID != "" {
 		return store.NewClubStore(db).LockBalance(ctx, s.ClubID, userID, amount)
 	}
-	return store.NewWalletStore(db).Debit(ctx, userID, amount)
+	return store.NewWalletStore(db).Debit(ctx, userID, amount, "table_buyin")
 }
 
 func releaseBuyIn(ctx context.Context, db *sql.DB, clubID, userID string, amount int64) {
@@ -419,7 +506,7 @@ func releaseBuyIn(ctx context.Context, db *sql.DB, clubID, userID string, amount
 		_ = store.NewClubStore(db).UnlockBalance(ctx, clubID, userID, amount)
 		return
 	}
-	_ = store.NewWalletStore(db).Credit(ctx, userID, amount)
+	_ = store.NewWalletStore(db).Credit(ctx, userID, amount, "table_cashout")
 }
 
 func creditRake(ctx context.Context, db *sql.DB, s *MatchState, pot int64) {
@@ -444,6 +531,32 @@ func creditRake(ctx context.Context, db *sql.DB, s *MatchState, pot int64) {
 		return
 	}
 	_ = store.NewRakeStore(db).Credit(ctx, s.ClubID, rakeAmount, s.MatchID, s.Table.HandNo)
+}
+
+// recordWinnings posts each pot winner's share to the global leaderboard and
+// sends them a "hand won" notification (native Nakama features).
+func recordWinnings(ctx context.Context, nk runtime.NakamaModule, s *MatchState, res poker.ShowdownResult) {
+	for _, r := range res.Resolutions {
+		if len(r.Winners) == 0 || r.Amount <= 0 {
+			continue
+		}
+		share := r.Amount / int64(len(r.Winners))
+		if share <= 0 {
+			continue
+		}
+		for _, seat := range r.Winners {
+			if seat < 0 || seat >= len(s.Table.Seats) || s.Table.Seats[seat] == nil {
+				continue
+			}
+			w := s.Table.Seats[seat]
+			social.RecordWinnings(ctx, nk, w.UserID, w.Username, share)
+			social.Notify(ctx, nk, w.UserID, "hand_won", map[string]interface{}{
+				"amount":  share,
+				"hand_no": s.Table.HandNo,
+				"room_id": s.RoomID,
+			}, social.CodeHandWon)
+		}
+	}
 }
 
 func reportTournamentBusts(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *MatchState) {
@@ -498,6 +611,18 @@ func (h *Handler) MatchSignal(ctx context.Context, logger runtime.Logger, db *sq
 			}
 		}
 		broadcastSnapshot(ctx, db, dispatcher, s, nil)
+	case "add_bot":
+		seatIdx := s.Table.FirstEmptySeat()
+		if seatIdx >= 0 {
+			s.BotCount++
+			buyIn := poker.ClampBuyIn(s.BuyIn)
+			name := fmt.Sprintf("Bot_%d", s.BotCount)
+			botID := fmt.Sprintf("bot_%s_%d", s.RoomID, seatIdx)
+			if err := s.Table.SitDownBot(seatIdx, botID, name, buyIn); err == nil {
+				dispatcher.MatchLabelUpdate(buildLabel(s))
+				broadcastSnapshot(ctx, db, dispatcher, s, nil)
+			}
+		}
 	}
 	return s, ""
 }
@@ -517,7 +642,7 @@ func buildLabel(s *MatchState) string {
 		"module":     protocol.MatchModule,
 		"room_id":    s.RoomID,
 		"seated":     seated,
-		"open_seats": protocol.MaxSeats - seated,
+		"open_seats": s.Table.Cap() - seated,
 		"sb":         s.SmallBlind,
 		"bb":         s.BigBlind,
 		"status":     poker.HandPhaseForTable(s.Table, s.Phase),
@@ -526,8 +651,9 @@ func buildLabel(s *MatchState) string {
 }
 
 func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) protocol.TableSnapshot {
-	seats := make([]protocol.SeatView, protocol.MaxSeats)
-	for i := 0; i < protocol.MaxSeats; i++ {
+	cap := s.Table.Cap()
+	seats := make([]protocol.SeatView, cap)
+	for i := 0; i < cap; i++ {
 		seats[i] = protocol.SeatView{Index: i, Status: "empty"}
 		if s.Table.Seats[i] != nil {
 			seat := s.Table.Seats[i]
@@ -559,6 +685,7 @@ func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) 
 		ButtonSeat:     s.Table.ButtonSeat,
 		SmallBlind:     s.SmallBlind,
 		BigBlind:       s.BigBlind,
+		MaxSeats:       s.Table.Cap(),
 		HeroWallet:     heroWallet,
 		HandNo:         s.Table.HandNo,
 		DeckCommitHash: s.Table.DeckCommitment,

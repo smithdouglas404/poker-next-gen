@@ -12,9 +12,14 @@ import {
 } from "react";
 
 import {
+  DEFAULT_BIG_BLIND_CENTS,
+  DEFAULT_MAX_SEATS,
+  DEFAULT_SMALL_BLIND_CENTS,
   INITIAL_WALLET_CENTS,
   MAX_BUY_IN_CENTS,
+  MAX_SEATS,
   MIN_BUY_IN_CENTS,
+  MIN_SEATS,
   OpAction,
   OpBoard,
   OpDealPrivate,
@@ -43,7 +48,13 @@ interface GameContextValue extends GameState {
   connect: () => Promise<void>;
   refreshWallet: () => Promise<void>;
   listTables: () => Promise<void>;
-  createRoom: (opts?: { name?: string; buyIn?: number }) => Promise<void>;
+  createRoom: (opts?: {
+    name?: string;
+    buyIn?: number;
+    smallBlind?: number;
+    bigBlind?: number;
+    maxSeats?: number;
+  }) => Promise<void>;
   joinRoom: (matchId: string) => Promise<void>;
   sitDown: (seat: number, buyIn?: number) => Promise<void>;
   standUp: () => Promise<void>;
@@ -73,6 +84,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [showdown, setShowdown] = useState<ShowdownMessage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [buyInCents, setBuyInCentsState] = useState(INITIAL_WALLET_CENTS);
+  const [maxSeats, setMaxSeats] = useState(DEFAULT_MAX_SEATS);
   const [gameLog, setGameLog] = useState<GameLogEntry[]>([]);
   const [matchmakerSearching, setMatchmakerSearching] = useState(false);
   const [openTables, setOpenTables] = useState<TableListItem[]>([]);
@@ -204,25 +216,39 @@ export function GameProvider({ children }: { children: ReactNode }) {
   );
 
   const createRoom = useCallback(
-    async (opts?: { name?: string; buyIn?: number }) => {
+    async (opts?: {
+      name?: string;
+      buyIn?: number;
+      smallBlind?: number;
+      bigBlind?: number;
+      maxSeats?: number;
+    }) => {
       const buyIn = opts?.buyIn ?? buyInCents;
+      const smallBlind = Math.max(1, Math.round(opts?.smallBlind ?? DEFAULT_SMALL_BLIND_CENTS));
+      const bigBlind = Math.max(smallBlind, Math.round(opts?.bigBlind ?? DEFAULT_BIG_BLIND_CENTS));
+      const seats = Math.min(MAX_SEATS, Math.max(MIN_SEATS, Math.round(opts?.maxSeats ?? maxSeats)));
       const res = await fetch("/api/nakama/table/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: opts?.name ?? "Hold'em Table",
-          small_blind: 100,
-          big_blind: 200,
+          small_blind: smallBlind,
+          big_blind: bigBlind,
           buy_in: buyIn,
+          max_seats: seats,
         }),
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? "Create room failed");
       setRoomId(json.data.room_id);
-      pushLog(`Room created · buy-in ${formatCents(buyIn)}`, "info");
+      setMaxSeats(seats);
+      pushLog(
+        `Room created · buy-in ${formatCents(buyIn)} · blinds ${formatCents(smallBlind)}/${formatCents(bigBlind)} · ${seats} seats`,
+        "info",
+      );
       await joinRoom(json.data.match_id);
     },
-    [buyInCents, joinRoom, pushLog],
+    [buyInCents, maxSeats, joinRoom, pushLog],
   );
 
   const sendMatch = useCallback(
@@ -328,6 +354,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       matchmakerSearching,
       openTables,
       dealTrigger,
+      maxSeats,
       connect,
       refreshWallet,
       listTables,
@@ -355,6 +382,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       matchmakerSearching,
       openTables,
       dealTrigger,
+      maxSeats,
       connect,
       refreshWallet,
       listTables,
