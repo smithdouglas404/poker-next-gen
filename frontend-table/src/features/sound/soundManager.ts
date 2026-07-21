@@ -17,26 +17,32 @@
 
 export type SoundCue =
   | "deal"
+  | "flip"
   | "check"
   | "bet"
   | "call"
   | "fold"
   | "win"
-  | "turn";
+  | "turn"
+  | "button"
+  | "showdown";
 
 const STORAGE_KEY = "poker.sound.muted";
 
 type MuteListener = (muted: boolean) => void;
 
-/** Audio file (in /sounds/) backing each cue, when present. */
-const CUE_FILES: Record<SoundCue, string> = {
+/** Audio file (in /sounds/) backing each cue, when present. Cues without a file
+ *  (e.g. the dealer button) fall through to the synth recipe below. */
+const CUE_FILES: Partial<Record<SoundCue, string>> = {
   deal: "card-deal",
+  flip: "card-flip",
   check: "check",
   bet: "raise",
   call: "call",
   fold: "fold",
   win: "win",
   turn: "turn-notify",
+  showdown: "showdown",
 };
 
 /** Cues that also get a synthesized chip layer for extra texture. */
@@ -61,6 +67,8 @@ interface ToneStep {
 /** Synth fallback recipes for each cue (used when no audio file is loaded). */
 const RECIPES: Record<SoundCue, ToneStep[]> = {
   deal: [{ freq: 880, at: 0, dur: 0.07, gain: 0.18, type: "triangle" }],
+  // Community card turned over — a quick, brighter snap than the deal blip.
+  flip: [{ freq: 1200, at: 0, dur: 0.05, gain: 0.16, type: "triangle" }],
   check: [
     { freq: 300, at: 0, dur: 0.06, gain: 0.22, type: "sine" },
     { freq: 300, at: 0.11, dur: 0.06, gain: 0.22, type: "sine" },
@@ -82,6 +90,17 @@ const RECIPES: Record<SoundCue, ToneStep[]> = {
   turn: [
     { freq: 987.77, at: 0, dur: 0.09, gain: 0.16, type: "sine" },
     { freq: 987.77, at: 0.14, dur: 0.09, gain: 0.16, type: "sine" },
+  ],
+  // Dealer button slides to the next seat — a soft woody double-knock (no asset).
+  button: [
+    { freq: 180, at: 0, dur: 0.05, gain: 0.16, type: "sine" },
+    { freq: 140, at: 0.06, dur: 0.06, gain: 0.13, type: "sine" },
+  ],
+  // Showdown reveal — a rising triad under the card flips.
+  showdown: [
+    { freq: 392.0, at: 0, dur: 0.1, gain: 0.18, type: "triangle" },
+    { freq: 523.25, at: 0.09, dur: 0.1, gain: 0.18, type: "triangle" },
+    { freq: 659.25, at: 0.18, dur: 0.16, gain: 0.2, type: "triangle" },
   ],
 };
 
@@ -166,9 +185,11 @@ class SoundManager {
     const ctx = this.ctx;
     await Promise.all(
       (Object.keys(CUE_FILES) as SoundCue[]).map(async (cue) => {
+        const file = CUE_FILES[cue];
+        if (!file) return;
         for (const ext of AUDIO_EXTENSIONS) {
           try {
-            const res = await fetch(`/sounds/${CUE_FILES[cue]}${ext}`);
+            const res = await fetch(`/sounds/${file}${ext}`);
             if (!res.ok) continue;
             const buf = await res.arrayBuffer();
             const decoded = await ctx.decodeAudioData(buf);
