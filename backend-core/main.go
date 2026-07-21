@@ -81,6 +81,8 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"withdrawal_reject_admin": rpc.WithdrawalRejectAdmin,
 		"daily_bonus_status":   rpc.DailyBonusStatus,
 		"daily_bonus_claim":    rpc.DailyBonusClaim,
+		"rakeback_status":      rpc.RakebackStatus,
+		"rakeback_claim":       rpc.RakebackClaim,
 	}
 	for id, fn := range rpcs {
 		if err := initializer.RegisterRpc(id, fn); err != nil {

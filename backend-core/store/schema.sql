@@ -255,3 +255,22 @@ CREATE TABLE IF NOT EXISTS poker_daily_bonus (
     last_claim_at TIMESTAMPTZ,
     streak INT NOT NULL DEFAULT 0
 );
+
+-- Rakeback accrual. Rake taken from raked (club) pots accrues back to the
+-- contributing players at their tier's rakeback percent; claimable to wallet.
+CREATE TABLE IF NOT EXISTS poker_rakeback (
+    user_id TEXT PRIMARY KEY,
+    balance BIGINT NOT NULL DEFAULT 0,
+    lifetime BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Global registry of which tables a user is currently seated at, so the tier's
+-- multi-table limit can be enforced across matches. Rows are added on sit and
+-- removed on stand/leave.
+CREATE TABLE IF NOT EXISTS poker_active_seat (
+    user_id TEXT NOT NULL,
+    match_id TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, match_id)
+);

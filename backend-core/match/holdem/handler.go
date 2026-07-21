@@ -12,6 +12,7 @@ import (
 	"github.com/heroiclabs/nakama-common/runtime"
 
 	"github.com/smithdouglas404/poker-next-gen/backend-core/audit"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/billing"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/bot"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/poker"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/protocol"
@@ -128,6 +129,7 @@ func (h *Handler) MatchJoin(ctx context.Context, logger runtime.Logger, db *sql.
 
 func (h *Handler) MatchLeave(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, presences []runtime.Presence) interface{} {
 	s := state.(*MatchState)
+	seatReg := store.NewActiveSeatStore(db)
 	for _, p := range presences {
 		delete(s.Presences, p.GetUserId())
 		for i, seat := range s.Table.Seats {
@@ -135,6 +137,7 @@ func (h *Handler) MatchLeave(ctx context.Context, logger runtime.Logger, db *sql
 				s.Table.StandUp(i)
 			}
 		}
+		_ = seatReg.Unregister(ctx, p.GetUserId(), matchIDForAudit(s))
 	}
 	dispatcher.MatchLabelUpdate(buildLabel(s))
 	broadcastSnapshot(ctx, db, dispatcher, s, nil)
@@ -176,6 +179,16 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			if req.BuyIn > 0 {
 				buyIn = poker.ClampBuyIn(req.BuyIn)
 			}
+			// Tier gate: enforce the multi-table limit (tables seated at once).
+			seatReg := store.NewActiveSeatStore(db)
+			matchKey := matchIDForAudit(s)
+			if !seatReg.IsSeated(ctx, userID, matchKey) {
+				limit := billing.GetTierDef(store.SubscriptionTier(ctx, db, userID)).MultiTableLimit
+				if cnt, _ := seatReg.Count(ctx, userID); limit > 0 && cnt >= limit {
+					sendError(dispatcher, presence, "multi_table_limit", "you have reached your plan's simultaneous-table limit")
+					continue
+				}
+			}
 			if err := reserveBuyIn(ctx, db, s, userID, buyIn); err != nil {
 				sendError(dispatcher, presence, "buy_in_failed", err.Error())
 				continue
@@ -189,6 +202,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				sendError(dispatcher, presence, "sit_failed", err.Error())
 				continue
 			}
+			_ = seatReg.Register(ctx, userID, matchKey)
 			dispatcher.MatchLabelUpdate(buildLabel(s))
 			broadcastSnapshot(ctx, db, dispatcher, s, nil)
 
@@ -200,6 +214,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 					break
 				}
 			}
+			_ = store.NewActiveSeatStore(db).Unregister(ctx, userID, matchIDForAudit(s))
 			dispatcher.MatchLabelUpdate(buildLabel(s))
 			broadcastSnapshot(ctx, db, dispatcher, s, nil)
 
@@ -576,6 +591,37 @@ func creditRake(ctx context.Context, db *sql.DB, s *MatchState, pot int64) {
 		return
 	}
 	_ = store.NewRakeStore(db).Credit(ctx, s.ClubID, rakeAmount, s.MatchID, s.Table.HandNo)
+	accrueRakeback(ctx, db, s, rakeAmount)
+}
+
+// accrueRakeback distributes rakeback to the human contributors of the raked
+// pot, proportional to each one's contribution, at their membership tier's
+// rakeback percent. Bots (no tier) are skipped.
+func accrueRakeback(ctx context.Context, db *sql.DB, s *MatchState, rakeAmount int64) {
+	var totalContrib int64
+	for _, seat := range s.Table.Seats {
+		if seat != nil {
+			totalContrib += seat.TotalContributed
+		}
+	}
+	if totalContrib <= 0 {
+		return
+	}
+	rb := store.NewRakebackStore(db)
+	for _, seat := range s.Table.Seats {
+		if seat == nil || seat.UserID == "" || seat.IsBot || seat.TotalContributed <= 0 {
+			continue
+		}
+		pct := billing.GetTierDef(store.SubscriptionTier(ctx, db, seat.UserID)).RakebackPercent
+		if pct <= 0 {
+			continue
+		}
+		share := rakeAmount * seat.TotalContributed / totalContrib
+		amount := share * int64(pct) / 100
+		if amount > 0 {
+			_ = rb.Accrue(ctx, seat.UserID, amount)
+		}
+	}
 }
 
 // recordWinnings posts each pot winner's share to the global leaderboard and
