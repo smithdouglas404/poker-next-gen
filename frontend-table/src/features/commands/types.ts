@@ -22,6 +22,11 @@ export interface CommandDefinition {
   icon: string;
   /** Example payload shown in the UI for planned or live RPC commands. */
   example?: Record<string, unknown>;
+  /**
+   * Role required to SEE this action. Omitted = everyone (player/game host).
+   * The backend still enforces every action; this only controls visibility.
+   */
+  requires?: "platform_admin" | "club_admin";
 }
 
 export interface CommandResult {
