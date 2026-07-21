@@ -104,7 +104,8 @@ type TableCreateRequest struct {
 	BuyIn      int64  `json:"buy_in"`
 	MaxSeats   int    `json:"max_seats"`
 	NumBots    int    `json:"num_bots"`
-	Variant    string `json:"variant"` // "holdem" | "plo"; empty => holdem
+	Variant    string `json:"variant"`       // "holdem" | "plo"; empty => holdem
+	DurationMins int  `json:"duration_mins"` // auto-close after N minutes (0 = no limit)
 }
 
 type TableCreateResponse struct {

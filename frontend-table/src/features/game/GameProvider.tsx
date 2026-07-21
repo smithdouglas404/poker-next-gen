@@ -72,6 +72,7 @@ interface GameContextValue extends GameState {
     maxSeats?: number;
     numBots?: number;
     variant?: string;
+    durationMins?: number;
   }) => Promise<void>;
   joinRoom: (matchId: string) => Promise<void>;
   sitDown: (seat: number, buyIn?: number) => Promise<void>;
@@ -296,6 +297,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       maxSeats?: number;
       numBots?: number;
       variant?: string;
+      durationMins?: number;
     }) => {
       const buyIn = opts?.buyIn ?? buyInCents;
       const smallBlind = Math.max(1, Math.round(opts?.smallBlind ?? DEFAULT_SMALL_BLIND_CENTS));
@@ -303,6 +305,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const seats = Math.min(MAX_SEATS, Math.max(MIN_SEATS, Math.round(opts?.maxSeats ?? maxSeats)));
       const numBots = Math.min(seats - 1, Math.max(0, Math.round(opts?.numBots ?? 0)));
       const variant = opts?.variant === "plo" ? "plo" : "holdem";
+      const durationMins = Math.max(0, Math.round(opts?.durationMins ?? 0));
       const res = await fetch("/api/nakama/table/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -314,6 +317,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           max_seats: seats,
           num_bots: numBots,
           variant,
+          duration_mins: durationMins,
         }),
       });
       const json = await res.json();

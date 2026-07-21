@@ -43,6 +43,7 @@ export function RoomPanel() {
   const [bigBlind, setBigBlind] = useState(DEFAULT_BIG_BLIND_CENTS);
   const [seats, setSeats] = useState(maxSeats);
   const [gameVariant, setGameVariant] = useState<"holdem" | "plo">("holdem");
+  const [durationMins, setDurationMins] = useState(0); // 0 = unlimited
 
   const seatCap = snapshot?.max_seats ?? snapshot?.seats.length ?? maxSeats;
   const seated = snapshot?.seats.filter((s) => s.status !== "empty").length ?? 0;
@@ -186,6 +187,35 @@ export function RoomPanel() {
             />
           </label>
 
+          <div className="mt-2">
+            <span className="text-[10px] uppercase tracking-wider text-neutral-500">
+              Duration (auto-closes · no host needed)
+            </span>
+            <div className="mt-1 grid grid-cols-4 gap-1">
+              {(
+                [
+                  { mins: 0, label: "∞" },
+                  { mins: 30, label: "30m" },
+                  { mins: 60, label: "1h" },
+                  { mins: 120, label: "2h" },
+                ] as const
+              ).map((d) => (
+                <button
+                  key={d.mins}
+                  type="button"
+                  onClick={() => setDurationMins(d.mins)}
+                  className={`rounded-lg border px-2 py-1 text-xs font-semibold transition ${
+                    durationMins === d.mins
+                      ? "border-amber-400/60 bg-amber-400/10 text-amber-100"
+                      : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25"
+                  }`}
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {!blindsValid && (
             <p className="mt-2 text-[10px] text-red-300">Big blind must be ≥ small blind.</p>
           )}
@@ -196,7 +226,14 @@ export function RoomPanel() {
             disabled={busy || !createValid}
             onClick={() =>
               run(() =>
-                createRoom({ buyIn: buyInCents, smallBlind, bigBlind, maxSeats: seats, variant: gameVariant }),
+                createRoom({
+                  buyIn: buyInCents,
+                  smallBlind,
+                  bigBlind,
+                  maxSeats: seats,
+                  variant: gameVariant,
+                  durationMins,
+                }),
               )
             }
             className="w-full"
