@@ -25,6 +25,7 @@ type SeatView struct {
 	Status   string `json:"status"` // empty | seated | folded | all_in
 	LastAction string `json:"last_action,omitempty"`
 	IsHero   bool   `json:"is_hero,omitempty"`
+	ModelURL string `json:"model_url,omitempty"` // equipped 3D character GLB
 }
 
 type PotView struct {

@@ -40,6 +40,8 @@ export interface SeatView {
   status: string;
   last_action?: string;
   is_hero?: boolean;
+  /** Equipped 3D model GLB URL (from cosmetics), when the player has one. */
+  model_url?: string;
 }
 
 export interface TableSnapshot {

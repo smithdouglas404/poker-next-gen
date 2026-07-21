@@ -74,6 +74,35 @@ func CreateTextToModel(ctx context.Context, prompt string) (string, error) {
 	return out.Data.TaskID, nil
 }
 
+// CreateRigTask auto-rigs a finished base model so it can animate, returning the
+// rig task id. Best-effort: callers should fall back to the base model on error.
+func CreateRigTask(ctx context.Context, originalTaskID string) (string, error) {
+	body, _ := json.Marshal(map[string]interface{}{
+		"type":                  "animate_rig",
+		"original_model_task_id": originalTaskID,
+		"out_format":            "glb",
+	})
+	raw, status, err := tripoDo(ctx, http.MethodPost, "/task", body)
+	if err != nil {
+		return "", err
+	}
+	if status >= 300 {
+		return "", fmt.Errorf("tripo rig task http %d: %s", status, string(raw))
+	}
+	var out struct {
+		Data struct {
+			TaskID string `json:"task_id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return "", err
+	}
+	if out.Data.TaskID == "" {
+		return "", fmt.Errorf("tripo rig task: no task id")
+	}
+	return out.Data.TaskID, nil
+}
+
 // TripoTask is the subset of a task we act on.
 type TripoTask struct {
 	Status   string // queued | running | success | failed | ...

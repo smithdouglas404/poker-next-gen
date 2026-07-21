@@ -94,6 +94,8 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"cosmetic_equip":       rpc.CosmeticEquip,
 		"character_generate":   rpc.CharacterGenerate,
 		"character_generation_status": rpc.CharacterGenerationStatus,
+		"anchor_run":           rpc.AnchorRun,
+		"anchor_status":        rpc.AnchorStatus,
 	}
 	for id, fn := range rpcs {
 		if err := initializer.RegisterRpc(id, fn); err != nil {

@@ -741,6 +741,28 @@ func buildLabel(s *MatchState) string {
 	return string(label)
 }
 
+// equippedModelURL returns the GLB asset URL of a player's equipped 3D character
+// (empty if none / a bot). Lets generated Tripo characters render at the seat.
+func equippedModelURL(ctx context.Context, db *sql.DB, userID string, isBot bool) string {
+	if userID == "" || isBot {
+		return ""
+	}
+	cs := store.NewCosmeticStore(db)
+	equipped, err := cs.Equipped(ctx, userID)
+	if err != nil {
+		return ""
+	}
+	cid, ok := equipped["model"]
+	if !ok || cid == "" {
+		return ""
+	}
+	c, err := cs.GetByID(ctx, cid)
+	if err != nil || c == nil {
+		return ""
+	}
+	return c.AssetRef
+}
+
 func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) protocol.TableSnapshot {
 	cap := s.Table.Cap()
 	seats := make([]protocol.SeatView, cap)
@@ -756,6 +778,7 @@ func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) 
 				Status:     string(seat.Status),
 				LastAction: seat.LastAction,
 				IsHero:     seat.UserID == heroID,
+				ModelURL:   equippedModelURL(ctx, db, seat.UserID, seat.IsBot),
 			}
 		}
 	}

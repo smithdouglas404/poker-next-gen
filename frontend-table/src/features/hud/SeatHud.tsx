@@ -8,6 +8,8 @@ import { computeTableLayout } from "@/features/table/tableLayout";
 import { getSeatPositions } from "@/features/table/seatLayout";
 import { avatarDef, avatarForKey } from "@/features/table/avatars";
 import { Character3D } from "@/features/table/Character3D";
+import { Character3DGL } from "@/features/table/Character3DGL";
+import { useRenderMode } from "@/features/table/renderMode";
 
 function SeatCard({
   seat,
@@ -15,12 +17,14 @@ function SeatCard({
   onSit,
   active,
   winner,
+  mode,
 }: {
   seat: SeatView;
   buyInLabel: string;
   onSit: () => void;
   active?: boolean;
   winner?: boolean;
+  mode: "2d" | "3d";
 }) {
   const empty = seat.status === "empty" || !seat.user_id;
 
@@ -50,14 +54,26 @@ function SeatCard({
       className="flex w-36 flex-col items-center rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3 py-3 backdrop-blur-xl"
       style={{ boxShadow: `0 0 0 1px ${accent}55, 0 8px 26px ${glow}` }}
     >
-      <Character3D
-        identity={identity}
-        name={seat.username}
-        hero={!!seat.is_hero}
-        active={active}
-        winner={winner}
-        folded={folded}
-      />
+      {mode === "3d" ? (
+        <Character3DGL
+          identity={identity}
+          name={seat.username}
+          hero={!!seat.is_hero}
+          active={active}
+          winner={winner}
+          folded={folded}
+          modelUrl={seat.model_url}
+        />
+      ) : (
+        <Character3D
+          identity={identity}
+          name={seat.username}
+          hero={!!seat.is_hero}
+          active={active}
+          winner={winner}
+          folded={folded}
+        />
+      )}
       <p
         className="mt-2 max-w-full truncate text-sm font-bold tracking-wide"
         style={{ color: seat.is_hero ? "#fde68a" : "#ffffff" }}
@@ -91,6 +107,7 @@ export function SeatHud() {
   const { snapshot, sitDown, profile, buyInCents, maxSeats, showdown } = useGame();
   const buyInLabel = formatCents(buyInCents);
 
+  const [mode, setMode] = useRenderMode();
   const activeSeat = snapshot?.action_seat;
   const winnerSeats = new Set((showdown?.winners ?? []).map((w) => w.seat));
 
@@ -124,6 +141,22 @@ export function SeatHud() {
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10">
+      <div className="pointer-events-auto absolute right-4 top-20 z-20 flex overflow-hidden rounded-full border border-white/15 bg-black/60 text-[11px] font-bold backdrop-blur-md">
+        <button
+          type="button"
+          onClick={() => setMode("2d")}
+          className={`px-3 py-1 ${mode === "2d" ? "bg-amber-500 text-black" : "text-neutral-300"}`}
+        >
+          2.5D
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("3d")}
+          className={`px-3 py-1 ${mode === "3d" ? "bg-amber-500 text-black" : "text-neutral-300"}`}
+        >
+          3D
+        </button>
+      </div>
       {positions.length > 0 &&
         seats.slice(0, seatCount).map((seat) => {
           const pos = positions[seat.index] ?? positions[seat.index % positions.length];
@@ -140,6 +173,7 @@ export function SeatHud() {
                 onSit={() => void sitDown(seat.index, buyInCents)}
                 active={activeSeat === seat.index && seat.status !== "empty"}
                 winner={winnerSeats.has(seat.index)}
+                mode={mode}
               />
             </div>
           );
