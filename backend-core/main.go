@@ -96,6 +96,10 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"character_generation_status": rpc.CharacterGenerationStatus,
 		"anchor_run":           rpc.AnchorRun,
 		"anchor_status":        rpc.AnchorStatus,
+		"marketplace_list":     rpc.MarketplaceList,
+		"marketplace_browse":   rpc.MarketplaceBrowse,
+		"marketplace_buy":      rpc.MarketplaceBuy,
+		"marketplace_cancel":   rpc.MarketplaceCancel,
 	}
 	for id, fn := range rpcs {
 		if err := initializer.RegisterRpc(id, fn); err != nil {

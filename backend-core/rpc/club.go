@@ -405,6 +405,13 @@ func RakeConfigSet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 	if req.Name == "" {
 		req.Name = "Standard"
 	}
+	// Rake is capped at 0–10% (0–1000 bps), per the club marketplace model.
+	if req.PercentBps < 0 {
+		req.PercentBps = 0
+	}
+	if req.PercentBps > 1000 {
+		req.PercentBps = 1000
+	}
 	req.IsActive = true
 	if err := store.NewClubStore(db).SetRake(ctx, &req); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
