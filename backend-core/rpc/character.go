@@ -176,6 +176,18 @@ func mintCharacter(ctx context.Context, db *sql.DB, gens *store.GenerationStore,
 		return generationResult(&store.Generation{ID: g.ID, Status: "failed"})
 	}
 	_ = cs.Grant(ctx, userID, cid, "generate")
+
+	// Re-host the GLB durably. Tripo's model URL is a temporary signed URL, so an
+	// equipped character would break once it expires. Copy the bytes into our own
+	// storage and repoint the cosmetic at the stable /api/model/<id> URL. On any
+	// failure keep the original Tripo URL (still renders short-term) — never lose
+	// the mint the player paid for.
+	if data, ct, derr := integrations.DownloadModel(ctx, modelURL); derr == nil && len(data) > 0 {
+		if serr := store.NewModelAssetStore(db).Save(ctx, cid, ct, data); serr == nil {
+			_ = cs.SetAssetRef(ctx, cid, "/api/model/"+cid)
+		}
+	}
+
 	_ = gens.Complete(ctx, g.ID, cid)
 	g.Status = "success"
 	g.CosmeticID = cid

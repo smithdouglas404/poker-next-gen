@@ -14,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -144,4 +145,31 @@ func GetTask(ctx context.Context, taskID string) (TripoTask, error) {
 		ModelURL:   model,
 		PreviewURL: out.Data.Output.RenderedImage,
 	}, nil
+}
+
+// DownloadModel fetches a generated model's bytes from its (temporary, signed)
+// Tripo URL so the caller can re-host them durably. Returns the bytes and a
+// content type. No auth header — the URL is self-authenticating. Capped at 64MB.
+func DownloadModel(ctx context.Context, url string) ([]byte, string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	resp, err := (&http.Client{Timeout: 60 * time.Second}).Do(req)
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return nil, "", fmt.Errorf("download model http %d", resp.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
+	if err != nil {
+		return nil, "", err
+	}
+	ct := resp.Header.Get("Content-Type")
+	if ct == "" || strings.Contains(ct, "octet-stream") {
+		ct = "model/gltf-binary"
+	}
+	return data, ct, nil
 }

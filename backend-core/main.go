@@ -100,6 +100,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"cosmetic_equip":       rpc.CosmeticEquip,
 		"character_generate":   rpc.CharacterGenerate,
 		"character_generation_status": rpc.CharacterGenerationStatus,
+		"model_asset":          rpc.ModelAsset,
 		"anchor_run":           rpc.AnchorRun,
 		"anchor_status":        rpc.AnchorStatus,
 		"marketplace_list":     rpc.MarketplaceList,

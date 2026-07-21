@@ -37,6 +37,14 @@ func (s *CosmeticStore) Create(ctx context.Context, c *Cosmetic) (string, error)
 	return c.ID, err
 }
 
+// SetAssetRef updates a cosmetic's asset reference — used to repoint a freshly
+// minted generated model from its temporary Tripo URL to the durable
+// /api/model/<id> URL once the bytes are re-hosted.
+func (s *CosmeticStore) SetAssetRef(ctx context.Context, id, assetRef string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE poker_cosmetic SET asset_ref=$2 WHERE id=$1`, id, assetRef)
+	return err
+}
+
 // GetByID returns a cosmetic, or (nil, nil) if missing.
 func (s *CosmeticStore) GetByID(ctx context.Context, id string) (*Cosmetic, error) {
 	var c Cosmetic

@@ -341,6 +341,18 @@ CREATE INDEX IF NOT EXISTS idx_poker_generation_user ON poker_generation(user_id
 ALTER TABLE poker_generation ADD COLUMN IF NOT EXISTS stage TEXT NOT NULL DEFAULT 'model';
 ALTER TABLE poker_generation ADD COLUMN IF NOT EXISTS base_model_url TEXT NOT NULL DEFAULT '';
 
+-- Durably re-hosted generated character GLBs. Tripo download URLs are temporary
+-- signed URLs, so at mint time we copy the bytes here (keyed by cosmetic id) and
+-- point the cosmetic's asset_ref at /api/model/<id>. Keeps equipped characters
+-- alive after the Tripo URL expires.
+CREATE TABLE IF NOT EXISTS poker_model_asset (
+    cosmetic_id TEXT PRIMARY KEY REFERENCES poker_cosmetic(id) ON DELETE CASCADE,
+    content_type TEXT NOT NULL DEFAULT 'model/gltf-binary',
+    data BYTEA NOT NULL,
+    byte_size BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Merkle-root batch anchors: one row per batch of audit events committed to
 -- Polygon (or a permanence layer). The batch's Merkle root over the events'
 -- payload hashes is anchored with a single tx — cheap, public verifiability.
