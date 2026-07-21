@@ -6,24 +6,26 @@ import { DEFAULT_MAX_SEATS, MAX_SEATS, MIN_SEATS, type SeatView } from "@/featur
 import { formatCents, useGame } from "@/features/game/GameProvider";
 import { computeTableLayout } from "@/features/table/tableLayout";
 import { getSeatPositions } from "@/features/table/seatLayout";
-import { avatarForKey, avatarGradient, avatarSrc } from "@/features/table/avatars";
+import { avatarDef, avatarForKey, avatarGradient, avatarSrc } from "@/features/table/avatars";
 
 /** A glowing character portrait for a seated player (falls back to a monogram). */
 function AvatarPortrait({ name, identity, hero }: { name?: string; identity: string; hero: boolean }) {
   const [failed, setFailed] = useState(false);
   const monogram = (name?.slice(0, 2).toUpperCase() ?? "??");
+  const def = avatarDef(avatarForKey(identity));
+  // The hero is always framed in gold; everyone else wears their character's neon color.
+  const ring = hero ? "#fbbf24" : def.border;
+  const glow = hero ? "rgba(251,191,36,0.7)" : def.glow;
   return (
     <div className="relative h-14 w-14">
-      {/* neon glow ring */}
+      {/* neon glow ring, tinted to the character */}
       <div
-        className={`absolute -inset-1 rounded-full blur-[7px] ${
-          hero ? "bg-amber-400/70" : "bg-emerald-400/40"
-        }`}
+        className="absolute -inset-1 rounded-full blur-[7px]"
+        style={{ backgroundColor: glow }}
       />
       <div
-        className={`relative h-14 w-14 overflow-hidden rounded-full ring-2 ${
-          hero ? "ring-amber-300/80" : "ring-cyan-300/60"
-        }`}
+        className="relative h-14 w-14 overflow-hidden rounded-full"
+        style={{ boxShadow: `0 0 0 2px ${ring}, 0 0 12px ${glow}` }}
       >
         {failed ? (
           <div
@@ -35,7 +37,7 @@ function AvatarPortrait({ name, identity, hero }: { name?: string; identity: str
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={avatarSrc(avatarForKey(identity))}
+            src={avatarSrc(def.id)}
             alt={name ?? "player"}
             onError={() => setFailed(true)}
             className="h-full w-full object-cover"
