@@ -38,6 +38,10 @@ func SubscriptionCheckout(ctx context.Context, logger runtime.Logger, db *sql.DB
 	if !ok || userID == "" {
 		return "", runtime.NewError("unauthorized", 16)
 	}
+	// Paying for services requires biometric-verified registration.
+	if err := requireVerified(ctx, db, userID, "biometric", "purchasing a subscription"); err != nil {
+		return "", err
+	}
 	var req struct {
 		Tier     string `json:"tier"`
 		Interval string `json:"interval"` // "month" | "year"

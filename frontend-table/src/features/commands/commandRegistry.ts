@@ -5,6 +5,7 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
   // Platform
   {
     id: "healthz",
+    capability: "guest",
     title: "Check Backend Health",
     description: "Ping the Nakama backend-core plugin and verify the server is online.",
     category: "platform",
@@ -14,6 +15,7 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
   },
   {
     id: "stack_health",
+    capability: "guest",
     title: "Live Stack Health",
     description: "Check Nakama, rs_poker engine-math, and OddSlingers in one request.",
     category: "platform",
@@ -23,6 +25,7 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
   },
   {
     id: "auth_sign_in",
+    capability: "guest",
     title: "Sign In / Create Account",
     description: "Authenticate with Nakama using device credentials (auto on first visit).",
     category: "platform",
@@ -62,6 +65,7 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
   },
   {
     id: "kyc",
+    capability: "guest",
     title: "Identity Verification",
     description: "Progressive KYC (Didit) — verify to unlock real-money deposits and higher limits.",
     category: "platform",
@@ -154,6 +158,7 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
   // Cash Games
   {
     id: "game_create",
+    capability: "guest",
     title: "Create Cash Game",
     description: "Open a new 6-max Texas Hold'em table with blinds and buy-in.",
     category: "game",
@@ -165,6 +170,7 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
   },
   {
     id: "game_join",
+    capability: "guest",
     title: "Join Cash Game",
     description: "Take a seat at an open cash game table.",
     category: "game",
@@ -174,6 +180,7 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
   },
   {
     id: "game_list",
+    capability: "guest",
     title: "List Open Tables",
     description: "Browse active cash game matches on the network.",
     category: "game",
@@ -185,6 +192,7 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
   },
   {
     id: "matchmaker_enqueue",
+    capability: "guest",
     title: "Find Match (Matchmaker)",
     description: "Get matchmaker params, then join via socket on the table page.",
     category: "game",

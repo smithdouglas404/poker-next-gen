@@ -52,3 +52,61 @@ export function canSeeCommand(command: Pick<CommandDefinition, "requires">, role
       return true;
   }
 }
+
+// Verification / capability state driving the guest → registered → paying → money
+// model. `enforced` is false until a KYC provider is live; while false the UI does
+// not gate by capability (everything stays visible).
+export interface MeVerification {
+  enforced: boolean;
+  verifications: Record<string, string>;
+  capabilities: Record<string, boolean>;
+}
+
+const EMPTY_VERIFICATION: MeVerification = { enforced: false, verifications: {}, capabilities: {} };
+
+export function useMeVerification(): MeVerification {
+  const [v, setV] = useState<MeVerification>(EMPTY_VERIFICATION);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = (await callSessionRpc("me_verification", {})) as Partial<MeVerification>;
+        if (!cancelled) {
+          setV({
+            enforced: !!data.enforced,
+            verifications: data.verifications ?? {},
+            capabilities: data.capabilities ?? {},
+          });
+        }
+      } catch {
+        /* dormant / not signed in — leave unenforced */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return v;
+}
+
+/** Whether a command's verification `capability` is met. No-ops (returns true)
+ *  while verification is not enforced. Default (no capability) requires email. */
+export function canAccessCommand(
+  command: Pick<CommandDefinition, "capability">,
+  v: MeVerification,
+): boolean {
+  if (!v.enforced) return true;
+  const cap = command.capability ?? "email";
+  switch (cap) {
+    case "guest":
+      return true;
+    case "email":
+      return v.verifications.email === "verified";
+    case "biometric":
+      return v.verifications.biometric === "verified";
+    case "kyc_aml":
+      return v.verifications.kyc_aml === "verified";
+    default:
+      return true;
+  }
+}

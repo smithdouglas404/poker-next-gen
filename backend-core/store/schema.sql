@@ -392,3 +392,18 @@ CREATE TABLE IF NOT EXISTS poker_achievement (
 );
 
 CREATE INDEX IF NOT EXISTS idx_poker_achievement_user ON poker_achievement(user_id);
+
+-- Progressive identity verification (Didit). One row per (user, kind) where kind
+-- is email | biometric | kyc_aml. Drives capability gating: unregistered guests
+-- can only host a game; email unlocks clubs/general; biometric unlocks paying +
+-- marketplace; kyc_aml unlocks fiat deposit + withdrawal (crypto is exempt).
+CREATE TABLE IF NOT EXISTS poker_verification (
+    user_id    TEXT NOT NULL,
+    kind       TEXT NOT NULL,
+    status     TEXT NOT NULL DEFAULT 'none',
+    session_id TEXT NOT NULL DEFAULT '',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, kind)
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_verification_session ON poker_verification(session_id);

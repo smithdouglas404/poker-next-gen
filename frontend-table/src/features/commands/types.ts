@@ -27,6 +27,12 @@ export interface CommandDefinition {
    * The backend still enforces every action; this only controls visibility.
    */
   requires?: "platform_admin" | "club_admin";
+  /**
+   * Verification capability required to SEE this action (only enforced when a
+   * KYC provider is live). "guest" = visible to unregistered guests. Omitted =
+   * requires registration (email). "biometric"/"kyc_aml" require those checks.
+   */
+  capability?: "guest" | "email" | "biometric" | "kyc_aml";
 }
 
 export interface CommandResult {
