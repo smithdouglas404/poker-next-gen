@@ -44,11 +44,20 @@ export default function ClubsPage() {
     }
   }, []);
 
+  const [rakePct, setRakePct] = useState(5);
   const openClub = useCallback(async (id: string) => {
     setMessage(null);
     try {
       const d = (await callSessionRpc("club_get", { club_id: id })) as ClubDetail;
       setDetail(d);
+      try {
+        const rc = (await callSessionRpc("rake_config_get", { club_id: id })) as {
+          percent_bps?: number;
+        };
+        setRakePct(Math.round((rc.percent_bps ?? 500) / 100));
+      } catch {
+        setRakePct(5);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to open club");
     }
@@ -195,6 +204,47 @@ export default function ClubsPage() {
                   </Button>
                 ) : null}
               </div>
+
+              {isOwnerAdmin && (
+                <div className="mt-5 rounded-xl border border-amber-400/25 bg-amber-950/10 p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-200">
+                      House rake
+                    </span>
+                    <span className="text-lg font-bold text-amber-300">{rakePct}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={10}
+                    step={1}
+                    value={rakePct}
+                    onChange={(e) => setRakePct(Number(e.target.value))}
+                    className="mt-2 w-full accent-amber-400"
+                  />
+                  <div className="mt-1 flex justify-between text-[10px] text-neutral-500">
+                    <span>0%</span>
+                    <span>10% max</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    disabled={busy !== null}
+                    onClick={() =>
+                      act("rake", async () => {
+                        await callSessionRpc("rake_config_set", {
+                          club_id: detail.club.id,
+                          name: "Standard",
+                          percent_bps: rakePct * 100,
+                        });
+                        setMessage(`Rake set to ${rakePct}%.`);
+                      })
+                    }
+                    className="mt-3"
+                  >
+                    Save rake
+                  </Button>
+                </div>
+              )}
 
               <div className="mt-5 space-y-2">
                 {detail.members.map((m) => (

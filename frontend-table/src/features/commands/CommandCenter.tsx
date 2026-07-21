@@ -342,6 +342,18 @@ export function CommandCenter() {
               Character Studio →
             </Link>
             <Link
+              href="/marketplace"
+              className="rounded-xl border border-fuchsia-400/40 bg-fuchsia-950/20 px-5 py-3 text-sm font-semibold text-fuchsia-200 hover:bg-fuchsia-900/20"
+            >
+              Marketplace →
+            </Link>
+            <Link
+              href="/provably-fair"
+              className="rounded-xl border border-emerald-400/40 bg-emerald-950/20 px-5 py-3 text-sm font-semibold text-emerald-200 hover:bg-emerald-900/20"
+            >
+              Provably Fair →
+            </Link>
+            <Link
               href="/login"
               className="rounded-xl border border-sky-500/40 bg-sky-950/30 px-5 py-3 text-sm font-semibold text-sky-200 hover:bg-sky-900/30"
             >
