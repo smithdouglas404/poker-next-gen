@@ -33,13 +33,9 @@ func WalletDepositCrypto(ctx context.Context, logger runtime.Logger, db *sql.DB,
 
 	// Real-money deposits require a plan that permits them (free = play chips
 	// only), and are capped at the tier's daily limit.
-	tier := store.SubscriptionTier(ctx, db, userID)
-	def := billing.GetTierDef(tier)
-	if def.DepositLimitDailyCents <= 0 {
-		return "", runtime.NewError("deposits require a paid membership — upgrade to add real funds", 7)
-	}
-	if req.AmountCents > def.DepositLimitDailyCents {
-		return "", runtime.NewError("amount exceeds your plan's daily deposit limit", 7)
+	deposits := store.NewDepositStore(db)
+	if err := checkDepositLimit(ctx, db, deposits, userID, req.AmountCents); err != nil {
+		return "", err
 	}
 
 	if !payments.NowPaymentsConfigured() {
@@ -50,7 +46,6 @@ func WalletDepositCrypto(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		return string(out), nil
 	}
 
-	deposits := store.NewDepositStore(db)
 	orderID, err := deposits.CreatePending(ctx, userID, req.AmountCents, "usd", "nowpayments")
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
@@ -69,6 +64,70 @@ func WalletDepositCrypto(ctx context.Context, logger runtime.Logger, db *sql.DB,
 	out, _ := json.Marshal(map[string]interface{}{
 		"configured":  true,
 		"invoice_url": invoiceURL,
+		"deposit_id":  orderID,
+	})
+	return string(out), nil
+}
+
+// checkDepositLimit enforces that deposits require a paid plan and that this
+// deposit plus the trailing-24h total stays within the tier's daily limit.
+func checkDepositLimit(ctx context.Context, db *sql.DB, deposits *store.DepositStore, userID string, amountCents int64) error {
+	tier := store.SubscriptionTier(ctx, db, userID)
+	def := billing.GetTierDef(tier)
+	if def.DepositLimitDailyCents <= 0 {
+		return runtime.NewError("deposits require a paid membership — upgrade to add real funds", 7)
+	}
+	priorToday, err := deposits.SumRecentCents(ctx, userID, 24)
+	if err != nil {
+		return runtime.NewError(err.Error(), 13)
+	}
+	if priorToday+amountCents > def.DepositLimitDailyCents {
+		return runtime.NewError("amount exceeds your plan's daily deposit limit", 7)
+	}
+	return nil
+}
+
+// WalletDepositFiat starts a card (fiat) deposit via a one-time Stripe Checkout
+// session. The wallet is credited by the Stripe webhook (kind=wallet_deposit),
+// never here. Same daily-limit gate as crypto.
+func WalletDepositFiat(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	userID, err := callerID(ctx)
+	if err != nil {
+		return "", err
+	}
+	var req struct {
+		AmountCents int64 `json:"amount_cents"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil {
+		return "", runtime.NewError("invalid payload", 3)
+	}
+	if req.AmountCents < 500 {
+		return "", runtime.NewError("minimum deposit is $5.00", 3)
+	}
+	deposits := store.NewDepositStore(db)
+	if err := checkDepositLimit(ctx, db, deposits, userID, req.AmountCents); err != nil {
+		return "", err
+	}
+	if !stripeConfigured() {
+		out, _ := json.Marshal(map[string]interface{}{
+			"configured": false,
+			"message":    "Card deposits are not configured yet (set STRIPE_SECRET_KEY).",
+		})
+		return string(out), nil
+	}
+	orderID, err := deposits.CreatePending(ctx, userID, req.AmountCents, "usd", "stripe")
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	url, err := createStripeDepositSession(ctx, userID, orderID, req.AmountCents)
+	if err != nil {
+		logger.Error("stripe deposit session error: %v", err)
+		_ = deposits.MarkFailed(ctx, orderID)
+		return "", runtime.NewError("deposit gateway error", 13)
+	}
+	out, _ := json.Marshal(map[string]interface{}{
+		"configured":  true,
+		"checkout_url": url,
 		"deposit_id":  orderID,
 	})
 	return string(out), nil

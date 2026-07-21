@@ -229,3 +229,29 @@ CREATE TABLE IF NOT EXISTS poker_deposit (
 );
 
 CREATE INDEX IF NOT EXISTS idx_poker_deposit_user ON poker_deposit(user_id, created_at DESC);
+
+-- Wallet withdrawals. Funds are held (debited) on request; an admin approves
+-- (payout) or rejects (refund). AML control: never auto-paid.
+CREATE TABLE IF NOT EXISTS poker_withdrawal (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    amount_cents BIGINT NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'usd',
+    destination TEXT NOT NULL DEFAULT '',
+    gateway TEXT NOT NULL DEFAULT '',
+    gateway_payout_id TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending', -- pending | paid | rejected
+    reason TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_withdrawal_user ON poker_withdrawal(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_poker_withdrawal_status ON poker_withdrawal(status);
+
+-- Daily bonus claim tracking (chips granted per tier, once per 24h).
+CREATE TABLE IF NOT EXISTS poker_daily_bonus (
+    user_id TEXT PRIMARY KEY,
+    last_claim_at TIMESTAMPTZ,
+    streak INT NOT NULL DEFAULT 0
+);

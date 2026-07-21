@@ -73,7 +73,14 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"kyc_submit":           rpc.KycSubmit,
 		"kyc_verify_admin":     rpc.KycVerifyAdmin,
 		"wallet_deposit_crypto": rpc.WalletDepositCrypto,
+		"wallet_deposit_fiat":  rpc.WalletDepositFiat,
 		"nowpayments_webhook":  rpc.NowPaymentsWebhook,
+		"wallet_withdraw":      rpc.WalletWithdraw,
+		"withdrawal_list":      rpc.WithdrawalList,
+		"withdrawal_approve_admin": rpc.WithdrawalApproveAdmin,
+		"withdrawal_reject_admin": rpc.WithdrawalRejectAdmin,
+		"daily_bonus_status":   rpc.DailyBonusStatus,
+		"daily_bonus_claim":    rpc.DailyBonusClaim,
 	}
 	for id, fn := range rpcs {
 		if err := initializer.RegisterRpc(id, fn); err != nil {
