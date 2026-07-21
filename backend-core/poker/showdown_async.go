@@ -19,6 +19,7 @@ type ShowdownPlan struct {
 	Board             []Card
 	DeckOrder         []string
 	DeckCommitment    string
+	DeckSeed          string
 	HoleCards         map[string][]Card
 	Variant           string
 	Seats             [MaxSeats]*Seat
@@ -42,6 +43,7 @@ func BuildShowdownPlan(t *Table, matchID string) ShowdownPlan {
 		Board:          append([]Card(nil), t.Board...),
 		DeckOrder:      append([]string(nil), t.DeckOrder...),
 		DeckCommitment: t.DeckCommitment,
+		DeckSeed:       t.DeckSeed,
 		HoleCards:      copyHoleCards(t.HoleCards),
 		Variant:        t.Variant,
 		TotalPot:  t.Pot,

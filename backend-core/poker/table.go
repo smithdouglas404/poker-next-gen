@@ -19,7 +19,7 @@ func (c Card) Code() string {
 	return r + suits[c.Suit]
 }
 
-func NewDeck() ([]Card, string, []string, error) {
+func NewDeck() (deck []Card, commitment, seed string, order []string, err error) {
 	return NewSecureDeck()
 }
 
@@ -67,7 +67,8 @@ type Table struct {
 	Seats          [MaxSeats]*Seat
 	Deck           []Card
 	DeckOrder      []string
-	DeckCommitment string
+	DeckCommitment string // SHA-256(seed) — committed before the deal
+	DeckSeed       string // hex seed — revealed only after the hand settles
 	Board          []Card
 	HoleCards   map[string][]Card
 	Pot         int64
@@ -206,13 +207,14 @@ func (t *Table) FirstEmptySeat() int {
 
 func (t *Table) StartHand(sb, bb int64) error {
 	t.HandNo++
-	deck, deckHash, deckOrder, err := NewDeck()
+	deck, commitment, seed, deckOrder, err := NewDeck()
 	if err != nil {
 		return err
 	}
 	t.Deck = deck
 	t.DeckOrder = deckOrder
-	t.DeckCommitment = deckHash
+	t.DeckCommitment = commitment
+	t.DeckSeed = seed
 	t.Board = nil
 	t.HoleCards = map[string][]Card{}
 	t.Pot = 0

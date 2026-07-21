@@ -9,7 +9,8 @@ use axum::{
 };
 use engine_math::{
     batch_rank, cfr_advise, compare_hands, deck_commitment, estimate_equity, gto_advise, icm, outs,
-    omaha_showdown_winners, range_equity, rank_hand, rank_omaha, showdown_winners, shuffle_deck,
+    omaha_showdown_winners, range_equity, rank_hand, rank_omaha, reproduce_from_seed,
+    shuffle_deck_seeded, showdown_winners,
 };
 use serde::{Deserialize, Serialize};
 use std::{cmp::Ordering, net::SocketAddr, sync::Arc};
@@ -70,17 +71,51 @@ async fn rank(Json(req): Json<RankRequest>) -> Result<Json<RankResponse>, (Statu
 #[derive(Serialize)]
 struct ShuffleResponse {
     cards: Vec<String>,
-    deck_hash: String,
+    deck_hash: String,   // SHA-256 over the final order (back-compat, tamper-evident)
+    seed: String,        // hex 32-byte seed the backend reveals AFTER the hand
+    commitment: String,  // SHA-256(seed) — the pre-deal commit shown to players
     source: &'static str,
 }
 
 async fn shuffle() -> Json<ShuffleResponse> {
-    let cards = shuffle_deck();
+    let s = shuffle_deck_seeded();
     Json(ShuffleResponse {
-        deck_hash: deck_commitment(&cards),
-        cards,
-        source: "csprng_os",
+        deck_hash: deck_commitment(&s.cards),
+        cards: s.cards,
+        seed: s.seed_hex,
+        commitment: s.commitment,
+        source: "sha256ctr_seeded",
     })
+}
+
+#[derive(Deserialize)]
+struct SeedVerifyRequest {
+    seed: String,
+    /// Optional expected commitment (SHA-256 of the seed) to check against.
+    #[serde(default)]
+    commitment: Option<String>,
+}
+
+#[derive(Serialize)]
+struct SeedVerifyResponse {
+    cards: Vec<String>,
+    commitment: String,
+    valid: bool,
+}
+
+/// Reproduce the deck from a revealed seed and confirm its commitment — the
+/// server-side twin of the downloadable Python verifier.
+async fn shuffle_verify(
+    Json(req): Json<SeedVerifyRequest>,
+) -> Result<Json<SeedVerifyResponse>, (StatusCode, String)> {
+    let (cards, commitment) =
+        reproduce_from_seed(&req.seed).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    let valid = req.commitment.as_deref().map_or(true, |c| c.eq_ignore_ascii_case(&commitment));
+    Ok(Json(SeedVerifyResponse {
+        cards,
+        commitment,
+        valid,
+    }))
 }
 
 async fn compare(Json(req): Json<CompareRequest>) -> Result<Json<CompareResponse>, (StatusCode, String)> {
@@ -363,6 +398,7 @@ async fn main() {
         .route("/health", get(health))
         .route("/rank", post(rank))
         .route("/shuffle", post(shuffle))
+        .route("/shuffle/verify", post(shuffle_verify))
         .route("/compare", post(compare))
         .route("/equity", post(equity))
         .route("/showdown", post(showdown))

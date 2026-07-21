@@ -639,6 +639,7 @@ func emitHandSettled(ctx context.Context, s *MatchState, res poker.ShowdownResul
 		"engine":           "rs_poker",
 		"deck_order":       plan.DeckOrder,
 		"deck_commit_hash": plan.DeckCommitment,
+		"reveal_seed":      plan.DeckSeed, // revealed now: re-run the shuffle to verify
 	}
 	return s.Audit.Emit(ctx, audit.Event{
 		Type:        "hand_settled",
@@ -1053,10 +1054,12 @@ func broadcastShowdownFromResult(ctx context.Context, db *sql.DB, dispatcher run
 		}
 	}
 	data, _ := json.Marshal(map[string]interface{}{
-		"pot":       pot,
-		"hands":     reveal,
-		"winners":   winnerViews,
-		"side_pots": len(winnerGroups),
+		"pot":         pot,
+		"hands":       reveal,
+		"winners":     winnerViews,
+		"side_pots":   len(winnerGroups),
+		"deck_commit": s.Table.DeckCommitment, // committed before the deal
+		"reveal_seed": s.Table.DeckSeed,       // reveal now — re-run to verify fairness
 	})
 	_ = dispatcher.BroadcastMessage(protocol.OpShowdown, data, nil, nil, true)
 
