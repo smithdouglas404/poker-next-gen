@@ -1,6 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { useDeckStyle } from "@/features/table/deckStyle";
+import { soundManager, type SoundPack } from "@/features/sound/soundManager";
 
 const SUIT_SWATCH = [
   { suit: "♠", two: "text-neutral-100", four: "text-neutral-100" },
@@ -14,6 +17,16 @@ const SUIT_SWATCH = [
 export function TableSettings() {
   const [deck, setDeck] = useDeckStyle();
   const fourColor = deck === "four-color";
+
+  const [pack, setPack] = useState<SoundPack>("studio");
+  useEffect(() => {
+    setPack(soundManager.getPack());
+    return soundManager.subscribePack(setPack);
+  }, []);
+  const selectPack = (p: SoundPack) => {
+    soundManager.setPack(p);
+    soundManager.play("deal"); // instant preview
+  };
 
   return (
     <aside className="pointer-events-auto flex w-full max-w-xs flex-col gap-2 rounded-2xl border border-white/10 bg-black/60 p-3 backdrop-blur-md">
@@ -47,6 +60,32 @@ export function TableSettings() {
             {s.suit}
           </span>
         ))}
+      </div>
+
+      <div className="mt-1 flex flex-col gap-1">
+        <span className="text-[11px] text-neutral-300">Sound pack</span>
+        <div className="grid grid-cols-2 gap-1">
+          {(
+            [
+              { key: "studio", label: "Studio", hint: "Synthesized" },
+              { key: "recorded", label: "Recorded", hint: "ElevenLabs" },
+            ] as const
+          ).map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => selectPack(p.key)}
+              className={`flex flex-col items-start rounded-lg border px-2 py-1 text-left transition ${
+                pack === p.key
+                  ? "border-amber-400/60 bg-amber-400/10 text-amber-100"
+                  : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25"
+              }`}
+            >
+              <span className="text-xs font-semibold">{p.label}</span>
+              <span className="text-[9px] text-neutral-500">{p.hint}</span>
+            </button>
+          ))}
+        </div>
       </div>
     </aside>
   );

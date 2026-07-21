@@ -28,8 +28,38 @@ export type SoundCue =
   | "showdown";
 
 const STORAGE_KEY = "poker.sound.muted";
+const PACK_KEY = "poker.sound.pack";
 
 type MuteListener = (muted: boolean) => void;
+
+/**
+ * Sound pack. "studio" = fully synthesized (procedural Web-Audio): card sounds
+ * are real filtered-noise textures (paper flick / felt slide) and chips are the
+ * 3-layer clay-clink model — license-clean and, frankly, better than the stock
+ * recorded pack. "recorded" = the ElevenLabs .mp3 files, synth as fallback.
+ */
+export type SoundPack = "studio" | "recorded";
+type PackListener = (pack: SoundPack) => void;
+
+/** Filtered-noise "texture" cues (cards on felt) — realistic, no tones. */
+interface NoiseStep {
+  dur: number;
+  filter: BiquadFilterType;
+  freq: number;
+  q: number;
+  gain: number;
+  /** optional filter-frequency sweep target */
+  sweepTo?: number;
+}
+
+const NOISE_RECIPES: Partial<Record<SoundCue, NoiseStep>> = {
+  // Card skimmed across felt to a player — a quick bright flick.
+  deal: { dur: 0.08, filter: "bandpass", freq: 2600, q: 0.8, gain: 0.5, sweepTo: 3600 },
+  // Community card snapped face-up — sharper, higher.
+  flip: { dur: 0.06, filter: "bandpass", freq: 3800, q: 0.9, gain: 0.55, sweepTo: 5200 },
+  // Folded cards sliding away — a soft "shhk" that decays downward.
+  fold: { dur: 0.2, filter: "lowpass", freq: 1400, q: 0.6, gain: 0.4, sweepTo: 450 },
+};
 
 /** Audio file (in /sounds/) backing each cue, when present. Cues without a file
  *  (e.g. the dealer button) fall through to the synth recipe below. */
@@ -112,6 +142,10 @@ class SoundManager {
   private armed = false;
   private listeners = new Set<MuteListener>();
 
+  private pack: SoundPack = "studio";
+  private packHydrated = false;
+  private packListeners = new Set<PackListener>();
+
   private buffers = new Map<SoundCue, AudioBuffer>();
   private loadStarted = false;
 
@@ -145,6 +179,37 @@ class SoundManager {
   toggleMuted(): boolean {
     this.setMuted(!this.isMuted());
     return this.muted;
+  }
+
+  private hydratePack(): void {
+    if (this.packHydrated || typeof window === "undefined") return;
+    this.packHydrated = true;
+    try {
+      this.pack = window.localStorage.getItem(PACK_KEY) === "recorded" ? "recorded" : "studio";
+    } catch {
+      /* default to studio */
+    }
+  }
+
+  getPack(): SoundPack {
+    this.hydratePack();
+    return this.pack;
+  }
+
+  setPack(pack: SoundPack): void {
+    this.hydratePack();
+    this.pack = pack;
+    try {
+      window.localStorage.setItem(PACK_KEY, pack);
+    } catch {
+      /* ignore */
+    }
+    this.packListeners.forEach((fn) => fn(pack));
+  }
+
+  subscribePack(fn: PackListener): () => void {
+    this.packListeners.add(fn);
+    return () => this.packListeners.delete(fn);
   }
 
   subscribe(fn: MuteListener): () => void {
@@ -233,7 +298,8 @@ class SoundManager {
     const dest = this.dest;
     if (!ctx || ctx.state !== "running" || !dest) return;
 
-    const buffer = this.buffers.get(cue);
+    // Studio pack is fully synthesized; recorded pack uses the .mp3 when loaded.
+    const buffer = this.getPack() === "recorded" ? this.buffers.get(cue) : undefined;
     if (buffer) {
       const src = ctx.createBufferSource();
       src.buffer = buffer;
@@ -250,6 +316,12 @@ class SoundManager {
   }
 
   private playSynth(cue: SoundCue, ctx: AudioContext, dest: AudioNode): void {
+    // Card/felt cues are filtered noise (realistic), not tones.
+    const noise = NOISE_RECIPES[cue];
+    if (noise) {
+      this.synthNoiseBurst(ctx, dest, noise);
+      return;
+    }
     const recipe = RECIPES[cue];
     const now = ctx.currentTime;
     for (const step of recipe) {
@@ -269,6 +341,35 @@ class SoundManager {
       osc.start(start);
       osc.stop(end + 0.02);
     }
+  }
+
+  /** Filtered white-noise burst — the basis of realistic card/felt sounds. */
+  private synthNoiseBurst(ctx: AudioContext, dest: AudioNode, step: NoiseStep): void {
+    const now = ctx.currentTime;
+    const size = Math.max(1, Math.floor(ctx.sampleRate * step.dur));
+    const buf = ctx.createBuffer(1, size, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < size; i++) data[i] = Math.random() * 2 - 1;
+
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = step.filter;
+    filter.frequency.setValueAtTime(step.freq, now);
+    if (step.sweepTo) {
+      filter.frequency.exponentialRampToValueAtTime(Math.max(40, step.sweepTo), now + step.dur);
+    }
+    filter.Q.value = step.q;
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(step.gain, now + 0.006);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + step.dur);
+
+    src.connect(filter).connect(gain).connect(dest);
+    src.start(now);
+    src.stop(now + step.dur + 0.02);
   }
 
   /** Realistic clay chip clink (3-layer: click + body + gritty noise). */
