@@ -50,6 +50,16 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
     rpc: "wallet_get",
     icon: "💵",
   },
+  {
+    id: "loyalty",
+    title: "Loyalty & HRP",
+    description: "High Roller Points, loyalty level, and achievements — earned by playing.",
+    category: "platform",
+    status: "live",
+    rpc: "loyalty_get",
+    href: "/loyalty",
+    icon: "🏅",
+  },
 
   // Community & Clubs
   {

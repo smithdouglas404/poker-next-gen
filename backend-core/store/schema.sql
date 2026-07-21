@@ -372,3 +372,23 @@ CREATE TABLE IF NOT EXISTS poker_listing (
 
 CREATE INDEX IF NOT EXISTS idx_poker_listing_status ON poker_listing(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_poker_listing_seller ON poker_listing(seller_user_id);
+
+-- High Roller Points (HRP) loyalty: earned by PLAYING (win or lose), separate
+-- from subscription tiers. Lifetime HRP drives the loyalty level.
+CREATE TABLE IF NOT EXISTS poker_loyalty (
+    user_id      TEXT PRIMARY KEY,
+    hrp_total    BIGINT NOT NULL DEFAULT 0,
+    hands_played BIGINT NOT NULL DEFAULT 0,
+    hands_won    BIGINT NOT NULL DEFAULT 0,
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Permanent achievement unlocks shown on a player's profile.
+CREATE TABLE IF NOT EXISTS poker_achievement (
+    user_id     TEXT NOT NULL,
+    code        TEXT NOT NULL,
+    unlocked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_achievement_user ON poker_achievement(user_id);

@@ -18,6 +18,7 @@ import (
 	"github.com/smithdouglas404/poker-next-gen/backend-core/audit"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/billing"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/bot"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/loyalty"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/poker"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/protocol"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/social"
@@ -506,6 +507,7 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		}
 		recordWinnings(ctx, nk, s, res)
 		creditRake(ctx, db, s, potBefore)
+		accrueLoyalty(ctx, db, s, res) // HRP + achievements (before seats reset)
 		s.Table.ResetBetweenHands()
 		s.Phase = poker.PhaseWaiting
 		reportTournamentBusts(ctx, db, nk, s)
@@ -778,6 +780,53 @@ func recordWinnings(ctx context.Context, nk runtime.NakamaModule, s *MatchState,
 				"hand_no": s.Table.HandNo,
 				"room_id": s.RoomID,
 			}, social.CodeHandWon)
+		}
+	}
+}
+
+// accrueLoyalty awards HRP to every human who played this hand (1 base, +2 for
+// winning, times their subscription-tier multiplier) and unlocks any newly-earned
+// achievements. HRP is earned by PLAYING, so losers still progress. Called before
+// ResetBetweenHands, while seats still carry the hand's state.
+func accrueLoyalty(ctx context.Context, db *sql.DB, s *MatchState, res poker.ShowdownResult) {
+	winners := map[int]string{} // seat -> winning hand category
+	for _, r := range res.Resolutions {
+		for _, seat := range r.Winners {
+			winners[seat] = r.HandCats[seat]
+		}
+	}
+	ls := store.NewLoyaltyStore(db)
+	for _, seat := range s.Table.Seats {
+		if seat == nil || seat.IsBot || seat.UserID == "" {
+			continue
+		}
+		if _, present := s.Presences[seat.UserID]; !present {
+			continue
+		}
+		cat, won := winners[seat.Index]
+		base := int64(1)
+		if won {
+			base += 2
+		}
+		tier := store.SubscriptionTier(ctx, db, seat.UserID)
+		hrp := int64(float64(base) * loyalty.Multiplier(tier))
+		if hrp < 1 {
+			hrp = 1
+		}
+		wonDelta := int64(0)
+		if won {
+			wonDelta = 1
+		}
+		l, err := ls.Award(ctx, seat.UserID, hrp, 1, wonDelta)
+		if err != nil {
+			continue
+		}
+		for _, code := range loyalty.AchievementsForResult(l.HandsPlayed, l.HandsWon, won, cat) {
+			if newly, _ := ls.UnlockAchievement(ctx, seat.UserID, code); newly {
+				if a, ok := loyalty.Catalog[code]; ok && a.HRP > 0 {
+					_, _ = ls.Award(ctx, seat.UserID, a.HRP, 0, 0)
+				}
+			}
 		}
 	}
 }
