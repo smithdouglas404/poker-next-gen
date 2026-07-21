@@ -46,6 +46,12 @@ interface Withdrawal {
   destination: string;
 }
 
+interface RakebackState {
+  balance_cents: number;
+  lifetime_cents: number;
+  percent: number;
+}
+
 const ACCENT: Record<string, string> = {
   free: "border-white/15",
   bronze: "border-amber-700/50",
@@ -64,6 +70,7 @@ export default function MembershipPage() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [kyc, setKyc] = useState<KycState | null>(null);
   const [bonus, setBonus] = useState<BonusState | null>(null);
+  const [rakeback, setRakeback] = useState<RakebackState | null>(null);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [interval, setIntervalChoice] = useState<"month" | "year">("month");
   const [error, setError] = useState<string | null>(null);
@@ -73,18 +80,20 @@ export default function MembershipPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [t, s, k, b, w] = await Promise.all([
+      const [t, s, k, b, w, rb] = await Promise.all([
         callSessionRpc("subscription_tiers", {}),
         callSessionRpc("subscription_status", {}),
         callSessionRpc("kyc_status", {}),
         callSessionRpc("daily_bonus_status", {}),
         callSessionRpc("withdrawal_list", {}),
+        callSessionRpc("rakeback_status", {}),
       ]);
       setTiers((t as { tiers?: TierDef[] }).tiers ?? []);
       setStatus(s as StatusResponse);
       setKyc((k as { kyc?: KycState }).kyc ?? null);
       setBonus(b as BonusState);
       setWithdrawals((w as { withdrawals?: Withdrawal[] }).withdrawals ?? []);
+      setRakeback(rb as RakebackState);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load membership");
     }
@@ -218,6 +227,22 @@ export default function MembershipPage() {
       setMessage(
         res.claimed ? `Claimed ${res.chips?.toLocaleString()} chips!` : res.message ?? "Already claimed.",
       );
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Claim failed");
+    } finally {
+      setBusy(null);
+    }
+  }, [load]);
+
+  const claimRakeback = useCallback(async () => {
+    setBusy("rakeback");
+    setMessage(null);
+    setError(null);
+    try {
+      const res = (await callSessionRpc("rakeback_claim", {})) as { claimed_cents?: number };
+      const c = res.claimed_cents ?? 0;
+      setMessage(c > 0 ? `Claimed $${(c / 100).toFixed(2)} rakeback!` : "No rakeback to claim yet.");
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Claim failed");
@@ -399,6 +424,31 @@ export default function MembershipPage() {
               className="rounded-xl bg-gradient-to-r from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad] px-5 py-2.5 text-sm font-bold text-black transition hover:shadow-[0_0_20px_rgba(212,175,55,0.3)] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
             >
               {busy === "bonus" ? "Claiming…" : bonus.can_claim ? "Claim" : "Claimed"}
+            </button>
+          </section>
+        )}
+
+        {rakeback && rakeback.percent > 0 && (
+          <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-400/25 bg-emerald-950/10 p-5">
+            <div>
+              <h2 className="text-sm font-black uppercase tracking-wider text-emerald-200">
+                Rakeback · {rakeback.percent}%
+              </h2>
+              <p className="mt-1 text-xs text-neutral-300">
+                ${(rakeback.balance_cents / 100).toFixed(2)} available
+                <span className="text-neutral-500">
+                  {" "}
+                  · ${(rakeback.lifetime_cents / 100).toFixed(2)} lifetime
+                </span>
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={rakeback.balance_cents <= 0 || busy !== null}
+              onClick={() => void claimRakeback()}
+              className="rounded-xl border border-emerald-400/50 px-5 py-2.5 text-sm font-bold text-emerald-200 transition hover:bg-emerald-400/10 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {busy === "rakeback" ? "Claiming…" : "Claim rakeback"}
             </button>
           </section>
         )}
