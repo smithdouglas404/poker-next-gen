@@ -11,6 +11,7 @@ export async function POST(request: Request) {
       big_blind: body.big_blind ?? 200,
       buy_in: body.buy_in ?? 100000,
       max_seats: body.max_seats ?? 6,
+      num_bots: body.num_bots ?? 0,
     });
     return NextResponse.json({ ok: true, data });
   } catch (error) {

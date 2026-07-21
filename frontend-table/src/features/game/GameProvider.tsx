@@ -57,6 +57,7 @@ interface GameContextValue extends GameState {
     smallBlind?: number;
     bigBlind?: number;
     maxSeats?: number;
+    numBots?: number;
   }) => Promise<void>;
   joinRoom: (matchId: string) => Promise<void>;
   sitDown: (seat: number, buyIn?: number) => Promise<void>;
@@ -234,11 +235,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
       smallBlind?: number;
       bigBlind?: number;
       maxSeats?: number;
+      numBots?: number;
     }) => {
       const buyIn = opts?.buyIn ?? buyInCents;
       const smallBlind = Math.max(1, Math.round(opts?.smallBlind ?? DEFAULT_SMALL_BLIND_CENTS));
       const bigBlind = Math.max(smallBlind, Math.round(opts?.bigBlind ?? DEFAULT_BIG_BLIND_CENTS));
       const seats = Math.min(MAX_SEATS, Math.max(MIN_SEATS, Math.round(opts?.maxSeats ?? maxSeats)));
+      const numBots = Math.min(seats - 1, Math.max(0, Math.round(opts?.numBots ?? 0)));
       const res = await fetch("/api/nakama/table/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -248,6 +251,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           big_blind: bigBlind,
           buy_in: buyIn,
           max_seats: seats,
+          num_bots: numBots,
         }),
       });
       const json = await res.json();
@@ -255,7 +259,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setRoomId(json.data.room_id);
       setMaxSeats(seats);
       pushLog(
-        `Room created · buy-in ${formatCents(buyIn)} · blinds ${formatCents(smallBlind)}/${formatCents(bigBlind)} · ${seats} seats`,
+        `Room created · buy-in ${formatCents(buyIn)} · blinds ${formatCents(smallBlind)}/${formatCents(bigBlind)} · ${seats} seats${numBots ? ` · ${numBots} bot${numBots > 1 ? "s" : ""}` : ""}`,
         "info",
       );
       await joinRoom(json.data.match_id);
