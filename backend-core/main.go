@@ -89,6 +89,11 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"daily_bonus_claim":    rpc.DailyBonusClaim,
 		"rakeback_status":      rpc.RakebackStatus,
 		"rakeback_claim":       rpc.RakebackClaim,
+		"cosmetic_list":        rpc.CosmeticList,
+		"inventory_list":       rpc.InventoryList,
+		"cosmetic_equip":       rpc.CosmeticEquip,
+		"character_generate":   rpc.CharacterGenerate,
+		"character_generation_status": rpc.CharacterGenerationStatus,
 	}
 	for id, fn := range rpcs {
 		if err := initializer.RegisterRpc(id, fn); err != nil {
