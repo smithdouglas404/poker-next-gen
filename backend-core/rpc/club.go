@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"os"
+	"strconv"
 	"strings"
 
 	"github.com/heroiclabs/nakama-common/runtime"
@@ -84,23 +86,198 @@ func ClubCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		return "", runtime.NewError("club limit reached for your plan — upgrade for more", 7)
 	}
 
+	// Ownership fee: creating a club is not free. Debit the one-time fee from the
+	// wallet up front (ledgered); refunded implicitly never — this is revenue.
+	fee := clubCreateFeeCents()
+	if fee > 0 {
+		if err := store.NewWalletStore(db).Debit(ctx, userID, fee, "club_create_fee"); err != nil {
+			return "", runtime.NewError("club creation fee requires a balance of "+dollars(fee)+" — add funds or upgrade", 9)
+		}
+	}
+
 	if err := clubStore.Create(ctx, &club); err != nil {
 		logger.Error("club create: %v", err)
+		// Refund the fee if the club couldn't be created.
+		if fee > 0 {
+			_ = store.NewWalletStore(db).Credit(ctx, userID, fee, "club_create_fee_refund")
+		}
 		return "", runtime.NewError("failed to create club", 13)
 	}
-	if userID != "" {
-		_ = clubStore.AddOwner(ctx, &models.Owner{
-			ClubID:       club.ID,
-			UserID:       userID,
-			Role:         "owner",
-			EquityBps:    10000,
-			CanConfigure: true,
-		})
-	}
+	_ = clubStore.AddOwner(ctx, &models.Owner{
+		ClubID: club.ID, UserID: userID, Role: "owner", EquityBps: 10000, CanConfigure: true,
+	})
+	username, _ := ctx.Value(runtime.RUNTIME_CTX_USERNAME).(string)
+	_ = clubStore.AddMember(ctx, club.ID, userID, username, "owner")
+
 	out, err := json.Marshal(club)
 	if err != nil {
 		return "", err
 	}
+	return string(out), nil
+}
+
+// clubCreateFeeCents is the one-time ownership fee to create a club (revenue).
+// Configurable via CLUB_CREATE_FEE_CENTS; defaults to $250.
+func clubCreateFeeCents() int64 {
+	if v := os.Getenv("CLUB_CREATE_FEE_CENTS"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n >= 0 {
+			return n
+		}
+	}
+	return 25000
+}
+
+func dollars(cents int64) string {
+	return "$" + strconv.FormatFloat(float64(cents)/100.0, 'f', 2, 64)
+}
+
+// ClubJoin adds the caller to a club as a member (enforcing the owner tier's
+// member cap and the club's KYC requirement).
+func ClubJoin(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	userID, err := callerID(ctx)
+	if err != nil {
+		return "", err
+	}
+	var req struct {
+		ClubID string `json:"club_id"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" {
+		return "", runtime.NewError("club_id required", 3)
+	}
+	clubStore := store.NewClubStore(db)
+	club, err := clubStore.GetByID(ctx, req.ClubID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	if club == nil {
+		return "", runtime.NewError("club not found", 5)
+	}
+	// Member cap (owner's tier).
+	memberCap := billing.ClubMemberCap(clubOwnerTier(ctx, db, req.ClubID))
+	count, err := clubStore.CountMembers(ctx, req.ClubID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	if existing, _ := clubStore.GetMembership(ctx, req.ClubID, userID); existing == nil && int64(count) >= memberCap {
+		return "", runtime.NewError("this club is full", 7)
+	}
+	username, _ := ctx.Value(runtime.RUNTIME_CTX_USERNAME).(string)
+	if err := clubStore.AddMember(ctx, req.ClubID, userID, username, "member"); err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	return `{"ok":true,"role":"member"}`, nil
+}
+
+// ClubLeave removes the caller from a club (owners cannot leave their own club).
+func ClubLeave(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	userID, err := callerID(ctx)
+	if err != nil {
+		return "", err
+	}
+	var req struct {
+		ClubID string `json:"club_id"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" {
+		return "", runtime.NewError("club_id required", 3)
+	}
+	m, _ := store.NewClubStore(db).GetMembership(ctx, req.ClubID, userID)
+	if m != nil && m.Role == "owner" {
+		return "", runtime.NewError("owners cannot leave their own club", 9)
+	}
+	if err := store.NewClubStore(db).RemoveMember(ctx, req.ClubID, userID); err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	return `{"ok":true}`, nil
+}
+
+// ClubMembers lists a club's roster.
+func ClubMembers(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	var req struct {
+		ClubID string `json:"club_id"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" {
+		return "", runtime.NewError("club_id required", 3)
+	}
+	members, err := store.NewClubStore(db).ListMembers(ctx, req.ClubID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	out, _ := json.Marshal(map[string]interface{}{"members": members})
+	return string(out), nil
+}
+
+// ClubMemberRole lets an owner/configurer set a member's role (member|admin).
+func ClubMemberRole(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	var req struct {
+		ClubID string `json:"club_id"`
+		UserID string `json:"user_id"`
+		Role   string `json:"role"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" || req.UserID == "" {
+		return "", runtime.NewError("club_id and user_id required", 3)
+	}
+	if req.Role != "member" && req.Role != "admin" {
+		return "", runtime.NewError("role must be member or admin", 3)
+	}
+	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+		return "", err
+	}
+	if err := store.NewClubStore(db).SetMemberRole(ctx, req.ClubID, req.UserID, req.Role); err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	return `{"ok":true}`, nil
+}
+
+// ClubKick removes a member from a club (owner/configurer only; cannot kick an owner).
+func ClubKick(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	var req struct {
+		ClubID string `json:"club_id"`
+		UserID string `json:"user_id"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" || req.UserID == "" {
+		return "", runtime.NewError("club_id and user_id required", 3)
+	}
+	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+		return "", err
+	}
+	clubStore := store.NewClubStore(db)
+	if m, _ := clubStore.GetMembership(ctx, req.ClubID, req.UserID); m != nil && m.Role == "owner" {
+		return "", runtime.NewError("cannot remove an owner", 9)
+	}
+	if err := clubStore.RemoveMember(ctx, req.ClubID, req.UserID); err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	return `{"ok":true}`, nil
+}
+
+// ClubGet returns a club, the caller's membership, and the create fee.
+func ClubGet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	userID, _ := ctx.Value(runtime.RUNTIME_CTX_USER_ID).(string)
+	var req struct {
+		ClubID string `json:"club_id"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" {
+		return "", runtime.NewError("club_id required", 3)
+	}
+	clubStore := store.NewClubStore(db)
+	club, err := clubStore.GetByID(ctx, req.ClubID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	if club == nil {
+		return "", runtime.NewError("club not found", 5)
+	}
+	members, _ := clubStore.ListMembers(ctx, req.ClubID)
+	var mine *store.ClubMember
+	if userID != "" {
+		mine, _ = clubStore.GetMembership(ctx, req.ClubID, userID)
+	}
+	out, _ := json.Marshal(map[string]interface{}{
+		"club":            club,
+		"members":         members,
+		"my_membership":   mine,
+		"create_fee_cents": clubCreateFeeCents(),
+	})
 	return string(out), nil
 }
 

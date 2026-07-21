@@ -76,12 +76,79 @@ func (s *ClubStore) CountOwnedClubs(ctx context.Context, userID string) (int, er
 	return n, err
 }
 
-// CountMembers returns the number of owner/manager rows in a club (the current
-// membership model). Used to enforce the tier's member limit on add.
+// CountMembers returns the number of members in a club (poker_club_member).
+// Used to enforce the tier's member limit on join.
 func (s *ClubStore) CountMembers(ctx context.Context, clubID string) (int, error) {
 	var n int
-	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM poker_owner WHERE club_id=$1`, clubID).Scan(&n)
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM poker_club_member WHERE club_id=$1`, clubID).Scan(&n)
 	return n, err
+}
+
+// ClubMember is a row in the club roster.
+type ClubMember struct {
+	ClubID   string `json:"club_id"`
+	UserID   string `json:"user_id"`
+	Username string `json:"username"`
+	Role     string `json:"role"`
+	Status   string `json:"status"`
+}
+
+// AddMember adds (or reactivates) a club member with the given role.
+func (s *ClubStore) AddMember(ctx context.Context, clubID, userID, username, role string) error {
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO poker_club_member (club_id, user_id, username, role, status, joined_at)
+		VALUES ($1,$2,$3,$4,'active',NOW())
+		ON CONFLICT (club_id, user_id) DO UPDATE SET username=EXCLUDED.username, status='active'`,
+		clubID, userID, username, role)
+	return err
+}
+
+// RemoveMember removes a member from a club.
+func (s *ClubStore) RemoveMember(ctx context.Context, clubID, userID string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM poker_club_member WHERE club_id=$1 AND user_id=$2`, clubID, userID)
+	return err
+}
+
+// SetMemberRole updates a member's role.
+func (s *ClubStore) SetMemberRole(ctx context.Context, clubID, userID, role string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE poker_club_member SET role=$3 WHERE club_id=$1 AND user_id=$2`, clubID, userID, role)
+	return err
+}
+
+// GetMembership returns a user's membership row, or (nil, nil) if not a member.
+func (s *ClubStore) GetMembership(ctx context.Context, clubID, userID string) (*ClubMember, error) {
+	var m ClubMember
+	err := s.db.QueryRowContext(ctx, `
+		SELECT club_id, user_id, username, role, status FROM poker_club_member
+		WHERE club_id=$1 AND user_id=$2`, clubID, userID).
+		Scan(&m.ClubID, &m.UserID, &m.Username, &m.Role, &m.Status)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// ListMembers returns a club's roster.
+func (s *ClubStore) ListMembers(ctx context.Context, clubID string) ([]ClubMember, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT club_id, user_id, username, role, status FROM poker_club_member
+		WHERE club_id=$1 ORDER BY joined_at ASC`, clubID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ClubMember
+	for rows.Next() {
+		var m ClubMember
+		if err := rows.Scan(&m.ClubID, &m.UserID, &m.Username, &m.Role, &m.Status); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
 }
 
 func (s *ClubStore) ListOwners(ctx context.Context, clubID string) ([]models.Owner, error) {
