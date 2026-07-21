@@ -6,6 +6,47 @@ import { DEFAULT_MAX_SEATS, MAX_SEATS, MIN_SEATS, type SeatView } from "@/featur
 import { formatCents, useGame } from "@/features/game/GameProvider";
 import { computeTableLayout } from "@/features/table/tableLayout";
 import { getSeatPositions } from "@/features/table/seatLayout";
+import { avatarDef, avatarForKey, avatarGradient, avatarSrc } from "@/features/table/avatars";
+
+/** A glowing character portrait for a seated player (falls back to a monogram). */
+function AvatarPortrait({ name, identity, hero }: { name?: string; identity: string; hero: boolean }) {
+  const [failed, setFailed] = useState(false);
+  const monogram = (name?.slice(0, 2).toUpperCase() ?? "??");
+  const def = avatarDef(avatarForKey(identity));
+  // The hero is always framed in gold; everyone else wears their character's neon color.
+  const ring = hero ? "#fbbf24" : def.border;
+  const glow = hero ? "rgba(251,191,36,0.7)" : def.glow;
+  return (
+    <div className="relative h-14 w-14">
+      {/* neon glow ring, tinted to the character */}
+      <div
+        className="absolute -inset-1 rounded-full blur-[7px]"
+        style={{ backgroundColor: glow }}
+      />
+      <div
+        className="relative h-14 w-14 overflow-hidden rounded-full"
+        style={{ boxShadow: `0 0 0 2px ${ring}, 0 0 12px ${glow}` }}
+      >
+        {failed ? (
+          <div
+            className="flex h-full w-full items-center justify-center text-sm font-bold text-white"
+            style={{ background: avatarGradient(identity) }}
+          >
+            {monogram}
+          </div>
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={avatarSrc(def.id)}
+            alt={name ?? "player"}
+            onError={() => setFailed(true)}
+            className="h-full w-full object-cover"
+          />
+        )}
+      </div>
+    </div>
+  );
+}
 
 function SeatCard({
   seat,
@@ -23,29 +64,41 @@ function SeatCard({
       <button
         type="button"
         onClick={onSit}
-        className="flex w-32 flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed border-emerald-500/50 bg-black/50 px-3 py-3 text-emerald-300 transition hover:border-emerald-400 hover:bg-emerald-950/40"
+        className="group flex w-32 flex-col items-center gap-1.5 rounded-2xl border border-dashed border-amber-400/40 bg-white/[0.03] px-3 py-3 text-amber-200/80 backdrop-blur-xl transition-all duration-300 hover:border-amber-300/70 hover:bg-amber-400/[0.06] hover:shadow-[0_0_22px_rgba(212,175,55,0.25)]"
       >
-        <span className="text-2xl leading-none">+</span>
+        <span className="text-2xl leading-none text-amber-300/90 transition group-hover:scale-110">+</span>
         <span className="text-xs font-bold uppercase tracking-wider">Sit Here</span>
         <span className="text-[10px] text-neutral-500">Seat {seat.index + 1}</span>
-        <span className="text-[10px] font-medium text-emerald-400/80">{buyInLabel}</span>
+        <span className="text-[10px] font-semibold text-amber-300/80">{buyInLabel}</span>
       </button>
     );
   }
 
+  const identity = seat.user_id || `seat-${seat.index}`;
+  const def = avatarDef(avatarForKey(identity));
+  const accent = seat.is_hero ? "#fbbf24" : def.border;
+  const glow = seat.is_hero ? "rgba(251,191,36,0.35)" : def.glow;
+
   return (
     <div
-      className={`flex w-36 flex-col items-center rounded-2xl border px-3 py-3 backdrop-blur-md ${
-        seat.is_hero ? "border-amber-400/70 bg-amber-950/40" : "border-white/15 bg-black/55"
-      }`}
+      className="flex w-36 flex-col items-center rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3 py-3 backdrop-blur-xl"
+      style={{ boxShadow: `0 0 0 1px ${accent}55, 0 8px 26px ${glow}` }}
     >
-      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-slate-600 to-slate-800 text-sm font-bold text-white ring-2 ring-amber-500/40">
-        {seat.username?.slice(0, 2).toUpperCase() ?? "??"}
-      </div>
-      <p className="mt-2 truncate text-sm font-semibold text-white">{seat.username}</p>
-      <p className="text-xs font-medium text-emerald-300">{formatCents(seat.stack)}</p>
+      <AvatarPortrait name={seat.username} identity={identity} hero={!!seat.is_hero} />
+      <p
+        className="mt-2 max-w-full truncate text-sm font-bold tracking-wide"
+        style={{ color: seat.is_hero ? "#fde68a" : "#ffffff" }}
+      >
+        {seat.username}
+      </p>
+      <p className="text-xs font-semibold text-emerald-300">{formatCents(seat.stack)}</p>
       {seat.last_action && (
-        <p className="mt-1 text-[10px] uppercase tracking-wider text-amber-200/70">{seat.last_action}</p>
+        <span
+          className="mt-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest"
+          style={{ color: accent, borderColor: `${accent}66`, backgroundColor: `${accent}12` }}
+        >
+          {seat.last_action}
+        </span>
       )}
     </div>
   );

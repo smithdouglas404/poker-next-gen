@@ -74,11 +74,27 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	if v, ok := params["max_seats"].(float64); ok && v >= 2 {
 		maxSeats = int(v)
 	}
+	numBots := 0
+	if v, ok := params["num_bots"].(float64); ok && v > 0 {
+		numBots = int(v)
+	}
+	if numBots > maxSeats-1 {
+		numBots = maxSeats - 1
+	}
 
 	table := poker.NewTable()
 	table.SetSeatCap(maxSeats)
+	// Seed AI opponents at creation (server-authoritative, like OddSlingers).
+	for i := 0; i < numBots; i++ {
+		seat := table.FirstEmptySeat()
+		if seat < 0 {
+			break
+		}
+		_ = table.SitDownBot(seat, fmt.Sprintf("bot_%s_%d", roomID, seat), fmt.Sprintf("Bot_%d", i+1), poker.ClampBuyIn(buyIn))
+	}
 	state := &MatchState{
 		Table:        table,
+		BotCount:     numBots,
 		Phase:        poker.PhaseWaiting,
 		Audit: audit.MultiEmitter{Sinks: []audit.Emitter{
 			audit.NewPostgresEmitter(db),

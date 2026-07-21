@@ -42,12 +42,21 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		maxSeats = protocol.MaxSeats
 	}
 
+	numBots := req.NumBots
+	if numBots < 0 {
+		numBots = 0
+	}
+	if numBots > maxSeats-1 { // always leave a seat for the human creator
+		numBots = maxSeats - 1
+	}
+
 	matchID, err := nk.MatchCreate(ctx, protocol.MatchModule, map[string]interface{}{
 		"room_id":     roomID,
 		"small_blind": sb,
 		"big_blind":   bb,
 		"buy_in":      buyIn,
 		"max_seats":   maxSeats,
+		"num_bots":    numBots,
 	})
 	if err != nil {
 		return "", err

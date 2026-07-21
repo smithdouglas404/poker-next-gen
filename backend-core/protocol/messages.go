@@ -91,6 +91,7 @@ type TableCreateRequest struct {
 	BigBlind   int64  `json:"big_blind"`
 	BuyIn      int64  `json:"buy_in"`
 	MaxSeats   int    `json:"max_seats"`
+	NumBots    int    `json:"num_bots"`
 }
 
 type TableCreateResponse struct {
