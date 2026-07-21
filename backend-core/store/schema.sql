@@ -338,6 +338,8 @@ CREATE TABLE IF NOT EXISTS poker_generation (
 );
 
 CREATE INDEX IF NOT EXISTS idx_poker_generation_user ON poker_generation(user_id, created_at DESC);
+ALTER TABLE poker_generation ADD COLUMN IF NOT EXISTS stage TEXT NOT NULL DEFAULT 'model';
+ALTER TABLE poker_generation ADD COLUMN IF NOT EXISTS base_model_url TEXT NOT NULL DEFAULT '';
 
 -- Merkle-root batch anchors: one row per batch of audit events committed to
 -- Polygon (or a permanence layer). The batch's Merkle root over the events'

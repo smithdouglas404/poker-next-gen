@@ -120,29 +120,31 @@ func CharacterGenerationStatus(ctx context.Context, logger runtime.Logger, db *s
 	}
 	switch strings.ToLower(task.Status) {
 	case "success":
-		if task.ModelURL == "" {
-			_ = gens.Fail(ctx, g.ID)
-			return generationResult(&store.Generation{ID: g.ID, Status: "failed"}), nil
+		// Base model done → try to auto-rig it (best effort) so it animates.
+		if g.Stage == "model" {
+			if task.ModelURL == "" {
+				_ = gens.Fail(ctx, g.ID)
+				return generationResult(&store.Generation{ID: g.ID, Status: "failed"}), nil
+			}
+			if rigTask, rerr := integrations.CreateRigTask(ctx, g.TripoTask); rerr == nil && rigTask != "" {
+				_ = gens.AdvanceToRig(ctx, g.ID, task.ModelURL, rigTask)
+				out, _ := json.Marshal(map[string]interface{}{"status": "running", "progress": 60})
+				return string(out), nil
+			}
+			// Rigging unavailable → mint the base model.
+			return mintCharacter(ctx, db, gens, g, userID, task.ModelURL, task.PreviewURL), nil
 		}
-		cid, err := store.NewCosmeticStore(db).Create(ctx, &store.Cosmetic{
-			Kind:        "model",
-			Name:        characterName(g.Prompt),
-			Rarity:      "legendary",
-			AssetRef:    task.ModelURL,
-			PreviewRef:  task.PreviewURL,
-			OwnerUserID: userID,
-		})
-		if err != nil {
-			return "", runtime.NewError(err.Error(), 13)
+		// Rig stage done → mint the rigged GLB (fall back to base on empty).
+		modelURL := task.ModelURL
+		if modelURL == "" {
+			modelURL = g.BaseModelURL
 		}
-		if err := store.NewCosmeticStore(db).Grant(ctx, userID, cid, "generate"); err != nil {
-			return "", runtime.NewError(err.Error(), 13)
-		}
-		_ = gens.Complete(ctx, g.ID, cid)
-		g.Status = "success"
-		g.CosmeticID = cid
-		return generationResult(g), nil
+		return mintCharacter(ctx, db, gens, g, userID, modelURL, task.PreviewURL), nil
 	case "failed", "cancelled", "unknown", "expired":
+		// If the rig stage failed but we have a base model, mint that instead.
+		if g.Stage == "rig" && g.BaseModelURL != "" {
+			return mintCharacter(ctx, db, gens, g, userID, g.BaseModelURL, ""), nil
+		}
 		_ = gens.Fail(ctx, g.ID)
 		g.Status = "failed"
 		return generationResult(g), nil
@@ -153,6 +155,31 @@ func CharacterGenerationStatus(ctx context.Context, logger runtime.Logger, db *s
 		})
 		return string(out), nil
 	}
+}
+
+// mintCharacter creates the model cosmetic, grants it, and completes the job.
+func mintCharacter(ctx context.Context, db *sql.DB, gens *store.GenerationStore, g *store.Generation, userID, modelURL, previewURL string) string {
+	if modelURL == "" {
+		_ = gens.Fail(ctx, g.ID)
+		return generationResult(&store.Generation{ID: g.ID, Status: "failed"})
+	}
+	cs := store.NewCosmeticStore(db)
+	cid, err := cs.Create(ctx, &store.Cosmetic{
+		Kind:        "model",
+		Name:        characterName(g.Prompt),
+		Rarity:      "legendary",
+		AssetRef:    modelURL,
+		PreviewRef:  previewURL,
+		OwnerUserID: userID,
+	})
+	if err != nil {
+		return generationResult(&store.Generation{ID: g.ID, Status: "failed"})
+	}
+	_ = cs.Grant(ctx, userID, cid, "generate")
+	_ = gens.Complete(ctx, g.ID, cid)
+	g.Status = "success"
+	g.CosmeticID = cid
+	return generationResult(g)
 }
 
 func generationResult(g *store.Generation) string {

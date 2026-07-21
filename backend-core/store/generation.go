@@ -7,13 +7,15 @@ import (
 
 // Generation is an async Tripo3D character-generation job.
 type Generation struct {
-	ID         string `json:"id"`
-	UserID     string `json:"user_id"`
-	Prompt     string `json:"prompt"`
-	TripoTask  string `json:"tripo_task_id"`
-	Status     string `json:"status"`
-	FeeCents   int64  `json:"fee_cents"`
-	CosmeticID string `json:"cosmetic_id,omitempty"`
+	ID           string `json:"id"`
+	UserID       string `json:"user_id"`
+	Prompt       string `json:"prompt"`
+	TripoTask    string `json:"tripo_task_id"`
+	Status       string `json:"status"`
+	Stage        string `json:"stage"` // model | rig
+	BaseModelURL string `json:"base_model_url,omitempty"`
+	FeeCents     int64  `json:"fee_cents"`
+	CosmeticID   string `json:"cosmetic_id,omitempty"`
 }
 
 type GenerationStore struct{ db *sql.DB }
@@ -37,9 +39,9 @@ func (s *GenerationStore) SetTaskID(ctx context.Context, id, taskID string) erro
 func (s *GenerationStore) GetByID(ctx context.Context, id string) (*Generation, error) {
 	var g Generation
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, user_id, prompt, tripo_task_id, status, fee_cents, cosmetic_id
+		SELECT id, user_id, prompt, tripo_task_id, status, stage, base_model_url, fee_cents, cosmetic_id
 		FROM poker_generation WHERE id=$1`, id).
-		Scan(&g.ID, &g.UserID, &g.Prompt, &g.TripoTask, &g.Status, &g.FeeCents, &g.CosmeticID)
+		Scan(&g.ID, &g.UserID, &g.Prompt, &g.TripoTask, &g.Status, &g.Stage, &g.BaseModelURL, &g.FeeCents, &g.CosmeticID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -47,6 +49,15 @@ func (s *GenerationStore) GetByID(ctx context.Context, id string) (*Generation, 
 		return nil, err
 	}
 	return &g, nil
+}
+
+// AdvanceToRig records the base model URL and moves the job to the rig stage
+// with the rig task id.
+func (s *GenerationStore) AdvanceToRig(ctx context.Context, id, baseModelURL, rigTaskID string) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE poker_generation SET stage='rig', base_model_url=$2, tripo_task_id=$3, updated_at=NOW()
+		WHERE id=$1`, id, baseModelURL, rigTaskID)
+	return err
 }
 
 // Complete marks the job successful and records the minted cosmetic id.
