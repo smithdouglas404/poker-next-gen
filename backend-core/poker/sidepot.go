@@ -84,7 +84,7 @@ func boardString(community []Card) string {
 }
 
 
-func winnersAmong(eligible []int, holeCards map[string][2]Card, community []Card, seats [MaxSeats]*Seat) ([]int, error) {
+func winnersAmong(eligible []int, holeCards map[string][]Card, community []Card, seats [MaxSeats]*Seat, omaha bool) ([]int, error) {
 	if len(eligible) == 0 {
 		return nil, nil
 	}
@@ -98,9 +98,15 @@ func winnersAmong(eligible []int, holeCards map[string][2]Card, community []Card
 			return nil, fmt.Errorf("missing seat %d for showdown", seat)
 		}
 		hole := holeCards[seats[seat].UserID]
-		holes[i] = handCardString(hole[:], nil)
+		holes[i] = handCardString(hole, nil)
 	}
-	winIdx, _, err := enginemath.ResolveShowdown(holes, boardString(community))
+	var winIdx []int
+	var err error
+	if omaha {
+		winIdx, _, err = enginemath.ResolveOmahaShowdown(holes, boardString(community))
+	} else {
+		winIdx, _, err = enginemath.ResolveShowdown(holes, boardString(community))
+	}
 	if err != nil {
 		return nil, fmt.Errorf("rs_poker showdown: %w", err)
 	}
@@ -130,7 +136,7 @@ func AwardSidePots(t *Table) ([][]int, int64, error) {
 	allWinners := make([][]int, 0, len(pots))
 	var total int64
 	for _, pot := range pots {
-		winners, err := winnersAmong(pot.Eligible, t.HoleCards, t.Board, t.Seats)
+		winners, err := winnersAmong(pot.Eligible, t.HoleCards, t.Board, t.Seats, t.IsOmaha())
 		if err != nil {
 			return nil, 0, err
 		}
@@ -166,7 +172,13 @@ func HandCategory(seat int, t *Table) (string, error) {
 		return "", fmt.Errorf("empty seat %d", seat)
 	}
 	hole := t.HoleCards[t.Seats[seat].UserID]
-	cat, err := enginemath.RankHand(handCardString(hole[:], t.Board))
+	var cat string
+	var err error
+	if t.IsOmaha() {
+		cat, err = enginemath.RankOmaha(handCardString(hole, nil), boardString(t.Board))
+	} else {
+		cat, err = enginemath.RankHand(handCardString(hole, t.Board))
+	}
 	if err != nil {
 		return "", fmt.Errorf("rs_poker rank: %w", err)
 	}

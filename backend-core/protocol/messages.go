@@ -48,6 +48,7 @@ type TableSnapshot struct {
 	HeroWallet   int64      `json:"hero_wallet_cents"`
 	HandNo         int         `json:"hand_no"`
 	DeckCommitHash string      `json:"deck_commit_hash,omitempty"`
+	Variant        string      `json:"variant,omitempty"` // "holdem" | "plo"
 }
 
 type DealPrivateMessage struct {
@@ -103,6 +104,7 @@ type TableCreateRequest struct {
 	BuyIn      int64  `json:"buy_in"`
 	MaxSeats   int    `json:"max_seats"`
 	NumBots    int    `json:"num_bots"`
+	Variant    string `json:"variant"` // "holdem" | "plo"; empty => holdem
 }
 
 type TableCreateResponse struct {

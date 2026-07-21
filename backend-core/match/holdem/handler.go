@@ -90,8 +90,14 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		numBots = maxSeats - 1
 	}
 
+	variant := poker.VariantHoldem
+	if v, ok := params["variant"].(string); ok && v != "" {
+		variant = v
+	}
+
 	table := poker.NewTable()
 	table.SetSeatCap(maxSeats)
+	table.SetVariant(variant)
 	// Seed AI opponents at creation (server-authoritative, like OddSlingers).
 	for i := 0; i < numBots; i++ {
 		seat := table.FirstEmptySeat()
@@ -373,7 +379,9 @@ func driveBots(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatch
 		if toCall > 0 {
 			action = "fold"
 		}
-		if ok {
+		if ok && len(hole) >= 2 {
+			// Bots reason over the first two cards as a rough proxy (fine for both
+			// Hold'em and PLO; PLO-optimal bot play is a later refinement).
 			holeStr := hole[0].Code() + hole[1].Code()
 			if d, err := bot.Decide(holeStr, boardCodes(s.Table.Board), toCall, s.Table.Pot, minRaise, maxRaise, seat.Stack, s.Rand); err == nil {
 				action, amount = d.Action, d.Amount
@@ -855,6 +863,7 @@ func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) 
 		HeroWallet:     heroWallet,
 		HandNo:         s.Table.HandNo,
 		DeckCommitHash: s.Table.DeckCommitment,
+		Variant:        s.Table.Variant,
 	}
 }
 
@@ -878,9 +887,9 @@ func dealPrivateCards(dispatcher runtime.MatchDispatcher, s *MatchState) {
 			continue
 		}
 		seat := seatForUser(s, userID)
-		cardViews := []protocol.CardView{
-			{Code: cards[0].Code(), FaceUp: true},
-			{Code: cards[1].Code(), FaceUp: true},
+		cardViews := make([]protocol.CardView, len(cards))
+		for i, c := range cards {
+			cardViews[i] = protocol.CardView{Code: c.Code(), FaceUp: true}
 		}
 		msg := protocol.DealPrivateMessage{Seat: seat}
 		// Encrypt the cards to the player's session key so the wire carries no
@@ -934,10 +943,11 @@ func broadcastActionRequired(ctx context.Context, db *sql.DB, dispatcher runtime
 func broadcastShowdownFromResult(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, winnerGroups [][]int, res poker.ShowdownResult, pot int64) error {
 	reveal := map[string][]protocol.CardView{}
 	for userID, cards := range s.Table.HoleCards {
-		reveal[userID] = []protocol.CardView{
-			{Code: cards[0].Code(), FaceUp: true},
-			{Code: cards[1].Code(), FaceUp: true},
+		views := make([]protocol.CardView, len(cards))
+		for i, c := range cards {
+			views[i] = protocol.CardView{Code: c.Code(), FaceUp: true}
 		}
+		reveal[userID] = views
 	}
 	winnerViews := make([]map[string]interface{}, 0)
 	for potIdx, group := range winnerGroups {
