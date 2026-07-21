@@ -3,6 +3,7 @@ export const OpStandUp = 2;
 export const OpAction = 3;
 export const OpStartHand = 4;
 export const OpChatSend = 5;
+export const OpHostAction = 6;
 
 export const OpChat = 111;
 export const OpSessionKey = 112;
@@ -63,6 +64,8 @@ export interface TableSnapshot {
   deck_commit_hash?: string;
   /** "holdem" | "plo"; absent => holdem. */
   variant?: string;
+  host_user_id?: string;
+  host_paused?: boolean;
 }
 
 export interface DealPrivateMessage {

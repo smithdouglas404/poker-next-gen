@@ -33,6 +33,7 @@ import {
   OpSnapshot,
   OpStandUp,
   OpStartHand,
+  OpHostAction,
   OpActionRequired,
   type ActionRequiredMessage,
   type CardView,
@@ -79,6 +80,7 @@ interface GameContextValue extends GameState {
   standUp: () => Promise<void>;
   startHand: () => Promise<void>;
   sendAction: (type: string, amount: number) => Promise<void>;
+  hostAction: (payload: Record<string, unknown>) => Promise<void>;
   findMatch: () => Promise<void>;
   setBuyInCents: (cents: number) => void;
   setPreviewSeats: (n: number) => void;
@@ -369,6 +371,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
     pushLog("Starting hand…", "action");
   }, [sendMatch, pushLog]);
 
+  const hostAction = useCallback(
+    async (payload: Record<string, unknown>) => {
+      await sendMatch(OpHostAction, payload);
+    },
+    [sendMatch],
+  );
+
   const sendAction = useCallback(
     async (type: string, amount: number) => {
       await sendMatch(OpAction, { type, amount });
@@ -483,6 +492,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       standUp,
       startHand,
       sendAction,
+      hostAction,
       findMatch,
       setBuyInCents,
       setPreviewSeats,
@@ -516,6 +526,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       standUp,
       startHand,
       sendAction,
+      hostAction,
       findMatch,
       setBuyInCents,
       setPreviewSeats,
