@@ -64,6 +64,7 @@ func AuditVerifyHand(ctx context.Context, logger runtime.Logger, db *sql.DB, nk 
 	var chainErrors []string
 	var deckHash string
 	var deckReveal []string
+	var revealSeed string
 	for i, ev := range events {
 		var payloadMap map[string]any
 		_ = json.Unmarshal(ev.Payload, &payloadMap)
@@ -93,17 +94,37 @@ func AuditVerifyHand(ctx context.Context, logger runtime.Logger, db *sql.DB, nk 
 					}
 				}
 			}
+			if v, ok := payloadMap["reveal_seed"].(string); ok {
+				revealSeed = v
+			}
 		}
 	}
 	deckOK := false
 	computedDeck := ""
-	if deckHash != "" && len(deckReveal) == 52 {
+	method := "none"
+	if revealSeed != "" && deckHash != "" {
+		// Seed-reproducible: reproduce the deck from the revealed seed and confirm
+		// SHA-256(seed) == the pre-deal commitment, plus (if present) that the
+		// reproduced order matches what was dealt.
+		res, err := enginemath.VerifySeed(revealSeed, deckHash)
+		if err != nil {
+			return "", runtime.NewError(err.Error(), 13)
+		}
+		deckOK = res.Valid
+		if len(deckReveal) == 52 {
+			deckOK = deckOK && equalStrings(res.Cards, deckReveal)
+		}
+		computedDeck = res.Commitment
+		method = "seed_reproduce"
+	} else if deckHash != "" && len(deckReveal) == 52 {
+		// Legacy: verify the revealed order against the order-hash commitment.
 		valid, computed, err := enginemath.VerifyDeck(deckReveal, deckHash)
 		if err != nil {
 			return "", runtime.NewError(err.Error(), 13)
 		}
 		deckOK = valid
 		computedDeck = computed
+		method = "order_hash"
 	}
 	out, _ := json.Marshal(map[string]any{
 		"match_id":       req.MatchID,
@@ -113,8 +134,22 @@ func AuditVerifyHand(ctx context.Context, logger runtime.Logger, db *sql.DB, nk 
 		"chain_errors":   chainErrors,
 		"deck_valid":     deckOK,
 		"deck_commit":    deckHash,
+		"reveal_seed":    revealSeed,
+		"verify_method":  method,
 		"computed_deck":  computedDeck,
 		"deck_revealed":  len(deckReveal) == 52,
 	})
 	return string(out), nil
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

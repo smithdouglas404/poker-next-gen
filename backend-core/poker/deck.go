@@ -6,20 +6,27 @@ import (
 	"github.com/smithdouglas404/poker-next-gen/backend-core/poker/enginemath"
 )
 
-// NewSecureDeck returns a shuffled 52-card deck and commitment hash from engine-math.
-func NewSecureDeck() ([]Card, string, []string, error) {
+// NewSecureDeck returns a shuffled 52-card deck from engine-math along with the
+// seed-reproducible provably-fair commitment: the pre-deal commit (SHA-256 of
+// the seed) and the seed itself (revealed only after the hand settles).
+func NewSecureDeck() (deck []Card, commitment, seed string, order []string, err error) {
 	result, err := enginemath.ShuffleDeck()
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("engine-math shuffle: %w", err)
+		return nil, "", "", nil, fmt.Errorf("engine-math shuffle: %w", err)
 	}
 	if len(result.Cards) != 52 {
-		return nil, "", nil, fmt.Errorf("engine-math shuffle: expected 52 cards, got %d", len(result.Cards))
+		return nil, "", "", nil, fmt.Errorf("engine-math shuffle: expected 52 cards, got %d", len(result.Cards))
 	}
-	deck, err := codesToDeck(result.Cards)
+	deck, err = codesToDeck(result.Cards)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, "", "", nil, err
 	}
-	return deck, result.DeckHash, append([]string(nil), result.Cards...), nil
+	// Prefer the seed commitment; fall back to the order hash for older engines.
+	commitment = result.Commitment
+	if commitment == "" {
+		commitment = result.DeckHash
+	}
+	return deck, commitment, result.Seed, append([]string(nil), result.Cards...), nil
 }
 
 func codesToDeck(codes []string) ([]Card, error) {

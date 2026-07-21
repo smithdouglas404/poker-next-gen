@@ -110,6 +110,98 @@ pub fn deck_commitment(cards: &[String]) -> String {
     hex::encode(digest)
 }
 
+// ── Seed-reproducible provably-fair shuffle ──────────────────────────────────
+// A 32-byte seed drives a SHA-256 counter-mode CSPRNG through a Fisher-Yates
+// shuffle. We commit to SHA-256(seed) BEFORE the deal and reveal the seed AFTER
+// the hand, so any player can re-run the exact shuffle and confirm the deck was
+// fixed at commit time. This is strictly stronger than committing to the final
+// order: the shuffle becomes reproducible (in pure Python, hashlib only), not
+// just tamper-evident.
+
+/// Canonical unshuffled 52-card deck (two-char codes).
+fn ordered_deck() -> Vec<String> {
+    let mut cards: Vec<String> = Vec::with_capacity(52);
+    for &r in &RANKS {
+        for &s in &SUITS {
+            cards.push(format!("{r}{s}"));
+        }
+    }
+    cards
+}
+
+/// Deterministically shuffle the canonical deck with a 32-byte seed via a
+/// SHA-256 counter-mode CSPRNG driving a Fisher-Yates shuffle. The algorithm is
+/// intentionally primitive so ANY language (notably the downloadable pure-Python
+/// verifier, hashlib only) reproduces it byte-for-byte:
+///
+///   block(c) = SHA-256(seed || c_as_le_u64); consume 4-byte little-endian words
+///   for i in (n-1..=1): j = next_u32() % (i+1); swap(cards[i], cards[j])
+pub fn shuffle_with_seed(seed: &[u8; 32]) -> Vec<String> {
+    let mut cards = ordered_deck();
+    let n = cards.len();
+    let mut counter: u64 = 0;
+    let mut block: [u8; 32] = {
+        let mut h = Sha256::new();
+        h.update(seed);
+        h.update(counter.to_le_bytes());
+        counter += 1;
+        h.finalize().into()
+    };
+    let mut off = 0usize;
+    for i in (1..n).rev() {
+        if off + 4 > block.len() {
+            let mut h = Sha256::new();
+            h.update(seed);
+            h.update(counter.to_le_bytes());
+            counter += 1;
+            block = h.finalize().into();
+            off = 0;
+        }
+        let w = u32::from_le_bytes([block[off], block[off + 1], block[off + 2], block[off + 3]]);
+        off += 4;
+        let j = (w as usize) % (i + 1);
+        cards.swap(i, j);
+    }
+    cards
+}
+
+/// SHA-256 commitment over the raw seed bytes (the pre-deal commit).
+pub fn seed_commitment(seed: &[u8]) -> String {
+    hex::encode(Sha256::digest(seed))
+}
+
+/// A shuffled deck plus the seed that produced it and its commitment.
+pub struct SeededDeck {
+    pub cards: Vec<String>,
+    pub seed_hex: String,
+    pub commitment: String,
+}
+
+/// Fresh 32-byte seed from the OS CSPRNG, shuffled via SHA-256 CTR → Fisher-Yates.
+pub fn shuffle_deck_seeded() -> SeededDeck {
+    use rand::RngCore;
+    let mut seed = [0u8; 32];
+    rand::rngs::OsRng.fill_bytes(&mut seed);
+    let cards = shuffle_with_seed(&seed);
+    SeededDeck {
+        seed_hex: hex::encode(seed),
+        commitment: seed_commitment(&seed),
+        cards,
+    }
+}
+
+/// Reproduce a shuffle from a hex-encoded 32-byte seed. Returns (cards,
+/// commitment). Errors if the seed isn't 32 bytes of valid hex.
+pub fn reproduce_from_seed(seed_hex: &str) -> Result<(Vec<String>, String), String> {
+    let bytes = hex::decode(seed_hex.trim()).map_err(|e| format!("bad seed hex: {e}"))?;
+    if bytes.len() != 32 {
+        return Err(format!("seed must be 32 bytes, got {}", bytes.len()));
+    }
+    let mut seed = [0u8; 32];
+    seed.copy_from_slice(&bytes);
+    Ok((shuffle_with_seed(&seed), seed_commitment(&seed)))
+}
+
 /// Rank an Omaha hand (PLO4–PLO7): exactly two hole cards + three board cards.
 pub fn rank_omaha(hole: &str, board: &str) -> Result<Rank, String> {
     let hand = OmahaHand::new_from_str(hole, board)
@@ -706,6 +798,45 @@ mod tests {
         let h2 = deck_commitment(&cards);
         assert_eq!(h1, h2);
         assert_eq!(h1.len(), 64);
+    }
+
+    #[test]
+    fn seeded_shuffle_is_reproducible_and_committed() {
+        let seed = [7u8; 32];
+        // Same seed → identical deck, every time.
+        let a = shuffle_with_seed(&seed);
+        let b = shuffle_with_seed(&seed);
+        assert_eq!(a, b);
+        assert_eq!(a.len(), 52);
+        // All 52 distinct cards survive the shuffle.
+        let mut sorted = a.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(sorted.len(), 52);
+        // Reproducing from the hex seed matches and the commitment checks out.
+        let seed_hex = hex::encode(seed);
+        let (cards, commitment) = reproduce_from_seed(&seed_hex).expect("reproduce");
+        assert_eq!(cards, a);
+        assert_eq!(commitment, seed_commitment(&seed));
+        assert_eq!(commitment.len(), 64);
+    }
+
+    #[test]
+    fn seed_reproduces_known_reference() {
+        // Locked reference vector cross-checked against the pure-Python verifier
+        // (hashlib only) — if this ever changes, the downloadable verifier breaks.
+        let cards = shuffle_with_seed(&[7u8; 32]);
+        assert_eq!(cards[0], "6d");
+        assert_eq!(cards[1], "2d");
+        assert_eq!(cards[51], "9s");
+    }
+
+    #[test]
+    fn fresh_seeds_differ() {
+        let a = shuffle_deck_seeded();
+        let b = shuffle_deck_seeded();
+        assert_ne!(a.seed_hex, b.seed_hex, "two fresh seeds must differ");
+        assert_eq!(a.commitment, seed_commitment(&hex::decode(a.seed_hex).unwrap()));
     }
 
     #[tokio::test]

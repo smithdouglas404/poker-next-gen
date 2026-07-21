@@ -87,6 +87,9 @@ export interface ShowdownMessage {
   winners?: Array<{ seat: number; username?: string; hand?: string; pot?: number }>;
   side_pots?: number;
   hands?: Record<string, CardView[]>;
+  /** Provably-fair reveal: the pre-deal commit and the now-revealed seed. */
+  deck_commit?: string;
+  reveal_seed?: string;
 }
 
 export interface TableListItem {
