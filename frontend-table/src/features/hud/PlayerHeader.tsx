@@ -44,7 +44,7 @@ export function PlayerHeader() {
         <Link href="/lobby" className="text-xs uppercase tracking-wider text-sky-300/80 hover:text-sky-200">
           Lobby
         </Link>
-        <Link href="/" className="text-xs uppercase tracking-wider text-emerald-300/80 hover:text-emerald-200">
+        <Link href="/hub" className="text-xs uppercase tracking-wider text-emerald-300/80 hover:text-emerald-200">
           Command Center
         </Link>
       </div>

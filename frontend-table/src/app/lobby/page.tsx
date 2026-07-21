@@ -39,7 +39,7 @@ function LobbyContent() {
           <Link href="/table" className="text-sm text-emerald-400 hover:underline">
             Open Table →
           </Link>
-          <Link href="/" className="text-sm text-neutral-400 hover:underline">
+          <Link href="/hub" className="text-sm text-neutral-400 hover:underline">
             Command Center
           </Link>
         </div>

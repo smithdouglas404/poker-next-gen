@@ -91,7 +91,7 @@ export default function LoginPage() {
         </p>
 
         <p className="mt-4 text-center">
-          <Link href="/" className="text-xs text-neutral-500 hover:text-neutral-300">
+          <Link href="/hub" className="text-xs text-neutral-500 hover:text-neutral-300">
             ← Back to Command Center
           </Link>
         </p>

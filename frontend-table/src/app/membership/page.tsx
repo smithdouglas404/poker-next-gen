@@ -266,7 +266,7 @@ export default function MembershipPage() {
             <p className="text-xs uppercase tracking-[0.3em] text-amber-300/80">Membership</p>
             <h1 className="mt-1 text-3xl font-semibold">High Rollers Club</h1>
           </div>
-          <Link href="/" className="text-sm text-emerald-400 hover:underline">
+          <Link href="/hub" className="text-sm text-emerald-400 hover:underline">
             ← Command Center
           </Link>
         </div>
