@@ -338,3 +338,18 @@ CREATE TABLE IF NOT EXISTS poker_generation (
 );
 
 CREATE INDEX IF NOT EXISTS idx_poker_generation_user ON poker_generation(user_id, created_at DESC);
+
+-- Merkle-root batch anchors: one row per batch of audit events committed to
+-- Polygon (or a permanence layer). The batch's Merkle root over the events'
+-- payload hashes is anchored with a single tx — cheap, public verifiability.
+CREATE TABLE IF NOT EXISTS poker_anchor_batch (
+    id TEXT PRIMARY KEY,
+    merkle_root TEXT NOT NULL,
+    event_count INT NOT NULL DEFAULT 0,
+    tx_hash TEXT NOT NULL DEFAULT '',
+    chain TEXT NOT NULL DEFAULT 'polygon',
+    status TEXT NOT NULL DEFAULT 'pending', -- pending | anchored | failed
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_anchor_batch_created ON poker_anchor_batch(created_at DESC);
