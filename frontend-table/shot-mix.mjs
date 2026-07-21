@@ -1,0 +1,12 @@
+import { chromium } from "playwright-core";
+const EXE = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const OUT = "/tmp/claude-0/-home-user-poker-next-gen/392cc787-6489-50fa-8651-c53dd904e186/scratchpad/proof-table-mix.png";
+const b = await chromium.launch({ executablePath: EXE, headless: true, args: ["--enable-unsafe-swiftshader", "--use-gl=angle", "--use-angle=swiftshader", "--no-sandbox", "--disable-dev-shm-usage", "--ignore-gpu-blocklist"] });
+const p = await b.newPage({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 2 });
+p.on("pageerror", (e) => console.log("[pageerror]", String(e).slice(0, 200)));
+await p.goto("http://localhost:3300/proof?screen=table&mode=mix", { waitUntil: "networkidle", timeout: 60000 }).catch(() => {});
+await p.addStyleTag({ content: "nextjs-portal,[data-next-badge-root],[data-nextjs-toast]{display:none!important}" }).catch(() => {});
+await p.waitForTimeout(11000);
+await p.screenshot({ path: OUT });
+console.log("saved", OUT);
+await b.close();
