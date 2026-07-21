@@ -7,6 +7,7 @@ import { formatCents, useGame } from "@/features/game/GameProvider";
 import { computeTableLayout } from "@/features/table/tableLayout";
 import { getSeatPositions } from "@/features/table/seatLayout";
 import { avatarDef, avatarForKey } from "@/features/table/avatars";
+import { ChipStack } from "@/features/hud/ChipStack";
 import { Character3D } from "@/features/table/Character3D";
 import { Character3DGL } from "@/features/table/Character3DGL";
 import { useRenderMode } from "@/features/table/renderMode";
@@ -81,6 +82,7 @@ function SeatCard({
         {seat.username}
       </p>
       <p className="text-xs font-semibold text-emerald-300">{formatCents(seat.stack)}</p>
+      {!folded && <ChipStack cents={seat.stack} />}
       {seat.last_action && (
         <span
           className="mt-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest"
