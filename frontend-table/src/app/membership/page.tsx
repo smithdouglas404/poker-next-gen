@@ -32,6 +32,20 @@ interface KycState {
   rejection_reason?: string;
 }
 
+interface BonusState {
+  chips: number;
+  can_claim: boolean;
+  streak: number;
+  next_claim_at?: string | null;
+}
+
+interface Withdrawal {
+  id: string;
+  amount_cents: number;
+  status: string;
+  destination: string;
+}
+
 const ACCENT: Record<string, string> = {
   free: "border-white/15",
   bronze: "border-amber-700/50",
@@ -49,6 +63,8 @@ export default function MembershipPage() {
   const [tiers, setTiers] = useState<TierDef[]>([]);
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [kyc, setKyc] = useState<KycState | null>(null);
+  const [bonus, setBonus] = useState<BonusState | null>(null);
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [interval, setIntervalChoice] = useState<"month" | "year">("month");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -57,14 +73,18 @@ export default function MembershipPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [t, s, k] = await Promise.all([
+      const [t, s, k, b, w] = await Promise.all([
         callSessionRpc("subscription_tiers", {}),
         callSessionRpc("subscription_status", {}),
         callSessionRpc("kyc_status", {}),
+        callSessionRpc("daily_bonus_status", {}),
+        callSessionRpc("withdrawal_list", {}),
       ]);
       setTiers((t as { tiers?: TierDef[] }).tiers ?? []);
       setStatus(s as StatusResponse);
       setKyc((k as { kyc?: KycState }).kyc ?? null);
+      setBonus(b as BonusState);
+      setWithdrawals((w as { withdrawals?: Withdrawal[] }).withdrawals ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load membership");
     }
@@ -142,6 +162,69 @@ export default function MembershipPage() {
       setBusy(null);
     }
   }, [depositAmount]);
+
+  const depositFiat = useCallback(async () => {
+    setBusy("deposit-fiat");
+    setMessage(null);
+    setError(null);
+    try {
+      const cents = Math.round(parseFloat(depositAmount || "0") * 100);
+      const res = (await callSessionRpc("wallet_deposit_fiat", { amount_cents: cents })) as {
+        configured?: boolean;
+        checkout_url?: string;
+        message?: string;
+      };
+      if (res.configured && res.checkout_url) {
+        window.location.href = res.checkout_url;
+        return;
+      }
+      setMessage(res.message ?? "Card deposits are not configured yet.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Deposit failed");
+    } finally {
+      setBusy(null);
+    }
+  }, [depositAmount]);
+
+  const [wdAmount, setWdAmount] = useState("25");
+  const [wdDest, setWdDest] = useState("");
+  const withdraw = useCallback(async () => {
+    setBusy("withdraw");
+    setMessage(null);
+    setError(null);
+    try {
+      const cents = Math.round(parseFloat(wdAmount || "0") * 100);
+      await callSessionRpc("wallet_withdraw", { amount_cents: cents, destination: wdDest.trim() });
+      setMessage("Withdrawal requested — pending review.");
+      setWdDest("");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Withdrawal failed");
+    } finally {
+      setBusy(null);
+    }
+  }, [wdAmount, wdDest, load]);
+
+  const claimBonus = useCallback(async () => {
+    setBusy("bonus");
+    setMessage(null);
+    setError(null);
+    try {
+      const res = (await callSessionRpc("daily_bonus_claim", {})) as {
+        claimed?: boolean;
+        chips?: number;
+        message?: string;
+      };
+      setMessage(
+        res.claimed ? `Claimed ${res.chips?.toLocaleString()} chips!` : res.message ?? "Already claimed.",
+      );
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Claim failed");
+    } finally {
+      setBusy(null);
+    }
+  }, [load]);
 
   const currentTier = status?.subscription.tier ?? "free";
 
@@ -294,14 +377,40 @@ export default function MembershipPage() {
           })}
         </section>
 
-        <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl">
-          <h2 className="text-lg font-black uppercase tracking-wider text-amber-200">Add funds — crypto</h2>
-          <p className="mt-1 text-xs text-neutral-400">
-            Fund your wallet with 200+ cryptocurrencies via NOWPayments. Requires a paid
-            membership. Your balance is credited automatically once the payment confirms on-chain.
-          </p>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-black/50 px-3 py-2">
+        {bonus && (
+          <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/30 bg-gradient-to-r from-amber-950/30 to-yellow-900/10 p-5">
+            <div>
+              <h2 className="text-sm font-black uppercase tracking-wider text-amber-200">Daily bonus</h2>
+              <p className="mt-1 text-xs text-neutral-300">
+                {bonus.chips.toLocaleString()} chips
+                {bonus.streak > 1 && <span className="text-amber-300"> · {bonus.streak}-day streak</span>}
+                {!bonus.can_claim && bonus.next_claim_at && (
+                  <span className="text-neutral-500">
+                    {" "}
+                    · next {new Date(bonus.next_claim_at).toLocaleTimeString()}
+                  </span>
+                )}
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={!bonus.can_claim || busy !== null}
+              onClick={() => void claimBonus()}
+              className="rounded-xl bg-gradient-to-r from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad] px-5 py-2.5 text-sm font-bold text-black transition hover:shadow-[0_0_20px_rgba(212,175,55,0.3)] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+            >
+              {busy === "bonus" ? "Claiming…" : bonus.can_claim ? "Claim" : "Claimed"}
+            </button>
+          </section>
+        )}
+
+        <section className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl">
+            <h2 className="text-lg font-black uppercase tracking-wider text-amber-200">Add funds</h2>
+            <p className="mt-1 text-xs text-neutral-400">
+              Fund your wallet with crypto (200+ coins) or card. Requires a paid membership;
+              your balance is credited automatically once payment confirms.
+            </p>
+            <div className="mt-4 flex items-center gap-1 rounded-lg border border-white/10 bg-black/50 px-3 py-2">
               <span className="text-neutral-500">$</span>
               <input
                 type="number"
@@ -312,14 +421,78 @@ export default function MembershipPage() {
                 className="w-24 bg-transparent text-white focus:outline-none"
               />
             </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => void depositCrypto()}
+                className="rounded-xl bg-gradient-to-r from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad] px-4 py-2 text-sm font-bold text-black transition hover:shadow-[0_0_20px_rgba(212,175,55,0.3)] disabled:opacity-40"
+              >
+                {busy === "deposit" ? "Starting…" : "Crypto →"}
+              </button>
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => void depositFiat()}
+                className="rounded-xl border border-amber-400/50 px-4 py-2 text-sm font-bold text-amber-200 transition hover:bg-amber-400/10 disabled:opacity-40"
+              >
+                {busy === "deposit-fiat" ? "Starting…" : "Card →"}
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl">
+            <h2 className="text-lg font-black uppercase tracking-wider text-amber-200">Withdraw</h2>
+            <p className="mt-1 text-xs text-neutral-400">
+              Cash out to a crypto address or account. Requests are reviewed before payout.
+            </p>
+            <div className="mt-4 flex items-center gap-1 rounded-lg border border-white/10 bg-black/50 px-3 py-2">
+              <span className="text-neutral-500">$</span>
+              <input
+                type="number"
+                min={5}
+                step={5}
+                value={wdAmount}
+                onChange={(e) => setWdAmount(e.target.value)}
+                className="w-24 bg-transparent text-white focus:outline-none"
+              />
+            </div>
+            <input
+              type="text"
+              value={wdDest}
+              onChange={(e) => setWdDest(e.target.value)}
+              placeholder="Payout destination (address / account)"
+              className="mt-2 w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:border-amber-400/50 focus:outline-none"
+            />
             <button
               type="button"
-              disabled={busy !== null}
-              onClick={() => void depositCrypto()}
-              className="rounded-xl bg-gradient-to-r from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad] px-5 py-2.5 text-sm font-bold text-black transition hover:shadow-[0_0_20px_rgba(212,175,55,0.3)] disabled:opacity-40"
+              disabled={busy !== null || wdDest.trim() === ""}
+              onClick={() => void withdraw()}
+              className="mt-3 rounded-xl border border-white/20 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/5 disabled:opacity-40"
             >
-              {busy === "deposit" ? "Starting…" : "Deposit with crypto →"}
+              {busy === "withdraw" ? "Requesting…" : "Request withdrawal"}
             </button>
+
+            {withdrawals.length > 0 && (
+              <ul className="mt-4 space-y-1 text-xs">
+                {withdrawals.slice(0, 5).map((w) => (
+                  <li key={w.id} className="flex justify-between text-neutral-400">
+                    <span>${(w.amount_cents / 100).toFixed(2)}</span>
+                    <span
+                      className={
+                        w.status === "paid"
+                          ? "text-emerald-400"
+                          : w.status === "rejected"
+                            ? "text-red-400"
+                            : "text-amber-300"
+                      }
+                    >
+                      {w.status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </section>
       </main>

@@ -99,6 +99,22 @@ func (s *DepositStore) MarkCredited(ctx context.Context, id string) (bool, error
 	return true, nil
 }
 
+// SumRecentCents returns the total of the user's deposits (pending/waiting/
+// credited — anything not failed) in the trailing `hours` window. Used to
+// enforce the tier's daily deposit limit as a rolling sum.
+func (s *DepositStore) SumRecentCents(ctx context.Context, userID string, hours int) (int64, error) {
+	var sum sql.NullInt64
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COALESCE(SUM(amount_cents),0) FROM poker_deposit
+		WHERE user_id=$1 AND status<>'failed'
+		  AND created_at > NOW() - ($2 || ' hours')::interval`,
+		userID, hours).Scan(&sum)
+	if err != nil {
+		return 0, err
+	}
+	return sum.Int64, nil
+}
+
 // MarkFailed flips a non-credited deposit to 'failed'.
 func (s *DepositStore) MarkFailed(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx,

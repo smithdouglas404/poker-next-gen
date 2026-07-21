@@ -102,5 +102,42 @@ Fund the Nakama wallet with crypto — env-gated, dormant without keys.
 - `NOWPAYMENTS_IPN_CALLBACK_URL` — the webhook URL NOWPayments should call:
   `https://<backend-core-host>/v2/rpc/nowpayments_webhook?http_key=<NAKAMA_HTTP_KEY>&unwrap`
 
-Follow-up: daily-deposit-sum tracking (limits are currently per-transaction), fiat
-card deposits, withdrawals.
+Deposit limits are enforced as a **rolling 24h sum** (`SumRecentCents`), not
+per-transaction.
+
+## Fiat (card) deposits
+
+`wallet_deposit_fiat` (user) creates a one-time Stripe Checkout session
+(`mode=payment`) tagged `metadata.kind=wallet_deposit`. The shared `stripe_webhook`
+credits the wallet **once** via the deposit record on `checkout.session.completed`.
+Same daily-limit gate as crypto. Dormant without `STRIPE_SECRET_KEY`.
+
+## Withdrawals
+
+- `wallet_withdraw` (user) — **holds** funds (debits the wallet in one
+  transaction) and records a `pending` `poker_withdrawal`. Enforces the tier's
+  **weekly** withdraw limit as a rolling 168h sum; requires a paid membership.
+- `withdrawal_list` (user) — recent requests + status.
+- `withdrawal_approve_admin` — marks `paid` (funds already held). Payout
+  execution (sending crypto/fiat) is operator-driven / a future gateway-payout
+  integration.
+- `withdrawal_reject_admin` — **refunds** the held funds and marks `rejected`.
+
+The wallet is the single authoritative ledger; every hold/refund writes to
+`poker_wallet_ledger`.
+
+## Daily bonus
+
+`daily_bonus_status` / `daily_bonus_claim` — credits the tier's `DailyBonusChips`
+once per ~24h (with a consecutive-day streak). One-transaction claim writes the
+ledger.
+
+## Railway env wiring
+
+`APP_BASE_URL` and `NOWPAYMENTS_IPN_CALLBACK_URL` are wired in `.railway/railway.ts`
+(derived from the service domains). The **secrets** — `STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET`, `NOWPAYMENTS_API_KEY`, `NOWPAYMENTS_IPN_SECRET`,
+`ADMIN_USER_IDS` — must be set in the Railway dashboard on `backend-core`.
+
+Follow-ups: automated crypto/fiat payout execution on approve, multi-table limit,
+rakeback (needs per-player rake accounting).

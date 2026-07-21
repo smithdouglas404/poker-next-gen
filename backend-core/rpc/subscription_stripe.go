@@ -124,6 +124,44 @@ func SubscriptionCheckout(ctx context.Context, logger runtime.Logger, db *sql.DB
 	return string(out), nil
 }
 
+// createStripeDepositSession creates a one-time (mode=payment) Checkout session
+// to top up the wallet. The wallet is credited by the webhook on completion.
+func createStripeDepositSession(ctx context.Context, userID, depositID string, amountCents int64) (string, error) {
+	base := os.Getenv("APP_BASE_URL")
+	if base == "" {
+		base = "https://app.example.com"
+	}
+	form := url.Values{}
+	form.Set("mode", "payment")
+	form.Set("client_reference_id", userID)
+	form.Set("success_url", base+"/membership?deposit=success")
+	form.Set("cancel_url", base+"/membership?deposit=cancel")
+	form.Set("line_items[0][quantity]", "1")
+	form.Set("line_items[0][price_data][currency]", "usd")
+	form.Set("line_items[0][price_data][unit_amount]", strconv.FormatInt(amountCents, 10))
+	form.Set("line_items[0][price_data][product_data][name]", "High Rollers wallet deposit")
+	form.Set("metadata[kind]", "wallet_deposit")
+	form.Set("metadata[deposit_id]", depositID)
+	form.Set("metadata[user_id]", userID)
+	form.Set("payment_intent_data[metadata][kind]", "wallet_deposit")
+	form.Set("payment_intent_data[metadata][deposit_id]", depositID)
+
+	body, status, err := stripePost(ctx, "https://api.stripe.com/v1/checkout/sessions", form)
+	if err != nil {
+		return "", err
+	}
+	if status >= 300 {
+		return "", fmt.Errorf("stripe http %d: %s", status, string(body))
+	}
+	var session struct {
+		URL string `json:"url"`
+	}
+	if err := json.Unmarshal(body, &session); err != nil {
+		return "", err
+	}
+	return session.URL, nil
+}
+
 func stripePost(ctx context.Context, endpoint string, form url.Values) ([]byte, int, error) {
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
@@ -180,6 +218,20 @@ func StripeWebhook(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 			Metadata          map[string]string `json:"metadata"`
 		}
 		_ = json.Unmarshal(event.Data.Object, &obj)
+
+		// A wallet top-up (mode=payment) rather than a subscription: credit the
+		// wallet exactly once via the deposit record.
+		if obj.Metadata["kind"] == "wallet_deposit" {
+			depositID := obj.Metadata["deposit_id"]
+			if depositID != "" {
+				if _, err := store.NewDepositStore(db).MarkCredited(ctx, depositID); err != nil {
+					logger.Error("stripe wallet deposit credit failed: %v", err)
+					return "", runtime.NewError("credit failed", 13)
+				}
+			}
+			return `{"received":true}`, nil
+		}
+
 		userID := obj.Metadata["user_id"]
 		if userID == "" {
 			userID = obj.ClientReferenceID

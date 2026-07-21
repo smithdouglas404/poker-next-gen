@@ -48,6 +48,17 @@ export default defineRailway(() => {
       PGDATABASE: db.env.PGDATABASE,
       ENGINE_MATH_URL: "http://engine-math.railway.internal:8080",
       NAKAMA_LOG_LEVEL: "INFO",
+
+      // ── Billing (membership + wallet deposits) ──────────────────────────
+      // Derivable values are wired here. The SECRETS below must be set in the
+      // Railway dashboard on the backend-core service (never commit secrets):
+      //   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
+      //   NOWPAYMENTS_API_KEY, NOWPAYMENTS_IPN_SECRET, ADMIN_USER_IDS
+      // Until they are set, billing stays dormant (checkout/deposit report
+      // "not configured"). See docs/MEMBERSHIP-BILLING.md.
+      APP_BASE_URL: "https://${{frontend-table.RAILWAY_PUBLIC_DOMAIN}}",
+      NOWPAYMENTS_IPN_CALLBACK_URL:
+        "https://${{backend-core.RAILWAY_PUBLIC_DOMAIN}}/v2/rpc/nowpayments_webhook?http_key=defaulthttpkey&unwrap",
     },
   });
 
