@@ -56,6 +56,16 @@ export default defineRailway(() => {
       //   NOWPAYMENTS_API_KEY, NOWPAYMENTS_IPN_SECRET, ADMIN_USER_IDS
       // Until they are set, billing stays dormant (checkout/deposit report
       // "not configured"). See docs/MEMBERSHIP-BILLING.md.
+      //
+      // ── Identity / KYC (Didit) ──────────────────────────────────────────
+      // Set on backend-core (verification) AND frontend-table (webhook receiver):
+      //   DIDIT_API_KEY, DIDIT_WEBHOOK_SECRET, KYC_APPLY_SECRET,
+      //   DIDIT_WORKFLOW_BASIC, DIDIT_WORKFLOW_STANDARD,
+      //   DIDIT_WORKFLOW_FULL, DIDIT_WORKFLOW_ENHANCED
+      // (optional: DIDIT_BASE_URL, DIDIT_SESSION_PATH). Configure the Didit
+      // webhook to POST https://${{frontend-table.RAILWAY_PUBLIC_DOMAIN}}/api/kyc/webhook
+      // Until DIDIT_API_KEY is set, KYC stays dormant (kyc_start reports "not
+      // enabled yet"). See docs/KYC-DIDIT.md.
       APP_BASE_URL: "https://${{frontend-table.RAILWAY_PUBLIC_DOMAIN}}",
       NOWPAYMENTS_IPN_CALLBACK_URL:
         "https://${{backend-core.RAILWAY_PUBLIC_DOMAIN}}/v2/rpc/nowpayments_webhook?http_key=defaulthttpkey&unwrap",
