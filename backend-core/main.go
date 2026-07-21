@@ -79,6 +79,8 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"stripe_webhook":       rpc.StripeWebhook,
 		"kyc_status":           rpc.KycStatus,
 		"kyc_submit":           rpc.KycSubmit,
+		"kyc_start":            rpc.KycStart,
+		"kyc_apply":            rpc.KycApply,
 		"kyc_verify_admin":     rpc.KycVerifyAdmin,
 		"wallet_deposit_crypto": rpc.WalletDepositCrypto,
 		"wallet_deposit_fiat":  rpc.WalletDepositFiat,

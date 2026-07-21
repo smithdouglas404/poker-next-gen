@@ -60,6 +60,16 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
     href: "/loyalty",
     icon: "🏅",
   },
+  {
+    id: "kyc",
+    title: "Identity Verification",
+    description: "Progressive KYC (Didit) — verify to unlock real-money deposits and higher limits.",
+    category: "platform",
+    status: "live",
+    rpc: "kyc_status",
+    href: "/kyc",
+    icon: "🪪",
+  },
 
   // Community & Clubs
   {
