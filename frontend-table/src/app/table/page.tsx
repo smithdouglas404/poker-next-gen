@@ -7,6 +7,7 @@ import { TableHud } from "@/features/hud/TableHud";
 import { drawTableLayer } from "@/features/table/drawTableScene";
 import { runDealAnimation } from "@/features/table/dealAnimation";
 import { chipsToPot, potToWinner } from "@/features/table/chipAnimation";
+import { muckLosers } from "@/features/table/muckAnimation";
 import { getCanvasResolution } from "@/features/table/rendererQuality";
 import { heroSeatIndex, syncGameToCanvas } from "@/features/table/syncGameToCanvas";
 import { useDeckStyle } from "@/features/table/deckStyle";
@@ -133,7 +134,7 @@ function TableCanvas() {
     }
   }, [snapshot]);
 
-  // GPU pot-sweep to the winner(s) at showdown.
+  // GPU pot-sweep to the winner(s) + muck the losing hands at showdown.
   useEffect(() => {
     const chipsLayer = chipsLayerRef.current;
     const layout = layoutRef.current;
@@ -142,6 +143,15 @@ function TableCanvas() {
     for (const w of showdown.winners) {
       potToWinner(chipsLayer, layout, w.seat, seatCount);
     }
+    // Muck: seats that reached showdown (not folded/empty) but did not win.
+    const winnerSeats = new Set(showdown.winners.map((w) => w.seat));
+    const losers = snapshot.seats
+      .filter((s) => {
+        const st = (s.status ?? "").toLowerCase();
+        return st !== "folded" && st !== "empty" && st !== "" && !winnerSeats.has(s.index);
+      })
+      .map((s) => s.index);
+    muckLosers(chipsLayer, layout, losers, seatCount);
   }, [showdown, snapshot]);
 
   return (
