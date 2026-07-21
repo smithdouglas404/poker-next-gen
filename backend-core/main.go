@@ -64,6 +64,11 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"gto_solve":            rpc.GtoSolve,
 		"coaching_tip":         rpc.CoachingTip,
 		"antibot_score":        rpc.AntibotScore,
+		"subscription_tiers":   rpc.SubscriptionTiers,
+		"subscription_status":  rpc.SubscriptionStatus,
+		"subscription_checkout": rpc.SubscriptionCheckout,
+		"subscription_grant_admin": rpc.SubscriptionGrantAdmin,
+		"stripe_webhook":       rpc.StripeWebhook,
 	}
 	for id, fn := range rpcs {
 		if err := initializer.RegisterRpc(id, fn); err != nil {

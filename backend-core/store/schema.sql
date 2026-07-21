@@ -175,3 +175,28 @@ CREATE INDEX IF NOT EXISTS poker_audit_event_match_hand_idx ON poker_audit_event
 
 ALTER TABLE poker_audit_event ADD COLUMN IF NOT EXISTS prev_hash TEXT NOT NULL DEFAULT '';
 ALTER TABLE poker_audit_event ADD COLUMN IF NOT EXISTS anchor_ref TEXT NOT NULL DEFAULT '';
+
+-- Membership subscriptions. Server-authoritative: only backend runtime code
+-- (Stripe webhook or admin RPC) ever writes tier/expiry — never the client.
+CREATE TABLE IF NOT EXISTS poker_subscription (
+    user_id TEXT PRIMARY KEY,
+    tier TEXT NOT NULL DEFAULT 'free',
+    status TEXT NOT NULL DEFAULT 'inactive',
+    expires_at TIMESTAMPTZ,
+    stripe_customer_id TEXT NOT NULL DEFAULT '',
+    stripe_subscription_id TEXT NOT NULL DEFAULT '',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Append-only audit trail of every tier grant/change (who, what, why, when).
+CREATE TABLE IF NOT EXISTS poker_subscription_ledger (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    from_tier TEXT NOT NULL DEFAULT '',
+    to_tier TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT '',
+    reference TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_subscription_ledger_user ON poker_subscription_ledger(user_id, created_at DESC);
