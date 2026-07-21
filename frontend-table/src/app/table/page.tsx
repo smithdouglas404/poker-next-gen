@@ -97,7 +97,7 @@ function TableCanvas() {
     if (!cardsLayer || !layout || dealTrigger === 0) return;
 
     dealAnimRef.current?.cancel();
-    dealAnimRef.current = runDealAnimation(cardsLayer, layout);
+    dealAnimRef.current = runDealAnimation(cardsLayer, layout, snapshot?.variant === "plo" ? 4 : 2);
     void dealAnimRef.current.promise.then(() => {
       const seatIdx = snapshot ? heroSeatIndex(snapshot.seats, profile.userId) : -1;
       syncGameToCanvas(cardsLayer, layout, snapshot, holeCards, seatIdx);
@@ -158,7 +158,7 @@ function TableCanvas() {
     <>
       <div ref={hostRef} className="absolute inset-0 z-0" aria-label="Poker table surface" />
       <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/40 px-3 py-1 text-[10px] uppercase tracking-widest text-neutral-400">
-        Renderer: {backend} · Multiplayer
+        {snapshot?.variant === "plo" ? "Pot-Limit Omaha" : "Hold'em"} · {backend} · Multiplayer
       </div>
     </>
   );

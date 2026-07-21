@@ -12,6 +12,7 @@ export async function POST(request: Request) {
       buy_in: body.buy_in ?? 100000,
       max_seats: body.max_seats ?? 6,
       num_bots: body.num_bots ?? 0,
+      variant: body.variant === "plo" ? "plo" : "holdem",
     });
     return NextResponse.json({ ok: true, data });
   } catch (error) {

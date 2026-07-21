@@ -20,6 +20,10 @@ export function syncGameToCanvas(
   const { width, height } = getCardDimensions(layout);
   const seats = getSeatPositions(layout, snapshot.max_seats ?? snapshot.seats.length);
 
+  // PLO deals 4 hole cards; opponents show that many face-down.
+  const holeCount = snapshot.variant === "plo" ? 4 : 2;
+  const scale = holeCount > 2 ? 0.82 : 1;
+
   // Hole cards per seated player
   for (const seatView of snapshot.seats) {
     if (seatView.status === "empty" || !seatView.user_id) continue;
@@ -30,14 +34,11 @@ export function syncGameToCanvas(
     const cards: CardView[] =
       isHero && holeCards.length > 0
         ? holeCards
-        : [
-            { code: "", face_up: false },
-            { code: "", face_up: false },
-          ];
+        : Array.from({ length: holeCount }, () => ({ code: "", face_up: false }));
 
     cards.forEach((cv, cardIndex) => {
-      const target = getCardTarget(layout, seat, cardIndex);
-      const card = createCardFace(width, height, cv.code, cv.face_up);
+      const target = getCardTarget(layout, seat, cardIndex, cards.length);
+      const card = createCardFace(width * scale, height * scale, cv.code, cv.face_up);
       card.position.set(target.x, target.y);
       card.rotation = target.rotation;
       cardsLayer.addChild(card);

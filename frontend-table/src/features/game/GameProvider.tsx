@@ -71,6 +71,7 @@ interface GameContextValue extends GameState {
     bigBlind?: number;
     maxSeats?: number;
     numBots?: number;
+    variant?: string;
   }) => Promise<void>;
   joinRoom: (matchId: string) => Promise<void>;
   sitDown: (seat: number, buyIn?: number) => Promise<void>;
@@ -294,22 +295,25 @@ export function GameProvider({ children }: { children: ReactNode }) {
       bigBlind?: number;
       maxSeats?: number;
       numBots?: number;
+      variant?: string;
     }) => {
       const buyIn = opts?.buyIn ?? buyInCents;
       const smallBlind = Math.max(1, Math.round(opts?.smallBlind ?? DEFAULT_SMALL_BLIND_CENTS));
       const bigBlind = Math.max(smallBlind, Math.round(opts?.bigBlind ?? DEFAULT_BIG_BLIND_CENTS));
       const seats = Math.min(MAX_SEATS, Math.max(MIN_SEATS, Math.round(opts?.maxSeats ?? maxSeats)));
       const numBots = Math.min(seats - 1, Math.max(0, Math.round(opts?.numBots ?? 0)));
+      const variant = opts?.variant === "plo" ? "plo" : "holdem";
       const res = await fetch("/api/nakama/table/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: opts?.name ?? "Hold'em Table",
+          name: opts?.name ?? (variant === "plo" ? "PLO Table" : "Hold'em Table"),
           small_blind: smallBlind,
           big_blind: bigBlind,
           buy_in: buyIn,
           max_seats: seats,
           num_bots: numBots,
+          variant,
         }),
       });
       const json = await res.json();

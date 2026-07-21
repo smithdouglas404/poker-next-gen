@@ -61,6 +61,8 @@ export interface TableSnapshot {
   hand_no: number;
   hero_wallet_cents?: number;
   deck_commit_hash?: string;
+  /** "holdem" | "plo"; absent => holdem. */
+  variant?: string;
 }
 
 export interface DealPrivateMessage {

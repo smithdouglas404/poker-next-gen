@@ -42,6 +42,7 @@ export function RoomPanel() {
   const [smallBlind, setSmallBlind] = useState(DEFAULT_SMALL_BLIND_CENTS);
   const [bigBlind, setBigBlind] = useState(DEFAULT_BIG_BLIND_CENTS);
   const [seats, setSeats] = useState(maxSeats);
+  const [gameVariant, setGameVariant] = useState<"holdem" | "plo">("holdem");
 
   const seatCap = snapshot?.max_seats ?? snapshot?.seats.length ?? maxSeats;
   const seated = snapshot?.seats.filter((s) => s.status !== "empty").length ?? 0;
@@ -138,6 +139,32 @@ export function RoomPanel() {
             </label>
           </div>
 
+          <div className="mt-2">
+            <span className="text-[10px] uppercase tracking-wider text-neutral-500">Game</span>
+            <div className="mt-1 grid grid-cols-2 gap-1">
+              {(
+                [
+                  { key: "holdem", label: "Hold'em", hint: "No-Limit · 2 cards" },
+                  { key: "plo", label: "Omaha", hint: "Pot-Limit · 4 cards" },
+                ] as const
+              ).map((v) => (
+                <button
+                  key={v.key}
+                  type="button"
+                  onClick={() => setGameVariant(v.key)}
+                  className={`flex flex-col items-start rounded-lg border px-2 py-1 text-left transition ${
+                    gameVariant === v.key
+                      ? "border-amber-400/60 bg-amber-400/10 text-amber-100"
+                      : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25"
+                  }`}
+                >
+                  <span className="text-xs font-semibold">{v.label}</span>
+                  <span className="text-[9px] text-neutral-500">{v.hint}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <label className="mt-2 flex items-center justify-between gap-2">
             <span className="text-[10px] uppercase tracking-wider text-neutral-500">
               Max Seats ({MIN_SEATS}–{MAX_SEATS})
@@ -168,7 +195,9 @@ export function RoomPanel() {
           <Button
             disabled={busy || !createValid}
             onClick={() =>
-              run(() => createRoom({ buyIn: buyInCents, smallBlind, bigBlind, maxSeats: seats }))
+              run(() =>
+                createRoom({ buyIn: buyInCents, smallBlind, bigBlind, maxSeats: seats, variant: gameVariant }),
+              )
             }
             className="w-full"
           >
