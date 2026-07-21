@@ -39,15 +39,19 @@ export function getCardDimensions(layout: TableLayout): { width: number; height:
   return { width, height: width * 1.4 };
 }
 
-/** Final resting position for a hole card at a given seat. */
+/** Final resting position for a hole card at a given seat. `count` is how many
+ *  hole cards this seat holds (2 for Hold'em, 4 for PLO) so the fan stays
+ *  centered and tightens as the count grows. */
 export function getCardTarget(
   layout: TableLayout,
   seat: SeatPosition,
   cardIndex: number,
+  count: number = CARDS_PER_SEAT,
 ): { x: number; y: number; rotation: number } {
   const { width } = getCardDimensions(layout);
   const inward = layout.feltRx * 0.1;
-  const tangentOffset = (cardIndex - 0.5) * width * 0.62;
+  const spread = count > 2 ? 0.44 : 0.62;
+  const tangentOffset = (cardIndex - (count - 1) / 2) * width * spread;
 
   const x =
     seat.x - Math.cos(seat.angle) * inward + Math.cos(seat.angle + Math.PI / 2) * tangentOffset;

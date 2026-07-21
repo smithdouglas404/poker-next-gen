@@ -43,6 +43,7 @@ export interface DealAnimationHandle {
 export function runDealAnimation(
   cardsLayer: Container,
   layout: TableLayout,
+  cardsPerSeat: number = CARDS_PER_SEAT,
 ): DealAnimationHandle {
   cardsLayer.removeChildren();
 
@@ -50,14 +51,15 @@ export function runDealAnimation(
   const seats = getSeatPositions(layout);
   const animations: SlideAnimation[] = [];
   const startedAt = performance.now();
+  const scale = cardsPerSeat > 2 ? 0.82 : 1;
 
   for (let seatIndex = 0; seatIndex < seats.length; seatIndex++) {
     const seat = seats[seatIndex];
     const seatDelay = seatIndex * SEAT_STAGGER_MS;
 
-    for (let cardIndex = 0; cardIndex < CARDS_PER_SEAT; cardIndex++) {
-      const card = createCardBack(width, height);
-      const target = getCardTarget(layout, seat, cardIndex);
+    for (let cardIndex = 0; cardIndex < cardsPerSeat; cardIndex++) {
+      const card = createCardBack(width * scale, height * scale);
+      const target = getCardTarget(layout, seat, cardIndex, cardsPerSeat);
       const cardDelay = seatDelay + cardIndex * CARD_STAGGER_MS;
 
       card.position.set(layout.cx, layout.cy);
