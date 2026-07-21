@@ -77,7 +77,7 @@ export default function MarketplacePage() {
           </div>
           <div className="flex gap-4 text-sm">
             <Link href="/studio" className="text-fuchsia-300 hover:underline">Studio</Link>
-            <Link href="/" className="text-cyan hover:underline">← Command Center</Link>
+            <Link href="/hub" className="text-cyan hover:underline">← Command Center</Link>
           </div>
         </div>
       </header>
