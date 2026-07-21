@@ -23,7 +23,9 @@ func NewDeck() (deck []Card, commitment, seed string, order []string, err error)
 	return NewSecureDeck()
 }
 
-const MaxSeats = 6
+// MaxSeats is the physical seat cap; a table's active seats (2..MaxSeats) are
+// configurable at creation. 9 supports full-ring; 6-max stays the default.
+const MaxSeats = 9
 
 type SeatStatus string
 
