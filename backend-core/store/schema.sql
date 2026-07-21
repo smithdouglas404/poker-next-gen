@@ -355,3 +355,20 @@ CREATE TABLE IF NOT EXISTS poker_anchor_batch (
 );
 
 CREATE INDEX IF NOT EXISTS idx_poker_anchor_batch_created ON poker_anchor_batch(created_at DESC);
+
+-- Member-to-member cosmetic marketplace listings. Platform takes a fee (the
+-- seller tier's marketplace bps) on each sale.
+CREATE TABLE IF NOT EXISTS poker_listing (
+    id TEXT PRIMARY KEY,
+    seller_user_id TEXT NOT NULL,
+    cosmetic_id TEXT NOT NULL REFERENCES poker_cosmetic(id) ON DELETE CASCADE,
+    price_cents BIGINT NOT NULL,
+    fee_cents BIGINT NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'open', -- open | sold | cancelled
+    buyer_user_id TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_listing_status ON poker_listing(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_poker_listing_seller ON poker_listing(seller_user_id);
