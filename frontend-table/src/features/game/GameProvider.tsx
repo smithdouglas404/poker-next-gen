@@ -27,6 +27,7 @@ import {
   OpDealPrivate,
   OpError,
   OpHandStart,
+  OpSessionKey,
   OpShowdown,
   OpSitDown,
   OpSnapshot,
@@ -46,6 +47,7 @@ import {
 import { ensureSession } from "@/lib/nakama/auth";
 import { createNakamaClient, type Session, type Socket } from "@/lib/nakama/client";
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
+import { decryptCards, importSessionKey } from "@/lib/nakama/cardCrypto";
 import { soundManager } from "@/features/sound/soundManager";
 import { tauntByKey, tauntUrls } from "@/features/sound/library";
 import { avatarForKey } from "@/features/table/avatars";
@@ -93,6 +95,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const clientRef = useRef(createNakamaClient());
   const sessionRef = useRef<Session | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  const sessionKeyRef = useRef<CryptoKey | null>(null);
 
   const [connected, setConnected] = useState(false);
   const [matchId, setMatchId] = useState<string | null>(null);
@@ -152,10 +155,38 @@ export function GameProvider({ children }: { children: ReactNode }) {
             setShowdown(null);
             setDealTrigger((n) => n + 1);
             break;
-          case OpDealPrivate:
-            setHoleCards((payload as DealPrivateMessage).cards);
+          case OpSessionKey: {
+            const key = (payload as { key?: string }).key;
+            if (key) {
+              void importSessionKey(key)
+                .then((k) => {
+                  sessionKeyRef.current = k;
+                })
+                .catch(() => {
+                  sessionKeyRef.current = null;
+                });
+            }
+            break;
+          }
+          case OpDealPrivate: {
+            const dp = payload as DealPrivateMessage;
+            if (dp.enc) {
+              // Encrypted hole cards: decrypt in memory with the session key.
+              const key = sessionKeyRef.current;
+              if (key) {
+                void decryptCards(key, dp.enc)
+                  .then((json) => {
+                    const parsed = JSON.parse(json) as { cards: CardView[] };
+                    setHoleCards(parsed.cards ?? []);
+                  })
+                  .catch(() => setHoleCards([]));
+              }
+            } else if (dp.cards) {
+              setHoleCards(dp.cards);
+            }
             pushLog("Hole cards dealt", "info");
             break;
+          }
           case OpBoard:
             pushLog(`Board: ${(payload.phase as string)?.toUpperCase()}`, "pot");
             setSnapshot((prev) =>
