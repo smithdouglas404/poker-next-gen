@@ -1,18 +1,13 @@
 import { Container, Graphics, Text } from "pixi.js";
 
 import { createCardBack } from "./createCardBack";
-
-const SUIT_COLORS: Record<string, number> = {
-  s: 0x111827,
-  c: 0x111827,
-  h: 0xdc2626,
-  d: 0xdc2626,
-};
+import { suitColor } from "./deckStyle";
 
 function parseCode(code: string): { rank: string; suit: string; color: number } {
   const suit = code.slice(-1);
   const rank = code.slice(0, -1);
-  return { rank: rank === "T" ? "10" : rank, suit, color: SUIT_COLORS[suit] ?? 0x111827 };
+  // Color honors the active deck style (two-color vs four-color).
+  return { rank: rank === "T" ? "10" : rank, suit, color: suitColor(suit) };
 }
 
 /** Face-up or face-down playing card for canvas rendering. */
