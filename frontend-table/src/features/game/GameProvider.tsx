@@ -76,6 +76,8 @@ interface GameContextValue extends GameState {
     durationMins?: number;
   }) => Promise<void>;
   joinRoom: (matchId: string) => Promise<void>;
+  joinByCode: (code: string) => Promise<void>;
+  roomCode: string | null;
   sitDown: (seat: number, buyIn?: number) => Promise<void>;
   standUp: () => Promise<void>;
   startHand: () => Promise<void>;
@@ -104,6 +106,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [connected, setConnected] = useState(false);
   const [matchId, setMatchId] = useState<string | null>(null);
   const [roomId, setRoomId] = useState<string | null>(null);
+  const [roomCode, setRoomCode] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<TableSnapshot | null>(null);
   const [holeCards, setHoleCards] = useState<CardView[]>([]);
   const [actionRequired, setActionRequired] = useState<ActionRequiredMessage | null>(null);
@@ -326,13 +329,29 @@ export function GameProvider({ children }: { children: ReactNode }) {
       if (!json.ok) throw new Error(json.error ?? "Create room failed");
       setRoomId(json.data.room_id);
       setMaxSeats(seats);
+      const code = json.data.code as string | undefined;
+      if (code) setRoomCode(code);
       pushLog(
         `Room created · buy-in ${formatCents(buyIn)} · blinds ${formatCents(smallBlind)}/${formatCents(bigBlind)} · ${seats} seats${numBots ? ` · ${numBots} bot${numBots > 1 ? "s" : ""}` : ""}`,
         "info",
       );
+      if (code) pushLog(`Share code ${code} — friends can join at /lobby?code=${code}`, "info");
       await joinRoom(json.data.match_id);
     },
     [buyInCents, maxSeats, joinRoom, pushLog],
+  );
+
+  // Join a private table by its short share code.
+  const joinByCode = useCallback(
+    async (code: string) => {
+      const trimmed = code.trim().toUpperCase();
+      if (!trimmed) return;
+      const data = (await callSessionRpc("room_resolve", { code: trimmed })) as { match_id?: string };
+      if (!data.match_id) throw new Error("No table found for that code");
+      setRoomCode(trimmed);
+      await joinRoom(data.match_id);
+    },
+    [joinRoom],
   );
 
   const sendMatch = useCallback(
@@ -488,6 +507,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       listTables,
       createRoom,
       joinRoom,
+      joinByCode,
+      roomCode,
       sitDown,
       standUp,
       startHand,
@@ -522,6 +543,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       listTables,
       createRoom,
       joinRoom,
+      joinByCode,
+      roomCode,
       sitDown,
       standUp,
       startHand,

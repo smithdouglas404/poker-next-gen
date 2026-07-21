@@ -20,6 +20,8 @@ export function RoomPanel() {
   const {
     createRoom,
     joinRoom,
+    joinByCode,
+    roomCode,
     matchId,
     startHand,
     snapshot,
@@ -35,6 +37,7 @@ export function RoomPanel() {
     setPreviewSeats,
   } = useGame();
   const [joinId, setJoinId] = useState("");
+  const [joinCode, setJoinCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(true);
 
@@ -252,6 +255,25 @@ export function RoomPanel() {
 
           <div className="flex gap-2">
             <Input
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              placeholder="Room code (e.g. K7M2QD)"
+              maxLength={6}
+              className="min-w-0 flex-1 px-3 py-2 text-xs uppercase tracking-widest"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy || joinCode.trim().length < 4}
+              onClick={() => run(() => joinByCode(joinCode.trim()))}
+              className="border-fuchsia-400/50 text-fuchsia-200 hover:bg-fuchsia-400/10"
+            >
+              Join Code
+            </Button>
+          </div>
+
+          <div className="flex gap-2">
+            <Input
               value={joinId}
               onChange={(e) => setJoinId(e.target.value)}
               placeholder="Match ID"
@@ -267,6 +289,24 @@ export function RoomPanel() {
               Join
             </Button>
           </div>
+
+          {matchId && roomCode && (
+            <button
+              type="button"
+              onClick={() => {
+                const link = `${window.location.origin}/lobby?code=${roomCode}`;
+                void navigator.clipboard?.writeText(link);
+              }}
+              title="Copy invite link"
+              className="flex items-center justify-between rounded-lg border border-fuchsia-400/30 bg-fuchsia-950/20 px-3 py-2 text-left"
+            >
+              <span className="text-[10px] uppercase tracking-wider text-neutral-400">Share code</span>
+              <span className="font-mono text-sm font-bold tracking-[0.3em] text-fuchsia-200">
+                {roomCode}
+              </span>
+              <span className="text-[10px] text-fuchsia-300/80">copy link</span>
+            </button>
+          )}
 
           {matchId && (
             <>

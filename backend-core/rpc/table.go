@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
@@ -96,15 +97,42 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		return "", err
 	}
 
+	// Allocate a short shareable room code (best-effort; table still works without).
+	code, _ := store.NewRoomCodeStore(db).Create(ctx, matchID)
+
 	resp, err := json.Marshal(protocol.TableCreateResponse{
 		MatchID: matchID,
 		RoomID:  roomID,
 		Label:   roomID,
+		Code:    code,
 	})
 	if err != nil {
 		return "", err
 	}
 	return string(resp), nil
+}
+
+// RoomResolve maps a short room code to its match id, for join-by-code / links.
+func RoomResolve(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	var req struct {
+		Code string `json:"code"`
+	}
+	if payload != "" {
+		_ = json.Unmarshal([]byte(payload), &req)
+	}
+	code := strings.ToUpper(strings.TrimSpace(req.Code))
+	if code == "" {
+		return "", runtime.NewError("code required", 3)
+	}
+	matchID, err := store.NewRoomCodeStore(db).Resolve(ctx, code)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	if matchID == "" {
+		return "", runtime.NewError("no table found for that code", 5)
+	}
+	out, _ := json.Marshal(map[string]string{"match_id": matchID, "code": code})
+	return string(out), nil
 }
 
 // TableAddBot seats an AI player at the given match (fills empty seats so a
