@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { useDeckStyle } from "@/features/table/deckStyle";
+import { useStackUnit } from "@/features/table/stackDisplay";
 import { soundManager, type SoundPack } from "@/features/sound/soundManager";
 
 const SUIT_SWATCH = [
@@ -17,6 +18,9 @@ const SUIT_SWATCH = [
 export function TableSettings() {
   const [deck, setDeck] = useDeckStyle();
   const fourColor = deck === "four-color";
+
+  const [stackUnit, setStackUnit] = useStackUnit();
+  const inBB = stackUnit === "bb";
 
   const [pack, setPack] = useState<SoundPack>("studio");
   useEffect(() => {
@@ -46,6 +50,23 @@ export function TableSettings() {
           <span
             className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
               fourColor ? "left-[18px]" : "left-0.5"
+            }`}
+          />
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] text-neutral-300">Stacks in big blinds</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={inBB}
+          onClick={() => setStackUnit(inBB ? "chips" : "bb")}
+          className={`relative h-5 w-9 rounded-full transition ${inBB ? "bg-amber-500" : "bg-white/15"}`}
+        >
+          <span
+            className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
+              inBB ? "left-[18px]" : "left-0.5"
             }`}
           />
         </button>

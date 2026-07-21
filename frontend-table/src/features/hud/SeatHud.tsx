@@ -8,6 +8,7 @@ import { computeTableLayout } from "@/features/table/tableLayout";
 import { getSeatPositions } from "@/features/table/seatLayout";
 import { avatarDef, avatarForKey } from "@/features/table/avatars";
 import { ChipStack } from "@/features/hud/ChipStack";
+import { formatStack, useStackUnit } from "@/features/table/stackDisplay";
 import { Character3D } from "@/features/table/Character3D";
 import { Character3DGL } from "@/features/table/Character3DGL";
 import { useRenderMode } from "@/features/table/renderMode";
@@ -19,6 +20,8 @@ function SeatCard({
   active,
   winner,
   mode,
+  bigBlind,
+  stackUnit,
 }: {
   seat: SeatView;
   buyInLabel: string;
@@ -26,6 +29,8 @@ function SeatCard({
   active?: boolean;
   winner?: boolean;
   mode: "2d" | "3d";
+  bigBlind: number;
+  stackUnit: "chips" | "bb";
 }) {
   const empty = seat.status === "empty" || !seat.user_id;
 
@@ -81,7 +86,9 @@ function SeatCard({
       >
         {seat.username}
       </p>
-      <p className="text-xs font-semibold text-emerald-300">{formatCents(seat.stack)}</p>
+      <p className="text-xs font-semibold text-emerald-300">
+        {formatStack(seat.stack, bigBlind, stackUnit, formatCents)}
+      </p>
       {!folded && <ChipStack cents={seat.stack} />}
       {seat.last_action && (
         <span
@@ -110,6 +117,8 @@ export function SeatHud() {
   const buyInLabel = formatCents(buyInCents);
 
   const [mode, setMode] = useRenderMode();
+  const [stackUnit] = useStackUnit();
+  const bigBlind = snapshot?.big_blind ?? 0;
   const activeSeat = snapshot?.action_seat;
   const winnerSeats = new Set((showdown?.winners ?? []).map((w) => w.seat));
 
@@ -176,6 +185,8 @@ export function SeatHud() {
                 active={activeSeat === seat.index && seat.status !== "empty"}
                 winner={winnerSeats.has(seat.index)}
                 mode={mode}
+                bigBlind={bigBlind}
+                stackUnit={stackUnit}
               />
             </div>
           );

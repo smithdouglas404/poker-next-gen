@@ -5,6 +5,7 @@ import { PlayerHeader } from "@/features/hud/PlayerHeader";
 import { RoomPanel } from "@/features/hud/RoomPanel";
 import { SeatHud } from "@/features/hud/SeatHud";
 import { ActionBar } from "@/features/hud/ActionBar";
+import { PreActionBar } from "@/features/hud/PreActionBar";
 import { ActionTimer } from "@/features/hud/ActionTimer";
 import { EquityPanel } from "@/features/hud/EquityPanel";
 import { HandVerifyPanel } from "@/features/hud/HandVerifyPanel";
@@ -54,6 +55,7 @@ export function TableHud({ children }: { children: React.ReactNode }) {
           <p className="pointer-events-none text-[10px] uppercase tracking-wider text-neutral-600">
             Keys: F fold · C check/call · R raise
           </p>
+          <PreActionBar />
           <ActionBar />
         </div>
 

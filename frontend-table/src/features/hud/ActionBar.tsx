@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { formatCents, useGame } from "@/features/game/GameProvider";
+import { usePreAction } from "@/features/hud/preAction";
 
 /** Snap a cent value to the nearest chip (100) and clamp into [min, max]. */
 function clampToBounds(value: number, min: number, max: number): number {
@@ -22,9 +23,25 @@ export function ActionBar() {
   const min = actionRequired?.min_raise ?? 0;
   const max = actionRequired?.max_raise ?? 0;
 
+  const [preAction, setPreAction] = usePreAction();
+
   useEffect(() => {
     if (actionRequired) setRaiseAmount(actionRequired.min_raise);
   }, [actionRequired]);
+
+  // Fire a queued pre-action the moment it becomes the hero's turn, then clear.
+  useEffect(() => {
+    if (!isMyTurn || !actionRequired || preAction === "none") return;
+    const va = actionRequired.valid_actions;
+    const canCheckNow = va.includes("check");
+    const canCallNow = va.includes("call");
+    let act: [string, number] | null = null;
+    if (preAction === "fold") act = ["fold", 0];
+    else if (preAction === "check_fold") act = canCheckNow ? ["check", 0] : ["fold", 0];
+    else if (preAction === "call_any") act = canCallNow ? ["call", 0] : canCheckNow ? ["check", 0] : null;
+    setPreAction("none");
+    if (act) void sendAction(act[0], act[1]);
+  }, [isMyTurn, actionRequired, preAction, sendAction, setPreAction]);
 
   const setClamped = useCallback(
     (value: number) => setRaiseAmount(clampToBounds(value, min, max)),
