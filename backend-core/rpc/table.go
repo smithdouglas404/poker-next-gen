@@ -79,6 +79,8 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		durationSecs = mins * 60
 	}
 
+	hostUserID, _ := callerID(ctx) // the creator is the table host
+
 	matchID, err := nk.MatchCreate(ctx, protocol.MatchModule, map[string]interface{}{
 		"room_id":       roomID,
 		"small_blind":   sb,
@@ -88,6 +90,7 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		"num_bots":      numBots,
 		"variant":       variant,
 		"duration_secs": durationSecs,
+		"host_user_id":  hostUserID,
 	})
 	if err != nil {
 		return "", err

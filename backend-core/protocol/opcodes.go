@@ -7,6 +7,7 @@ const (
 	OpAction   int64 = 3
 	OpStartHand int64 = 4
 	OpChatSend  int64 = 5
+	OpHostAction int64 = 6 // table host: pause/resume/kick/set_blinds/close
 )
 
 // Server → client match op codes.

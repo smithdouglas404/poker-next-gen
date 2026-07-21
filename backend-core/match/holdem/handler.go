@@ -54,6 +54,10 @@ type MatchState struct {
 	DurationSecs     int   // auto-close after this many seconds (0 = no limit)
 	AutoDeal         bool  // auto-start each hand (cash tables); tournaments deal via director
 	NextDealTick     int64 // tick at which to auto-deal the next hand (0 = unset)
+	// Host controls (the table creator can pause/kick/adjust/close live):
+	HostUserID       string
+	HostPaused       bool
+	HostClosed       bool
 }
 
 // autoDealDelayTicks is the breather between hands on a self-dealing table
@@ -102,6 +106,10 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	if v, ok := params["duration_secs"].(float64); ok && v > 0 {
 		durationSecs = int(v)
 	}
+	hostUserID := ""
+	if v, ok := params["host_user_id"].(string); ok {
+		hostUserID = v
+	}
 
 	variant := poker.VariantHoldem
 	if v, ok := params["variant"].(string); ok && v != "" {
@@ -140,6 +148,7 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		// Cash tables deal themselves (no operator babysitting); tournament tables
 		// are driven by the tournament director, so they opt out.
 		AutoDeal:     tournamentID == "",
+		HostUserID:   hostUserID,
 	}
 	label := buildLabel(state)
 	return state, 1, label
@@ -229,13 +238,18 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 	}
 
 	// Self-managing table lifecycle, evaluated only between hands so a live pot is
-	// never abandoned: close after the configured duration, else auto-deal.
+	// never abandoned: close after the configured duration or a host close, else
+	// auto-deal (unless the host paused the table).
 	if s.Phase == poker.PhaseWaiting && s.Table.Street == poker.StreetWaiting {
+		if s.HostClosed {
+			closeTable(ctx, db, dispatcher, s, "closed by host")
+			return nil
+		}
 		if s.DurationSecs > 0 && tick >= int64(s.DurationSecs) {
 			closeTable(ctx, db, dispatcher, s, "scheduled time reached")
 			return nil // ending the match releases the handler
 		}
-		if s.AutoDeal && s.Table.SeatedCount() >= 2 && len(s.Presences) >= 1 {
+		if s.AutoDeal && !s.HostPaused && s.Table.SeatedCount() >= 2 && len(s.Presences) >= 1 {
 			if s.NextDealTick == 0 {
 				s.NextDealTick = tick + autoDealDelayTicks
 			} else if tick >= s.NextDealTick {
@@ -333,6 +347,13 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				Seat:     seatForUser(s, userID),
 				HandNo:   s.Table.HandNo,
 			})
+
+		case protocol.OpHostAction:
+			if s.HostUserID == "" || userID != s.HostUserID {
+				sendError(dispatcher, presence, "not_host", "only the table host can do that")
+				continue
+			}
+			handleHostAction(ctx, db, dispatcher, s, msg.GetData())
 
 		case protocol.OpStartHand:
 			if s.Table.SeatedCount() >= 2 && s.Phase == poker.PhaseWaiting && s.Table.Street == poker.StreetWaiting {
@@ -532,6 +553,51 @@ func autoStartHand(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDisp
 	broadcastHandStart(ctx, db, dispatcher, s)
 	dealPrivateCards(dispatcher, s)
 	broadcastActionRequired(ctx, db, dispatcher, s)
+}
+
+// handleHostAction applies a host-only table control. Blind/close changes take
+// effect between hands; pause stops new hands being auto-dealt; kick stands a
+// player up (refunding their stack). The caller has already verified the sender
+// is the host.
+func handleHostAction(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, data []byte) {
+	var req struct {
+		Action     string `json:"action"`
+		Seat       int    `json:"seat"`
+		SmallBlind int64  `json:"small_blind"`
+		BigBlind   int64  `json:"big_blind"`
+	}
+	if err := json.Unmarshal(data, &req); err != nil {
+		return
+	}
+	switch req.Action {
+	case "pause":
+		s.HostPaused = true
+		s.NextDealTick = 0
+		narrate(dispatcher, s, "Host paused the table — no new hands will be dealt.")
+	case "resume":
+		s.HostPaused = false
+		narrate(dispatcher, s, "Host resumed the table.")
+	case "close":
+		s.HostClosed = true
+		narrate(dispatcher, s, "Host is closing the table…")
+	case "kick":
+		seat := s.Table.Seats[req.Seat]
+		if req.Seat >= 0 && req.Seat < poker.MaxSeats && seat != nil && !seat.IsBot {
+			releaseBuyIn(ctx, db, s.ClubID, seat.UserID, seat.Stack)
+			_ = store.NewActiveSeatStore(db).Unregister(ctx, seat.UserID, matchIDForAudit(s))
+			name := seat.Username
+			s.Table.StandUp(req.Seat)
+			narrate(dispatcher, s, fmt.Sprintf("Host removed %s from the table.", name))
+		}
+	case "set_blinds":
+		if req.SmallBlind > 0 && req.BigBlind >= req.SmallBlind {
+			s.SmallBlind = req.SmallBlind
+			s.BigBlind = req.BigBlind
+			narrate(dispatcher, s, fmt.Sprintf("Host set blinds to $%d/$%d (from the next hand).", req.SmallBlind/100, req.BigBlind/100))
+		}
+	}
+	dispatcher.MatchLabelUpdate(buildLabel(s))
+	broadcastSnapshot(ctx, db, dispatcher, s, nil)
 }
 
 // closeTable ends a self-managing table: refunds every seated human's remaining
@@ -985,6 +1051,8 @@ func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) 
 		HandNo:         s.Table.HandNo,
 		DeckCommitHash: s.Table.DeckCommitment,
 		Variant:        s.Table.Variant,
+		HostUserID:     s.HostUserID,
+		HostPaused:     s.HostPaused,
 	}
 }
 

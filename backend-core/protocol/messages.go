@@ -49,6 +49,8 @@ type TableSnapshot struct {
 	HandNo         int         `json:"hand_no"`
 	DeckCommitHash string      `json:"deck_commit_hash,omitempty"`
 	Variant        string      `json:"variant,omitempty"` // "holdem" | "plo"
+	HostUserID     string      `json:"host_user_id,omitempty"`
+	HostPaused     bool        `json:"host_paused,omitempty"`
 }
 
 type DealPrivateMessage struct {

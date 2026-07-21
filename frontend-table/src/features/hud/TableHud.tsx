@@ -12,6 +12,7 @@ import { HandVerifyPanel } from "@/features/hud/HandVerifyPanel";
 import { BuyInSlider, TableLog } from "@/features/hud/TableLog";
 import { ChatPanel } from "@/features/hud/ChatPanel";
 import { HandHistoryPanel } from "@/features/hud/HandHistoryPanel";
+import { HostPanel } from "@/features/hud/HostPanel";
 import { MusicPicker } from "@/features/sound/MusicPicker";
 import { TableSettings } from "@/features/hud/TableSettings";
 import { TauntBar } from "@/features/sound/TauntBar";
@@ -34,6 +35,7 @@ export function TableHud({ children }: { children: React.ReactNode }) {
         <div className="mt-4 flex flex-1 gap-4">
           <div className="flex w-full max-w-xs flex-col gap-3">
             <RoomPanel />
+            <HostPanel />
             <BuyInSlider />
             <EquityPanel />
             <HandVerifyPanel />
