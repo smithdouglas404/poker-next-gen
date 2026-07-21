@@ -6,6 +6,45 @@ import { DEFAULT_MAX_SEATS, MAX_SEATS, MIN_SEATS, type SeatView } from "@/featur
 import { formatCents, useGame } from "@/features/game/GameProvider";
 import { computeTableLayout } from "@/features/table/tableLayout";
 import { getSeatPositions } from "@/features/table/seatLayout";
+import { avatarForKey, avatarGradient, avatarSrc } from "@/features/table/avatars";
+
+/** A glowing character portrait for a seated player (falls back to a monogram). */
+function AvatarPortrait({ name, identity, hero }: { name?: string; identity: string; hero: boolean }) {
+  const [failed, setFailed] = useState(false);
+  const monogram = (name?.slice(0, 2).toUpperCase() ?? "??");
+  return (
+    <div className="relative h-14 w-14">
+      {/* neon glow ring */}
+      <div
+        className={`absolute -inset-1 rounded-full blur-[7px] ${
+          hero ? "bg-amber-400/70" : "bg-emerald-400/40"
+        }`}
+      />
+      <div
+        className={`relative h-14 w-14 overflow-hidden rounded-full ring-2 ${
+          hero ? "ring-amber-300/80" : "ring-cyan-300/60"
+        }`}
+      >
+        {failed ? (
+          <div
+            className="flex h-full w-full items-center justify-center text-sm font-bold text-white"
+            style={{ background: avatarGradient(identity) }}
+          >
+            {monogram}
+          </div>
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={avatarSrc(avatarForKey(identity))}
+            alt={name ?? "player"}
+            onError={() => setFailed(true)}
+            className="h-full w-full object-cover"
+          />
+        )}
+      </div>
+    </div>
+  );
+}
 
 function SeatCard({
   seat,
@@ -39,9 +78,11 @@ function SeatCard({
         seat.is_hero ? "border-amber-400/70 bg-amber-950/40" : "border-white/15 bg-black/55"
       }`}
     >
-      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-slate-600 to-slate-800 text-sm font-bold text-white ring-2 ring-amber-500/40">
-        {seat.username?.slice(0, 2).toUpperCase() ?? "??"}
-      </div>
+      <AvatarPortrait
+        name={seat.username}
+        identity={seat.user_id || `seat-${seat.index}`}
+        hero={!!seat.is_hero}
+      />
       <p className="mt-2 truncate text-sm font-semibold text-white">{seat.username}</p>
       <p className="text-xs font-medium text-emerald-300">{formatCents(seat.stack)}</p>
       {seat.last_action && (
