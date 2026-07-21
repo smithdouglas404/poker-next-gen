@@ -5,6 +5,7 @@ export const OpStartHand = 4;
 export const OpChatSend = 5;
 
 export const OpChat = 111;
+export const OpSessionKey = 112;
 
 export const OpSnapshot = 100;
 export const OpHandStart = 101;
@@ -64,7 +65,9 @@ export interface TableSnapshot {
 
 export interface DealPrivateMessage {
   seat: number;
-  cards: CardView[];
+  cards?: CardView[];
+  /** base64(nonce || AES-256-GCM ciphertext) of {"cards":[...]}. */
+  enc?: string;
 }
 
 export interface ActionRequiredMessage {

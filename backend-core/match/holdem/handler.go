@@ -2,7 +2,11 @@ package holdem
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	crand "crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -42,6 +46,9 @@ type MatchState struct {
 	Presences        map[string]runtime.Presence
 	BotCount         int
 	Rand             *rand.Rand
+	// Per-session AES-256-GCM keys (userID -> 32 raw bytes) used to encrypt each
+	// player's own hole cards so the wire never carries plaintext card codes.
+	SessionKeys      map[string][]byte
 }
 
 type Handler struct{}
@@ -109,6 +116,7 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		BuyIn:        buyIn,
 		Presences:    map[string]runtime.Presence{},
 		Rand:         rand.New(rand.NewSource(time.Now().UnixNano())),
+		SessionKeys:  map[string][]byte{},
 	}
 	label := buildLabel(state)
 	return state, 1, label
@@ -121,10 +129,54 @@ func (h *Handler) MatchJoinAttempt(ctx context.Context, logger runtime.Logger, d
 func (h *Handler) MatchJoin(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, presences []runtime.Presence) interface{} {
 	s := state.(*MatchState)
 	for _, p := range presences {
-		s.Presences[p.GetUserId()] = p
+		uid := p.GetUserId()
+		s.Presences[uid] = p
+		issueSessionKey(dispatcher, s, uid, p)
 	}
 	broadcastSnapshot(ctx, db, dispatcher, s, nil)
 	return s
+}
+
+// issueSessionKey ensures a per-session AES key exists for the user and sends it
+// (base64) to that one player, so they can decrypt their own hole cards.
+func issueSessionKey(dispatcher runtime.MatchDispatcher, s *MatchState, userID string, p runtime.Presence) {
+	if s.SessionKeys == nil {
+		s.SessionKeys = map[string][]byte{}
+	}
+	key, ok := s.SessionKeys[userID]
+	if !ok {
+		key = make([]byte, 32)
+		if _, err := crand.Read(key); err != nil {
+			return
+		}
+		s.SessionKeys[userID] = key
+	}
+	msg, _ := json.Marshal(protocol.SessionKeyMessage{Key: base64.StdEncoding.EncodeToString(key)})
+	_ = dispatcher.BroadcastMessage(protocol.OpSessionKey, msg, []runtime.Presence{p}, nil, true)
+}
+
+// encryptForUser AES-256-GCM encrypts plaintext with the user's session key,
+// returning base64(nonce || ciphertext). Returns "" if no key (caller falls
+// back to plaintext).
+func encryptForUser(s *MatchState, userID string, plaintext []byte) string {
+	key, ok := s.SessionKeys[userID]
+	if !ok {
+		return ""
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return ""
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return ""
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := crand.Read(nonce); err != nil {
+		return ""
+	}
+	ct := gcm.Seal(nil, nonce, plaintext, nil)
+	return base64.StdEncoding.EncodeToString(append(nonce, ct...))
 }
 
 func (h *Handler) MatchLeave(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, presences []runtime.Presence) interface{} {
@@ -826,12 +878,18 @@ func dealPrivateCards(dispatcher runtime.MatchDispatcher, s *MatchState) {
 			continue
 		}
 		seat := seatForUser(s, userID)
-		msg := protocol.DealPrivateMessage{
-			Seat: seat,
-			Cards: []protocol.CardView{
-				{Code: cards[0].Code(), FaceUp: true},
-				{Code: cards[1].Code(), FaceUp: true},
-			},
+		cardViews := []protocol.CardView{
+			{Code: cards[0].Code(), FaceUp: true},
+			{Code: cards[1].Code(), FaceUp: true},
+		}
+		msg := protocol.DealPrivateMessage{Seat: seat}
+		// Encrypt the cards to the player's session key so the wire carries no
+		// plaintext card codes. Falls back to plaintext only if no key exists.
+		inner, _ := json.Marshal(map[string]interface{}{"cards": cardViews})
+		if enc := encryptForUser(s, userID, inner); enc != "" {
+			msg.Enc = enc
+		} else {
+			msg.Cards = cardViews
 		}
 		data, _ := json.Marshal(msg)
 		_ = dispatcher.BroadcastMessage(protocol.OpDealPrivate, data, []runtime.Presence{p}, nil, true)

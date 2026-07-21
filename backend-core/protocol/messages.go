@@ -51,8 +51,18 @@ type TableSnapshot struct {
 }
 
 type DealPrivateMessage struct {
-	Seat  int    `json:"seat"`
-	Cards []CardView `json:"cards"`
+	Seat  int        `json:"seat"`
+	Cards []CardView `json:"cards,omitempty"`
+	// Enc, when set, is base64(nonce || AES-256-GCM ciphertext) of the JSON
+	// {"cards":[...]} encrypted with the recipient's per-session key. The raw
+	// WebSocket frame then carries no plaintext card identities.
+	Enc string `json:"enc,omitempty"`
+}
+
+// SessionKeyMessage delivers a player's per-session AES key (base64) used to
+// decrypt their own hole cards. Sent only to that player on join.
+type SessionKeyMessage struct {
+	Key string `json:"key"`
 }
 
 type ActionRequiredMessage struct {

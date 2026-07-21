@@ -23,6 +23,7 @@ const (
 	OpBlindUpdate     int64 = 109
 	OpTournamentInfo  int64 = 110
 	OpChat            int64 = 111
+	OpSessionKey      int64 = 112
 )
 
 const (
