@@ -57,13 +57,19 @@ const (
 	StreetShowdown Street = "showdown"
 )
 
+// Variant identifies the poker game a table plays.
+const (
+	VariantHoldem = "holdem" // Texas Hold'em (2 hole cards, no-limit)
+	VariantPLO    = "plo"    // Pot-Limit Omaha (4 hole cards, pot-limit)
+)
+
 type Table struct {
 	Seats          [MaxSeats]*Seat
 	Deck           []Card
 	DeckOrder      []string
 	DeckCommitment string
 	Board          []Card
-	HoleCards   map[string][2]Card
+	HoleCards   map[string][]Card
 	Pot         int64
 	CurrentBet  int64
 	MinRaise    int64
@@ -72,16 +78,52 @@ type Table struct {
 	ActionSeat  int
 	HandNo      int
 	ActedThisRound map[int]bool
-	SeatCap        int // configured active seats (2..MaxSeats); 0 => default 6
+	SeatCap        int    // configured active seats (2..MaxSeats); 0 => default 6
+	Variant        string // "holdem" | "plo"; empty => holdem
+	PotLimit       bool   // cap raises to the pot size (PLO)
 }
 
 func NewTable() *Table {
 	return &Table{
-		HoleCards:      map[string][2]Card{},
+		HoleCards:      map[string][]Card{},
 		ActedThisRound: map[int]bool{},
 		Street:         StreetWaiting,
 		SeatCap:        6,
+		Variant:        VariantHoldem,
 	}
+}
+
+// SetVariant configures the game variant and its betting mode. Unknown values
+// fall back to Hold'em so existing tables are unaffected.
+func (t *Table) SetVariant(v string) {
+	switch v {
+	case VariantPLO:
+		t.Variant = VariantPLO
+		t.PotLimit = true
+	default:
+		t.Variant = VariantHoldem
+		t.PotLimit = false
+	}
+}
+
+// IsOmaha reports whether the table uses Omaha (4-card, must-use-2) evaluation.
+func (t *Table) IsOmaha() bool { return t.Variant == VariantPLO }
+
+// holeCount is how many hole cards each player is dealt for this variant.
+func (t *Table) holeCount() int {
+	if t.Variant == VariantPLO {
+		return 4
+	}
+	return 2
+}
+
+// potLimitMaxTotal is the largest total bet a raiser may commit under pot-limit
+// rules: their current bet + the pot after they call + a pot-sized raise. t.Pot
+// already includes every chip bet this street, so the pot after calling is
+// t.Pot + toCall and the max raise increment equals that — giving
+// s.Bet + t.Pot + 2*toCall.
+func (t *Table) potLimitMaxTotal(s *Seat, toCall int64) int64 {
+	return s.Bet + t.Pot + 2*toCall
 }
 
 // cap returns the configured number of active seats, clamped to [2, MaxSeats].
@@ -172,7 +214,7 @@ func (t *Table) StartHand(sb, bb int64) error {
 	t.DeckOrder = deckOrder
 	t.DeckCommitment = deckHash
 	t.Board = nil
-	t.HoleCards = map[string][2]Card{}
+	t.HoleCards = map[string][]Card{}
 	t.Pot = 0
 	t.CurrentBet = bb
 	t.MinRaise = bb
@@ -191,12 +233,15 @@ func (t *Table) StartHand(sb, bb int64) error {
 		t.ButtonSeat = t.nextSeated(t.ButtonSeat)
 	}
 
-	// Deal hole cards
+	// Deal hole cards (2 for Hold'em, 4 for PLO).
+	n := t.holeCount()
 	for _, idx := range seated {
 		s := t.Seats[idx]
-		c1 := t.draw()
-		c2 := t.draw()
-		t.HoleCards[s.UserID] = [2]Card{c1, c2}
+		hole := make([]Card, n)
+		for i := 0; i < n; i++ {
+			hole[i] = t.draw()
+		}
+		t.HoleCards[s.UserID] = hole
 		s.Status = SeatSeated
 		s.Bet = 0
 		s.LastAction = ""
@@ -314,6 +359,18 @@ func (t *Table) ApplyAction(seat int, action string, amount int64) error {
 		if action == "all_in" {
 			amount = s.Bet + s.Stack
 		}
+		// Pot-limit: no bet may exceed the pot. A shove above the cap becomes a
+		// pot-sized raise; an explicit raise above the cap is rejected.
+		if t.PotLimit {
+			maxTotal := t.potLimitMaxTotal(s, toCall)
+			if amount > maxTotal {
+				if action == "all_in" {
+					amount = maxTotal
+				} else {
+					return fmt.Errorf("raise exceeds pot limit")
+				}
+			}
+		}
 		raiseTotal := amount - s.Bet
 		if raiseTotal <= toCall {
 			return fmt.Errorf("raise too small")
@@ -428,6 +485,12 @@ func (t *Table) ValidActions(seat int) (actions []string, toCall, minRaise, maxR
 		toCall = 0
 	}
 	maxRaise = s.Bet + s.Stack
+	// Pot-limit caps the max raise to the pot size (still clamped by stack).
+	if t.PotLimit {
+		if capTotal := t.potLimitMaxTotal(s, toCall); capTotal < maxRaise {
+			maxRaise = capTotal
+		}
+	}
 	minRaise = t.CurrentBet + t.MinRaise
 	if minRaise < t.BigBlindAmount() {
 		minRaise = t.BigBlindAmount()

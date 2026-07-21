@@ -19,7 +19,8 @@ type ShowdownPlan struct {
 	Board             []Card
 	DeckOrder         []string
 	DeckCommitment    string
-	HoleCards         map[string][2]Card
+	HoleCards         map[string][]Card
+	Variant           string
 	Seats             [MaxSeats]*Seat
 	Pots              []SidePot
 	TotalPot          int64
@@ -42,6 +43,7 @@ func BuildShowdownPlan(t *Table, matchID string) ShowdownPlan {
 		DeckOrder:      append([]string(nil), t.DeckOrder...),
 		DeckCommitment: t.DeckCommitment,
 		HoleCards:      copyHoleCards(t.HoleCards),
+		Variant:        t.Variant,
 		TotalPot:  t.Pot,
 	}
 	for i, s := range t.Seats {
@@ -60,10 +62,10 @@ func BuildShowdownPlan(t *Table, matchID string) ShowdownPlan {
 	return plan
 }
 
-func copyHoleCards(src map[string][2]Card) map[string][2]Card {
-	out := make(map[string][2]Card, len(src))
+func copyHoleCards(src map[string][]Card) map[string][]Card {
+	out := make(map[string][]Card, len(src))
 	for k, v := range src {
-		out[k] = v
+		out[k] = append([]Card(nil), v...)
 	}
 	return out
 }
@@ -93,7 +95,7 @@ func computeShowdown(_ context.Context, plan ShowdownPlan) ShowdownResult {
 	resolutions := make([]PotResolution, 0, len(plan.Pots))
 	winnerGroups := make([][]int, 0, len(plan.Pots))
 	for i, pot := range plan.Pots {
-		winners, err := winnersAmong(pot.Eligible, plan.HoleCards, plan.Board, plan.Seats)
+		winners, err := winnersAmong(pot.Eligible, plan.HoleCards, plan.Board, plan.Seats, plan.Variant == VariantPLO)
 		if err != nil {
 			return ShowdownResult{Err: err}
 		}
@@ -119,6 +121,7 @@ func handCategoryFromPlan(seat int, plan ShowdownPlan) (string, error) {
 		Board:     plan.Board,
 		HoleCards: plan.HoleCards,
 		Seats:     plan.Seats,
+		Variant:   plan.Variant,
 	}
 	return HandCategory(seat, t)
 }

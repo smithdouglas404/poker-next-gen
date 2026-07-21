@@ -9,6 +9,7 @@ import (
 	"github.com/heroiclabs/nakama-common/runtime"
 
 	"github.com/smithdouglas404/poker-next-gen/backend-core/billing"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/poker"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/protocol"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
@@ -63,6 +64,11 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		numBots = maxSeats - 1
 	}
 
+	variant := poker.VariantHoldem
+	if req.Variant == poker.VariantPLO {
+		variant = poker.VariantPLO
+	}
+
 	matchID, err := nk.MatchCreate(ctx, protocol.MatchModule, map[string]interface{}{
 		"room_id":     roomID,
 		"small_blind": sb,
@@ -70,6 +76,7 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		"buy_in":      buyIn,
 		"max_seats":   maxSeats,
 		"num_bots":    numBots,
+		"variant":     variant,
 	})
 	if err != nil {
 		return "", err
