@@ -76,6 +76,30 @@ func (s *ClubStore) CountOwnedClubs(ctx context.Context, userID string) (int, er
 	return n, err
 }
 
+// ClubsAdministeredBy returns the IDs of active clubs the user can configure
+// (owner, or an operator with can_configure) — the set of clubs whose admin
+// actions should be surfaced to this user.
+func (s *ClubStore) ClubsAdministeredBy(ctx context.Context, userID string) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT o.club_id FROM poker_owner o
+		JOIN poker_club c ON c.id=o.club_id AND c.is_active
+		WHERE o.user_id=$1 AND (o.can_configure OR o.role='owner')
+		ORDER BY o.club_id`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
 // CountMembers returns the number of members in a club (poker_club_member).
 // Used to enforce the tier's member limit on join.
 func (s *ClubStore) CountMembers(ctx context.Context, clubID string) (int, error) {

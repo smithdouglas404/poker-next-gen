@@ -6,6 +6,7 @@ import { useCallback, useMemo, useState } from "react";
 import { COMMAND_REGISTRY, commandsByCategory, getCommand } from "./commandRegistry";
 import type { CommandCategory, CommandDefinition, CommandResult } from "./types";
 import { CATEGORY_META } from "./types";
+import { canSeeCommand, useMeRoles } from "./useMeRoles";
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 
 const CATEGORY_ORDER: CommandCategory[] = [
@@ -133,6 +134,7 @@ function CommandCard({
 }
 
 export function CommandCenter() {
+  const roles = useMeRoles();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [activeCommand, setActiveCommand] = useState<CommandDefinition | null>(null);
   const [formJson, setFormJson] = useState("");
@@ -359,12 +361,14 @@ export function CommandCenter() {
             >
               Sign In →
             </Link>
-            <Link
-              href="/admin"
-              className="rounded-xl border border-amber-500/40 bg-amber-950/20 px-5 py-3 text-sm font-semibold text-amber-200 hover:bg-amber-900/20"
-            >
-              Admin →
-            </Link>
+            {roles.platform_admin && (
+              <Link
+                href="/admin"
+                className="rounded-xl border border-amber-500/40 bg-amber-950/20 px-5 py-3 text-sm font-semibold text-amber-200 hover:bg-amber-900/20"
+              >
+                Admin →
+              </Link>
+            )}
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-4 py-3 text-center">
               <p className="text-2xl font-bold text-emerald-300">{stats.live}</p>
               <p className="text-[10px] uppercase tracking-wider text-neutral-400">Live Commands</p>
@@ -376,7 +380,8 @@ export function CommandCenter() {
       <main className="mx-auto max-w-6xl px-6 py-10">
         {CATEGORY_ORDER.map((category) => {
           const meta = CATEGORY_META[category];
-          const commands = commandsByCategory(category);
+          const commands = commandsByCategory(category).filter((c) => canSeeCommand(c, roles));
+          if (commands.length === 0) return null;
           return (
             <section key={category} className="mb-12">
               <div className={`mb-5 rounded-2xl border p-5 ${meta.accent}`}>

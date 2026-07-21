@@ -85,6 +85,7 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
     status: "live",
     rpc: "club_owner_add",
     icon: "♦",
+    requires: "club_admin",
     example: { club_id: "club_123", user_id: "user-id", role: "manager", equity_bps: 2500 },
   },
   {
@@ -95,6 +96,7 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
     status: "live",
     rpc: "balance_allocate",
     icon: "♠",
+    requires: "club_admin",
     example: { club_id: "club_123", user_id: "user-id", balance: 100000, currency: "USD" },
   },
   {
@@ -115,6 +117,7 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
     status: "live",
     rpc: "rake_config_set",
     icon: "♥",
+    requires: "club_admin",
     example: { club_id: "club_123", name: "Standard", percent_bps: 500, cap_minor: 500 },
   },
   {
