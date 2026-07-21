@@ -1,5 +1,5 @@
-import { CommandCenter } from "@/features/commands/CommandCenter";
+import { Landing } from "@/features/marketing/Landing";
 
 export default function Home() {
-  return <CommandCenter />;
+  return <Landing />;
 }

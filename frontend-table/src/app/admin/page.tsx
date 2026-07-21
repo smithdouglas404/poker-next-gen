@@ -54,7 +54,7 @@ export default function AdminPage() {
             <p className="text-xs uppercase tracking-[0.3em] text-amber-300/80">Admin</p>
             <h1 className="mt-1 text-3xl font-semibold">Platform Dashboard</h1>
           </div>
-          <Link href="/" className="text-sm text-emerald-400 hover:underline">
+          <Link href="/hub" className="text-sm text-emerald-400 hover:underline">
             ← Command Center
           </Link>
         </div>
@@ -98,7 +98,7 @@ export default function AdminPage() {
             {clubs.length === 0 && (
               <p className="text-sm text-neutral-500">
                 No clubs yet. Create one from the{" "}
-                <Link href="/" className="text-emerald-400 hover:underline">
+                <Link href="/hub" className="text-emerald-400 hover:underline">
                   Command Center
                 </Link>
                 .

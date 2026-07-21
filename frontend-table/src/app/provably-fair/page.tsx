@@ -51,7 +51,7 @@ export default function ProvablyFairPage() {
         <div className="mx-auto flex max-w-5xl flex-col gap-3">
           <div className="flex items-center justify-between">
             <SectionHeader>Provably fair</SectionHeader>
-            <Link href="/" className="text-sm text-cyan hover:underline">← Command Center</Link>
+            <Link href="/hub" className="text-sm text-cyan hover:underline">← Command Center</Link>
           </div>
           <h1 className="font-display text-4xl font-bold md:text-5xl">
             Where every hand is{" "}

@@ -98,7 +98,7 @@ export default function TournamentsPage() {
             <p className="text-xs uppercase tracking-[0.3em] text-violet-300/80">Tournaments</p>
             <h1 className="mt-1 text-3xl font-semibold">MTT Lobby</h1>
           </div>
-          <Link href="/" className="text-sm text-emerald-400 hover:underline">
+          <Link href="/hub" className="text-sm text-emerald-400 hover:underline">
             ← Command Center
           </Link>
         </div>

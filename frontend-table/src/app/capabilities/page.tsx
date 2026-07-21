@@ -81,7 +81,7 @@ export default function CapabilitiesPage() {
         <div className="mx-auto flex max-w-6xl flex-col gap-4">
           <div className="flex items-center justify-between">
             <SectionHeader>What sets us apart</SectionHeader>
-            <Link href="/" className="text-sm text-cyan hover:underline">
+            <Link href="/hub" className="text-sm text-cyan hover:underline">
               ← Command Center
             </Link>
           </div>

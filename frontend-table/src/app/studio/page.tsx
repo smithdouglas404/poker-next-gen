@@ -112,7 +112,7 @@ export default function StudioPage() {
             <SectionHeader>Character Studio</SectionHeader>
             <h1 className="font-display mt-1 text-3xl font-bold">Generate your character</h1>
           </div>
-          <Link href="/" className="text-sm text-cyan hover:underline">
+          <Link href="/hub" className="text-sm text-cyan hover:underline">
             ← Command Center
           </Link>
         </div>

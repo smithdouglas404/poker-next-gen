@@ -101,7 +101,7 @@ export default function ClubsPage() {
             <SectionHeader>Clubs</SectionHeader>
             <h1 className="font-display mt-1 text-3xl font-bold">Private Clubs</h1>
           </div>
-          <Link href="/" className="text-sm text-cyan hover:underline">
+          <Link href="/hub" className="text-sm text-cyan hover:underline">
             ← Command Center
           </Link>
         </div>
