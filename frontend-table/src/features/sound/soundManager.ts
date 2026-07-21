@@ -302,6 +302,134 @@ class SoundManager {
       );
     }
   }
+
+  // ── Voice taunts ───────────────────────────────────────────────────────────
+
+  /**
+   * Play a character voice taunt, trying each candidate URL until one loads.
+   * Uses a plain HTMLAudio element (no decode) and follows the SFX mute state.
+   */
+  playTaunt(urls: string[], volume = 0.9): void {
+    if (this.isMuted() || typeof window === "undefined" || urls.length === 0) return;
+    const tryAt = (i: number) => {
+      if (i >= urls.length) return;
+      const audio = new Audio(urls[i]);
+      audio.volume = Math.max(0, Math.min(1, volume));
+      audio.play().catch(() => tryAt(i + 1));
+    };
+    tryAt(0);
+  }
+
+  // ── Background music ───────────────────────────────────────────────────────
+
+  private bgmAudio: HTMLAudioElement | null = null;
+  private bgmUrl = "";
+  private bgmVol = 0.35;
+  private bgmOn = false;
+  private bgmHydrated = false;
+  private bgmListeners = new Set<() => void>();
+
+  private hydrateBgm(): void {
+    if (this.bgmHydrated || typeof window === "undefined") return;
+    this.bgmHydrated = true;
+    try {
+      this.bgmUrl = window.localStorage.getItem("poker.bgm.url") ?? "";
+      const v = window.localStorage.getItem("poker.bgm.vol");
+      if (v !== null) this.bgmVol = parseFloat(v);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  subscribeBgm(fn: () => void): () => void {
+    this.bgmListeners.add(fn);
+    return () => this.bgmListeners.delete(fn);
+  }
+
+  private emitBgm(): void {
+    this.bgmListeners.forEach((fn) => fn());
+  }
+
+  getBgmUrl(): string {
+    this.hydrateBgm();
+    return this.bgmUrl;
+  }
+  getBgmVolume(): number {
+    this.hydrateBgm();
+    return this.bgmVol;
+  }
+  isBgmPlaying(): boolean {
+    return this.bgmOn;
+  }
+
+  setBgmVolume(v: number): void {
+    this.hydrateBgm();
+    this.bgmVol = Math.max(0, Math.min(1, v));
+    if (this.bgmAudio) this.bgmAudio.volume = this.bgmVol;
+    try {
+      window.localStorage.setItem("poker.bgm.vol", String(this.bgmVol));
+    } catch {
+      /* ignore */
+    }
+    this.emitBgm();
+  }
+
+  /** Select a track (URL). Restarts playback if already playing. */
+  setBgmTrack(url: string): void {
+    this.hydrateBgm();
+    this.bgmUrl = url;
+    try {
+      window.localStorage.setItem("poker.bgm.url", url);
+    } catch {
+      /* ignore */
+    }
+    if (this.bgmOn) {
+      this.stopBgm();
+      if (url) this.playBgm();
+    }
+    this.emitBgm();
+  }
+
+  playBgm(): void {
+    this.hydrateBgm();
+    if (typeof window === "undefined" || !this.bgmUrl) return;
+    if (!this.bgmAudio || this.bgmAudio.src.indexOf(this.bgmUrl) === -1) {
+      this.stopBgm();
+      this.bgmAudio = new Audio(this.bgmUrl);
+      this.bgmAudio.loop = true;
+      this.bgmAudio.addEventListener("error", () => {
+        this.bgmOn = false;
+        this.emitBgm();
+      });
+    }
+    this.bgmAudio.volume = this.bgmVol;
+    this.bgmAudio
+      .play()
+      .then(() => {
+        this.bgmOn = true;
+        this.emitBgm();
+      })
+      .catch(() => {
+        this.bgmOn = false;
+        this.emitBgm();
+      });
+  }
+
+  stopBgm(): void {
+    if (this.bgmAudio) {
+      this.bgmAudio.pause();
+      this.bgmAudio.src = "";
+      this.bgmAudio = null;
+    }
+    this.bgmOn = false;
+    this.emitBgm();
+  }
+
+  toggleBgm(): boolean {
+    if (this.bgmOn) this.stopBgm();
+    else this.playBgm();
+    return this.bgmOn;
+  }
 }
 
 /** Process-wide singleton shared by every hook/component. */

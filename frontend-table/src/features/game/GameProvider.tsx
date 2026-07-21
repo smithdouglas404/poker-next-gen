@@ -46,6 +46,17 @@ import {
 import { ensureSession } from "@/lib/nakama/auth";
 import { createNakamaClient, type Session, type Socket } from "@/lib/nakama/client";
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
+import { soundManager } from "@/features/sound/soundManager";
+import { tauntByKey, tauntUrls } from "@/features/sound/library";
+import { avatarForKey } from "@/features/table/avatars";
+
+/** Voice taunts ride the chat channel using a printable marker (control chars
+ *  are stripped server-side, so this survives sanitization). */
+const TAUNT_MARKER = /^::taunt:([a-z0-9-]{1,32})::$/;
+function parseTauntMarker(text: string): { key: string } | null {
+  const m = TAUNT_MARKER.exec(text.trim());
+  return m ? { key: m[1] } : null;
+}
 
 interface GameContextValue extends GameState {
   connect: () => Promise<void>;
@@ -68,6 +79,7 @@ interface GameContextValue extends GameState {
   setBuyInCents: (cents: number) => void;
   setPreviewSeats: (n: number) => void;
   sendChat: (text: string) => Promise<void>;
+  sendTaunt: (key: string) => Promise<void>;
   addBot: () => Promise<void>;
 }
 
@@ -162,7 +174,22 @@ export function GameProvider({ children }: { children: ReactNode }) {
           }
           case OpChat: {
             const chat = payload as ChatMessage;
-            setChatMessages((prev) => [...prev.slice(-99), chat]);
+            const taunt = parseTauntMarker(chat.text);
+            if (taunt) {
+              // A voice taunt piggybacked on chat: play the sender's character
+              // voice for everyone, and show a friendly emote line instead of the
+              // raw marker.
+              const character = avatarForKey(chat.user_id || `seat-${chat.seat}`);
+              soundManager.playTaunt(tauntUrls(character, taunt.key));
+              const meta = tauntByKey(taunt.key);
+              const nice: ChatMessage = {
+                ...chat,
+                text: meta ? `${meta.emoji} ${meta.label}` : taunt.key,
+              };
+              setChatMessages((prev) => [...prev.slice(-99), nice]);
+            } else {
+              setChatMessages((prev) => [...prev.slice(-99), chat]);
+            }
             break;
           }
           case OpError:
@@ -321,6 +348,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
     [sendMatch, matchId],
   );
 
+  const sendTaunt = useCallback(
+    async (key: string) => {
+      if (!matchId) return;
+      await sendMatch(OpChatSend, { text: `::taunt:${key}::` });
+    },
+    [sendMatch, matchId],
+  );
+
   const findMatch = useCallback(async () => {
     const socket = socketRef.current;
     if (!socket) return;
@@ -413,6 +448,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setBuyInCents,
       setPreviewSeats,
       sendChat,
+      sendTaunt,
       addBot,
     }),
     [
@@ -445,6 +481,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setBuyInCents,
       setPreviewSeats,
       sendChat,
+      sendTaunt,
       addBot,
     ],
   );
