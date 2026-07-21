@@ -119,6 +119,30 @@ export default function MembershipPage() {
     [interval],
   );
 
+  const [depositAmount, setDepositAmount] = useState("25");
+  const depositCrypto = useCallback(async () => {
+    setBusy("deposit");
+    setMessage(null);
+    setError(null);
+    try {
+      const cents = Math.round(parseFloat(depositAmount || "0") * 100);
+      const res = (await callSessionRpc("wallet_deposit_crypto", { amount_cents: cents })) as {
+        configured?: boolean;
+        invoice_url?: string;
+        message?: string;
+      };
+      if (res.configured && res.invoice_url) {
+        window.location.href = res.invoice_url;
+        return;
+      }
+      setMessage(res.message ?? "Crypto deposits are not configured yet.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Deposit failed");
+    } finally {
+      setBusy(null);
+    }
+  }, [depositAmount]);
+
   const currentTier = status?.subscription.tier ?? "free";
 
   return (
@@ -268,6 +292,35 @@ export default function MembershipPage() {
               </div>
             );
           })}
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl">
+          <h2 className="text-lg font-black uppercase tracking-wider text-amber-200">Add funds — crypto</h2>
+          <p className="mt-1 text-xs text-neutral-400">
+            Fund your wallet with 200+ cryptocurrencies via NOWPayments. Requires a paid
+            membership. Your balance is credited automatically once the payment confirms on-chain.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-black/50 px-3 py-2">
+              <span className="text-neutral-500">$</span>
+              <input
+                type="number"
+                min={5}
+                step={5}
+                value={depositAmount}
+                onChange={(e) => setDepositAmount(e.target.value)}
+                className="w-24 bg-transparent text-white focus:outline-none"
+              />
+            </div>
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void depositCrypto()}
+              className="rounded-xl bg-gradient-to-r from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad] px-5 py-2.5 text-sm font-bold text-black transition hover:shadow-[0_0_20px_rgba(212,175,55,0.3)] disabled:opacity-40"
+            >
+              {busy === "deposit" ? "Starting…" : "Deposit with crypto →"}
+            </button>
+          </div>
         </section>
       </main>
     </div>

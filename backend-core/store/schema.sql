@@ -212,3 +212,20 @@ CREATE TABLE IF NOT EXISTS poker_kyc (
     provider TEXT NOT NULL DEFAULT '',
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Wallet deposits (crypto/fiat funding). One row per initiated deposit; the
+-- gateway webhook flips status to 'credited' exactly once (idempotent), which
+-- is when the Nakama wallet is credited.
+CREATE TABLE IF NOT EXISTS poker_deposit (
+    id TEXT PRIMARY KEY,                    -- our order_id
+    user_id TEXT NOT NULL,
+    amount_cents BIGINT NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'usd',
+    gateway TEXT NOT NULL DEFAULT '',
+    gateway_payment_id TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending', -- pending | waiting | credited | failed
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_deposit_user ON poker_deposit(user_id, created_at DESC);

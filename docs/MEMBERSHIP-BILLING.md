@@ -60,9 +60,47 @@ Subscribe to: `checkout.session.completed`, `invoice.paid`,
 `/membership` — pricing grid (monthly/annual), current plan, Upgrade → Stripe
 Checkout. Linked from the Command Center.
 
-## Not yet wired (follow-ups)
+## Tier enforcement (wired)
 
-- Enforce tier limits at the gates (club create/member caps, table stakes vs
-  `max_big_blind_cents`, multi-table). The catalog values are in place; the
-  enforcement calls are the next step.
-- KYC gating for Gold/Platinum, rakeback payout, daily bonus.
+Gates read the caller's subscription tier and reject over-limit actions:
+
+- `club_create` — club-create limit (owned-club count vs tier; 0 = cannot
+  create, -1 = unlimited).
+- `club_owner_add` — club member cap (using the club owner's tier).
+- `table_create` — big blind capped to `EffectiveMaxBigBlindCents(tier)` (free
+  plays the default $1/$2; platinum = unlimited).
+
+Still cosmetic (follow-ups): multi-table limit, rakeback payout, daily bonus.
+
+## KYC
+
+- `poker_kyc` table + `store/kyc.go`. RPCs: `kyc_status`, `kyc_submit`
+  (manual → `pending`), `kyc_verify_admin` (`ADMIN_USER_IDS`-gated verify/reject).
+- **Gold/Platinum checkout requires `status = verified`** — `subscription_checkout`
+  returns `{kyc_required:true}` otherwise. `/membership` shows the KYC banner + a
+  "Verify identity" action.
+- A live provider (Didit/Sumsub) can later call the same `SetStatus` path from its
+  verified webhook.
+
+## Crypto deposits (NOWPayments)
+
+Fund the Nakama wallet with crypto — env-gated, dormant without keys.
+
+- `wallet_deposit_crypto` (user) — records a **pending** `poker_deposit`, creates a
+  hosted NOWPayments invoice, returns `invoice_url`. Requires a paid membership
+  (free tier's daily deposit limit is $0) and caps the amount to the tier's daily
+  limit.
+- `nowpayments_webhook` (http_key) — verifies the `x-nowpayments-sig` HMAC-SHA512,
+  then credits the wallet **exactly once** (idempotent `MarkCredited` transaction)
+  on `finished`/`confirmed`. The wallet is never credited from the client.
+- `/membership` has an "Add funds — crypto" panel.
+
+### Env (crypto)
+
+- `NOWPAYMENTS_API_KEY` — enables crypto deposits.
+- `NOWPAYMENTS_IPN_SECRET` — required to accept IPN callbacks.
+- `NOWPAYMENTS_IPN_CALLBACK_URL` — the webhook URL NOWPayments should call:
+  `https://<backend-core-host>/v2/rpc/nowpayments_webhook?http_key=<NAKAMA_HTTP_KEY>&unwrap`
+
+Follow-up: daily-deposit-sum tracking (limits are currently per-transaction), fiat
+card deposits, withdrawals.
