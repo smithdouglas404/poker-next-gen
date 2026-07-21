@@ -6,56 +6,21 @@ import { DEFAULT_MAX_SEATS, MAX_SEATS, MIN_SEATS, type SeatView } from "@/featur
 import { formatCents, useGame } from "@/features/game/GameProvider";
 import { computeTableLayout } from "@/features/table/tableLayout";
 import { getSeatPositions } from "@/features/table/seatLayout";
-import { avatarDef, avatarForKey, avatarGradient, avatarSrc } from "@/features/table/avatars";
-
-/** A glowing character portrait for a seated player (falls back to a monogram). */
-function AvatarPortrait({ name, identity, hero }: { name?: string; identity: string; hero: boolean }) {
-  const [failed, setFailed] = useState(false);
-  const monogram = (name?.slice(0, 2).toUpperCase() ?? "??");
-  const def = avatarDef(avatarForKey(identity));
-  // The hero is always framed in gold; everyone else wears their character's neon color.
-  const ring = hero ? "#fbbf24" : def.border;
-  const glow = hero ? "rgba(251,191,36,0.7)" : def.glow;
-  return (
-    <div className="relative h-14 w-14">
-      {/* neon glow ring, tinted to the character */}
-      <div
-        className="absolute -inset-1 rounded-full blur-[7px]"
-        style={{ backgroundColor: glow }}
-      />
-      <div
-        className="relative h-14 w-14 overflow-hidden rounded-full"
-        style={{ boxShadow: `0 0 0 2px ${ring}, 0 0 12px ${glow}` }}
-      >
-        {failed ? (
-          <div
-            className="flex h-full w-full items-center justify-center text-sm font-bold text-white"
-            style={{ background: avatarGradient(identity) }}
-          >
-            {monogram}
-          </div>
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={avatarSrc(def.id)}
-            alt={name ?? "player"}
-            onError={() => setFailed(true)}
-            className="h-full w-full object-cover"
-          />
-        )}
-      </div>
-    </div>
-  );
-}
+import { avatarDef, avatarForKey } from "@/features/table/avatars";
+import { Character3D } from "@/features/table/Character3D";
 
 function SeatCard({
   seat,
   buyInLabel,
   onSit,
+  active,
+  winner,
 }: {
   seat: SeatView;
   buyInLabel: string;
   onSit: () => void;
+  active?: boolean;
+  winner?: boolean;
 }) {
   const empty = seat.status === "empty" || !seat.user_id;
 
@@ -78,13 +43,21 @@ function SeatCard({
   const def = avatarDef(avatarForKey(identity));
   const accent = seat.is_hero ? "#fbbf24" : def.border;
   const glow = seat.is_hero ? "rgba(251,191,36,0.35)" : def.glow;
+  const folded = (seat.last_action ?? "").toLowerCase() === "fold";
 
   return (
     <div
       className="flex w-36 flex-col items-center rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3 py-3 backdrop-blur-xl"
       style={{ boxShadow: `0 0 0 1px ${accent}55, 0 8px 26px ${glow}` }}
     >
-      <AvatarPortrait name={seat.username} identity={identity} hero={!!seat.is_hero} />
+      <Character3D
+        identity={identity}
+        name={seat.username}
+        hero={!!seat.is_hero}
+        active={active}
+        winner={winner}
+        folded={folded}
+      />
       <p
         className="mt-2 max-w-full truncate text-sm font-bold tracking-wide"
         style={{ color: seat.is_hero ? "#fde68a" : "#ffffff" }}
@@ -115,8 +88,11 @@ function SeatCard({
  * count (2–9) and rescale correctly on resize — no hardcoded per-count layouts.
  */
 export function SeatHud() {
-  const { snapshot, sitDown, profile, buyInCents, maxSeats } = useGame();
+  const { snapshot, sitDown, profile, buyInCents, maxSeats, showdown } = useGame();
   const buyInLabel = formatCents(buyInCents);
+
+  const activeSeat = snapshot?.action_seat;
+  const winnerSeats = new Set((showdown?.winners ?? []).map((w) => w.seat));
 
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
   useEffect(() => {
@@ -162,6 +138,8 @@ export function SeatHud() {
                 seat={{ ...seat, is_hero: seat.index === heroSeat }}
                 buyInLabel={buyInLabel}
                 onSit={() => void sitDown(seat.index, buyInCents)}
+                active={activeSeat === seat.index && seat.status !== "empty"}
+                winner={winnerSeats.has(seat.index)}
               />
             </div>
           );
