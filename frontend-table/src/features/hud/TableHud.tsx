@@ -10,6 +10,7 @@ import { EquityPanel } from "@/features/hud/EquityPanel";
 import { HandVerifyPanel } from "@/features/hud/HandVerifyPanel";
 import { BuyInSlider, TableLog } from "@/features/hud/TableLog";
 import { ChatPanel } from "@/features/hud/ChatPanel";
+import { HandHistoryPanel } from "@/features/hud/HandHistoryPanel";
 import { MusicPicker } from "@/features/sound/MusicPicker";
 import { TauntBar } from "@/features/sound/TauntBar";
 import { usePokerKeyboard } from "@/features/hud/usePokerKeyboard";
@@ -36,6 +37,7 @@ export function TableHud({ children }: { children: React.ReactNode }) {
             <HandVerifyPanel />
             <TableLog />
             <ChatPanel />
+            <HandHistoryPanel />
             <TauntBar />
             <MusicPicker />
           </div>
