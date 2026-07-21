@@ -122,6 +122,16 @@ func (s *SubscriptionStore) Grant(ctx context.Context, userID, tier string, mont
 	}, nil
 }
 
+// SubscriptionTier is a convenience returning the user's current (post-expiry)
+// tier id, defaulting to "free" on any error. Handy for inline tier gates.
+func SubscriptionTier(ctx context.Context, db *sql.DB, userID string) string {
+	sub, err := NewSubscriptionStore(db).Get(ctx, userID)
+	if err != nil || sub.Tier == "" {
+		return "free"
+	}
+	return sub.Tier
+}
+
 // FindByStripeSubscription resolves the local user for a Stripe subscription id
 // (used by the webhook on renewal/cancel events).
 func (s *SubscriptionStore) FindByStripeSubscription(ctx context.Context, subscriptionID string) (string, error) {

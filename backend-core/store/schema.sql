@@ -200,3 +200,15 @@ CREATE TABLE IF NOT EXISTS poker_subscription_ledger (
 );
 
 CREATE INDEX IF NOT EXISTS idx_poker_subscription_ledger_user ON poker_subscription_ledger(user_id, created_at DESC);
+
+-- KYC / identity verification state. Server writes status; clients submit data
+-- and read status. Verified status gates high tiers + real-money deposits.
+CREATE TABLE IF NOT EXISTS poker_kyc (
+    user_id TEXT PRIMARY KEY,
+    level TEXT NOT NULL DEFAULT 'none',
+    status TEXT NOT NULL DEFAULT 'none',   -- none | pending | verified | rejected
+    data JSONB NOT NULL DEFAULT '{}',
+    rejection_reason TEXT NOT NULL DEFAULT '',
+    provider TEXT NOT NULL DEFAULT '',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

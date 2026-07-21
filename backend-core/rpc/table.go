@@ -8,7 +8,9 @@ import (
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
+	"github.com/smithdouglas404/poker-next-gen/backend-core/billing"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/protocol"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
 
 func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
@@ -30,6 +32,17 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 	if req.BuyIn > 0 {
 		buyIn = req.BuyIn
 	}
+
+	// Tier gate: cap the big blind to what the caller's plan allows. Free plays
+	// the default $1/$2; higher stakes require an upgrade (platinum = unlimited).
+	if userID, uerr := callerID(ctx); uerr == nil {
+		tier := store.SubscriptionTier(ctx, db, userID)
+		if maxBB := billing.EffectiveMaxBigBlindCents(tier); bb > maxBB {
+			return "", runtime.NewError(
+				fmt.Sprintf("stakes exceed your plan (max big blind %d¢) — upgrade to play higher", maxBB), 7)
+		}
+	}
+
 	roomID := req.Name
 	if roomID == "" {
 		roomID = fmt.Sprintf("table-%d", sb)

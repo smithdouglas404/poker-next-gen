@@ -65,6 +65,25 @@ func (s *ClubStore) AddOwner(ctx context.Context, o *models.Owner) error {
 	return err
 }
 
+// CountOwnedClubs returns how many active clubs the user owns (role='owner').
+// Used to enforce the tier's club-create limit.
+func (s *ClubStore) CountOwnedClubs(ctx context.Context, userID string) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM poker_owner o
+		JOIN poker_club c ON c.id=o.club_id AND c.is_active
+		WHERE o.user_id=$1 AND o.role='owner'`, userID).Scan(&n)
+	return n, err
+}
+
+// CountMembers returns the number of owner/manager rows in a club (the current
+// membership model). Used to enforce the tier's member limit on add.
+func (s *ClubStore) CountMembers(ctx context.Context, clubID string) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM poker_owner WHERE club_id=$1`, clubID).Scan(&n)
+	return n, err
+}
+
 func (s *ClubStore) ListOwners(ctx context.Context, clubID string) ([]models.Owner, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT id,club_id,user_id,role,equity_bps,can_configure,created_at,updated_at FROM poker_owner WHERE club_id=$1`, clubID)
 	if err != nil {

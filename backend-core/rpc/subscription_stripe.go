@@ -51,6 +51,19 @@ func SubscriptionCheckout(ctx context.Context, logger runtime.Logger, db *sql.DB
 	if req.Interval != "year" {
 		req.Interval = "month"
 	}
+
+	// KYC gate: Gold/Platinum require a verified identity (matches the
+	// subscription/KYC model). Bronze/Silver do not.
+	if req.Tier == "gold" || req.Tier == "platinum" {
+		if !store.NewKYCStore(db).IsVerified(ctx, userID) {
+			out, _ := json.Marshal(map[string]interface{}{
+				"configured":   stripeConfigured(),
+				"kyc_required": true,
+				"message":      "Identity verification is required for Gold and Platinum. Complete KYC first.",
+			})
+			return string(out), nil
+		}
+	}
 	if !stripeConfigured() {
 		out, _ := json.Marshal(map[string]interface{}{
 			"configured": false,

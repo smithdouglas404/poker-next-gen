@@ -69,6 +69,9 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"subscription_checkout": rpc.SubscriptionCheckout,
 		"subscription_grant_admin": rpc.SubscriptionGrantAdmin,
 		"stripe_webhook":       rpc.StripeWebhook,
+		"kyc_status":           rpc.KycStatus,
+		"kyc_submit":           rpc.KycSubmit,
+		"kyc_verify_admin":     rpc.KycVerifyAdmin,
 	}
 	for id, fn := range rpcs {
 		if err := initializer.RegisterRpc(id, fn); err != nil {

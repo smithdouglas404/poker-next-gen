@@ -8,6 +8,7 @@ import (
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
+	"github.com/smithdouglas404/poker-next-gen/backend-core/billing"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/models"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
@@ -63,8 +64,26 @@ func ClubCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 	}
 	club.IsActive = true
 
-	userID, _ := ctx.Value(runtime.RUNTIME_CTX_USER_ID).(string)
+	userID, err := callerID(ctx)
+	if err != nil {
+		return "", err
+	}
 	clubStore := store.NewClubStore(db)
+
+	// Tier gate: enforce the caller's club-create limit.
+	tier := store.SubscriptionTier(ctx, db, userID)
+	owned, err := clubStore.CountOwnedClubs(ctx, userID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	if !billing.CanCreateClub(tier, owned) {
+		def := billing.GetTierDef(tier)
+		if def.ClubCreateLimit == 0 {
+			return "", runtime.NewError("your plan cannot create clubs — upgrade to create one", 7)
+		}
+		return "", runtime.NewError("club limit reached for your plan — upgrade for more", 7)
+	}
+
 	if err := clubStore.Create(ctx, &club); err != nil {
 		logger.Error("club create: %v", err)
 		return "", runtime.NewError("failed to create club", 13)
@@ -83,6 +102,21 @@ func ClubCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		return "", err
 	}
 	return string(out), nil
+}
+
+// clubOwnerTier returns the subscription tier of a club's primary owner
+// (role='owner'), defaulting to free.
+func clubOwnerTier(ctx context.Context, db *sql.DB, clubID string) string {
+	owners, err := store.NewClubStore(db).ListOwners(ctx, clubID)
+	if err != nil {
+		return "free"
+	}
+	for _, o := range owners {
+		if o.Role == "owner" {
+			return store.SubscriptionTier(ctx, db, o.UserID)
+		}
+	}
+	return "free"
 }
 
 func ClubList(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
@@ -108,7 +142,20 @@ func ClubOwnerAdd(ctx context.Context, logger runtime.Logger, db *sql.DB, nk run
 	if req.Role == "" {
 		req.Role = "manager"
 	}
-	if err := store.NewClubStore(db).AddOwner(ctx, &req); err != nil {
+	clubStore := store.NewClubStore(db)
+
+	// Tier gate: enforce the club owner's member cap.
+	ownerTier := clubOwnerTier(ctx, db, req.ClubID)
+	memberCap := billing.ClubMemberCap(ownerTier)
+	count, err := clubStore.CountMembers(ctx, req.ClubID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	if int64(count) >= memberCap {
+		return "", runtime.NewError("club member limit reached for the owner's plan — upgrade for more", 7)
+	}
+
+	if err := clubStore.AddOwner(ctx, &req); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	out, _ := json.Marshal(req)

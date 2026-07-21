@@ -153,3 +153,42 @@ func IsValidTier(id string) bool {
 func IsPaidTier(id string) bool {
 	return IsValidTier(id) && id != "free"
 }
+
+// Unlimited is the effective cap used where a tier field of 0 means "no limit"
+// (e.g. platinum stakes) and for unlimited (-1) club limits.
+const Unlimited int64 = 1<<62 - 1
+
+// EffectiveMaxBigBlindCents returns the highest big blind (in cents) a tier may
+// sit at. Platinum (catalog value 0) is unlimited. Free (catalog value 0, but
+// "play chips only") is given a modest play cap so default $1/$2 tables keep
+// working while real stakes require an upgrade.
+func EffectiveMaxBigBlindCents(id string) int64 {
+	def := GetTierDef(id)
+	if id == "platinum" {
+		return Unlimited
+	}
+	if def.MaxBigBlindCents <= 0 {
+		return 200 // free: default play stake ($2 BB)
+	}
+	return def.MaxBigBlindCents
+}
+
+// CanCreateClub reports whether a user on `tier` who already owns `owned` clubs
+// may create another (-1 = unlimited, 0 = cannot create).
+func CanCreateClub(id string, owned int) bool {
+	limit := GetTierDef(id).ClubCreateLimit
+	if limit < 0 {
+		return true
+	}
+	return owned < limit
+}
+
+// ClubMemberCap returns the member limit for a club owned by `tier`
+// (-1 = unlimited → Unlimited).
+func ClubMemberCap(id string) int64 {
+	limit := GetTierDef(id).ClubMemberLimit
+	if limit < 0 {
+		return Unlimited
+	}
+	return int64(limit)
+}
