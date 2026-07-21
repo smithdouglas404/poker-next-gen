@@ -9,6 +9,7 @@ import { runDealAnimation } from "@/features/table/dealAnimation";
 import { chipsToPot, potToWinner } from "@/features/table/chipAnimation";
 import { getCanvasResolution } from "@/features/table/rendererQuality";
 import { heroSeatIndex, syncGameToCanvas } from "@/features/table/syncGameToCanvas";
+import { useDeckStyle } from "@/features/table/deckStyle";
 import { MAX_SEATS, MIN_SEATS } from "@/features/game/protocol";
 import type { TableLayout } from "@/features/table/tableLayout";
 
@@ -22,6 +23,7 @@ function TableCanvas() {
   const [backend, setBackend] = useState<Backend>("unknown");
 
   const { snapshot, holeCards, profile, dealTrigger, showdown } = useGame();
+  const [deckStyle] = useDeckStyle();
   const dealAnimRef = useRef<ReturnType<typeof runDealAnimation> | null>(null);
   const lastActionsRef = useRef<Record<number, string>>({});
   const chipHandNoRef = useRef<number>(-1);
@@ -108,7 +110,7 @@ function TableCanvas() {
 
     const seatIdx = snapshot ? heroSeatIndex(snapshot.seats, profile.userId) : -1;
     syncGameToCanvas(cardsLayer, layout, snapshot, holeCards, seatIdx);
-  }, [snapshot, holeCards, profile.userId]);
+  }, [snapshot, holeCards, profile.userId, deckStyle]);
 
   // GPU chips: fly seat → pot on a bet/call/raise (diffed from last_action).
   useEffect(() => {

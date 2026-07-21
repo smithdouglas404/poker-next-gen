@@ -12,6 +12,7 @@ import { BuyInSlider, TableLog } from "@/features/hud/TableLog";
 import { ChatPanel } from "@/features/hud/ChatPanel";
 import { HandHistoryPanel } from "@/features/hud/HandHistoryPanel";
 import { MusicPicker } from "@/features/sound/MusicPicker";
+import { TableSettings } from "@/features/hud/TableSettings";
 import { TauntBar } from "@/features/sound/TauntBar";
 import { usePokerKeyboard } from "@/features/hud/usePokerKeyboard";
 import { useGameSounds } from "@/features/sound/useGameSounds";
@@ -40,6 +41,7 @@ export function TableHud({ children }: { children: React.ReactNode }) {
             <HandHistoryPanel />
             <TauntBar />
             <MusicPicker />
+            <TableSettings />
           </div>
           <div className="relative flex-1">
             <SeatHud />
