@@ -47,6 +47,7 @@ export async function POST(request: Request) {
 
   try {
     await callNakamaRpc("kyc_apply", {
+      session_id: sessionId,
       user_id: vendorData,
       status,
       secret: process.env.KYC_APPLY_SECRET || secret,

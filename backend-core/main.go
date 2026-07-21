@@ -81,6 +81,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"kyc_submit":           rpc.KycSubmit,
 		"kyc_start":            rpc.KycStart,
 		"kyc_apply":            rpc.KycApply,
+		"me_verification":      rpc.MeVerification,
 		"kyc_verify_admin":     rpc.KycVerifyAdmin,
 		"wallet_deposit_crypto": rpc.WalletDepositCrypto,
 		"wallet_deposit_fiat":  rpc.WalletDepositFiat,

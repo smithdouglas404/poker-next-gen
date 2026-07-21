@@ -6,7 +6,7 @@ import { useCallback, useMemo, useState } from "react";
 import { COMMAND_REGISTRY, commandsByCategory, getCommand } from "./commandRegistry";
 import type { CommandCategory, CommandDefinition, CommandResult } from "./types";
 import { CATEGORY_META } from "./types";
-import { canSeeCommand, useMeRoles } from "./useMeRoles";
+import { canAccessCommand, canSeeCommand, useMeRoles, useMeVerification } from "./useMeRoles";
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 
 const CATEGORY_ORDER: CommandCategory[] = [
@@ -135,6 +135,7 @@ function CommandCard({
 
 export function CommandCenter() {
   const roles = useMeRoles();
+  const verification = useMeVerification();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [activeCommand, setActiveCommand] = useState<CommandDefinition | null>(null);
   const [formJson, setFormJson] = useState("");
@@ -380,7 +381,9 @@ export function CommandCenter() {
       <main className="mx-auto max-w-6xl px-6 py-10">
         {CATEGORY_ORDER.map((category) => {
           const meta = CATEGORY_META[category];
-          const commands = commandsByCategory(category).filter((c) => canSeeCommand(c, roles));
+          const commands = commandsByCategory(category).filter(
+            (c) => canSeeCommand(c, roles) && canAccessCommand(c, verification),
+          );
           if (commands.length === 0) return null;
           return (
             <section key={category} className="mb-12">

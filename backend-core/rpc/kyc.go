@@ -13,67 +13,69 @@ import (
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
 
-var kycLevels = map[string]bool{"basic": true, "standard": true, "full": true, "enhanced": true}
+var verificationKinds = map[string]bool{"email": true, "biometric": true, "kyc_aml": true}
 
-// KycStart opens a Didit verification session for the requested KYC level and
-// returns the hosted verification URL. Progressive: each level maps to a Didit
-// workflow with escalating checks. No-ops with a clear error until DIDIT_API_KEY
-// (and the level's workflow id) are configured.
+// KycStart opens a Didit verification session for a verification KIND
+// (email | biometric | kyc_aml) and returns the hosted verification URL. Each
+// kind maps to a Didit workflow. No-ops with a clear error until DIDIT_API_KEY
+// is set.
 func KycStart(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	userID, err := callerID(ctx)
 	if err != nil {
 		return "", err
 	}
 	var req struct {
-		Level string `json:"level"`
+		Kind  string `json:"kind"`
+		Level string `json:"level"` // back-compat alias
 	}
 	if payload != "" {
 		_ = json.Unmarshal([]byte(payload), &req)
 	}
-	if !kycLevels[req.Level] {
-		return "", runtime.NewError("level must be one of: basic, standard, full, enhanced", 3)
+	kind := req.Kind
+	if kind == "" {
+		kind = req.Level
+	}
+	if !verificationKinds[kind] {
+		return "", runtime.NewError("kind must be one of: email, biometric, kyc_aml", 3)
 	}
 	if !integrations.DiditConfigured() {
 		return "", runtime.NewError("identity verification is not enabled yet (DIDIT_API_KEY unset)", 9)
 	}
-	workflow := integrations.DiditWorkflowFor(req.Level)
+	workflow := integrations.DiditWorkflowFor(kind)
 	if workflow == "" {
-		return "", runtime.NewError(fmt.Sprintf("no Didit workflow configured for level %q", req.Level), 9)
+		return "", runtime.NewError(fmt.Sprintf("no Didit workflow configured for %q", kind), 9)
 	}
 	callback := ""
 	if base := os.Getenv("APP_BASE_URL"); base != "" {
-		callback = base + "/membership?kyc=complete"
+		callback = base + "/kyc?done=1"
 	}
 	sess, err := integrations.CreateDiditSession(userID, workflow, callback)
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
-	// Record the target level as pending; the webhook flips it to verified while
-	// preserving this level.
-	data, _ := json.Marshal(map[string]string{"session_id": sess.SessionID, "provider": "didit"})
-	if err := store.NewKYCStore(db).Submit(ctx, userID, req.Level, string(data)); err != nil {
+	if err := store.NewVerificationStore(db).StartPending(ctx, userID, kind, sess.SessionID); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	out, _ := json.Marshal(map[string]any{
 		"url":        sess.URL,
 		"session_id": sess.SessionID,
 		"status":     sess.Status,
-		"level":      req.Level,
+		"kind":       kind,
 	})
 	return string(out), nil
 }
 
 // KycApply is the server-to-server webhook apply path. Our Next.js /api/kyc/webhook
-// route verifies Didit's HMAC signature, then calls this with a shared secret so a
-// verified/declined result updates the store. Protected by KYC_APPLY_SECRET (falls
-// back to DIDIT_WEBHOOK_SECRET) — NOT meant for direct client use.
+// route verifies Didit's HMAC signature, then calls this with a shared secret. The
+// verification KIND is resolved from the session id. Protected by KYC_APPLY_SECRET
+// (falls back to DIDIT_WEBHOOK_SECRET) — NOT for direct client use.
 func KycApply(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	var req struct {
-		UserID string `json:"user_id"`
-		Status string `json:"status"`
-		Level  string `json:"level"`
-		Reason string `json:"reason"`
-		Secret string `json:"secret"`
+		SessionID string `json:"session_id"`
+		UserID    string `json:"user_id"`
+		Kind      string `json:"kind"`
+		Status    string `json:"status"`
+		Secret    string `json:"secret"`
 	}
 	if payload != "" {
 		_ = json.Unmarshal([]byte(payload), &req)
@@ -85,9 +87,18 @@ func KycApply(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime
 	if secret == "" || req.Secret != secret {
 		return "", runtime.NewError("unauthorized", 16)
 	}
-	if req.UserID == "" {
-		return "", runtime.NewError("user_id required", 3)
+
+	vstore := store.NewVerificationStore(db)
+	userID, kind := req.UserID, req.Kind
+	if req.SessionID != "" {
+		if u, k, err := vstore.ResolveSession(ctx, req.SessionID); err == nil && u != "" {
+			userID, kind = u, k
+		}
 	}
+	if userID == "" || !verificationKinds[kind] {
+		return "", runtime.NewError("could not resolve verification (session_id or user_id+kind)", 3)
+	}
+
 	status := "pending"
 	switch {
 	case eqFold(req.Status, "approved", "verified"):
@@ -95,10 +106,14 @@ func KycApply(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime
 	case eqFold(req.Status, "declined", "rejected", "abandoned", "expired"):
 		status = "rejected"
 	}
-	if err := store.NewKYCStore(db).SetStatus(ctx, req.UserID, status, req.Level, req.Reason, "didit"); err != nil {
+	if err := vstore.SetStatus(ctx, userID, kind, status); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
-	out, _ := json.Marshal(map[string]any{"ok": true, "status": status})
+	// Mirror kyc_aml into the legacy poker_kyc so existing tier/KYC gates still see it.
+	if kind == "kyc_aml" {
+		_ = store.NewKYCStore(db).SetStatus(ctx, userID, status, "full", "", "didit")
+	}
+	out, _ := json.Marshal(map[string]any{"ok": true, "kind": kind, "status": status})
 	return string(out), nil
 }
 

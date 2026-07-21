@@ -17,6 +17,9 @@ func MarketplaceList(ctx context.Context, logger runtime.Logger, db *sql.DB, nk 
 	if err != nil {
 		return "", err
 	}
+	if err := requireVerified(ctx, db, userID, "biometric", "selling on the marketplace"); err != nil {
+		return "", err
+	}
 	var req struct {
 		CosmeticID string `json:"cosmetic_id"`
 		PriceCents int64  `json:"price_cents"`
@@ -47,6 +50,9 @@ func MarketplaceBrowse(ctx context.Context, logger runtime.Logger, db *sql.DB, n
 func MarketplaceBuy(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	buyerID, err := callerID(ctx)
 	if err != nil {
+		return "", err
+	}
+	if err := requireVerified(ctx, db, buyerID, "biometric", "buying on the marketplace"); err != nil {
 		return "", err
 	}
 	var req struct {

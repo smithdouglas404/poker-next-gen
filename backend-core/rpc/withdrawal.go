@@ -21,6 +21,10 @@ func WalletWithdraw(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 	if err != nil {
 		return "", err
 	}
+	// Receiving money requires KYC/AML verification.
+	if err := requireVerified(ctx, db, userID, "kyc_aml", "withdrawing funds"); err != nil {
+		return "", err
+	}
 	var req struct {
 		AmountCents int64  `json:"amount_cents"`
 		Destination string `json:"destination"`

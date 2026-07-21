@@ -70,6 +70,10 @@ func ClubCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 	if err != nil {
 		return "", err
 	}
+	// Registration gate: unregistered guests can host a game but not create clubs.
+	if err := requireVerified(ctx, db, userID, "email", "creating a club"); err != nil {
+		return "", err
+	}
 	clubStore := store.NewClubStore(db)
 
 	// Tier gate: enforce the caller's club-create limit.

@@ -40,19 +40,38 @@ func diditSessionPath() string {
 	return "/v2/session/"
 }
 
-// DiditWorkflowFor maps a KYC level to its configured Didit workflow id.
-func DiditWorkflowFor(level string) string {
-	switch strings.ToLower(level) {
-	case "basic":
-		return os.Getenv("DIDIT_WORKFLOW_BASIC")
-	case "standard":
-		return os.Getenv("DIDIT_WORKFLOW_STANDARD")
-	case "full":
-		return os.Getenv("DIDIT_WORKFLOW_FULL")
-	case "enhanced":
-		return os.Getenv("DIDIT_WORKFLOW_ENHANCED")
+// Default Didit workflow ids for each verification kind. These are account-scoped
+// configuration identifiers (NOT secrets — useless without DIDIT_API_KEY), baked
+// so verification works as soon as the API key + webhook secret are set. Override
+// any of them with the matching env var.
+const (
+	defaultWorkflowEmail     = "4de83718-1a62-450e-935e-c65a59a68099" // basic registration
+	defaultWorkflowBiometric = "3e935904-d675-4bb9-896a-af618cbaae9f" // pay for services + marketplace
+	defaultWorkflowKycAML    = "fe9718ad-9945-4a3c-a913-7a0d2892ace0" // receiving money / fiat buying
+)
+
+// VerificationKinds are the progressive identity checks a player can hold.
+var VerificationKinds = []string{"email", "biometric", "kyc_aml"}
+
+// DiditWorkflowFor maps a verification kind to its Didit workflow id (env override
+// wins over the baked default).
+func DiditWorkflowFor(kind string) string {
+	switch strings.ToLower(kind) {
+	case "email":
+		return envOr("DIDIT_WORKFLOW_EMAIL", defaultWorkflowEmail)
+	case "biometric":
+		return envOr("DIDIT_WORKFLOW_BIOMETRIC", defaultWorkflowBiometric)
+	case "kyc_aml", "kyc", "aml":
+		return envOr("DIDIT_WORKFLOW_KYC_AML", defaultWorkflowKycAML)
 	}
 	return ""
+}
+
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }
 
 // DiditSession is the created verification session the player is sent to.
