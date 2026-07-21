@@ -407,3 +407,10 @@ CREATE TABLE IF NOT EXISTS poker_verification (
 );
 
 CREATE INDEX IF NOT EXISTS idx_poker_verification_session ON poker_verification(session_id);
+
+-- Short shareable room codes → match id, for PokerNow-style "join by link/code".
+CREATE TABLE IF NOT EXISTS poker_room_code (
+    code       TEXT PRIMARY KEY,
+    match_id   TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

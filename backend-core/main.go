@@ -62,6 +62,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"me_roles":             rpc.MeRoles,
 		"loyalty_get":          rpc.LoyaltyGet,
 		"matchmaker_enqueue":   rpc.MatchmakerEnqueue,
+		"room_resolve":         rpc.RoomResolve,
 		"equity_estimate":      rpc.EquityEstimate,
 		"hand_rank":            rpc.HandRank,
 		"audit_list":           rpc.AuditList,

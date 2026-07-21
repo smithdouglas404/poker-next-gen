@@ -114,6 +114,7 @@ type TableCreateResponse struct {
 	MatchID string `json:"match_id"`
 	RoomID  string `json:"room_id"`
 	Label   string `json:"label"`
+	Code    string `json:"code,omitempty"` // short shareable room code
 }
 
 type TableListResponse struct {

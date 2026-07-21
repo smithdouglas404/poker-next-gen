@@ -8,13 +8,29 @@ import { BuyInSlider } from "@/features/hud/TableLog";
 import { TableCard } from "@/features/hud/TableCard";
 
 function LobbyContent() {
-  const { listTables, openTables, joinRoom, createRoom, findMatch, matchmakerSearching, connected, buyInCents } =
+  const { listTables, openTables, joinRoom, joinByCode, createRoom, findMatch, matchmakerSearching, connected, buyInCents } =
     useGame();
   const [busy, setBusy] = useState(false);
+  const [codeError, setCodeError] = useState<string | null>(null);
 
   useEffect(() => {
     if (connected) void listTables();
   }, [connected, listTables]);
+
+  // Deep-link join: /lobby?code=XXXXXX (shared invite link).
+  useEffect(() => {
+    if (!connected) return;
+    const code = new URLSearchParams(window.location.search).get("code");
+    if (!code) return;
+    void (async () => {
+      try {
+        await joinByCode(code);
+        window.location.href = "/table";
+      } catch (e) {
+        setCodeError(e instanceof Error ? e.message : "That room code didn't work");
+      }
+    })();
+  }, [connected, joinByCode]);
 
   const run = useCallback(async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -46,6 +62,11 @@ function LobbyContent() {
       </header>
 
       <main className="mx-auto max-w-4xl space-y-6 px-6 py-10">
+        {codeError && (
+          <div className="rounded-xl border border-red-500/30 bg-red-950/20 p-3 text-sm text-red-200">
+            {codeError}
+          </div>
+        )}
         <BuyInSlider />
 
         <div className="flex flex-wrap gap-3">
