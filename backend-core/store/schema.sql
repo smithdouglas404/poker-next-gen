@@ -288,3 +288,53 @@ CREATE TABLE IF NOT EXISTS poker_club_member (
 );
 
 CREATE INDEX IF NOT EXISTS idx_poker_club_member_user ON poker_club_member(user_id);
+
+-- Cosmetics catalog: sellable/ownable items (character models, taunts, card
+-- backs, emotes). `owner_user_id` is set for user-generated items (UGC minted
+-- via Tripo); official items have it empty.
+CREATE TABLE IF NOT EXISTS poker_cosmetic (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,                     -- model | taunt | cardback | emote | table
+    name TEXT NOT NULL,
+    rarity TEXT NOT NULL DEFAULT 'common',
+    asset_ref TEXT NOT NULL DEFAULT '',     -- GLB URL (model) or asset id
+    preview_ref TEXT NOT NULL DEFAULT '',   -- preview image URL
+    owner_user_id TEXT NOT NULL DEFAULT '', -- creator (UGC) or '' for official
+    price_cents BIGINT NOT NULL DEFAULT 0,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Owned cosmetics (inventory).
+CREATE TABLE IF NOT EXISTS poker_inventory (
+    user_id TEXT NOT NULL,
+    cosmetic_id TEXT NOT NULL REFERENCES poker_cosmetic(id) ON DELETE CASCADE,
+    source TEXT NOT NULL DEFAULT '',        -- generate | purchase | marketplace | grant
+    acquired_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, cosmetic_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_inventory_user ON poker_inventory(user_id);
+
+-- Equipped cosmetic per kind, per user.
+CREATE TABLE IF NOT EXISTS poker_equipped (
+    user_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    cosmetic_id TEXT NOT NULL,
+    PRIMARY KEY (user_id, kind)
+);
+
+-- Tripo3D generation jobs (async character minting).
+CREATE TABLE IF NOT EXISTS poker_generation (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    prompt TEXT NOT NULL DEFAULT '',
+    tripo_task_id TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending', -- pending | running | success | failed
+    fee_cents BIGINT NOT NULL DEFAULT 0,
+    cosmetic_id TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_generation_user ON poker_generation(user_id, created_at DESC);

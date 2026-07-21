@@ -336,6 +336,12 @@ export function CommandCenter() {
               Capabilities →
             </Link>
             <Link
+              href="/studio"
+              className="rounded-xl border border-fuchsia-400/40 bg-fuchsia-950/20 px-5 py-3 text-sm font-semibold text-fuchsia-200 hover:bg-fuchsia-900/20"
+            >
+              Character Studio →
+            </Link>
+            <Link
               href="/login"
               className="rounded-xl border border-sky-500/40 bg-sky-950/30 px-5 py-3 text-sm font-semibold text-sky-200 hover:bg-sky-900/30"
             >
