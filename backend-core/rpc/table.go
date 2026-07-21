@@ -69,14 +69,25 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		variant = poker.VariantPLO
 	}
 
+	// Optional self-managing duration: cap to [0, 12h] and convert to seconds.
+	durationSecs := 0
+	if req.DurationMins > 0 {
+		mins := req.DurationMins
+		if mins > 720 {
+			mins = 720
+		}
+		durationSecs = mins * 60
+	}
+
 	matchID, err := nk.MatchCreate(ctx, protocol.MatchModule, map[string]interface{}{
-		"room_id":     roomID,
-		"small_blind": sb,
-		"big_blind":   bb,
-		"buy_in":      buyIn,
-		"max_seats":   maxSeats,
-		"num_bots":    numBots,
-		"variant":     variant,
+		"room_id":       roomID,
+		"small_blind":   sb,
+		"big_blind":     bb,
+		"buy_in":        buyIn,
+		"max_seats":     maxSeats,
+		"num_bots":      numBots,
+		"variant":       variant,
+		"duration_secs": durationSecs,
 	})
 	if err != nil {
 		return "", err

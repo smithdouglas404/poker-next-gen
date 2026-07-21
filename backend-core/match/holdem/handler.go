@@ -49,7 +49,15 @@ type MatchState struct {
 	// Per-session AES-256-GCM keys (userID -> 32 raw bytes) used to encrypt each
 	// player's own hole cards so the wire never carries plaintext card codes.
 	SessionKeys      map[string][]byte
+	// Self-managing table lifecycle (no operator babysitting):
+	DurationSecs     int   // auto-close after this many seconds (0 = no limit)
+	AutoDeal         bool  // auto-start each hand (cash tables); tournaments deal via director
+	NextDealTick     int64 // tick at which to auto-deal the next hand (0 = unset)
 }
+
+// autoDealDelayTicks is the breather between hands on a self-dealing table
+// (MatchInit sets tick rate = 1/s, so this is seconds).
+const autoDealDelayTicks = 4
 
 type Handler struct{}
 
@@ -89,6 +97,10 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	if numBots > maxSeats-1 {
 		numBots = maxSeats - 1
 	}
+	durationSecs := 0
+	if v, ok := params["duration_secs"].(float64); ok && v > 0 {
+		durationSecs = int(v)
+	}
 
 	variant := poker.VariantHoldem
 	if v, ok := params["variant"].(string); ok && v != "" {
@@ -123,6 +135,10 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		Presences:    map[string]runtime.Presence{},
 		Rand:         rand.New(rand.NewSource(time.Now().UnixNano())),
 		SessionKeys:  map[string][]byte{},
+		DurationSecs: durationSecs,
+		// Cash tables deal themselves (no operator babysitting); tournament tables
+		// are driven by the tournament director, so they opt out.
+		AutoDeal:     tournamentID == "",
 	}
 	label := buildLabel(state)
 	return state, 1, label
@@ -209,6 +225,25 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 		if finished := pollPendingShowdown(ctx, logger, db, dispatcher, nk, s); finished {
 			return s
 		}
+	}
+
+	// Self-managing table lifecycle, evaluated only between hands so a live pot is
+	// never abandoned: close after the configured duration, else auto-deal.
+	if s.Phase == poker.PhaseWaiting && s.Table.Street == poker.StreetWaiting {
+		if s.DurationSecs > 0 && tick >= int64(s.DurationSecs) {
+			closeTable(ctx, db, dispatcher, s, "scheduled time reached")
+			return nil // ending the match releases the handler
+		}
+		if s.AutoDeal && s.Table.SeatedCount() >= 2 && len(s.Presences) >= 1 {
+			if s.NextDealTick == 0 {
+				s.NextDealTick = tick + autoDealDelayTicks
+			} else if tick >= s.NextDealTick {
+				s.NextDealTick = 0
+				autoStartHand(ctx, db, dispatcher, s)
+			}
+		}
+	} else {
+		s.NextDealTick = 0
 	}
 
 	for _, msg := range messages {
@@ -478,6 +513,42 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 	default:
 		return false
 	}
+}
+
+// autoStartHand deals the next hand on a self-managing cash table (mirrors the
+// manual OpStartHand path). Bots are driven by the loop's trailing driveBots.
+func autoStartHand(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
+	if s.Table.SeatedCount() < 2 || s.Phase != poker.PhaseWaiting || s.Table.Street != poker.StreetWaiting {
+		return
+	}
+	if err := s.Table.StartHand(s.SmallBlind, s.BigBlind); err != nil {
+		return // engine-math unavailable; retry next tick
+	}
+	s.Phase = poker.PhaseBetting
+	emitHandStarted(ctx, s)
+	narrate(dispatcher, s, fmt.Sprintf("Hand #%d dealt — blinds $%d/$%d", s.Table.HandNo, s.SmallBlind/100, s.BigBlind/100))
+	broadcastHandStart(ctx, db, dispatcher, s)
+	dealPrivateCards(dispatcher, s)
+	broadcastActionRequired(ctx, db, dispatcher, s)
+}
+
+// closeTable ends a self-managing table: refunds every seated human's remaining
+// stack to their wallet, clears their active-seat registration, and tells the
+// room. Called only between hands, so no chips are tied up in a live pot.
+func closeTable(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, reason string) {
+	seatReg := store.NewActiveSeatStore(db)
+	for i, seat := range s.Table.Seats {
+		if seat == nil {
+			continue
+		}
+		if !seat.IsBot {
+			releaseBuyIn(ctx, db, s.ClubID, seat.UserID, seat.Stack)
+			_ = seatReg.Unregister(ctx, seat.UserID, matchIDForAudit(s))
+		}
+		s.Table.StandUp(i)
+	}
+	narrate(dispatcher, s, "Table closed — "+reason+". Remaining chips returned to your wallet.")
+	broadcastSnapshot(ctx, db, dispatcher, s, nil)
 }
 
 func matchIDForAudit(s *MatchState) string {

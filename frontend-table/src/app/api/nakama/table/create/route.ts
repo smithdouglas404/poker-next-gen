@@ -13,6 +13,7 @@ export async function POST(request: Request) {
       max_seats: body.max_seats ?? 6,
       num_bots: body.num_bots ?? 0,
       variant: body.variant === "plo" ? "plo" : "holdem",
+      duration_mins: body.duration_mins ?? 0,
     });
     return NextResponse.json({ ok: true, data });
   } catch (error) {
