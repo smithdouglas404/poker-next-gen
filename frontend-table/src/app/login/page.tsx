@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { authenticate } from "@/lib/nakama/auth";
+import { Button, Field, Input, Panel, SectionHeader } from "@/features/ui";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -33,73 +34,56 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-neutral-950 px-4 text-white">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-black/40 p-8">
-        <p className="text-xs uppercase tracking-[0.3em] text-amber-300/80">Poker Next-Gen</p>
-        <h1 className="mt-2 text-2xl font-semibold">{mode === "login" ? "Sign In" : "Create Account"}</h1>
+    <div className="flex min-h-screen items-center justify-center px-4 text-white">
+      <Panel className="w-full max-w-md p-8">
+        <SectionHeader>High Rollers Club</SectionHeader>
+        <h1 className="font-display mt-2 text-3xl font-bold">
+          {mode === "login" ? "Sign In" : "Create Account"}
+        </h1>
         <p className="mt-2 text-sm text-neutral-400">
-          Real Nakama email authentication — replaces anonymous device-only login.
+          {mode === "login"
+            ? "Welcome back to the table."
+            : "Join the club — real email authentication."}
         </p>
 
         {error && (
-          <div className="mt-4 rounded-lg border border-red-500/30 bg-red-950/20 p-3 text-sm text-red-200">
+          <div className="mt-4 rounded-xl border border-red-500/30 bg-red-950/20 p-3 text-sm text-red-200">
             {error}
           </div>
         )}
 
-        <div className="mt-6 space-y-3">
+        <div className="mt-6 space-y-4">
           {mode === "signup" && (
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Username"
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-emerald-500/50"
-            />
+            <Field label="Username">
+              <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Your handle" />
+            </Field>
           )}
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
-            className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-emerald-500/50"
-          />
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
-            className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-emerald-500/50"
-          />
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void submit()}
-            className="w-full rounded-xl bg-emerald-700 py-3 text-sm font-semibold uppercase tracking-wider hover:bg-emerald-600 disabled:opacity-50"
-          >
-            {mode === "login" ? "Sign In" : "Create Account"}
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void googleLogin()}
-            className="w-full rounded-xl border border-white/20 py-3 text-sm font-semibold uppercase tracking-wider hover:bg-white/5 disabled:opacity-50"
-          >
+          <Field label="Email">
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+          </Field>
+          <Field label="Password">
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+          </Field>
+          <Button size="lg" disabled={busy} onClick={() => void submit()} className="w-full">
+            {busy ? "Please wait…" : mode === "login" ? "Sign In" : "Create Account"}
+          </Button>
+          <Button variant="outline" size="lg" disabled={busy} onClick={() => void googleLogin()} className="w-full">
             Continue with Google
-          </button>
+          </Button>
         </div>
 
         <p className="mt-6 text-center text-sm text-neutral-500">
           {mode === "login" ? (
             <>
               No account?{" "}
-              <button type="button" onClick={() => setMode("signup")} className="text-emerald-400 hover:underline">
+              <button type="button" onClick={() => setMode("signup")} className="text-cyan hover:underline">
                 Sign up
               </button>
             </>
           ) : (
             <>
               Have an account?{" "}
-              <button type="button" onClick={() => setMode("login")} className="text-emerald-400 hover:underline">
+              <button type="button" onClick={() => setMode("login")} className="text-cyan hover:underline">
                 Sign in
               </button>
             </>
@@ -111,7 +95,7 @@ export default function LoginPage() {
             ← Back to Command Center
           </Link>
         </p>
-      </div>
+      </Panel>
     </div>
   );
 }

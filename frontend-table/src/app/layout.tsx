@@ -1,20 +1,23 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Space_Grotesk, Manrope } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Neon Vault type system (matches HighRollersClub): Space Grotesk for display,
+// Manrope for body.
+const displayFont = Space_Grotesk({
+  variable: "--font-display",
   subsets: ["latin"],
+  weight: ["500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const bodyFont = Manrope({
+  variable: "--font-body",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "Poker Next-Gen — Command Center",
-  description: "Create communities, games, tournaments, and open the live poker table",
+  title: "High Rollers Club — Command Center",
+  description: "Premium poker network: clubs, cash games, tournaments, and the live table",
 };
 
 export default function RootLayout({
@@ -24,11 +27,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-      </body>
+      <body className={`${displayFont.variable} ${bodyFont.variable} antialiased`}>{children}</body>
     </html>
   );
 }

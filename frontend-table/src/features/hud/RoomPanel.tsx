@@ -12,6 +12,7 @@ import {
   MIN_BUY_IN_CENTS,
   MIN_SEATS,
 } from "@/features/game/protocol";
+import { Button, Input, SectionHeader, cn } from "@/features/ui";
 
 const OPEN_STORAGE_KEY = "pkr:roomPanelOpen";
 
@@ -84,19 +85,20 @@ export function RoomPanel() {
   return (
     <div className="pointer-events-none fixed left-0 top-20 z-40 flex items-start">
       <aside
-        className={`pointer-events-auto max-h-[calc(100vh-6rem)] w-72 overflow-y-auto rounded-r-2xl border border-l-0 border-white/10 bg-black/70 p-4 shadow-2xl backdrop-blur-md transition-transform duration-300 ease-out ${
-          open ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={cn(
+          "pointer-events-auto max-h-[calc(100vh-6rem)] w-72 overflow-y-auto rounded-r-2xl border border-l-0 border-white/10 bg-black/70 p-4 shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-out",
+          open ? "translate-x-0" : "-translate-x-full",
+        )}
         aria-hidden={!open}
       >
         <div className="flex items-start justify-between gap-2">
           <div>
-            <p className="text-xs uppercase tracking-[0.25em] text-amber-300/80">Room Control</p>
-            <h2 className="mt-1 text-lg font-semibold text-white">Create / Join</h2>
+            <SectionHeader>Room Control</SectionHeader>
+            <h2 className="font-display mt-1 text-lg font-bold text-white">Create / Join</h2>
           </div>
           <Link
             href="/lobby"
-            className="rounded-lg border border-emerald-500/30 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-300 hover:bg-emerald-950/40"
+            className="rounded-lg border border-cyan/30 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-cyan hover:bg-cyan/10"
           >
             Lobby
           </Link>
@@ -104,37 +106,33 @@ export function RoomPanel() {
 
         <p className="mt-2 text-[10px] text-neutral-500">
           Buy-in {formatCents(MIN_BUY_IN_CENTS)}–{formatCents(MAX_BUY_IN_CENTS)} · selected{" "}
-          {formatCents(buyInCents)}
+          <span className="text-amber-300/90">{formatCents(buyInCents)}</span>
         </p>
 
-        <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-          <p className="text-[10px] uppercase tracking-wider text-neutral-400">New table setup</p>
+        <div className="mt-3 rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-300/70">
+            New table setup
+          </p>
           <div className="mt-2 grid grid-cols-2 gap-2">
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-wider text-neutral-500">
-                Small Blind
-              </span>
-              <input
+              <span className="text-[10px] uppercase tracking-wider text-neutral-500">Small Blind</span>
+              <Input
                 type="number"
                 min={1}
                 value={smallBlind}
                 onChange={(e) => setSmallBlind(Math.max(1, Math.round(Number(e.target.value) || 0)))}
-                className="w-full rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-xs text-white outline-none focus:border-emerald-500/50"
+                className="px-2 py-1.5 text-xs"
               />
               <span className="text-[9px] text-neutral-500">{formatCents(smallBlind)}</span>
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-wider text-neutral-500">
-                Big Blind
-              </span>
-              <input
+              <span className="text-[10px] uppercase tracking-wider text-neutral-500">Big Blind</span>
+              <Input
                 type="number"
                 min={1}
                 value={bigBlind}
                 onChange={(e) => setBigBlind(Math.max(1, Math.round(Number(e.target.value) || 0)))}
-                className={`w-full rounded-lg border bg-black/40 px-2 py-1.5 text-xs text-white outline-none focus:border-emerald-500/50 ${
-                  blindsValid ? "border-white/10" : "border-red-500/60"
-                }`}
+                className={cn("px-2 py-1.5 text-xs", !blindsValid && "border-red-500/60")}
               />
               <span className="text-[9px] text-neutral-500">{formatCents(bigBlind)}</span>
             </label>
@@ -144,7 +142,7 @@ export function RoomPanel() {
             <span className="text-[10px] uppercase tracking-wider text-neutral-500">
               Max Seats ({MIN_SEATS}–{MAX_SEATS})
             </span>
-            <input
+            <Input
               type="number"
               min={MIN_SEATS}
               max={MAX_SEATS}
@@ -157,7 +155,7 @@ export function RoomPanel() {
                 setSeats(n);
                 setPreviewSeats(n); // live-update the seat ring before Create
               }}
-              className="w-16 rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-center text-xs text-white outline-none focus:border-emerald-500/50"
+              className="w-16 px-2 py-1.5 text-center text-xs"
             />
           </label>
 
@@ -167,77 +165,70 @@ export function RoomPanel() {
         </div>
 
         <div className="mt-4 flex flex-col gap-2">
-          <button
-            type="button"
+          <Button
             disabled={busy || !createValid}
             onClick={() =>
-              run(() =>
-                createRoom({
-                  buyIn: buyInCents,
-                  smallBlind,
-                  bigBlind,
-                  maxSeats: seats,
-                }),
-              )
+              run(() => createRoom({ buyIn: buyInCents, smallBlind, bigBlind, maxSeats: seats }))
             }
-            className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold uppercase tracking-wider text-white hover:bg-emerald-600 disabled:opacity-50"
+            className="w-full"
           >
             Create Room
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="outline"
             disabled={busy || matchmakerSearching}
             onClick={() => run(() => findMatch())}
-            className="rounded-xl border border-sky-400/40 bg-sky-950/40 px-4 py-2.5 text-sm font-semibold uppercase tracking-wider text-sky-200 hover:bg-sky-900/40 disabled:opacity-50"
+            className="w-full border-cyan/40 text-cyan hover:bg-cyan/10"
           >
             {matchmakerSearching ? "Searching…" : "Find Match"}
-          </button>
+          </Button>
 
           <div className="flex gap-2">
-            <input
+            <Input
               value={joinId}
               onChange={(e) => setJoinId(e.target.value)}
               placeholder="Match ID"
-              className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white outline-none focus:border-emerald-500/50"
+              className="min-w-0 flex-1 px-3 py-2 text-xs"
             />
-            <button
-              type="button"
+            <Button
+              variant="outline"
+              size="sm"
               disabled={busy || !joinId.trim()}
               onClick={() => run(() => joinRoom(joinId.trim()))}
-              className="rounded-xl border border-amber-400/50 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-amber-200 hover:bg-amber-950/40 disabled:opacity-50"
+              className="border-amber-400/50 text-amber-200 hover:bg-amber-400/10"
             >
               Join
-            </button>
+            </Button>
           </div>
 
           {matchId && (
             <>
-              <button
-                type="button"
+              <Button
+                variant="outline"
                 disabled={busy || seated < 2}
                 onClick={() => run(() => startHand())}
-                className="rounded-xl border border-violet-400/40 bg-violet-950/40 px-4 py-2.5 text-sm font-semibold uppercase tracking-wider text-violet-200 hover:bg-violet-900/40 disabled:opacity-50"
+                className="w-full border-violet-400/40 text-violet-200 hover:bg-violet-500/10"
               >
                 Start Hand ({seated}/{seatCap} seated)
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="outline"
                 disabled={busy || seated >= seatCap}
                 onClick={() => run(() => addBot())}
-                className="rounded-xl border border-teal-400/40 bg-teal-950/40 px-4 py-2.5 text-sm font-semibold uppercase tracking-wider text-teal-200 hover:bg-teal-900/40 disabled:opacity-50"
+                className="w-full border-teal-400/40 text-teal-200 hover:bg-teal-500/10"
               >
                 + Add Bot
-              </button>
+              </Button>
               {heroSeated && (
-                <button
-                  type="button"
+                <Button
+                  variant="danger"
                   disabled={busy}
                   onClick={() => run(() => standUp())}
-                  className="rounded-xl border border-red-400/40 bg-red-950/30 px-4 py-2.5 text-sm font-semibold uppercase tracking-wider text-red-200 hover:bg-red-900/30 disabled:opacity-50"
+                  className="w-full"
                 >
                   Stand Up
-                </button>
+                </Button>
               )}
             </>
           )}
@@ -274,7 +265,7 @@ export function RoomPanel() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={open ? "Close room control" : "Open room control"}
-        className="pointer-events-auto mt-2 flex items-center gap-1 rounded-r-xl border border-l-0 border-emerald-500/40 bg-black/70 px-2 py-3 text-[11px] font-semibold uppercase tracking-wider text-emerald-200 shadow-lg backdrop-blur-md transition hover:bg-emerald-950/60 [writing-mode:vertical-rl]"
+        className="pointer-events-auto mt-2 flex items-center gap-1 rounded-r-xl border border-l-0 border-amber-400/40 bg-black/70 px-2 py-3 text-[11px] font-semibold uppercase tracking-wider text-amber-200 shadow-lg backdrop-blur-xl transition hover:bg-amber-950/40 [writing-mode:vertical-rl]"
       >
         <span className="rotate-180">⚙ Room</span>
       </button>
