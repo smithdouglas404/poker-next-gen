@@ -200,3 +200,32 @@ CREATE TABLE IF NOT EXISTS poker_subscription_ledger (
 );
 
 CREATE INDEX IF NOT EXISTS idx_poker_subscription_ledger_user ON poker_subscription_ledger(user_id, created_at DESC);
+
+-- KYC / identity verification state. Server writes status; clients submit data
+-- and read status. Verified status gates high tiers + real-money deposits.
+CREATE TABLE IF NOT EXISTS poker_kyc (
+    user_id TEXT PRIMARY KEY,
+    level TEXT NOT NULL DEFAULT 'none',
+    status TEXT NOT NULL DEFAULT 'none',   -- none | pending | verified | rejected
+    data JSONB NOT NULL DEFAULT '{}',
+    rejection_reason TEXT NOT NULL DEFAULT '',
+    provider TEXT NOT NULL DEFAULT '',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Wallet deposits (crypto/fiat funding). One row per initiated deposit; the
+-- gateway webhook flips status to 'credited' exactly once (idempotent), which
+-- is when the Nakama wallet is credited.
+CREATE TABLE IF NOT EXISTS poker_deposit (
+    id TEXT PRIMARY KEY,                    -- our order_id
+    user_id TEXT NOT NULL,
+    amount_cents BIGINT NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'usd',
+    gateway TEXT NOT NULL DEFAULT '',
+    gateway_payment_id TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending', -- pending | waiting | credited | failed
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_deposit_user ON poker_deposit(user_id, created_at DESC);
