@@ -120,6 +120,22 @@ func (s *WithdrawalStore) Reject(ctx context.Context, id, reason string) error {
 	return tx.Commit()
 }
 
+// GetByID returns a withdrawal, or (nil, nil) if missing.
+func (s *WithdrawalStore) GetByID(ctx context.Context, id string) (*Withdrawal, error) {
+	var w Withdrawal
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id, user_id, amount_cents, currency, destination, gateway, gateway_payout_id, status, reason
+		FROM poker_withdrawal WHERE id=$1`, id).
+		Scan(&w.ID, &w.UserID, &w.AmountCents, &w.Currency, &w.Destination, &w.Gateway, &w.GatewayPayoutID, &w.Status, &w.Reason)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &w, nil
+}
+
 // SumRecentCents totals the user's non-rejected withdrawals in the trailing
 // window (for the tier's weekly withdraw limit).
 func (s *WithdrawalStore) SumRecentCents(ctx context.Context, userID string, hours int) (int64, error) {

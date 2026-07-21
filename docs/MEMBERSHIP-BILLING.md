@@ -118,9 +118,17 @@ Same daily-limit gate as crypto. Dormant without `STRIPE_SECRET_KEY`.
   transaction) and records a `pending` `poker_withdrawal`. Enforces the tier's
   **weekly** withdraw limit as a rolling 168h sum; requires a paid membership.
 - `withdrawal_list` (user) — recent requests + status.
-- `withdrawal_approve_admin` — marks `paid` (funds already held). Payout
-  execution (sending crypto/fiat) is operator-driven / a future gateway-payout
-  integration.
+- `withdrawal_approve_admin` — marks `paid`. **Automated crypto payout**: if the
+  withdrawal specified a coin (`currency` = e.g. `btc`/`usdttrc20`, routing
+  `gateway=nowpayments`) and payout is configured, approve **executes** the
+  NOWPayments payout (auth → USD→coin estimate → payout) and records the batch id.
+  Fiat/manual withdrawals stay operator-sent by hand.
+
+  Automated payout env (in addition to the deposit keys): `NOWPAYMENTS_EMAIL` +
+  `NOWPAYMENTS_PASSWORD` (for the payout JWT). NOWPayments may also require a
+  whitelisted IP and per-payout 2FA on the account; with 2FA on, the batch is
+  created but completes after operator verification. Without these, approve falls
+  back to manual "mark paid".
 - `withdrawal_reject_admin` — **refunds** the held funds and marks `rejected`.
 
 The wallet is the single authoritative ledger; every hold/refund writes to

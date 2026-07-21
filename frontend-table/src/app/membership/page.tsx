@@ -197,13 +197,18 @@ export default function MembershipPage() {
 
   const [wdAmount, setWdAmount] = useState("25");
   const [wdDest, setWdDest] = useState("");
+  const [wdCurrency, setWdCurrency] = useState("");
   const withdraw = useCallback(async () => {
     setBusy("withdraw");
     setMessage(null);
     setError(null);
     try {
       const cents = Math.round(parseFloat(wdAmount || "0") * 100);
-      await callSessionRpc("wallet_withdraw", { amount_cents: cents, destination: wdDest.trim() });
+      await callSessionRpc("wallet_withdraw", {
+        amount_cents: cents,
+        destination: wdDest.trim(),
+        currency: wdCurrency.trim(),
+      });
       setMessage("Withdrawal requested — pending review.");
       setWdDest("");
       await load();
@@ -212,7 +217,7 @@ export default function MembershipPage() {
     } finally {
       setBusy(null);
     }
-  }, [wdAmount, wdDest, load]);
+  }, [wdAmount, wdDest, wdCurrency, load]);
 
   const claimBonus = useCallback(async () => {
     setBusy("bonus");
@@ -511,8 +516,15 @@ export default function MembershipPage() {
               type="text"
               value={wdDest}
               onChange={(e) => setWdDest(e.target.value)}
-              placeholder="Payout destination (address / account)"
+              placeholder="Payout destination (crypto address / account)"
               className="mt-2 w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:border-amber-400/50 focus:outline-none"
+            />
+            <input
+              type="text"
+              value={wdCurrency}
+              onChange={(e) => setWdCurrency(e.target.value)}
+              placeholder="Coin for auto-payout (e.g. btc, usdttrc20) — blank = manual"
+              className="mt-2 w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-xs text-white placeholder:text-neutral-600 focus:border-amber-400/50 focus:outline-none"
             />
             <button
               type="button"

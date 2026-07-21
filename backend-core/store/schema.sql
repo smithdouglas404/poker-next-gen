@@ -274,3 +274,17 @@ CREATE TABLE IF NOT EXISTS poker_active_seat (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (user_id, match_id)
 );
+
+-- Club membership (the general member roster, distinct from poker_owner which
+-- carries equity/config rights). Roles: owner | admin | member.
+CREATE TABLE IF NOT EXISTS poker_club_member (
+    club_id TEXT NOT NULL REFERENCES poker_club(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL,
+    username TEXT NOT NULL DEFAULT '',
+    role TEXT NOT NULL DEFAULT 'member',
+    status TEXT NOT NULL DEFAULT 'active',
+    joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (club_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_club_member_user ON poker_club_member(user_id);

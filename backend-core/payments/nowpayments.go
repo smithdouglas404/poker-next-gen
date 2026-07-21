@@ -123,3 +123,124 @@ func ParseNowPaymentsEvent(rawBody string) (NowPaymentsEvent, error) {
 func FormatCentsUSD(cents int64) string {
 	return "$" + strconv.FormatFloat(float64(cents)/100.0, 'f', 2, 64)
 }
+
+// ── Payouts (withdrawal execution) ─────────────────────────────────────────
+//
+// NOWPayments mass-payout needs a JWT (email/password) in addition to the API
+// key, and — depending on the account — a whitelisted IP and per-payout 2FA. We
+// implement auth → estimate (USD→coin) → create payout. If the account requires
+// 2FA verification, the batch is created but stays pending on NOWPayments until
+// an operator verifies it; the approve flow still records our side as paid with
+// the batch id. Fully hands-off payout requires the account be configured for
+// it. Gated on NOWPAYMENTS_EMAIL + NOWPAYMENTS_PASSWORD.
+
+// NowPaymentsPayoutConfigured reports whether automated crypto payouts are set up.
+func NowPaymentsPayoutConfigured() bool {
+	return NowPaymentsConfigured() &&
+		os.Getenv("NOWPAYMENTS_EMAIL") != "" &&
+		os.Getenv("NOWPAYMENTS_PASSWORD") != ""
+}
+
+func nowPaymentsAuth(ctx context.Context) (string, error) {
+	body, _ := json.Marshal(map[string]string{
+		"email":    os.Getenv("NOWPAYMENTS_EMAIL"),
+		"password": os.Getenv("NOWPAYMENTS_PASSWORD"),
+	})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, nowPaymentsAPI+"/auth", bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 300 {
+		return "", fmt.Errorf("nowpayments auth http %d: %s", resp.StatusCode, string(raw))
+	}
+	var out struct {
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return "", err
+	}
+	if out.Token == "" {
+		return "", fmt.Errorf("nowpayments auth: empty token")
+	}
+	return out.Token, nil
+}
+
+// estimateCoinAmount converts USD cents to the payout coin's amount string.
+func estimateCoinAmount(ctx context.Context, amountCents int64, currency string) (string, error) {
+	url := fmt.Sprintf("%s/estimate?amount=%s&currency_from=usd&currency_to=%s",
+		nowPaymentsAPI, strconv.FormatFloat(float64(amountCents)/100.0, 'f', 2, 64), currency)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("x-api-key", os.Getenv("NOWPAYMENTS_API_KEY"))
+	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 300 {
+		return "", fmt.Errorf("nowpayments estimate http %d: %s", resp.StatusCode, string(raw))
+	}
+	var out struct {
+		EstimatedAmount json.Number `json:"estimated_amount"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return "", err
+	}
+	if out.EstimatedAmount.String() == "" {
+		return "", fmt.Errorf("nowpayments estimate: empty amount")
+	}
+	return out.EstimatedAmount.String(), nil
+}
+
+// CreateNowPaymentsPayout sends `amountCents` (USD) worth of `currency` to
+// `address`, returning the payout batch id. `currency` is the coin ticker
+// (e.g. "btc", "usdttrc20").
+func CreateNowPaymentsPayout(ctx context.Context, address, currency string, amountCents int64) (string, error) {
+	token, err := nowPaymentsAuth(ctx)
+	if err != nil {
+		return "", err
+	}
+	coinAmount, err := estimateCoinAmount(ctx, amountCents, currency)
+	if err != nil {
+		return "", err
+	}
+	body, _ := json.Marshal(map[string]interface{}{
+		"ipn_callback_url": os.Getenv("NOWPAYMENTS_IPN_CALLBACK_URL"),
+		"withdrawals": []map[string]interface{}{
+			{"address": address, "currency": currency, "amount": coinAmount},
+		},
+	})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, nowPaymentsAPI+"/payout", bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("x-api-key", os.Getenv("NOWPAYMENTS_API_KEY"))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := (&http.Client{Timeout: 20 * time.Second}).Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 300 {
+		return "", fmt.Errorf("nowpayments payout http %d: %s", resp.StatusCode, string(raw))
+	}
+	var out struct {
+		ID json.Number `json:"id"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return "", err
+	}
+	return out.ID.String(), nil
+}
