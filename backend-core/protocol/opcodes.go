@@ -34,7 +34,7 @@ const (
 const (
 	MatchModule           = "holdem_cash_6max"
 	TournamentModule      = "tournament_director"
-	MaxSeats              = 9 // physical seat cap; a table's active seats (2-9) is configurable
+	MaxSeats              = 10 // physical seat cap; a table's active seats (2-10) is configurable
 )
 
 const (

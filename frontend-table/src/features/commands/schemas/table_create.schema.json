@@ -63,7 +63,7 @@
       "title": "Seats at the table",
       "type": "integer",
       "minimum": 2,
-      "maximum": 9,
+      "maximum": 10,
       "x-unit": "count",
       "x-order": 5
     },
@@ -71,7 +71,7 @@
       "title": "Players needed to start",
       "type": "integer",
       "minimum": 2,
-      "maximum": 9,
+      "maximum": 10,
       "x-unit": "count",
       "x-order": 6
     },
@@ -84,7 +84,7 @@
       "title": "Bots",
       "type": "integer",
       "minimum": 0,
-      "maximum": 8,
+      "maximum": 9,
       "x-unit": "count",
       "x-order": 7
     },

@@ -37,6 +37,10 @@ export const COMMAND_ACCESS: Record<string, AccessLevel> = {
   club_members: "member",
   club_roster: "member",
 
+  // Anti-bot scoring is operator-only — never advertise the mechanics to players
+  // who could probe their own detectability (P1-9).
+  antibot_score: "platform_admin",
+
   // Tournaments — structure edits are configurer/creator (server: requireTournamentOwner).
   tournament_create: "configurer",
   tournament_blinds: "configurer",

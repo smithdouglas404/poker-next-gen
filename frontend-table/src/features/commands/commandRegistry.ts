@@ -405,11 +405,12 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
   {
     id: "antibot_score",
     title: "Anti-Bot Pattern Score",
-    description: "Betting-pattern bot-likelihood score from recent action history.",
+    description: "ML bot-likelihood scoring runs automatically on every table; review flagged players here.",
     category: "security",
     status: "live",
     rpc: "antibot_score",
     icon: "🛡",
+    requires: "platform_admin",
     example: {
       user_id: "player_1",
       actions: [

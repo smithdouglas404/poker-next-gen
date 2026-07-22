@@ -23,6 +23,9 @@ type gtoAdviseRequest struct {
 
 // GtoAdvise proxies equity-based GTO approximation to engine-math (rs_poker CFR-lite).
 func GtoAdvise(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	if err := guardRTA(payload); err != nil { // S-1: no live assistance at stakes tables
+		return "", err
+	}
 	var req gtoAdviseRequest
 	if payload != "" {
 		_ = json.Unmarshal([]byte(payload), &req)
@@ -58,6 +61,9 @@ type gtoSolveRequest struct {
 // heads-up spot — real counterfactual regret minimization, not the equity
 // heuristic behind GtoAdvise.
 func GtoSolve(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	if err := guardRTA(payload); err != nil { // S-1
+		return "", err
+	}
 	var req gtoSolveRequest
 	if payload != "" {
 		_ = json.Unmarshal([]byte(payload), &req)
@@ -93,6 +99,9 @@ func GtoSolve(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime
 
 // CoachingTip returns Smart HUD coaching alerts (MCP-ready analysis surface).
 func CoachingTip(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	if err := guardRTA(payload); err != nil { // S-1
+		return "", err
+	}
 	var req coaching.TipRequest
 	if payload != "" {
 		_ = json.Unmarshal([]byte(payload), &req)
