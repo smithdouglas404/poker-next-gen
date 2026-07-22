@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { authenticate } from "@/lib/nakama/auth";
 import { Button, Field, Input, Panel, SectionHeader } from "@/features/ui";
@@ -10,6 +10,14 @@ import { Button, Field, Input, Panel, SectionHeader } from "@/features/ui";
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "signup">("login");
+
+  // Open directly in sign-up when linked as /login?mode=signup ("Join" button).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("mode") === "signup") {
+      setMode("signup");
+    }
+  }, []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");

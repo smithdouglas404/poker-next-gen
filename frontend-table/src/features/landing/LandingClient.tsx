@@ -71,8 +71,43 @@ export function LandingClient() {
 
   return (
     <div className="min-h-screen overflow-hidden text-foreground">
+      {/* Marketing header — makes sign-in / join explicit instead of hidden
+          behind the hero's "Play now" button. */}
+      <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#0b0d0f]/85 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3.5">
+          <Link href="/" className="flex items-center gap-2">
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-[#f5c518] to-[#d4a80f] font-display text-sm font-bold text-black">
+              HR
+            </span>
+            <span className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
+              {siteName}
+            </span>
+          </Link>
+          <nav className="flex items-center gap-2">
+            <Link
+              href="/provably-fair"
+              className="hidden rounded-lg px-3 py-2 text-sm font-semibold text-neutral-400 transition hover:text-white sm:inline"
+            >
+              How it works
+            </Link>
+            <Link
+              href="/login"
+              className="rounded-lg px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:text-white"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/login?mode=signup"
+              className={cn(BTN_GOLD, "rounded-lg px-4 py-2 text-sm uppercase tracking-wide")}
+            >
+              Join
+            </Link>
+          </nav>
+        </div>
+      </header>
+
       {/* Hero */}
-      <section className="relative px-6 pt-24 pb-14 text-center">
+      <section className="relative px-6 pt-16 pb-14 text-center">
         <div className="pointer-events-none absolute inset-0 -z-10">
           <div className="absolute left-1/2 top-0 h-[440px] w-[860px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse,rgba(255,255,255,0.035),transparent_65%)]" />
         </div>
