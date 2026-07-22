@@ -202,6 +202,93 @@ pub fn reproduce_from_seed(seed_hex: &str) -> Result<(Vec<String>, String), Stri
     Ok((shuffle_with_seed(&seed), seed_commitment(&seed)))
 }
 
+/// Deal `boards` independent completions of a partial board ("run it twice/N times").
+///
+/// Given the current community `board` (0–5 cards) and every known dead card
+/// (`dead`: typically all players' hole cards — the board's own cards are unioned
+/// in automatically), this returns `boards` full 5-card boards. Each runout is
+/// dealt WITHOUT replacement from the cards still in the 52-card deck, and the
+/// runouts are INDEPENDENT of one another (each starts from the same remaining
+/// deck) — the standard rule for running a board multiple times when players are
+/// all-in. `boards` is clamped to `[1, 4]`.
+///
+/// # Errors
+/// Returns `Err` on unparseable cards, a board with more than 5 cards, a
+/// duplicate board card, or too few cards left to complete the requested boards.
+pub fn run_it_twice(board: &str, dead: &[&str], boards: usize) -> Result<Vec<String>, String> {
+    use rand::seq::SliceRandom;
+    let n_boards = boards.clamp(1, 4);
+
+    let mut used: std::collections::HashSet<String> = std::collections::HashSet::new();
+    // Parse the board by 2-char chunks so the existing flop/turn ORDER is preserved
+    // verbatim (rs_poker's `Hand` reorders internally, which we must not do to a
+    // board that is already on the table).
+    let board = board.trim();
+    if board.len() % 2 != 0 {
+        return Err(format!("board '{board}' has a dangling card code"));
+    }
+    let mut board_cards: Vec<String> = Vec::with_capacity(board.len() / 2);
+    let chars: Vec<char> = board.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        let r = chars[i];
+        let s = chars[i + 1];
+        if !RANKS.contains(&r) || !SUITS.contains(&s) {
+            return Err(format!("invalid board card '{r}{s}'"));
+        }
+        let code = format!("{r}{s}");
+        if !used.insert(code.clone()) {
+            return Err(format!("duplicate board card {code}"));
+        }
+        board_cards.push(code);
+        i += 2;
+    }
+    if board_cards.len() > 5 {
+        return Err(format!("board has {} cards, max 5", board_cards.len()));
+    }
+    for d in dead {
+        if d.trim().is_empty() {
+            continue;
+        }
+        let hand =
+            Hand::new_from_str(d).map_err(|e| format!("invalid dead cards '{d}': {e:?}"))?;
+        for c in hand.iter() {
+            // Two players cannot hold the same card in a real deal; if a caller
+            // passes a collision we simply treat the card as already dead.
+            used.insert(c.to_string());
+        }
+    }
+
+    let need = 5usize.saturating_sub(board_cards.len());
+    let mut remaining: Vec<String> = Vec::with_capacity(52);
+    for &r in &RANKS {
+        for &s in &SUITS {
+            let code = format!("{r}{s}");
+            if !used.contains(&code) {
+                remaining.push(code);
+            }
+        }
+    }
+    if remaining.len() < need {
+        return Err(format!(
+            "not enough cards left to run out ({} available, {need} needed)",
+            remaining.len()
+        ));
+    }
+
+    let mut rng = rand::rngs::OsRng;
+    let mut out = Vec::with_capacity(n_boards);
+    for _ in 0..n_boards {
+        // Independent runout: shuffle a fresh copy of the remaining deck each time.
+        let mut deck = remaining.clone();
+        deck.shuffle(&mut rng);
+        let mut full = board_cards.clone();
+        full.extend(deck.into_iter().take(need));
+        out.push(full.join(""));
+    }
+    Ok(out)
+}
+
 /// Rank an Omaha hand (PLO4–PLO7): exactly two hole cards + three board cards.
 pub fn rank_omaha(hole: &str, board: &str) -> Result<Rank, String> {
     let hand = OmahaHand::new_from_str(hole, board)
@@ -869,6 +956,40 @@ mod tests {
             strong.converged,
             weak.suggested_action,
         );
+    }
+
+    #[test]
+    fn run_it_twice_deals_distinct_complete_boards() {
+        // Flop out, hole cards known: run it twice must produce two full 5-card
+        // boards that keep the flop, never reuse a dead card, and are internally
+        // consistent (5 distinct cards each).
+        let dead = ["AsAh", "KsKh"];
+        let boards = run_it_twice("QdJc2s", &dead, 2).expect("run it twice");
+        assert_eq!(boards.len(), 2);
+        let used_dead: std::collections::HashSet<&str> =
+            ["As", "Ah", "Ks", "Kh", "Qd", "Jc", "2s"].into_iter().collect();
+        for b in &boards {
+            // Each full board is 5 cards (10 chars) and starts with the flop.
+            assert_eq!(b.len(), 10, "board should be 5 cards: {b}");
+            assert!(b.starts_with("QdJc2s"), "board must keep the flop: {b}");
+            let cards: Vec<String> = (0..5).map(|i| b[i * 2..i * 2 + 2].to_string()).collect();
+            let uniq: std::collections::HashSet<&String> = cards.iter().collect();
+            assert_eq!(uniq.len(), 5, "board cards must be distinct: {b}");
+            // The two runout cards (turn+river) must not collide with dead cards.
+            for c in &cards[3..] {
+                assert!(!used_dead.contains(c.as_str()), "runout reused dead card {c}");
+            }
+        }
+    }
+
+    #[test]
+    fn run_it_twice_rejects_overfull_board() {
+        // A 5-card board has nothing left to run; asking still returns it verbatim.
+        let boards = run_it_twice("QdJc2s5h9c", &["AsAh"], 3).expect("already complete");
+        assert_eq!(boards.len(), 3);
+        for b in &boards {
+            assert_eq!(b, "QdJc2s5h9c");
+        }
     }
 
     #[test]

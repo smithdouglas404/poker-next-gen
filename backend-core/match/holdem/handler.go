@@ -20,6 +20,7 @@ import (
 	"github.com/smithdouglas404/poker-next-gen/backend-core/bot"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/loyalty"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/poker"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/poker/enginemath"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/protocol"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/social"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
@@ -61,6 +62,19 @@ type MatchState struct {
 	// Per-hand behavioural tracking (userID -> counters), reset each hand start
 	// and drained into poker_hand_stats at settlement. Feeds VPIP/PFR/AF.
 	HandTrack        map[string]*playerHandTrack
+	// Optional table features (#41), all per-hand and reset at hand start:
+	RITAgree         map[string]bool             // userID -> agreed to run it twice
+	Insurance        map[string]insurancePolicy  // userID -> accepted all-in insurance
+	InsOffered       map[string]insurancePolicy  // userID -> standing (unaccepted) offer
+}
+
+// insurancePolicy is one all-in insurance wager, settled against the wallet (not
+// the pot): the player pays Premium up front and receives Payout if they lose.
+type insurancePolicy struct {
+	Seat    int
+	Premium int64
+	Payout  int64
+	Equity  float64
 }
 
 // autoDealDelayTicks is the breather between hands on a self-dealing table
@@ -122,6 +136,23 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	table := poker.NewTable()
 	table.SetSeatCap(maxSeats)
 	table.SetVariant(variant)
+	// Optional table features (#41). All default-off; a table with none of these
+	// params behaves exactly as before.
+	if v, ok := params["allow_straddle"].(bool); ok {
+		table.AllowStraddle = v
+	}
+	if v, ok := params["allow_bomb_pot"].(bool); ok {
+		table.AllowBombPot = v
+	}
+	if v, ok := params["bomb_pot_ante"].(float64); ok && v > 0 {
+		table.BombPotAnte = int64(v)
+	}
+	if v, ok := params["allow_insurance"].(bool); ok {
+		table.AllowInsurance = v
+	}
+	if v, ok := params["allow_run_it_twice"].(bool); ok {
+		table.AllowRunItTwice = v
+	}
 	// Seed AI opponents at creation (server-authoritative, like OddSlingers).
 	for i := 0; i < numBots; i++ {
 		seat := table.FirstEmptySeat()
@@ -147,6 +178,9 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		Presences:    map[string]runtime.Presence{},
 		Rand:         rand.New(rand.NewSource(time.Now().UnixNano())),
 		SessionKeys:  map[string][]byte{},
+		RITAgree:     map[string]bool{},
+		Insurance:    map[string]insurancePolicy{},
+		InsOffered:   map[string]insurancePolicy{},
 		DurationSecs: durationSecs,
 		// Cash tables deal themselves (no operator babysitting); tournament tables
 		// are driven by the tournament director, so they opt out.
@@ -273,8 +307,12 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 
 		// Chat and standing up are allowed at any time; game actions are gated
 		// to the betting phase.
+		// Straddle-arming and run-it-twice votes are lightweight opt-ins that may
+		// arrive between hands (like chat / standing up), so they bypass the
+		// betting-phase gate; their handlers validate table state themselves.
 		if !s.Phase.AllowsPlayerActions() &&
-			msg.GetOpCode() != protocol.OpStandUp && msg.GetOpCode() != protocol.OpChatSend {
+			msg.GetOpCode() != protocol.OpStandUp && msg.GetOpCode() != protocol.OpChatSend &&
+			msg.GetOpCode() != protocol.OpPostStraddle && msg.GetOpCode() != protocol.OpRunItTwice {
 			sendError(dispatcher, presence, "hand_busy", "showdown in progress")
 			continue
 		}
@@ -358,6 +396,46 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			}
 			handleHostAction(ctx, db, dispatcher, s, msg.GetData())
 
+		case protocol.OpPostStraddle:
+			if !s.Table.AllowStraddle {
+				sendError(dispatcher, presence, "straddle_disabled", "straddles are not enabled at this table")
+				continue
+			}
+			if seatForUser(s, userID) < 0 {
+				sendError(dispatcher, presence, "not_seated", "sit down to post a straddle")
+				continue
+			}
+			var req protocol.PostStraddleRequest
+			_ = json.Unmarshal(msg.GetData(), &req)
+			s.Table.StraddleRequested = req.Enable
+			if req.Enable {
+				narrate(dispatcher, s, fmt.Sprintf("%s armed a straddle for the next hand.", displayName(s, userID)))
+			} else {
+				narrate(dispatcher, s, "Straddle disarmed for the next hand.")
+			}
+			broadcastSnapshot(ctx, db, dispatcher, s, nil)
+
+		case protocol.OpRunItTwice:
+			if !s.Table.AllowRunItTwice {
+				sendError(dispatcher, presence, "rit_disabled", "run-it-twice is not enabled at this table")
+				continue
+			}
+			if seatForUser(s, userID) < 0 {
+				continue
+			}
+			var vote protocol.RunItTwiceVote
+			_ = json.Unmarshal(msg.GetData(), &vote)
+			if s.RITAgree == nil {
+				s.RITAgree = map[string]bool{}
+			}
+			s.RITAgree[userID] = vote.Agree
+			if vote.Agree {
+				narrate(dispatcher, s, fmt.Sprintf("%s agrees to run it twice.", displayName(s, userID)))
+			}
+
+		case protocol.OpInsuranceAccept:
+			handleInsuranceAccept(ctx, db, dispatcher, s, userID, presence, msg.GetData())
+
 		case protocol.OpStartHand:
 			if s.Table.SeatedCount() >= 2 && s.Phase == poker.PhaseWaiting && s.Table.Street == poker.StreetWaiting {
 				if err := s.Table.StartHand(s.SmallBlind, s.BigBlind); err != nil {
@@ -368,8 +446,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				emitHandStarted(ctx, s)
 				narrate(dispatcher, s, fmt.Sprintf("Hand #%d dealt — blinds $%d/$%d", s.Table.HandNo, s.SmallBlind/100, s.BigBlind/100))
 				broadcastHandStart(ctx, db, dispatcher, s)
-				dealPrivateCards(dispatcher, s)
-				broadcastActionRequired(ctx, db, dispatcher, s)
+				dealAndBeginBetting(ctx, db, dispatcher, s)
 			}
 
 		case protocol.OpAction:
@@ -407,6 +484,11 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				broadcastActionRequired(ctx, db, dispatcher, s)
 			} else {
 				broadcastActionRequired(ctx, db, dispatcher, s)
+			}
+			// If that action put a player all-in with opponents still to act, offer
+			// all-in insurance (no-op unless the feature is enabled).
+			if s.Phase.AllowsPlayerActions() {
+				maybeOfferInsurance(ctx, db, dispatcher, s)
 			}
 		}
 	}
@@ -489,10 +571,24 @@ func boardCodes(board []poker.Card) string {
 	return out
 }
 
+// boardStrings renders each run-it-twice board as a concatenated card-code string
+// for persistence (poker_run_it_twice.boards).
+func boardStrings(boards [][]poker.Card) []string {
+	out := make([]string, 0, len(boards))
+	for _, b := range boards {
+		out = append(out, boardCodes(b))
+	}
+	return out
+}
+
 func beginShowdownResolution(ctx context.Context, s *MatchState) {
 	if s.Phase == poker.PhaseResolvingSidePots {
 		return
 	}
+	// Decide run-it-twice before snapshotting the plan: only when enabled, the
+	// board is incomplete, and every remaining player is all-in AND has agreed
+	// (bots auto-agree). Otherwise the standard single-board path runs unchanged.
+	s.Table.RunItTwice = shouldRunItTwice(s)
 	plan := poker.BuildShowdownPlan(s.Table, matchIDForAudit(s))
 	s.Phase = poker.PhaseResolvingSidePots
 	s.PendingShowdown = &PendingShowdown{
@@ -501,6 +597,211 @@ func beginShowdownResolution(ctx context.Context, s *MatchState) {
 		Plan:      plan,
 	}
 	emitSidePotsPlanned(ctx, s, plan)
+}
+
+// shouldRunItTwice reports whether the imminent showdown should run the board
+// multiple times: the feature must be enabled, the board incomplete, and every
+// non-folded player must be all-in and (if human) have agreed to it.
+//
+// TODO(#41): the agreement is collected as a pre-commit vote during betting
+// (OpRunItTwice), not via a dedicated post-all-in prompt with a decision timer.
+// Adding a real vote window means a new match phase between "all-in reached" and
+// showdown resolution — deliberately deferred here to avoid destabilizing the
+// live showdown path. The per-board deal/split/side-pot resolution below is fully
+// implemented and gated behind AllowRunItTwice.
+func shouldRunItTwice(s *MatchState) bool {
+	t := s.Table
+	if !t.AllowRunItTwice || t.RunItTwiceBoards < 2 {
+		return false
+	}
+	if len(t.Board) >= 5 {
+		return false
+	}
+	remaining := t.NonFoldedSeats()
+	if len(remaining) < 2 {
+		return false
+	}
+	for _, i := range remaining {
+		seat := t.Seats[i]
+		if seat == nil || seat.Status != poker.SeatAllIn {
+			return false // someone can still act — not an all-in runout
+		}
+		if !seat.IsBot && !s.RITAgree[seat.UserID] {
+			return false // every human in the pot must agree
+		}
+	}
+	return true
+}
+
+// displayName resolves a user's seat username for narration, falling back to a
+// short id-derived handle.
+func displayName(s *MatchState, userID string) string {
+	if seat := seatForUser(s, userID); seat >= 0 && s.Table.Seats[seat] != nil {
+		if n := s.Table.Seats[seat].Username; n != "" {
+			return n
+		}
+	}
+	if len(userID) >= 4 {
+		return "Player_" + userID[:4]
+	}
+	return "Player"
+}
+
+// maybeOfferInsurance offers an all-in favorite insurance priced off live equity
+// (rs_poker via enginemath.EstimateEquity), payable if they end up losing. It is
+// only offered on plain cash tables (no club/tournament wallet indirection), when
+// the board is incomplete, and while at least one opponent can still act — so the
+// player has a betting-phase window to accept. Money never touches the pot.
+//
+// TODO(#41): insurance is priced ONCE at the moment of the all-in using the
+// current board, and the accept window only exists while an opponent can still
+// act (no window when everyone is all-in simultaneously). Per-street re-pricing
+// and a formal offer/accept prompt with a timer are the remaining UX pieces; the
+// pricing (real equity), wallet-side premium debit, and loss payout are complete
+// and gated behind AllowInsurance.
+func maybeOfferInsurance(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
+	if !s.Table.AllowInsurance || s.ClubID != "" || s.TournamentID != "" {
+		return
+	}
+	if len(s.Table.Board) >= 5 {
+		return
+	}
+	remaining := s.Table.NonFoldedSeats()
+	if len(remaining) < 2 {
+		return
+	}
+	// An accept window only exists if someone who is NOT all-in can still act.
+	someoneCanAct := false
+	for _, i := range remaining {
+		seat := s.Table.Seats[i]
+		if seat != nil && seat.Status == poker.SeatSeated && seat.Stack > 0 {
+			someoneCanAct = true
+			break
+		}
+	}
+	if !someoneCanAct {
+		return
+	}
+	// Build the contesting holes in seat order for the equity call.
+	holes := make([]string, 0, len(remaining))
+	seatOf := make([]int, 0, len(remaining))
+	for _, i := range remaining {
+		seat := s.Table.Seats[i]
+		hole := s.Table.HoleCards[seat.UserID]
+		if len(hole) == 0 {
+			return // incomplete knowledge; skip pricing this round
+		}
+		holes = append(holes, holeCodes(hole))
+		seatOf = append(seatOf, i)
+	}
+	eq, err := enginemath.EstimateEquity(holes, boardCodes(s.Table.Board), 1500)
+	if err != nil || len(eq) != len(holes) {
+		return // engine-math unavailable: no offer (never guess equity)
+	}
+	for k, i := range seatOf {
+		seat := s.Table.Seats[i]
+		if seat == nil || seat.IsBot || seat.Status != poker.SeatAllIn {
+			continue
+		}
+		if _, present := s.Presences[seat.UserID]; !present {
+			continue
+		}
+		if _, offered := s.InsOffered[seat.UserID]; offered {
+			continue // one offer per player per hand (MVP)
+		}
+		if _, accepted := s.Insurance[seat.UserID]; accepted {
+			continue
+		}
+		q := float64(eq[k])
+		if q < 0.5 {
+			continue // only offer favorites protection against a bad beat
+		}
+		payout := seat.TotalContributed // recover their at-risk stake if they lose
+		if payout <= 0 {
+			continue
+		}
+		// Fair premium = (1-q)*payout; add a 10% house margin. Guard against a
+		// premium that meets/exceeds the payout (never a sensible bet).
+		premium := int64(float64(payout) * (1.0 - q) * 1.10)
+		if premium <= 0 || premium >= payout {
+			continue
+		}
+		policy := insurancePolicy{Seat: i, Premium: premium, Payout: payout, Equity: q}
+		s.InsOffered[seat.UserID] = policy
+		if p, ok := s.Presences[seat.UserID]; ok {
+			msg, _ := json.Marshal(protocol.InsuranceOfferMessage{
+				Seat:    i,
+				HandNo:  s.Table.HandNo,
+				Premium: premium,
+				Payout:  payout,
+				Equity:  q,
+			})
+			_ = dispatcher.BroadcastMessage(protocol.OpInsuranceOffer, msg, []runtime.Presence{p}, nil, true)
+		}
+	}
+}
+
+// handleInsuranceAccept debits the premium from the player's wallet and records
+// the policy. Settlement (payout on loss) happens at showdown. Wallet-only: the
+// live pot is never touched, so pot/side-pot invariants are unaffected.
+func handleInsuranceAccept(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, userID string, presence runtime.Presence, data []byte) {
+	if !s.Table.AllowInsurance {
+		sendError(dispatcher, presence, "insurance_disabled", "insurance is not enabled at this table")
+		return
+	}
+	policy, ok := s.InsOffered[userID]
+	if !ok {
+		sendError(dispatcher, presence, "no_offer", "no standing insurance offer")
+		return
+	}
+	if _, already := s.Insurance[userID]; already {
+		return
+	}
+	if err := store.NewWalletStore(db).Debit(ctx, userID, policy.Premium, "insurance_premium"); err != nil {
+		sendError(dispatcher, presence, "premium_failed", err.Error())
+		return
+	}
+	s.Insurance[userID] = policy
+	delete(s.InsOffered, userID)
+	_ = store.NewInsuranceStore(db).RecordAccepted(ctx, matchIDForAudit(s), s.Table.HandNo, userID, policy.Premium, policy.Payout, policy.Equity)
+	narrate(dispatcher, s, fmt.Sprintf("%s took insurance on their all-in.", displayName(s, userID)))
+	broadcastSnapshot(ctx, db, dispatcher, s, nil)
+}
+
+// settleInsurance pays out accepted policies whose holder lost the hand and marks
+// every policy resolved. Called at showdown before seats reset, using the winner
+// seats from the resolution. Wallet-only; independent of pot settlement.
+func settleInsurance(ctx context.Context, db *sql.DB, s *MatchState, res poker.ShowdownResult) {
+	if len(s.Insurance) == 0 {
+		return
+	}
+	won := map[int]bool{}
+	for _, r := range res.Resolutions {
+		for _, seat := range r.Winners {
+			won[seat] = true
+		}
+	}
+	ins := store.NewInsuranceStore(db)
+	for userID, policy := range s.Insurance {
+		seat := seatForUser(s, userID)
+		playerWon := seat >= 0 && won[seat]
+		if !playerWon {
+			// Lost the hand — pay the insurance payout to their wallet.
+			_ = store.NewWalletStore(db).Credit(ctx, userID, policy.Payout, "insurance_payout")
+			_ = ins.Settle(ctx, matchIDForAudit(s), s.Table.HandNo, userID, true)
+		} else {
+			_ = ins.Settle(ctx, matchIDForAudit(s), s.Table.HandNo, userID, false)
+		}
+	}
+}
+
+// holeCodes concatenates a player's hole cards into an engine-math card string.
+func holeCodes(hole []poker.Card) string {
+	out := ""
+	for _, c := range hole {
+		out += c.Code()
+	}
+	return out
 }
 
 func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB, dispatcher runtime.MatchDispatcher, nk runtime.NakamaModule, s *MatchState) bool {
@@ -532,6 +833,14 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		recordWinnings(ctx, nk, s, res)
 		creditRake(ctx, db, s, potBefore)
 		accrueLoyalty(ctx, db, nk, s, res) // HRP + achievements (before seats reset)
+		// Run-it-twice: persist the dealt boards (audit/replay). All-in insurance:
+		// pay out policies whose holder lost. Both run before ResetBetweenHands
+		// while seat/winner state is still intact; both are wallet/record only and
+		// never touch the settled pot.
+		if len(res.Boards) > 0 {
+			_ = store.NewRunItTwiceStore(db).Record(ctx, matchIDForAudit(s), s.Table.HandNo, boardStrings(res.Boards))
+		}
+		settleInsurance(ctx, db, s, res)
 		// Per-hand analytics + mission progress (best-effort; must not break the
 		// match loop). Uses seat state before ResetBetweenHands clears it.
 		attributeHand(ctx, logger, db, s, res, plan, potBefore)
@@ -564,7 +873,23 @@ func autoStartHand(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDisp
 	emitHandStarted(ctx, s)
 	narrate(dispatcher, s, fmt.Sprintf("Hand #%d dealt — blinds $%d/$%d", s.Table.HandNo, s.SmallBlind/100, s.BigBlind/100))
 	broadcastHandStart(ctx, db, dispatcher, s)
+	dealAndBeginBetting(ctx, db, dispatcher, s)
+}
+
+// dealAndBeginBetting sends hole cards and opens the first betting round. It also
+// covers the bomb-pot case, where StartHand has already dealt the flop (so the
+// board must be broadcast) and — in the rare event every seated player is all-in
+// for the ante — advances straight to showdown resolution.
+func dealAndBeginBetting(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
 	dealPrivateCards(dispatcher, s)
+	if len(s.Table.Board) > 0 { // bomb pot: flop is already out
+		broadcastBoard(dispatcher, s)
+	}
+	if s.Table.ActionSeat < 0 {
+		beginShowdownResolution(ctx, s)
+		broadcastSnapshot(ctx, db, dispatcher, s, nil)
+		return
+	}
 	broadcastActionRequired(ctx, db, dispatcher, s)
 }
 
@@ -578,11 +903,25 @@ func handleHostAction(ctx context.Context, db *sql.DB, dispatcher runtime.MatchD
 		Seat       int    `json:"seat"`
 		SmallBlind int64  `json:"small_blind"`
 		BigBlind   int64  `json:"big_blind"`
+		Ante       int64  `json:"ante"`
 	}
 	if err := json.Unmarshal(data, &req); err != nil {
 		return
 	}
 	switch req.Action {
+	case "bomb_pot":
+		if !s.Table.AllowBombPot {
+			return
+		}
+		if req.Ante > 0 {
+			s.Table.BombPotAnte = req.Ante
+		}
+		s.Table.BombPotRequested = true
+		ante := s.Table.BombPotAnte
+		if ante <= 0 {
+			ante = s.BigBlind
+		}
+		narrate(dispatcher, s, fmt.Sprintf("Host called a BOMB POT — every player antes $%d and the hand deals straight to the flop.", ante/100))
 	case "pause":
 		s.HostPaused = true
 		s.NextDealTick = 0
@@ -642,6 +981,10 @@ func matchIDForAudit(s *MatchState) string {
 func emitHandStarted(ctx context.Context, s *MatchState) {
 	// Start a fresh per-hand behavioural tracker (VPIP/PFR/AF derivation).
 	s.HandTrack = map[string]*playerHandTrack{}
+	// Clear per-hand table-feature state (run-it-twice votes, insurance offers).
+	s.RITAgree = map[string]bool{}
+	s.Insurance = map[string]insurancePolicy{}
+	s.InsOffered = map[string]insurancePolicy{}
 	if s.Audit == nil {
 		return
 	}
@@ -1088,6 +1431,11 @@ func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) 
 		Variant:        s.Table.Variant,
 		HostUserID:     s.HostUserID,
 		HostPaused:     s.HostPaused,
+		AllowStraddle:   s.Table.AllowStraddle,
+		AllowBombPot:    s.Table.AllowBombPot,
+		AllowInsurance:  s.Table.AllowInsurance,
+		AllowRunItTwice: s.Table.AllowRunItTwice,
+		StraddleArmed:   s.Table.StraddleRequested,
 	}
 }
 
@@ -1205,14 +1553,28 @@ func broadcastShowdownFromResult(ctx context.Context, db *sql.DB, dispatcher run
 			})
 		}
 	}
-	data, _ := json.Marshal(map[string]interface{}{
+	payload := map[string]interface{}{
 		"pot":         pot,
 		"hands":       reveal,
 		"winners":     winnerViews,
 		"side_pots":   len(winnerGroups),
 		"deck_commit": s.Table.DeckCommitment, // committed before the deal
 		"reveal_seed": s.Table.DeckSeed,       // reveal now — re-run to verify fairness
-	})
+	}
+	// Run-it-twice: surface each dealt board so the client can show all runouts.
+	if len(res.Boards) > 0 {
+		boards := make([][]protocol.CardView, 0, len(res.Boards))
+		for _, b := range res.Boards {
+			cv := make([]protocol.CardView, 0, len(b))
+			for _, c := range b {
+				cv = append(cv, protocol.CardView{Code: c.Code(), FaceUp: true})
+			}
+			boards = append(boards, cv)
+		}
+		payload["boards"] = boards
+		payload["run_it_twice"] = true
+	}
+	data, _ := json.Marshal(payload)
 	_ = dispatcher.BroadcastMessage(protocol.OpShowdown, data, nil, nil, true)
 
 	// Play-by-play: announce each pot's winner(s) and amount.

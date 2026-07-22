@@ -92,6 +92,12 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		"variant":       variant,
 		"duration_secs": durationSecs,
 		"host_user_id":  hostUserID,
+		// Optional table features (#41); default-off so a plain table is unchanged.
+		"allow_straddle":     req.AllowStraddle,
+		"allow_bomb_pot":     req.AllowBombPot,
+		"bomb_pot_ante":      req.BombPotAnte,
+		"allow_insurance":    req.AllowInsurance,
+		"allow_run_it_twice": req.AllowRunItTwice,
 	})
 	if err != nil {
 		return "", err

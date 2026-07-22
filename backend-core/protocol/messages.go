@@ -51,6 +51,13 @@ type TableSnapshot struct {
 	Variant        string      `json:"variant,omitempty"` // "holdem" | "plo"
 	HostUserID     string      `json:"host_user_id,omitempty"`
 	HostPaused     bool        `json:"host_paused,omitempty"`
+	// Optional table-feature capabilities (#41) so the client only shows controls
+	// that bind to a live, enabled RPC path.
+	AllowStraddle   bool `json:"allow_straddle,omitempty"`
+	AllowBombPot    bool `json:"allow_bomb_pot,omitempty"`
+	AllowInsurance  bool `json:"allow_insurance,omitempty"`
+	AllowRunItTwice bool `json:"allow_run_it_twice,omitempty"`
+	StraddleArmed   bool `json:"straddle_armed,omitempty"`
 }
 
 type DealPrivateMessage struct {
@@ -108,6 +115,38 @@ type TableCreateRequest struct {
 	NumBots    int    `json:"num_bots"`
 	Variant    string `json:"variant"`       // "holdem" | "plo"; empty => holdem
 	DurationMins int  `json:"duration_mins"` // auto-close after N minutes (0 = no limit)
+	// Optional table features (#41); all default-off so a plain table is unchanged.
+	AllowStraddle   bool  `json:"allow_straddle,omitempty"`
+	AllowBombPot    bool  `json:"allow_bomb_pot,omitempty"`
+	BombPotAnte     int64 `json:"bomb_pot_ante,omitempty"` // per-player ante (0 => one BB when triggered)
+	AllowInsurance  bool  `json:"allow_insurance,omitempty"`
+	AllowRunItTwice bool  `json:"allow_run_it_twice,omitempty"`
+}
+
+// PostStraddleRequest arms (or disarms) a voluntary straddle for the next hand.
+type PostStraddleRequest struct {
+	Enable bool `json:"enable"`
+}
+
+// RunItTwiceVote is a player's agreement (or withdrawal) to run the board twice
+// when they are all-in.
+type RunItTwiceVote struct {
+	Agree bool `json:"agree"`
+}
+
+// InsuranceOfferMessage (server → the all-in player) prices insurance off the
+// player's live equity: pay Premium now, receive Payout if the hand is lost.
+type InsuranceOfferMessage struct {
+	Seat    int     `json:"seat"`
+	HandNo  int     `json:"hand_no"`
+	Premium int64   `json:"premium"`
+	Payout  int64   `json:"payout"`
+	Equity  float64 `json:"equity"`
+}
+
+// InsuranceAcceptRequest (client → server) accepts the standing offer for the hand.
+type InsuranceAcceptRequest struct {
+	HandNo int `json:"hand_no"`
 }
 
 type TableCreateResponse struct {

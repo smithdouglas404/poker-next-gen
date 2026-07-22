@@ -84,15 +84,44 @@ type Table struct {
 	SeatCap        int    // configured active seats (2..MaxSeats); 0 => default 6
 	Variant        string // "holdem" | "plo"; empty => holdem
 	PotLimit       bool   // cap raises to the pot size (PLO)
+
+	// ── Optional table features (#41) ────────────────────────────────────────
+	// All default-off and gated so a standard Hold'em/PLO hand is byte-for-byte
+	// unchanged when none of these are enabled.
+
+	// Straddle: a voluntary UTG post of 2x BB before the deal; betting reopens
+	// from the straddle (the straddler acts last preflop).
+	AllowStraddle     bool
+	StraddleRequested bool // armed for the next StartHand; consumed there
+	StraddleSeat      int  // seat that posted a straddle this hand, else -1
+
+	// Bomb pot: every seated player antes a set amount, preflop betting is
+	// skipped, and the hand deals straight to the flop.
+	AllowBombPot     bool
+	BombPotAnte      int64 // ante per player (0 => one big blind when triggered)
+	BombPotRequested bool  // armed for the next StartHand; consumed there
+
+	// Run-it-twice: when all remaining players are all-in and agree, the board is
+	// run N times and each pot fraction settled per board. RunItTwice is resolved
+	// by the match handler immediately before showdown; the engine only reads it.
+	AllowRunItTwice  bool
+	RunItTwice       bool
+	RunItTwiceBoards int // N (default 2)
+
+	// All-in insurance: offered to an all-in favorite, priced off real equity and
+	// settled against the wallet (never the pot). The engine only carries the flag.
+	AllowInsurance bool
 }
 
 func NewTable() *Table {
 	return &Table{
-		HoleCards:      map[string][]Card{},
-		ActedThisRound: map[int]bool{},
-		Street:         StreetWaiting,
-		SeatCap:        6,
-		Variant:        VariantHoldem,
+		HoleCards:        map[string][]Card{},
+		ActedThisRound:   map[int]bool{},
+		Street:           StreetWaiting,
+		SeatCap:          6,
+		Variant:          VariantHoldem,
+		StraddleSeat:     -1,
+		RunItTwiceBoards: 2,
 	}
 }
 
@@ -251,13 +280,84 @@ func (t *Table) StartHand(sb, bb int64) error {
 		s.LastAction = ""
 	}
 
+	// Reset per-hand feature state before choosing the opening structure.
+	t.StraddleSeat = -1
+	t.RunItTwice = false
+
+	// Bomb pot: every seated player antes, preflop betting is skipped, and the
+	// hand deals straight to the flop. Takes precedence over blinds/straddle.
+	if t.AllowBombPot && t.BombPotRequested {
+		ante := t.bombAnte(bb)
+		t.BombPotRequested = false
+		if ante > 0 {
+			for _, idx := range seated {
+				t.postAnte(idx, ante)
+			}
+			// Deal the flop immediately; there is no preflop betting round.
+			t.Board = append(t.Board, t.draw(), t.draw(), t.draw())
+			t.Street = StreetFlop
+			t.CurrentBet = 0
+			t.MinRaise = bb
+			t.ActedThisRound = map[int]bool{}
+			// Post-flop action opens on the first active seat left of the button.
+			t.ActionSeat = t.nextActiveSeat(t.ButtonSeat)
+			return nil
+		}
+	}
+
 	// Post blinds
 	sbSeat := t.nextSeated(t.ButtonSeat)
 	bbSeat := t.nextSeated(sbSeat)
 	t.postBlind(sbSeat, sb, "SB")
 	t.postBlind(bbSeat, bb, "BB")
 	t.ActionSeat = t.nextActiveSeat(bbSeat)
+
+	// Optional voluntary straddle: UTG posts 2x BB and betting reopens from the
+	// straddle (the straddler retains the option to act last preflop, exactly as
+	// the big blind does — postBlind does not mark the seat as having acted).
+	if t.AllowStraddle && t.StraddleRequested {
+		utg := t.nextSeated(bbSeat)
+		su := t.Seats[utg]
+		straddle := 2 * bb
+		if utg != bbSeat && utg != sbSeat && su != nil && su.Stack >= straddle {
+			t.postBlind(utg, straddle, "STRADDLE")
+			t.CurrentBet = straddle
+			t.MinRaise = bb // last raise increment stays one big blind
+			t.StraddleSeat = utg
+			t.ActionSeat = t.nextActiveSeat(utg)
+		}
+	}
+	t.StraddleRequested = false
 	return nil
+}
+
+// bombAnte is the per-player ante for a bomb pot: the configured amount, or one
+// big blind when none is configured.
+func (t *Table) bombAnte(bb int64) int64 {
+	if t.BombPotAnte > 0 {
+		return t.BombPotAnte
+	}
+	return bb
+}
+
+// postAnte moves an ante into the pot. Unlike a blind it does NOT set the seat's
+// current Bet (there is nothing to call it against), so bomb-pot flop betting
+// opens at CurrentBet 0. A player who cannot cover the ante is put all-in for it.
+func (t *Table) postAnte(seat int, amount int64) {
+	s := t.Seats[seat]
+	if s == nil || amount <= 0 {
+		return
+	}
+	pay := amount
+	if pay > s.Stack {
+		pay = s.Stack
+	}
+	s.Stack -= pay
+	t.addContribution(seat, pay)
+	s.LastAction = "ante"
+	if s.Stack == 0 {
+		s.Status = SeatAllIn
+	}
 }
 
 func (t *Table) addContribution(seat int, amount int64) {

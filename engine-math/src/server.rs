@@ -10,7 +10,7 @@ use axum::{
 use engine_math::{
     batch_rank, cfr_advise, compare_hands, deck_commitment, estimate_equity, gto_advise, icm, outs,
     omaha_showdown_winners, range_equity, rank_hand, rank_omaha, reproduce_from_seed,
-    shuffle_deck_seeded, showdown_winners,
+    run_it_twice, shuffle_deck_seeded, showdown_winners,
 };
 use serde::{Deserialize, Serialize};
 use std::{cmp::Ordering, net::SocketAddr, sync::Arc};
@@ -367,6 +367,39 @@ async fn icm_handler(
 }
 
 #[derive(Deserialize)]
+struct RunItTwiceRequest {
+    board: String,
+    #[serde(default)]
+    dead: Vec<String>,
+    #[serde(default = "default_run_boards")]
+    boards: usize,
+}
+
+fn default_run_boards() -> usize {
+    2
+}
+
+#[derive(Serialize)]
+struct RunItTwiceResponse {
+    boards: Vec<String>,
+    engine: &'static str,
+}
+
+/// Deal N independent runouts of the remaining board (run-it-twice) off the known
+/// dead cards. Used when all-in players agree to run the board multiple times.
+async fn run_it_twice_handler(
+    Json(req): Json<RunItTwiceRequest>,
+) -> Result<Json<RunItTwiceResponse>, (StatusCode, String)> {
+    let dead: Vec<&str> = req.dead.iter().map(String::as_str).collect();
+    let boards =
+        run_it_twice(&req.board, &dead, req.boards).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    Ok(Json(RunItTwiceResponse {
+        boards,
+        engine: "rs_poker_run_it_twice",
+    }))
+}
+
+#[derive(Deserialize)]
 struct DeckVerifyRequest {
     cards: Vec<String>,
     deck_hash: String,
@@ -410,6 +443,7 @@ async fn main() {
         .route("/outs", post(outs_handler))
         .route("/equity/range", post(range_equity_handler))
         .route("/icm", post(icm_handler))
+        .route("/run_it_twice", post(run_it_twice_handler))
         .route("/deck/verify", post(deck_verify))
         .layer(CorsLayer::permissive())
         .with_state(state);

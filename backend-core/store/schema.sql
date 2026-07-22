@@ -967,3 +967,33 @@ CREATE INDEX IF NOT EXISTS idx_poker_device_fingerprint_fp ON poker_device_finge
 ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS late_reg_secs INT NOT NULL DEFAULT 0;
 ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS time_bank_secs INT NOT NULL DEFAULT 0;
 ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS format TEXT NOT NULL DEFAULT 'mtt';
+
+-- ============================================================
+-- table features (#41): run-it-twice + all-in insurance
+-- ============================================================
+CREATE TABLE IF NOT EXISTS poker_run_it_twice (
+    id TEXT PRIMARY KEY,
+    match_id TEXT NOT NULL,
+    hand_no INT NOT NULL,
+    boards JSONB NOT NULL DEFAULT '[]',
+    board_count INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(match_id, hand_no)
+);
+CREATE INDEX IF NOT EXISTS idx_poker_rit_match ON poker_run_it_twice(match_id, hand_no);
+
+CREATE TABLE IF NOT EXISTS poker_insurance (
+    id TEXT PRIMARY KEY,
+    match_id TEXT NOT NULL,
+    hand_no INT NOT NULL,
+    user_id TEXT NOT NULL,
+    premium BIGINT NOT NULL DEFAULT 0,
+    payout BIGINT NOT NULL DEFAULT 0,
+    equity DOUBLE PRECISION NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'accepted', -- accepted | won | paid
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    settled_at TIMESTAMPTZ,
+    UNIQUE(match_id, hand_no, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_poker_insurance_match ON poker_insurance(match_id, hand_no);
+CREATE INDEX IF NOT EXISTS idx_poker_insurance_user ON poker_insurance(user_id);
