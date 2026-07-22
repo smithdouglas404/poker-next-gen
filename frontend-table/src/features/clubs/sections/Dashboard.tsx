@@ -100,9 +100,9 @@ export function Dashboard({
         {/* Overview stats */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatTile label="Members" value={compact(quick?.member_count ?? 0)} />
-          <StatTile label="Active 7d" value={compact(stats?.active_7d ?? 0)} accent="#f3c14b" />
+          <StatTile label="Active 7d" value={compact(stats?.active_7d ?? 0)} accent="#22c55e" />
           <StatTile label="Hands" value={compact(stats?.hands ?? 0)} />
-          <StatTile label="Chips Won" value={compact(stats?.chips_won ?? 0)} accent="#f3e2ad" />
+          <StatTile label="Chips Won" value={compact(stats?.chips_won ?? 0)} accent="#f5c518" />
         </div>
 
         {/* Daily missions */}
@@ -120,7 +120,7 @@ export function Dashboard({
                     <p className="mb-2 mt-0.5 text-[10px] text-neutral-500">
                       {compact(m.progress)} / {compact(m.goal)} · {money(m.reward_cents)}
                     </p>
-                    <ProgressBar pct={pct} color={m.completed ? "#f3c14b" : "#81ecff"} />
+                    <ProgressBar pct={pct} color={m.completed ? "#f5c518" : "#22c55e"} />
                     {m.completed && !m.claimed && (
                       <Button
                         size="sm"
@@ -132,7 +132,7 @@ export function Dashboard({
                       </Button>
                     )}
                     {m.claimed && (
-                      <p className="mt-2 text-center text-[10px] uppercase tracking-wider text-emerald-400/70">
+                      <p className="mt-2 text-center text-[10px] uppercase tracking-wider text-green/80">
                         Claimed
                       </p>
                     )}
@@ -153,7 +153,7 @@ export function Dashboard({
               {quick!.activity.slice(0, 8).map((a) => (
                 <li key={a.id} className="flex items-center justify-between text-sm">
                   <span className="text-white/75">
-                    <span className="mr-2 rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-cyan/80">
+                    <span className="mr-2 rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted">
                       {a.kind}
                     </span>
                     {a.detail}
@@ -173,7 +173,7 @@ export function Dashboard({
           <CardHeader
             badge={
               news.length > 0 && (
-                <span className="rounded-full bg-[#c9302c] px-1.5 text-[10px] font-bold text-white">
+                <span className="rounded-full bg-brand px-1.5 text-[10px] font-bold text-white">
                   {news.length}
                 </span>
               )
@@ -203,7 +203,7 @@ export function Dashboard({
 
         {/* Pending join requests */}
         {isConfigurer && (
-          <div className="rounded-2xl border border-cyan/30 bg-cyan/[0.06] p-4">
+          <div className="rounded-xl border border-brand/30 bg-brand/[0.06] p-4">
             <CardHeader>Pending Join Requests</CardHeader>
             {requests.length === 0 ? (
               <p className="text-[12px] text-white/50">No pending requests.</p>
@@ -212,7 +212,7 @@ export function Dashboard({
                 {requests.map((r) => (
                   <div key={r.id}>
                     <div className="flex items-center gap-3">
-                      <MemberAvatar seed={r.user_id} name={r.username} size={44} ring="#b44dff" />
+                      <MemberAvatar seed={r.user_id} name={r.username} size={44} ring="#e01e2b" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold text-white">
                           {r.username || r.user_id.slice(0, 8)}
@@ -226,7 +226,7 @@ export function Dashboard({
                         disabled={busy === r.id}
                         onClick={() => review(r, "approve")}
                         className="flex-1 rounded-lg py-2 text-[12px] font-bold text-white transition hover:brightness-110 disabled:opacity-50"
-                        style={{ background: "linear-gradient(180deg,#2fbf6b,#1c8a4b)" }}
+                        style={{ background: "linear-gradient(180deg,#22c55e,#0a7d43)" }}
                       >
                         APPROVE
                       </button>
@@ -235,7 +235,7 @@ export function Dashboard({
                         disabled={busy === r.id}
                         onClick={() => review(r, "deny")}
                         className="flex-1 rounded-lg py-2 text-[12px] font-bold text-white transition hover:brightness-110 disabled:opacity-50"
-                        style={{ background: "linear-gradient(180deg,#d9534f,#a12e2a)" }}
+                        style={{ background: "linear-gradient(180deg,#ff2d3f,#b3151f)" }}
                       >
                         DECLINE
                       </button>
@@ -266,7 +266,7 @@ export function Dashboard({
                       {ev.format ? ` · ${ev.format}` : ""}
                     </p>
                   </div>
-                  <span className="shrink-0 text-[11px] text-cyan/80">
+                  <span className="shrink-0 text-[11px] text-green">
                     {new Date(ev.scheduled_at).toLocaleDateString(undefined, {
                       month: "short",
                       day: "numeric",

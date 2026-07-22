@@ -34,7 +34,7 @@ export function ComposePanel({
   return (
     <div className={cn(GLASS_PANEL, "p-5")}>
       <div className="flex items-center justify-between">
-        <p className={cn(HEADING_SM, "text-cyan/80")}>Compose</p>
+        <p className={cn(HEADING_SM, "text-gold/80")}>Compose</p>
         <span className="rounded-full border border-gold/30 bg-gold/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gold">
           Fee {fmtFee(feeCents)}
         </span>
@@ -53,7 +53,7 @@ export function ComposePanel({
           onChange={(e) => setSeed(e.target.value)}
           rows={3}
           placeholder="a neon cyberpunk poker boss with a scarred jaw"
-          className="w-full resize-none rounded-xl border border-white/10 bg-black/40 px-4 py-2.5 text-sm text-white placeholder:text-neutral-600 outline-none transition focus:border-cyan/40 focus:ring-2 focus:ring-cyan/10"
+          className="w-full resize-none rounded-xl border border-white/10 bg-black/40 px-4 py-2.5 text-sm text-white placeholder:text-neutral-600 outline-none transition focus:border-white/25 focus:ring-2 focus:ring-white/10"
         />
       </label>
 
@@ -74,7 +74,7 @@ export function ComposePanel({
                     className={cn(
                       "rounded-full border px-3 py-1 text-xs transition",
                       active
-                        ? "border-cyan/60 bg-cyan/15 text-cyan shadow-[0_0_14px_rgba(129,236,255,0.18)]"
+                        ? "border-brand/60 bg-brand/15 text-brand"
                         : "border-white/10 bg-white/[0.03] text-neutral-300 hover:border-white/25",
                     )}
                   >

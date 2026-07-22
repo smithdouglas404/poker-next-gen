@@ -147,7 +147,7 @@ function LobbyContent() {
         title: "Private Table",
         blurb: "Exclusive access. Custom blinds, invite-only for elite play. Set your stakes and play with invited guests.",
         cta: "Create Private Table",
-        accent: "cyan",
+        accent: "red",
         scene: "lounge",
       },
       {
@@ -166,7 +166,7 @@ function LobbyContent() {
         title: "Tournament",
         blurb: "Compete against the best. Multi-table events, big prize pools. Climb the leaderboard to become a legend.",
         cta: "Join Tournament",
-        accent: "purple",
+        accent: "green",
         scene: "arena",
       },
     ],
@@ -183,10 +183,7 @@ function LobbyContent() {
       <div
         aria-hidden
         className="pointer-events-none fixed inset-0 -z-10"
-        style={{
-          background:
-            "radial-gradient(60% 40% at 80% -5%, rgba(212,175,55,0.06), transparent), radial-gradient(50% 40% at 15% 0%, rgba(129,236,255,0.06), transparent)",
-        }}
+        style={{ background: "#0b0d0f" }}
       />
 
       {/* ---- top bar ---- */}
@@ -196,7 +193,7 @@ function LobbyContent() {
             href="/hub"
             className={cn(
               GLASS_PANEL,
-              "inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:border-gold/40 hover:text-gold",
+              "inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:border-white/20 hover:text-white",
             )}
           >
             <span aria-hidden>←</span> Back to Dashboard
@@ -206,7 +203,7 @@ function LobbyContent() {
               <span
                 className={cn(
                   "h-2 w-2 rounded-full",
-                  connected ? "bg-cyan shadow-[0_0_10px_rgba(129,236,255,0.6)]" : "bg-neutral-600",
+                  connected ? "bg-green shadow-[0_0_10px_rgba(34,197,94,0.6)]" : "bg-neutral-600",
                 )}
               />
               <span className="uppercase tracking-[0.2em] text-neutral-500">
@@ -227,7 +224,7 @@ function LobbyContent() {
         {/* ---- hero title ---- */}
         <div>
           <p className={HEADING_SM}>High Rollers Club</p>
-          <h1 className="mt-1 bg-gradient-to-r from-[#f3e2ad] via-[#d4af37] to-[#9a7b2c] bg-clip-text font-display text-4xl font-bold uppercase tracking-wide text-transparent sm:text-5xl">
+          <h1 className="mt-1 bg-gradient-to-r from-[#ffd54a] via-[#f5c518] to-[#d4a80f] bg-clip-text font-display text-4xl font-bold uppercase tracking-wide text-transparent sm:text-5xl">
             {view === "private"
               ? "Private Table Setup"
               : view === "public"
@@ -274,7 +271,7 @@ function LobbyContent() {
                   type="button"
                   disabled={busy || matchmakerSearching || !connected}
                   onClick={() => void run(() => findMatch())}
-                  className="mt-4 inline-flex w-fit rounded-xl border border-cyan/40 px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-cyan transition hover:bg-cyan/5 disabled:opacity-40"
+                  className="mt-4 inline-flex w-fit rounded-xl border border-brand/40 px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-brand transition hover:bg-brand/5 disabled:opacity-40"
                 >
                   {matchmakerSearching ? "Searching…" : "Find a Seat →"}
                 </button>
@@ -297,7 +294,7 @@ function LobbyContent() {
                     onKeyDown={(e) => e.key === "Enter" && submitCode()}
                     maxLength={8}
                     placeholder="ABC123"
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-2.5 font-mono text-sm uppercase tracking-widest text-white outline-none transition placeholder:text-neutral-600 focus:border-cyan/40 focus:ring-2 focus:ring-cyan/10"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-2.5 font-mono text-sm uppercase tracking-widest text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25 focus:ring-2 focus:ring-white/10"
                   />
                   <button
                     type="button"
@@ -327,7 +324,7 @@ function LobbyContent() {
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Search tables…"
-                    className="w-44 rounded-xl border border-white/10 bg-black/40 px-4 py-2 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-cyan/40 focus:ring-2 focus:ring-cyan/10"
+                    className="w-44 rounded-xl border border-white/10 bg-black/40 px-4 py-2 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25 focus:ring-2 focus:ring-white/10"
                   />
                   <button
                     type="button"
@@ -408,7 +405,7 @@ function LobbyContent() {
                       className={cn(
                         "rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider",
                         t.status === "running"
-                          ? "bg-cyan/15 text-cyan"
+                          ? "bg-green/15 text-green"
                           : t.status === "finished"
                             ? "bg-white/5 text-neutral-400"
                             : "bg-gold/15 text-gold",
@@ -448,7 +445,7 @@ function LobbyContent() {
             <button
               type="button"
               onClick={() => setView("select")}
-              className="text-xs uppercase tracking-[0.2em] text-neutral-500 transition hover:text-cyan"
+              className="text-xs uppercase tracking-[0.2em] text-neutral-500 transition hover:text-foreground"
             >
               ← Back to game modes
             </button>
@@ -457,9 +454,9 @@ function LobbyContent() {
 
         {/* ---- footer ---- */}
         <footer className="flex flex-wrap items-center justify-center gap-4 border-t border-white/[0.06] pt-6 text-xs text-neutral-500">
-          <Link href="/hub" className="transition hover:text-cyan">About Us</Link>
-          <Link href="/hub" className="transition hover:text-cyan">Terms</Link>
-          <Link href="/hub" className="transition hover:text-cyan">Privacy</Link>
+          <Link href="/hub" className="transition hover:text-foreground">About Us</Link>
+          <Link href="/hub" className="transition hover:text-foreground">Terms</Link>
+          <Link href="/hub" className="transition hover:text-foreground">Privacy</Link>
         </footer>
       </main>
     </div>

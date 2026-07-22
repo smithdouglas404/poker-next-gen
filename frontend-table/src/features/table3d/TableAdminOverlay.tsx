@@ -21,7 +21,7 @@ import {
 
 /* ------------------------------ primitives ------------------------------ */
 
-function Avatar({ src, ring = "#81ecff", size = 44 }: { src: string; ring?: string; size?: number }) {
+function Avatar({ src, ring = "#9aa0a6", size = 44 }: { src: string; ring?: string; size?: number }) {
   return (
     <div
       style={{
@@ -61,7 +61,7 @@ function Seg<T extends string | number | boolean>({
             onClick={() => onChange(o.v)}
             className={cn(
               "px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-colors",
-              on ? "bg-gradient-to-r from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad] text-black" : "text-neutral-400 hover:text-white",
+              on ? "bg-gradient-to-r from-[#ffd54a] via-[#f5c518] to-[#d4a80f] text-[#231b00]" : "text-neutral-400 hover:text-white",
             )}
           >
             {o.label}
@@ -116,10 +116,10 @@ function ModalShell({
           "relative flex max-h-[90vh] w-full flex-col overflow-hidden border-gold/25 shadow-[0_0_60px_rgba(0,0,0,0.7)]",
           wide ? "max-w-5xl" : "max-w-lg",
         )}
-        style={{ background: "linear-gradient(180deg, rgba(16,18,24,0.96), rgba(9,10,14,0.97))" }}
+        style={{ background: "#16191d" }}
       >
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
-          <h2 className={cn(HEADING_LG, "text-gold-lite")} style={{ textShadow: "0 0 18px rgba(212,175,55,0.35)" }}>
+          <h2 className={cn(HEADING_LG, "text-gold")}>
             {title}
           </h2>
           <button
@@ -163,7 +163,7 @@ function AdminControl({
       </button>
       {open && (
         <div className={cn(GLASS_PANEL, "w-full overflow-hidden border-gold/20")}>
-          <MenuRow label="Pause Game" glyph={admin.paused ? "▶" : "❚❚"} accent={admin.paused ? "#f3c14b" : undefined} onClick={() => void admin.pauseResume()} sub={admin.paused ? "Paused" : undefined} />
+          <MenuRow label="Pause Game" glyph={admin.paused ? "▶" : "❚❚"} accent={admin.paused ? "#f5c518" : undefined} onClick={() => void admin.pauseResume()} sub={admin.paused ? "Paused" : undefined} />
           <MenuRow label="Table Settings" glyph="⚙" onClick={onSettings} />
           <MenuRow label="Player Management" glyph="👥" onClick={onPlayers} />
           <MenuRow label="Session Report" glyph="📊" onClick={onSummary} />
@@ -193,10 +193,10 @@ function MenuRow({
       className="flex w-full items-center justify-between border-b border-white/[0.06] px-4 py-2.5 text-left text-sm text-neutral-200 transition-colors last:border-b-0 hover:bg-white/[0.05]"
     >
       <span className="flex items-center gap-2">
-        <span style={{ color: accent ?? "#81ecff" }}>{label}</span>
-        {sub && <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[9px] font-bold uppercase text-amber-300">{sub}</span>}
+        <span style={{ color: accent ?? "#f5f6f7" }}>{label}</span>
+        {sub && <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[9px] font-bold uppercase text-gold">{sub}</span>}
       </span>
-      <span aria-hidden style={{ color: accent ?? "#d4af37" }}>{glyph}</span>
+      <span aria-hidden style={{ color: accent ?? "#f5c518" }}>{glyph}</span>
     </button>
   );
 }
@@ -216,18 +216,18 @@ function WaitingList({ admin }: { admin: TableAdmin }) {
   };
   return (
     <div className="pointer-events-auto absolute right-4 top-28 z-20 flex w-64 flex-col gap-3">
-      <div className={cn(HEADING_LG, "text-center text-gold-lite")} style={{ textShadow: "0 0 18px rgba(212,175,55,0.3)" }}>
+      <div className={cn(HEADING_LG, "text-center text-gold")}>
         Waiting List
       </div>
       <div className="flex flex-col gap-3">
         {admin.waiting.map((e) => (
           <div key={e.invitationId} className={cn(GLASS_PANEL, "border-gold/15 p-3")}>
             <div className="flex items-center gap-3">
-              <Avatar src={e.avatar} ring="#d4af37" />
+              <Avatar src={e.avatar} ring="#f5c518" />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold text-white">{e.name}</div>
                 <div className="truncate text-[11px] text-neutral-400">[{e.handle}]</div>
-                <div className="text-[13px] font-bold text-gold-lite">{formatCents(e.buyInCents)}</div>
+                <div className="text-[13px] font-bold text-gold">{formatCents(e.buyInCents)}</div>
               </div>
             </div>
             <button
@@ -240,7 +240,7 @@ function WaitingList({ admin }: { admin: TableAdmin }) {
             </button>
             {e.walletCents > 0 && (
               <div className="mt-2 text-center text-[11px] text-neutral-400">
-                Wallet Balance: <span className="font-semibold text-cyan">{formatCents(e.walletCents)}</span>
+                Wallet Balance: <span className="font-semibold text-green">{formatCents(e.walletCents)}</span>
               </div>
             )}
           </div>
@@ -288,14 +288,14 @@ function TableSettingsModal({ admin, onClose }: { admin: TableAdmin; onClose: ()
     >
       <div className="space-y-6 px-6 py-5">
         <section className="space-y-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-cyan">Wallet &amp; Credit Limits</h3>
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground">Wallet &amp; Credit Limits</h3>
           <div className="flex items-center justify-between gap-4">
             <span className="text-sm text-neutral-300">Universal Player Wallet Limit</span>
             <input
               type="text"
               value={formatCents(s.walletLimitCents)}
               onChange={(e) => set("walletLimitCents", Math.round(Number(e.target.value.replace(/[^0-9.]/g, "")) * 100) || 0)}
-              className="w-44 rounded-lg border border-white/10 bg-black/50 px-3 py-1.5 text-right text-sm font-semibold text-gold-lite focus:border-gold/50 focus:outline-none"
+              className="w-44 rounded-lg border border-white/10 bg-black/50 px-3 py-1.5 text-right text-sm font-semibold text-gold focus:border-gold/50 focus:outline-none"
             />
           </div>
           <div className="flex items-center justify-between gap-4">
@@ -306,7 +306,7 @@ function TableSettingsModal({ admin, onClose }: { admin: TableAdmin; onClose: ()
         </section>
 
         <section className="space-y-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-cyan">Game Rules &amp; Timing</h3>
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground">Game Rules &amp; Timing</h3>
           <Row label="Auto start the next hand?">
             <Seg value={s.autoStart} onChange={(v) => set("autoStart", v)} options={yn} />
           </Row>
@@ -361,7 +361,7 @@ function PlayerManagementModal({ admin, onClose }: { admin: TableAdmin; onClose:
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold text-white">{p.name}</div>
                 <div className="text-[11px] text-neutral-400">
-                  Seat {p.seat + 1} · <span className="text-gold-lite">{formatCents(p.stackCents)}</span>
+                  Seat {p.seat + 1} · <span className="text-gold">{formatCents(p.stackCents)}</span>
                 </div>
               </div>
               <button
@@ -410,7 +410,7 @@ function FinancialSummaryModal({ admin, onClose }: { admin: TableAdmin; onClose:
             type="button"
             disabled={!sum?.hands.length || !!replaying}
             onClick={() => sum?.hands[0] && void replay(sum.hands[0].handId)}
-            className={cn(GLASS_PANEL, "rounded-xl border-gold/30 px-10 py-2.5 text-sm font-semibold uppercase tracking-wider text-gold-lite hover:border-gold/60 disabled:opacity-40")}
+            className={cn(GLASS_PANEL, "rounded-xl border-gold/30 px-10 py-2.5 text-sm font-semibold uppercase tracking-wider text-gold hover:border-gold/60 disabled:opacity-40")}
           >
             Replay
           </button>
@@ -423,7 +423,7 @@ function FinancialSummaryModal({ admin, onClose }: { admin: TableAdmin; onClose:
         <div className="grid gap-5 px-6 py-5 md:grid-cols-[300px_1fr]">
           {/* Financial Summary */}
           <div className={cn(GLASS_PANEL, "flex flex-col border-white/10 p-4")}>
-            <h3 className="text-center text-sm font-semibold uppercase tracking-wider text-gold-lite">Financial Summary</h3>
+            <h3 className="text-center text-sm font-semibold uppercase tracking-wider text-gold">Financial Summary</h3>
             <div className="mt-3 space-y-2 text-center">
               <div>
                 <div className="text-[11px] uppercase tracking-wider text-neutral-500">Total Chips in Play</div>
@@ -431,7 +431,7 @@ function FinancialSummaryModal({ admin, onClose }: { admin: TableAdmin; onClose:
               </div>
               <div>
                 <div className="text-[11px] uppercase tracking-wider text-neutral-500">Total Rake Collected</div>
-                <div className="text-lg font-bold text-cyan">{formatCents(sum.totalRakeCents)}</div>
+                <div className="text-lg font-bold text-green">{formatCents(sum.totalRakeCents)}</div>
               </div>
             </div>
             <div className="mt-4 flex items-center justify-between border-b border-white/10 pb-1 text-[11px] uppercase tracking-wider text-neutral-500">
@@ -446,7 +446,7 @@ function FinancialSummaryModal({ admin, onClose }: { admin: TableAdmin; onClose:
                     <div className="truncate text-[12px] font-semibold text-white">{p.name}</div>
                     <div className="truncate text-[10px] text-neutral-500">[{p.handle}]</div>
                   </div>
-                  <div className={cn("text-sm font-bold", p.netCents === null ? "text-neutral-500" : p.netCents >= 0 ? "text-emerald-400" : "text-red-400")}>
+                  <div className={cn("text-sm font-bold", p.netCents === null ? "text-neutral-500" : p.netCents >= 0 ? "text-green" : "text-[#ff6b70]")}>
                     {p.netCents === null ? "—" : `${p.netCents >= 0 ? "+" : "-"}${formatCents(Math.abs(p.netCents))}`}
                   </div>
                 </div>
@@ -463,13 +463,13 @@ function FinancialSummaryModal({ admin, onClose }: { admin: TableAdmin; onClose:
               <p className="py-10 text-center text-sm text-neutral-500">No hands recorded this session yet.</p>
             ) : (
               sum.hands.map((h, i) => (
-                <div key={h.handId || i} className={cn(GLASS_PANEL, i === 0 ? "border-gold/40 shadow-[0_0_24px_rgba(212,175,55,0.15)]" : "border-white/10", "p-3")}>
+                <div key={h.handId || i} className={cn(GLASS_PANEL, i === 0 ? "border-gold/40" : "border-white/10", "p-3")}>
                   <div className="flex items-center justify-between border-b border-white/10 pb-2 text-[12px]">
                     <span className="text-neutral-400">Hand ID: <span className="font-mono text-neutral-300">{h.handId || h.handNo}</span></span>
-                    <span className="text-neutral-400">Total Pot Size: <span className="font-bold text-gold-lite">{formatCents(h.potCents)}</span></span>
+                    <span className="text-neutral-400">Total Pot Size: <span className="font-bold text-gold">{formatCents(h.potCents)}</span></span>
                   </div>
                   <div className="mt-2 flex items-center gap-3">
-                    <Avatar src={h.winnerAvatar} size={40} ring="#d4af37" />
+                    <Avatar src={h.winnerAvatar} size={40} ring="#f5c518" />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-semibold text-white">{h.winnerName}</div>
                       <div className="truncate text-[11px] text-neutral-400">
@@ -480,7 +480,7 @@ function FinancialSummaryModal({ admin, onClose }: { admin: TableAdmin; onClose:
                       type="button"
                       disabled={replaying === h.handId}
                       onClick={() => void replay(h.handId)}
-                      className={cn(GLASS_PANEL, "rounded-lg border-gold/30 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-gold-lite hover:border-gold/60 disabled:opacity-50")}
+                      className={cn(GLASS_PANEL, "rounded-lg border-gold/30 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-gold hover:border-gold/60 disabled:opacity-50")}
                     >
                       {replaying === h.handId ? "…" : "Replay"}
                     </button>

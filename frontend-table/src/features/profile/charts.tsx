@@ -6,12 +6,12 @@
 
 import { cn } from "@/features/ui/tokens";
 
-const CYAN = "#81ecff";
-const GOLD = "#d4af37";
+const ACCENT = "#e01e2b";
+const GOLD = "#f5c518";
 
 /**
  * RadialGauge — a threshold-gated donut showing a poker % stat against an
- * "ideal" band. Cyan primary arc; the ideal band is a faint gold underlay so
+ * "ideal" band. Brand primary arc; the ideal band is a faint gold underlay so
  * the player can read at a glance whether they are inside a healthy range.
  */
 export function RadialGauge({
@@ -19,7 +19,7 @@ export function RadialGauge({
   value,
   max = 100,
   ideal,
-  accent = CYAN,
+  accent = ACCENT,
   suffix = "%",
 }: {
   label: string;
@@ -96,7 +96,7 @@ export function StatMeter({
   value,
   max = 100,
   ideal,
-  accent = CYAN,
+  accent = ACCENT,
   suffix = "%",
 }: {
   label: string;
@@ -130,7 +130,7 @@ export function StatMeter({
         {idealPct !== undefined && (
           <div
             className="absolute top-0 h-full w-px bg-gold/70"
-            style={{ left: `${idealPct}%`, boxShadow: "0 0 6px rgba(212,175,55,0.6)" }}
+            style={{ left: `${idealPct}%`, boxShadow: "0 0 6px rgba(245,197,24,0.6)" }}
           />
         )}
       </div>

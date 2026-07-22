@@ -26,13 +26,13 @@ export function LoyaltyHero({ data }: { data: LoyaltyData }) {
   return (
     <section className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
       {/* Level + HRP hero */}
-      <div className="relative overflow-hidden rounded-2xl border border-gold/25 bg-gradient-to-b from-gold/[0.07] via-white/[0.02] to-transparent p-6 backdrop-blur-xl">
+      <div className="relative overflow-hidden rounded-2xl border border-gold/25 bg-gradient-to-b from-gold/[0.06] via-[#16191d] to-[#16191d] p-6 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
         <div
           aria-hidden
           className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-gold/10 blur-3xl"
         />
         <div className="relative flex items-center gap-5">
-          <div className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl border border-gold/30 bg-black/40 text-5xl shadow-[0_0_30px_rgba(212,175,55,0.25)]">
+          <div className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl border border-gold/30 bg-black/40 text-5xl shadow-[0_0_30px_rgba(245,197,24,0.25)]">
             {data.level.badge}
           </div>
           <div className="min-w-0 flex-1">
@@ -75,7 +75,7 @@ export function LoyaltyHero({ data }: { data: LoyaltyData }) {
 
         <div className="relative mt-5 grid grid-cols-3 gap-2.5">
           <StatTile label="Hands Played" value={data.hands_played.toLocaleString()} />
-          <StatTile label="Hands Won" value={data.hands_won.toLocaleString()} accent="cyan" />
+          <StatTile label="Hands Won" value={data.hands_won.toLocaleString()} accent="green" />
           <StatTile
             label={`${data.tier || "free"} tier`}
             value={`${data.multiplier}×`}
@@ -89,7 +89,7 @@ export function LoyaltyHero({ data }: { data: LoyaltyData }) {
       </div>
 
       {/* Level ladder */}
-      <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 backdrop-blur-xl">
+      <div className="rounded-2xl border border-white/[0.06] bg-[#16191d] p-5 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
         <Eyebrow tone="muted">Loyalty Ladder</Eyebrow>
         <div className="mt-3 space-y-1">
           {LEVELS.map((lvl) => {
@@ -101,7 +101,7 @@ export function LoyaltyHero({ data }: { data: LoyaltyData }) {
                 className={cn(
                   "flex items-center gap-3 rounded-lg border px-3 py-1.5 transition",
                   isCurrent
-                    ? "border-gold/40 bg-gold/10 shadow-[0_0_18px_rgba(212,175,55,0.12)]"
+                    ? "border-gold/40 bg-gold/10 shadow-[0_0_18px_rgba(245,197,24,0.12)]"
                     : reached
                       ? "border-white/10 bg-white/[0.02]"
                       : "border-transparent opacity-45",

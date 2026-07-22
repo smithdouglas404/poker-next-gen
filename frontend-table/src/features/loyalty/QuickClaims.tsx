@@ -22,9 +22,9 @@ export function DailyBonusCard({
     <GlassCard hover className="flex flex-col p-5">
       <div className="flex items-start justify-between">
         <div>
-          <Eyebrow tone="cyan">Daily Bonus</Eyebrow>
+          <Eyebrow tone="green">Daily Bonus</Eyebrow>
           <p className="mt-1.5 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-cyan tabular-nums">
+            <span className="text-2xl font-bold text-green tabular-nums">
               <NumberTicker value={status?.chips ?? 0} format={(n) => compact(n)} />
             </span>
             <span className="text-sm text-neutral-400">chips</span>

@@ -23,15 +23,15 @@ const BUCKETS: { id: OwnerBucket; label: string }[] = [
   { id: "drafts", label: "Drafts" },
 ];
 
-function statusTone(status: string): "green" | "cyan" | "gold" | "purple" {
+function statusTone(status: string): "green" | "red" | "gold" | "purple" {
   if (status === "running") return "green";
-  if (status === "registering") return "cyan";
+  if (status === "registering") return "red";
   if (status === "finished") return "gold";
   return "purple";
 }
 
 interface AlertItem {
-  tone: "red" | "gold" | "cyan";
+  tone: "red" | "gold" | "cyan" | "green";
   title: string;
   body: string;
 }
@@ -62,7 +62,7 @@ function buildAlerts(
     }
   }
   if (alerts.length === 0) {
-    alerts.push({ tone: "cyan", title: "All systems nominal", body: "No tournaments need attention right now." });
+    alerts.push({ tone: "green", title: "All systems nominal", body: "No tournaments need attention right now." });
   }
   return alerts.slice(0, 4);
 }
@@ -89,7 +89,7 @@ function PrizeLadder({ prizes, poolMinor }: { prizes: Prize[]; poolMinor: number
               </span>
               <span className="flex items-center gap-3">
                 <span className="text-neutral-500">{bps(p.payout_bps)}</span>
-                <span className="font-display font-bold text-emerald-300">
+                <span className="font-display font-bold text-green">
                   {dollars(share, { compact: true })}
                 </span>
               </span>
@@ -169,7 +169,7 @@ export function OwnerCenter({
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-cyan/70">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-muted">
             Operator
           </p>
           <h1 className="mt-1 font-display text-4xl font-bold uppercase tracking-tight text-white">
@@ -179,7 +179,7 @@ export function OwnerCenter({
             Manage your live schedule, prize pools, and projected revenue across the network.
           </p>
         </div>
-        <Button variant="gold" size="lg" onClick={onCreate}>
+        <Button variant="primary" size="lg" onClick={onCreate}>
           ♛ New Tournament
         </Button>
       </div>
@@ -215,7 +215,7 @@ export function OwnerCenter({
                   onClick={() => setBucket(b.id)}
                   className={cn(
                     "flex-1 rounded-lg px-3 py-2 text-sm font-semibold uppercase tracking-wide transition",
-                    bucket === b.id ? "bg-cyan/15 text-cyan" : "text-neutral-500 hover:text-neutral-300",
+                    bucket === b.id ? "bg-brand text-white" : "text-neutral-500 hover:text-neutral-300",
                   )}
                 >
                   {b.label}
@@ -255,7 +255,7 @@ export function OwnerCenter({
                         onClick={() => setSelectedId(t.id)}
                         className={cn(
                           "cursor-pointer border-b border-white/5 transition last:border-b-0",
-                          selectedId === t.id ? "bg-cyan/[0.06]" : "hover:bg-white/[0.03]",
+                          selectedId === t.id ? "bg-brand/[0.08]" : "hover:bg-white/[0.03]",
                         )}
                       >
                         <td className="px-4 py-3">
@@ -272,7 +272,7 @@ export function OwnerCenter({
                           {registered}
                           <span className="text-neutral-600">/{t.max_players}</span>
                         </td>
-                        <td className="px-4 py-3 text-right font-semibold tabular-nums text-emerald-300">
+                        <td className="px-4 py-3 text-right font-semibold tabular-nums text-green">
                           {dollars(pool, { compact: true })}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums text-gold">
@@ -319,7 +319,7 @@ export function OwnerCenter({
                   {/* progress bar */}
                   <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/5">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-cyan to-emerald-400 transition-all"
+                      className="h-full rounded-full bg-gradient-to-r from-[#0a7d43] to-[#22c55e] transition-all"
                       style={{ width: `${Math.min(100, Math.max(0, analytics.progress_pct ?? 0))}%` }}
                     />
                   </div>
@@ -377,14 +377,22 @@ export function OwnerCenter({
                     a.tone === "gold"
                       ? "border-gold/30 bg-gold/[0.06]"
                       : a.tone === "red"
-                        ? "border-red-400/30 bg-red-400/[0.06]"
-                        : "border-cyan/25 bg-cyan/[0.05]",
+                        ? "border-brand/35 bg-brand/[0.07]"
+                        : a.tone === "green"
+                          ? "border-green/30 bg-green/[0.06]"
+                          : "border-white/10 bg-white/[0.03]",
                   )}
                 >
                   <p
                     className={cn(
                       "text-xs font-bold uppercase tracking-wide",
-                      a.tone === "gold" ? "text-gold" : a.tone === "red" ? "text-red-300" : "text-cyan",
+                      a.tone === "gold"
+                        ? "text-gold"
+                        : a.tone === "red"
+                          ? "text-[#ff2d3f]"
+                          : a.tone === "green"
+                            ? "text-green"
+                            : "text-neutral-300",
                     )}
                   >
                     {a.title}
@@ -421,7 +429,7 @@ function MiniStat({
       <p
         className={cn(
           "mt-1 font-display text-lg font-bold tabular-nums",
-          tone === "cyan" ? "text-cyan" : tone === "gold" ? "text-gold" : "text-white",
+          tone === "cyan" ? "text-green" : tone === "gold" ? "text-gold" : "text-white",
         )}
       >
         {value}

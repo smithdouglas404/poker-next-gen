@@ -77,8 +77,8 @@ export function ActionBar() {
   ];
 
   return (
-    <div className="pointer-events-auto w-full max-w-md rounded-2xl border border-amber-500/30 bg-black/70 p-4 backdrop-blur-md">
-      <p className="text-xs uppercase tracking-[0.25em] text-amber-300/80">Your Action</p>
+    <div className="pointer-events-auto w-full max-w-md rounded-2xl border border-white/[0.06] bg-surface p-4 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
+      <p className="text-xs uppercase tracking-[0.25em] text-muted">Your Action</p>
       <p className="mt-1 text-sm text-neutral-300">
         Pot {formatCents(pot)} · To call {formatCents(actionRequired.to_call)}
       </p>
@@ -87,7 +87,7 @@ export function ActionBar() {
         <button
           type="button"
           onClick={() => void sendAction("fold", 0)}
-          className="rounded-xl border border-red-500/50 bg-red-950/50 px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-red-200 hover:bg-red-900/50"
+          className="rounded-xl border border-brand/50 bg-brand/15 px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-[#ff9ba1] hover:bg-brand/25"
         >
           Fold
         </button>
@@ -95,7 +95,7 @@ export function ActionBar() {
           <button
             type="button"
             onClick={() => void sendAction("check", 0)}
-            className="rounded-xl border border-sky-500/50 bg-sky-950/40 px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-sky-200 hover:bg-sky-900/40"
+            className="rounded-xl border border-white/15 bg-white/[0.04] px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-neutral-200 hover:bg-white/10"
           >
             Check
           </button>
@@ -104,7 +104,7 @@ export function ActionBar() {
           <button
             type="button"
             onClick={() => void sendAction("call", 0)}
-            className="rounded-xl border border-emerald-500/50 bg-emerald-950/40 px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-emerald-200 hover:bg-emerald-900/40"
+            className="rounded-xl border border-green/50 bg-green/15 px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-[#bff5d3] hover:bg-green/25"
           >
             Call {formatCents(actionRequired.to_call)}
           </button>
@@ -113,7 +113,7 @@ export function ActionBar() {
           <button
             type="button"
             onClick={() => void sendAction("raise", raiseAmount)}
-            className="rounded-xl border border-amber-500/50 bg-amber-950/40 px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-amber-200 hover:bg-amber-900/40"
+            className="rounded-xl border border-gold/50 bg-gold/15 px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-gold hover:bg-gold/25"
           >
             Raise {formatCents(raiseAmount)}
           </button>
@@ -124,7 +124,7 @@ export function ActionBar() {
         <div className="mt-4">
           <div className="flex items-center justify-between text-xs text-neutral-400">
             <span>{formatCents(min)}</span>
-            <span className="font-semibold text-amber-200">{formatCents(raiseAmount)}</span>
+            <span className="font-semibold text-gold">{formatCents(raiseAmount)}</span>
             <span>{formatCents(max)}</span>
           </div>
 
@@ -135,7 +135,7 @@ export function ActionBar() {
             step={100}
             value={raiseAmount}
             onChange={(e) => setClamped(Number(e.target.value))}
-            className="mt-2 w-full accent-amber-400"
+            className="mt-2 w-full accent-[#f5c518]"
           />
 
           <div className="mt-3 flex items-center gap-2">
@@ -153,7 +153,7 @@ export function ActionBar() {
                 step={1}
                 value={Math.round(raiseAmount / 100)}
                 onChange={(e) => setClamped(Number(e.target.value) * 100)}
-                className="w-20 bg-transparent px-1 py-1 text-sm text-amber-100 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-20 bg-transparent px-1 py-1 text-sm text-gold outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
           </div>
@@ -168,7 +168,7 @@ export function ActionBar() {
                   onClick={() => setClamped(amount)}
                   className={`rounded-lg border px-3 py-1 text-[10px] font-semibold uppercase tracking-wider transition ${
                     active
-                      ? "border-amber-400/70 bg-amber-500/20 text-amber-100"
+                      ? "border-brand/60 bg-brand/15 text-white"
                       : "border-white/10 text-neutral-300 hover:bg-white/5"
                   }`}
                 >

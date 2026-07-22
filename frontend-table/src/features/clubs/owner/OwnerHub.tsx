@@ -306,7 +306,7 @@ export function OwnerHub() {
             <button
               type="button"
               onClick={() => setForceBrowse(false)}
-              className="text-xs text-cyan/70 hover:text-cyan"
+              className="text-xs text-muted hover:text-brand"
             >
               ← Back to your club
             </button>
@@ -357,10 +357,10 @@ export function OwnerHub() {
       {toast && (
         <div
           className={cn(
-            "fixed left-1/2 top-20 z-50 -translate-x-1/2 rounded-xl border px-4 py-2.5 text-sm backdrop-blur-xl",
+            "fixed left-1/2 top-20 z-50 -translate-x-1/2 rounded-xl border px-4 py-2.5 text-sm",
             toast.kind === "ok"
-              ? "border-emerald-500/30 bg-emerald-950/40 text-emerald-200"
-              : "border-red-500/30 bg-red-950/40 text-red-200",
+              ? "border-[#22c55e]/30 bg-[#0a7d43]/25 text-[#bff5d3]"
+              : "border-[#e01e2b]/35 bg-[#b3151f]/25 text-[#ffcdd1]",
           )}
         >
           {toast.msg}

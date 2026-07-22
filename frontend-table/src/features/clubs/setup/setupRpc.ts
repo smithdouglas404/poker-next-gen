@@ -160,10 +160,10 @@ export interface BrandSwatch {
 }
 
 export const BRAND_SWATCHES: BrandSwatch[] = [
-  { name: "Vault Gold", value: "#d4af37" },
-  { name: "Neon Cyan", value: "#81ecff" },
+  { name: "GG Gold", value: "#f5c518" },
+  { name: "GG Red", value: "#e01e2b" },
+  { name: "Poker Green", value: "#22c55e" },
   { name: "Royal Purple", value: "#b44dff" },
-  { name: "Emerald Felt", value: "#1fa85a" },
   { name: "Crimson", value: "#e5484d" },
   { name: "Sapphire", value: "#2f6bff" },
 ];

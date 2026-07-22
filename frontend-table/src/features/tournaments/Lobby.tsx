@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { Button } from "@/features/ui";
-import { BTN_GOLD, GLASS_PANEL, GLASS_PANEL_HOVER, cn } from "@/features/ui/tokens";
+import { BTN_RED, GLASS_PANEL, GLASS_PANEL_HOVER, cn } from "@/features/ui/tokens";
 
 import { Eyebrow, KpiTile, RowIcon, Stat, Tag } from "./atoms";
 import { FocusRail } from "./FocusRail";
@@ -29,11 +29,11 @@ function prizePoolMinor(t: EnrichedTournament, registered: number): number {
 function CountdownPill({ scheduledAt, status }: { scheduledAt: string; status: string }) {
   useNow(1000);
   if (status === "running") {
-    return <span className="font-display text-lg font-bold text-emerald-300">LIVE</span>;
+    return <span className="font-display text-lg font-bold text-green">LIVE</span>;
   }
   const ms = msUntil(scheduledAt);
   return (
-    <span className="font-display text-lg font-bold tabular-nums text-cyan">
+    <span className="font-display text-lg font-bold tabular-nums text-foreground">
       {ms > 0 ? countdown(ms) : "Starting"}
     </span>
   );
@@ -61,12 +61,14 @@ function HeroCard({
       type="button"
       onClick={() => onSelect(t.id)}
       className={cn(
-        "group relative overflow-hidden rounded-2xl border p-6 text-left transition-all duration-300",
-        selected ? "border-cyan/50 shadow-[0_0_28px_rgba(129,236,255,0.12)]" : "border-white/[0.08] hover:border-white/20",
+        "group relative overflow-hidden rounded-xl border p-6 text-left transition-all duration-200",
+        selected
+          ? "border-brand/60 shadow-[0_4px_18px_rgba(0,0,0,0.5)]"
+          : "border-white/[0.06] hover:border-white/[0.14]",
       )}
-      style={{ background: t.meta?.heroArt ?? "linear-gradient(135deg,#111318,#05070c)" }}
+      style={{ background: t.meta?.heroArt ?? "#16191d" }}
     >
-      <div className="pointer-events-none absolute inset-0 bg-black/30" />
+      <div className="pointer-events-none absolute inset-0 bg-black/10" />
       <div className="relative flex flex-col gap-4">
         <div className="flex items-center gap-3">
           {t.meta?.tag && <Tag tone={t.meta.tagTone}>{t.meta.tag}</Tag>}
@@ -78,7 +80,7 @@ function HeroCard({
           {t.name}
         </h3>
         <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
-          <Stat label="Prize Pool" tone="cyan" value={dollars(prizePoolMinor(t, registered), { compact: true })} />
+          <Stat label="Prize Pool" tone="green" value={dollars(prizePoolMinor(t, registered), { compact: true })} />
           <Stat label="Buy-in" tone="gold" value={dollars(t.buy_in_minor, { compact: true })} />
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500">Players</p>
@@ -105,18 +107,18 @@ function HeroCard({
               if (!busy && !isRegistered && !t.meta?.locked) onRegister(t.id);
             }}
             className={cn(
-              "inline-flex items-center justify-center rounded-xl px-6 py-2.5 text-sm font-bold uppercase tracking-wide transition-all",
+              "inline-flex items-center justify-center rounded-lg px-6 py-2.5 text-sm font-bold uppercase tracking-wide transition-all",
               isRegistered
-                ? "cursor-default border border-emerald-400/40 bg-emerald-400/10 text-emerald-300"
+                ? "cursor-default border border-green/40 bg-green/10 text-green"
                 : t.meta?.locked
                   ? "cursor-not-allowed border border-white/10 text-neutral-600"
-                  : BTN_GOLD,
+                  : BTN_RED,
               busy && "opacity-50",
             )}
           >
             {isRegistered ? "Registered ✓" : t.meta?.locked ? "Locked" : "Register Now"}
           </span>
-          <span className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 group-hover:text-cyan">
+          <span className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 group-hover:text-brand">
             View Details →
           </span>
         </div>
@@ -153,7 +155,7 @@ function EventRow({
     <div
       className={cn(
         "flex items-center gap-4 rounded-xl border p-3.5 transition-all",
-        selected ? "border-cyan/40 bg-cyan/[0.04]" : "border-white/[0.06] bg-white/[0.02] hover:border-white/15",
+        selected ? "border-brand/50 bg-brand/[0.06]" : "border-white/[0.06] bg-[#16191d] hover:border-white/[0.14]",
       )}
     >
       <RowIcon tone={tone} glyph={GLYPH[tone]} />
@@ -190,7 +192,7 @@ function EventRow({
         </Button>
         <Button
           size="sm"
-          variant={isRegistered ? "outline" : "gold"}
+          variant={isRegistered ? "outline" : "primary"}
           disabled={busy || isRegistered || t.meta?.locked}
           onClick={() => onRegister(t.id)}
         >
@@ -282,7 +284,7 @@ export function Lobby({
         {featured.length > 0 && (
           <section className="space-y-3">
             <h2 className="flex items-center gap-2 font-display text-sm font-bold uppercase tracking-[0.2em] text-white">
-              <span className="text-cyan">★</span> Featured Events
+              <span className="text-gold">★</span> Featured Events
             </h2>
             <div className={cn("grid gap-4", featured.length > 1 ? "md:grid-cols-2" : "")}>
               {featured.map((t) => (
@@ -305,7 +307,7 @@ export function Lobby({
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 font-display text-sm font-bold uppercase tracking-[0.2em] text-white">
-              <span className="text-cyan">≡</span> Ongoing &amp; Upcoming
+              <span className="text-brand">≡</span> Ongoing &amp; Upcoming
             </h2>
             <div className="flex items-center gap-2">
               <div className="flex rounded-lg border border-white/10 bg-black/30 p-0.5">
@@ -316,7 +318,7 @@ export function Lobby({
                     onClick={() => setFilter(f)}
                     className={cn(
                       "rounded-md px-3 py-1 text-[11px] font-semibold uppercase tracking-wide transition",
-                      filter === f ? "bg-cyan/15 text-cyan" : "text-neutral-500 hover:text-neutral-300",
+                      filter === f ? "bg-brand text-white" : "text-neutral-500 hover:text-neutral-300",
                     )}
                   >
                     {f === "all" ? "All" : f === "running" ? "Live" : f === "upcoming" ? "Soon" : "Sat"}
@@ -326,7 +328,7 @@ export function Lobby({
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value as SortKey)}
-                className="rounded-lg border border-white/10 bg-black/30 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-neutral-300 outline-none focus:border-cyan/40"
+                className="rounded-lg border border-white/10 bg-black/30 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-neutral-300 outline-none focus:border-brand/40"
               >
                 <option value="time">Sort: Time</option>
                 <option value="prize">Sort: Prize</option>

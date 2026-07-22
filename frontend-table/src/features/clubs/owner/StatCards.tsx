@@ -12,10 +12,10 @@ export interface StatCard {
 }
 
 const ACCENT: Record<StatCard["accent"], { bar: string; text: string; subText: string }> = {
-  cyan: { bar: "#22d3ee", text: "text-cyan", subText: "text-cyan/70" },
-  gold: { bar: "#d4af37", text: "text-gold", subText: "text-gold/70" },
-  green: { bar: "#33d17a", text: "text-emerald-300", subText: "text-emerald-300/70" },
-  red: { bar: "#ff3b46", text: "text-red-300", subText: "text-red-300/80" },
+  cyan: { bar: "#9aa0a6", text: "text-foreground", subText: "text-muted" },
+  gold: { bar: "#f5c518", text: "text-gold", subText: "text-gold/70" },
+  green: { bar: "#22c55e", text: "text-green", subText: "text-green/70" },
+  red: { bar: "#e01e2b", text: "text-brand", subText: "text-brand/80" },
 };
 
 export function StatCards({ cards }: { cards: StatCard[] }) {
@@ -27,7 +27,7 @@ export function StatCards({ cards }: { cards: StatCard[] }) {
           <div key={c.label} className={cn(GLASS_PANEL, "relative overflow-hidden p-4 pl-5")}>
             <span
               className="absolute left-0 top-0 h-full w-1"
-              style={{ background: a.bar, boxShadow: `0 0 16px ${a.bar}` }}
+              style={{ background: a.bar }}
             />
             <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/45">
               {c.label}

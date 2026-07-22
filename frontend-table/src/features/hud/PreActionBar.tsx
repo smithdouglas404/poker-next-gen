@@ -24,8 +24,8 @@ export function PreActionBar() {
   if (!inHand || !activeHand || isMyTurn) return null;
 
   return (
-    <div className="pointer-events-auto flex items-center gap-2 rounded-xl border border-white/10 bg-black/60 px-3 py-2 backdrop-blur-md">
-      <span className="text-[10px] uppercase tracking-wider text-neutral-500">Pre-action</span>
+    <div className="pointer-events-auto flex items-center gap-2 rounded-xl border border-white/[0.06] bg-surface px-3 py-2 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
+      <span className="text-[10px] uppercase tracking-wider text-muted">Pre-action</span>
       {OPTS.map((o) => {
         const active = pre === o.key;
         return (
@@ -35,7 +35,7 @@ export function PreActionBar() {
             onClick={() => togglePreAction(o.key)}
             className={`rounded-lg border px-3 py-1 text-[11px] font-semibold uppercase tracking-wider transition ${
               active
-                ? "border-amber-400/70 bg-amber-500/20 text-amber-100"
+                ? "border-brand/60 bg-brand/15 text-white"
                 : "border-white/10 text-neutral-300 hover:bg-white/5"
             }`}
           >

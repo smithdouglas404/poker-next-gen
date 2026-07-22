@@ -40,7 +40,7 @@ export function AdminShell({
         <aside className="lg:w-64 lg:shrink-0">
           <div className={cn(GLASS_PANEL, "sticky top-6 p-4")}>
             <div className="flex items-center gap-3 px-2 pb-4">
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad] text-lg font-black text-black shadow-[0_0_20px_rgba(212,175,55,0.3)]">
+              <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-[#d4a80f] via-[#f5c518] to-[#ffd54a] text-lg font-black text-black shadow-[0_0_20px_rgba(245,197,24,0.25)]">
                 ♦
               </div>
               <div>
@@ -68,11 +68,11 @@ export function AdminShell({
                           className={cn(
                             "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition",
                             active
-                              ? "border border-cyan/25 bg-cyan/[0.07] text-cyan shadow-[0_0_18px_rgba(129,236,255,0.08)]"
+                              ? "border border-brand/40 bg-brand/[0.1] text-brand"
                               : "border border-transparent text-neutral-400 hover:bg-white/[0.03] hover:text-white",
                           )}
                         >
-                          <span className={cn("text-base", active ? "text-cyan" : "text-neutral-500")}>
+                          <span className={cn("text-base", active ? "text-brand" : "text-neutral-500")}>
                             {n.glyph}
                           </span>
                           <span className="font-medium">{n.label}</span>
@@ -93,7 +93,7 @@ export function AdminShell({
                   </span>
                   {online !== null ? `${online} online` : "—"}
                 </span>
-                <Link href="/hub" className="text-cyan/70 transition hover:text-cyan">
+                <Link href="/hub" className="text-brand/80 transition hover:text-brand">
                   ← Hub
                 </Link>
               </div>

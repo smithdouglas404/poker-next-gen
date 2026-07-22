@@ -70,7 +70,7 @@ export function LeaderboardPanel({
               className={cn(
                 "rounded-lg px-4 py-1.5 text-xs font-semibold uppercase tracking-wide transition",
                 metric === m.id
-                  ? "bg-cyan/15 text-cyan shadow-[0_0_16px_rgba(129,236,255,0.15)]"
+                  ? "bg-brand/15 text-brand shadow-[0_0_16px_rgba(224,30,43,0.15)]"
                   : "text-neutral-400 hover:text-white",
               )}
             >
@@ -97,7 +97,7 @@ export function LeaderboardPanel({
                 className={cn(
                   "flex items-center gap-4 rounded-xl border px-4 py-2.5 transition",
                   isMe
-                    ? "border-cyan/40 bg-cyan/[0.06] shadow-[0_0_18px_rgba(129,236,255,0.1)]"
+                    ? "border-brand/40 bg-brand/[0.06] shadow-[0_0_18px_rgba(224,30,43,0.1)]"
                     : "border-white/[0.06] bg-black/20 hover:border-white/15",
                 )}
               >
@@ -107,7 +107,7 @@ export function LeaderboardPanel({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-foreground">
                     {e.username || e.user_id.slice(0, 8)}
-                    {isMe && <span className="ml-2 text-[10px] uppercase tracking-widest text-cyan">You</span>}
+                    {isMe && <span className="ml-2 text-[10px] uppercase tracking-widest text-brand">You</span>}
                   </p>
                 </div>
                 <span className="font-display text-sm font-bold tabular-nums text-gold">{fmt(e.score)}</span>

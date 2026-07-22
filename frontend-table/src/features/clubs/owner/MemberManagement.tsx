@@ -125,12 +125,12 @@ export function MemberManagement({
               className={cn(
                 "rounded-full border px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] transition",
                 active
-                  ? "border-cyan/50 bg-cyan/10 text-cyan"
+                  ? "border-brand/50 bg-brand/10 text-brand"
                   : "border-white/10 text-white/50 hover:border-white/25 hover:text-white/80",
               )}
             >
               {t.label}
-              <span className={cn("ml-2", active ? "text-cyan/80" : "text-white/35")}>{t.count}</span>
+              <span className={cn("ml-2", active ? "text-brand/80" : "text-white/35")}>{t.count}</span>
             </button>
           );
         })}
@@ -159,7 +159,7 @@ export function MemberManagement({
                   className="flex flex-col gap-3 border-b border-white/[0.05] px-5 py-4 last:border-0 lg:flex-row lg:items-center"
                 >
                   <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <MemberAvatar seed={r.user_id} name={r.username} ring="#f3c14b" />
+                    <MemberAvatar seed={r.user_id} name={r.username} ring="#f5c518" />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="truncate font-semibold text-white">{r.username}</p>
@@ -172,9 +172,9 @@ export function MemberManagement({
                   <div className="flex shrink-0 gap-2">
                     <Button
                       size="sm"
+                      variant="green"
                       disabled={!canManage || busy === `rev-${r.id}`}
                       onClick={() => void run(`rev-${r.id}`, () => onReview(r, "approve"))}
-                      className="!from-emerald-600 !via-emerald-500 !to-emerald-400 !text-black"
                     >
                       Approve
                     </Button>
@@ -317,7 +317,7 @@ export function MemberManagement({
                 className={cn(
                   "min-w-[28px] rounded-lg border px-2 py-1 transition",
                   i === page
-                    ? "border-cyan/50 bg-cyan/10 text-cyan"
+                    ? "border-brand/50 bg-brand/10 text-brand"
                     : "border-white/10 text-white/60 hover:border-white/25",
                 )}
               >

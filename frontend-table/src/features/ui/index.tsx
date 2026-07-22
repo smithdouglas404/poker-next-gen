@@ -2,19 +2,21 @@
 
 import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
 
-import { BTN_GOLD, GLASS_PANEL, HEADING_SM, cn } from "./tokens";
+import { BTN_GOLD, BTN_GREEN, BTN_RED, GLASS_PANEL, GLASS_PANEL_HOVER, HEADING_SM, cn } from "./tokens";
 
 // A small, dependency-free primitive layer giving the app a consistent
-// HRC-grade look for buttons, panels, inputs, selects, and labeled fields.
+// GGPoker-grade look for buttons, panels, inputs, selects, and labeled fields.
 
-type ButtonVariant = "gold" | "outline" | "ghost" | "danger";
+type ButtonVariant = "primary" | "gold" | "green" | "outline" | "ghost" | "danger";
 type ButtonSize = "sm" | "md" | "lg";
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
+  primary: BTN_RED,
   gold: BTN_GOLD,
-  outline: "border border-white/20 text-white hover:bg-white/5",
+  green: BTN_GREEN,
+  outline: "border border-white/15 text-white hover:bg-white/5",
   ghost: "text-neutral-300 hover:bg-white/5 hover:text-white",
-  danger: "border border-red-500/40 text-red-200 hover:bg-red-950/30",
+  danger: "border border-[#e01e2b]/40 text-[#ff9ba1] bg-[#e01e2b]/10 hover:bg-[#e01e2b]/20",
 };
 
 const BUTTON_SIZES: Record<ButtonSize, string> = {

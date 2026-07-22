@@ -80,7 +80,7 @@ export function CharacterGallery({
                 className={cn(
                   "rounded-xl border bg-black/30 p-3 transition",
                   isEquipped
-                    ? "border-cyan/50 shadow-[0_0_18px_rgba(129,236,255,0.12)]"
+                    ? "border-brand/50 shadow-[0_2px_18px_-6px_rgba(224,30,43,0.35)]"
                     : "border-white/[0.08] hover:border-white/20",
                 )}
               >
@@ -90,7 +90,7 @@ export function CharacterGallery({
                     <div className="flex items-center gap-2">
                       <p className="truncate text-sm font-semibold text-white">{c.name}</p>
                       {c.demo && (
-                        <span className="shrink-0 rounded border border-amber-500/40 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-300">
+                        <span className="shrink-0 rounded border border-gold/40 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-gold">
                           Demo
                         </span>
                       )}
@@ -110,7 +110,7 @@ export function CharacterGallery({
                           href={glbHref}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-[10px] uppercase tracking-wider text-cyan/70 hover:text-cyan hover:underline"
+                          className="text-[10px] uppercase tracking-wider text-muted hover:text-foreground hover:underline"
                         >
                           View GLB
                         </a>

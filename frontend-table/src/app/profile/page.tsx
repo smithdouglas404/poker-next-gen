@@ -81,7 +81,7 @@ export default function ProfilePage() {
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:py-12">
         <div className="flex items-center justify-between">
           <p className={cn(HEADING_SM, "text-gold/80")}>Command Center</p>
-          <Link href="/hub" className="text-xs uppercase tracking-widest text-neutral-500 hover:text-cyan">
+          <Link href="/hub" className="text-xs uppercase tracking-widest text-neutral-500 hover:text-foreground">
             ← Back to hub
           </Link>
         </div>
@@ -91,8 +91,8 @@ export default function ProfilePage() {
           <div
             className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl font-display text-2xl font-bold text-black"
             style={{
-              background: "linear-gradient(135deg, #f3e2ad, #d4af37 55%, #9a7b2c)",
-              boxShadow: "0 0 26px rgba(212,175,55,0.3)",
+              background: "linear-gradient(135deg, #ffd54a, #f5c518 55%, #d4a80f)",
+              boxShadow: "0 0 26px rgba(245,197,24,0.28)",
             }}
           >
             {initials(displayName)}
@@ -125,7 +125,7 @@ export default function ProfilePage() {
             >
               {t.label}
               {tab === t.id && (
-                <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-cyan shadow-[0_0_10px_rgba(129,236,255,0.6)]" />
+                <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-brand shadow-[0_0_10px_rgba(224,30,43,0.5)]" />
               )}
             </button>
           ))}

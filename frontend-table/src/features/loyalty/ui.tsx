@@ -12,10 +12,10 @@ export function Eyebrow({
 }: {
   children: ReactNode;
   className?: string;
-  tone?: "gold" | "cyan" | "muted";
+  tone?: "gold" | "green" | "muted";
 }) {
   const color =
-    tone === "gold" ? "text-gold/80" : tone === "cyan" ? "text-cyan/80" : "text-neutral-400";
+    tone === "gold" ? "text-gold/80" : tone === "green" ? "text-green/80" : "text-neutral-400";
   return (
     <p
       className={cn(
@@ -35,7 +35,7 @@ export function GoldHeading({ children, className }: { children: ReactNode; clas
     <h2
       className={cn(
         "font-display font-bold uppercase tracking-wide",
-        "bg-gradient-to-b from-[#f3e2ad] via-[#e7cd7b] to-[#b8912f] bg-clip-text text-transparent",
+        "bg-gradient-to-b from-[#ffd54a] via-[#f5c518] to-[#d4a80f] bg-clip-text text-transparent",
         className,
       )}
     >
@@ -44,7 +44,7 @@ export function GoldHeading({ children, className }: { children: ReactNode; clas
   );
 }
 
-/** Glass card wrapper with the standard border/blur + optional cyan hover glow. */
+/** Card wrapper with the standard GG surface border + optional hover glow. */
 export function GlassCard({
   children,
   className,
@@ -65,10 +65,10 @@ export function StatTile({
 }: {
   label: string;
   value: ReactNode;
-  accent?: "default" | "gold" | "cyan";
+  accent?: "default" | "gold" | "green";
 }) {
   const valueColor =
-    accent === "gold" ? "text-gold" : accent === "cyan" ? "text-cyan" : "text-white";
+    accent === "gold" ? "text-gold" : accent === "green" ? "text-green" : "text-white";
   return (
     <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-center">
       <p className={cn("text-lg font-bold tabular-nums", valueColor)}>{value}</p>
@@ -86,16 +86,16 @@ export function ProgressBar({
   className,
 }: {
   value: number; // 0..1
-  tone?: "gold" | "cyan" | "emerald";
+  tone?: "gold" | "green" | "emerald";
   className?: string;
 }) {
   const pct = Math.max(0, Math.min(1, value)) * 100;
   const fill =
-    tone === "cyan"
-      ? "from-cyan/70 to-cyan"
+    tone === "green"
+      ? "from-green/70 to-green"
       : tone === "emerald"
         ? "from-emerald-500 to-emerald-300"
-        : "from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad]";
+        : "from-[#d4a80f] via-[#f5c518] to-[#ffd54a]";
   return (
     <div className={cn("h-2 overflow-hidden rounded-full bg-white/10", className)}>
       <div
@@ -113,12 +113,12 @@ export function Pill({
   className,
 }: {
   children: ReactNode;
-  tone?: "gold" | "cyan" | "emerald" | "muted";
+  tone?: "gold" | "green" | "emerald" | "muted";
   className?: string;
 }) {
   const styles: Record<string, string> = {
     gold: "border-gold/40 bg-gold/10 text-gold",
-    cyan: "border-cyan/40 bg-cyan/10 text-cyan",
+    green: "border-green/40 bg-green/10 text-green",
     emerald: "border-emerald-500/40 bg-emerald-950/40 text-emerald-300",
     muted: "border-white/10 bg-white/5 text-neutral-400",
   };

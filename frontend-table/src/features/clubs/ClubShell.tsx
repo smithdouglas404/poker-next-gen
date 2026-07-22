@@ -41,23 +41,20 @@ export function ClubShell({
     <div className="min-h-screen text-foreground">
       <div className="mx-auto flex min-h-screen w-full max-w-[1280px] flex-col px-3 py-4 md:px-6 md:py-6">
         <div
-          className="relative flex flex-1 flex-col overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-2xl md:flex-row"
-          style={{
-            boxShadow:
-              "0 40px 120px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.05), 0 0 60px rgba(129,236,255,0.06)",
-          }}
+          className="relative flex flex-1 flex-col overflow-hidden rounded-2xl border border-white/[0.06] bg-[#16191d] md:flex-row"
+          style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.4)" }}
         >
           {/* Sidebar */}
-          <aside className="shrink-0 border-b border-white/[0.08] p-5 md:w-[248px] md:border-b-0 md:border-r md:p-6">
+          <aside className="shrink-0 border-b border-white/[0.06] p-5 md:w-[248px] md:border-b-0 md:border-r md:p-6">
             <div className="mb-6 flex items-center gap-3">
               <div
-                className="flex h-11 w-11 items-center justify-center rounded-xl text-2xl"
-                style={{ background: "linear-gradient(180deg,#f3e2ad,#d4af37)", color: "#3a2c07" }}
+                className="flex h-11 w-11 items-center justify-center rounded-xl font-display text-lg font-bold text-white"
+                style={{ background: "linear-gradient(180deg,#ff2d3f,#b3151f)", boxShadow: "0 4px 14px -4px rgba(224,30,43,0.4)" }}
               >
-                ♜
+                HR
               </div>
               <div className="leading-tight">
-                <div className="font-display text-sm font-bold tracking-wide text-gold">HIGH ROLLERS</div>
+                <div className="font-display text-sm font-bold tracking-wide text-foreground">HIGH ROLLERS</div>
                 <div className="text-[11px] tracking-[0.35em] text-white/40">CLUB</div>
               </div>
             </div>
@@ -92,7 +89,7 @@ export function ClubShell({
                     className={cn(
                       "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition",
                       active
-                        ? "border border-cyan/40 bg-cyan/[0.12] text-cyan shadow-[0_0_18px_rgba(129,236,255,0.12)]"
+                        ? "border border-transparent bg-gradient-to-r from-[#e01e2b] to-[#b3151f] text-white shadow-[0_6px_18px_-8px_rgba(224,30,43,0.5)]"
                         : "border border-transparent text-white/55 hover:bg-white/[0.04] hover:text-white/80",
                     )}
                   >
@@ -105,7 +102,7 @@ export function ClubShell({
 
             <Link
               href="/hub"
-              className="mt-8 inline-flex items-center gap-1 text-xs text-cyan/70 transition hover:text-cyan"
+              className="mt-8 inline-flex items-center gap-1 text-xs text-muted transition hover:text-brand"
             >
               ← Command Center
             </Link>

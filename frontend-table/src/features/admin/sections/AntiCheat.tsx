@@ -40,7 +40,7 @@ export function AntiCheat({ notify }: { notify: Notify }) {
             className={cn(
               "rounded-full border px-4 py-1.5 text-xs font-semibold uppercase tracking-wider transition",
               tab === t.id
-                ? "border-cyan/30 bg-cyan/[0.08] text-cyan"
+                ? "border-brand/40 bg-brand/[0.1] text-brand"
                 : "border-white/10 text-neutral-400 hover:bg-white/[0.03] hover:text-white",
             )}
           >
@@ -140,7 +140,7 @@ function Antibot({ notify }: { notify: Notify }) {
               <Td>
                 <Badge tone={statusTone(r.risk)}>{r.risk}</Badge>
               </Td>
-              <Td className="font-display text-cyan">{r.score.toFixed(2)}</Td>
+              <Td className="font-display text-brand">{r.score.toFixed(2)}</Td>
               <Td className="text-neutral-400">{r.sample_size}</Td>
               <Td className="text-neutral-500">{relTime(r.updated_at)}</Td>
               <Td className="text-right">

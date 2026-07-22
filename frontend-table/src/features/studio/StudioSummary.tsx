@@ -39,7 +39,7 @@ export function StudioSummary({
 
       <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-3 text-center">
         <p className="text-[10px] uppercase tracking-[0.2em] text-neutral-500">Equipped Character</p>
-        <p className="mt-1 truncate text-sm font-semibold text-cyan">
+        <p className="mt-1 truncate text-sm font-semibold text-green">
           {equippedModel ? equippedModel.name : "None equipped"}
         </p>
       </div>
@@ -68,7 +68,7 @@ export function StudioSummary({
                 className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5"
               >
                 <span className="truncate text-xs text-neutral-200">{m.name}</span>
-                <span className="ml-2 shrink-0 text-[10px] uppercase tracking-wider text-amber-300/70">
+                <span className="ml-2 shrink-0 text-[10px] uppercase tracking-wider text-gold/70">
                   {m.rarity}
                 </span>
               </div>

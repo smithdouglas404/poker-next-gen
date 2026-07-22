@@ -1,7 +1,7 @@
 "use client";
 
 import type { TableListItem } from "@/features/game/protocol";
-import { GLASS_PANEL, GLASS_PANEL_HOVER, cn } from "@/features/ui/tokens";
+import { BTN_RED, GLASS_PANEL, GLASS_PANEL_HOVER, cn } from "@/features/ui/tokens";
 
 // Neon Vault glass table thumbnail for the lobby grid. Seat pips encode
 // occupancy; the join CTA is gated by real open-seat count from table_list.
@@ -54,7 +54,7 @@ export function LobbyTableCard({
             "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
             full
               ? "bg-white/5 text-neutral-400"
-              : "bg-cyan/15 text-cyan shadow-[0_0_14px_rgba(129,236,255,0.25)]",
+              : "bg-green/15 text-green",
           )}
         >
           {full ? "Full" : "Live"}
@@ -70,7 +70,7 @@ export function LobbyTableCard({
               className={cn(
                 "h-6 w-6 rounded-full border transition",
                 i < seated
-                  ? "border-gold/50 bg-gradient-to-br from-[#f3e2ad] to-[#9a7b2c] shadow-[0_0_10px_rgba(212,175,55,0.35)]"
+                  ? "border-gold/50 bg-gradient-to-br from-[#ffd54a] to-[#d4a80f] shadow-[0_0_10px_rgba(245,197,24,0.3)]"
                   : "border-white/10 bg-white/[0.02]",
               )}
             />
@@ -78,7 +78,7 @@ export function LobbyTableCard({
         </div>
         <p className="mt-3 text-xs text-neutral-300">
           <span className="font-semibold text-foreground">{seated}</span>/{capacity} seated ·{" "}
-          <span className="text-cyan">{open} open</span>
+          <span className="text-green">{open} open</span>
         </p>
       </div>
 
@@ -91,7 +91,7 @@ export function LobbyTableCard({
           "disabled:cursor-not-allowed disabled:opacity-40",
           full
             ? "border border-white/15 text-neutral-400"
-            : "bg-gradient-to-r from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad] text-black hover:shadow-[0_0_22px_rgba(212,175,55,0.35)]",
+            : cn(BTN_RED, "shadow-none"),
         )}
       >
         {full ? "Table Full" : busy ? "Joining…" : "Take a Seat"}

@@ -74,7 +74,7 @@ export function Financials({
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/45">
             Hands Raked
           </p>
-          <p className="font-display mt-1.5 text-3xl font-bold text-cyan">
+          <p className="font-display mt-1.5 text-3xl font-bold text-foreground">
             {(report?.hand_count ?? 0).toLocaleString()}
           </p>
         </div>
@@ -82,7 +82,7 @@ export function Financials({
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/45">
             House Balance
           </p>
-          <p className="font-display mt-1.5 text-3xl font-bold text-emerald-300">
+          <p className="font-display mt-1.5 text-3xl font-bold text-green">
             {usd(ledger?.house_balance ?? 0)}
           </p>
         </div>
@@ -104,8 +104,7 @@ export function Financials({
                     className="w-full rounded-t-md"
                     style={{
                       height: `${(pt.amount / maxAmount) * 100}%`,
-                      background: "linear-gradient(180deg,#f3e2ad,#d4af37)",
-                      boxShadow: "0 0 14px rgba(212,175,55,0.25)",
+                      background: "linear-gradient(180deg,#ffd54a,#f5c518)",
                     }}
                     title={`${usd(pt.amount)} · ${pt.hands.toLocaleString()} hands`}
                   />

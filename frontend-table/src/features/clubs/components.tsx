@@ -6,9 +6,9 @@ import { avatarDef, avatarForKey, avatarGradient, avatarSrc } from "@/features/t
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
 const ROLE_COLOR: Record<string, string> = {
-  owner: "#f3c14b",
-  admin: "#7fe9ff",
-  manager: "#7fe9ff",
+  owner: "#f5c518",
+  admin: "#22c55e",
+  manager: "#22c55e",
   member: "rgba(255,255,255,0.5)",
 };
 
@@ -62,7 +62,7 @@ export function MemberAvatar({
 }
 
 export function StatusDot({ online }: { online: boolean }) {
-  const c = online ? "#33d17a" : "#e0a83a";
+  const c = online ? "#22c55e" : "#f5c518";
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-white/70">
       <span className="inline-block h-2 w-2 rounded-full" style={{ background: c, boxShadow: `0 0 8px ${c}` }} />
@@ -74,7 +74,7 @@ export function StatusDot({ online }: { online: boolean }) {
 export function StatTile({
   label,
   value,
-  accent = "#81ecff",
+  accent = "#f5f6f7",
   sub,
 }: {
   label: string;
@@ -111,9 +111,9 @@ export function EmptyState({ children }: { children: ReactNode }) {
 }
 
 const SEVERITY: Record<string, string> = {
-  critical: "#ff3b46",
-  warning: "#f3c14b",
-  info: "#7fe9ff",
+  critical: "#e01e2b",
+  warning: "#f5c518",
+  info: "#4a9eb0",
 };
 
 export function severityColor(s: string): string {

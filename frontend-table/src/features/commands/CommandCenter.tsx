@@ -23,6 +23,14 @@ const CATEGORY_ORDER: CommandCategory[] = [
 
 const NO_PAYLOAD_COMMANDS = new Set(["healthz", "club_list", "table_list", "tournament_list", "wallet_get", "profile_get"]);
 
+// GGPoker nav chips — clean neutral surface with tone accents for primary/premium.
+const NAV_CHIP =
+  "rounded-xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-semibold text-neutral-200 transition hover:border-white/20 hover:bg-white/[0.06]";
+const NAV_CHIP_RED =
+  "rounded-xl border border-brand/50 bg-brand/10 px-5 py-3 text-sm font-semibold text-brand transition hover:bg-brand/15";
+const NAV_CHIP_GOLD =
+  "rounded-xl border border-gold/50 bg-gold/10 px-5 py-3 text-sm font-semibold text-gold transition hover:bg-gold/15";
+
 async function runLiveCommand(
   command: CommandDefinition,
   payload?: Record<string, unknown>,
@@ -76,7 +84,7 @@ async function runLiveCommand(
 
 function StatusBadge() {
   return (
-    <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
+    <span className="rounded-full bg-green/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-green">
       Live
     </span>
   );
@@ -96,15 +104,15 @@ function CommandCard({
   const inner = (
     <>
       <div className="flex items-start justify-between gap-3">
-        <span className="text-2xl leading-none text-amber-300/90">{command.icon}</span>
+        <span className="text-2xl leading-none text-gold">{command.icon}</span>
         <StatusBadge />
       </div>
       <h3 className="mt-4 text-base font-semibold text-white">{command.title}</h3>
       <p className="mt-2 text-sm leading-relaxed text-neutral-400">{command.description}</p>
       {command.rpc && (
-        <p className="mt-3 font-mono text-[10px] text-emerald-400/80">rpc/{command.rpc}</p>
+        <p className="mt-3 font-mono text-[10px] text-green/80">rpc/{command.rpc}</p>
       )}
-      <div className="mt-4 text-xs font-semibold uppercase tracking-wider text-amber-200/80">
+      <div className="mt-4 text-xs font-semibold uppercase tracking-wider text-brand">
         {isLink ? "Open →" : "Run Command →"}
       </div>
     </>
@@ -114,7 +122,7 @@ function CommandCard({
     return (
       <Link
         href={command.href!}
-        className="group rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-amber-400/40 hover:bg-white/[0.06]"
+        className="group rounded-2xl border border-white/[0.06] bg-[#16191d] p-5 transition hover:border-brand/40 hover:bg-white/[0.04]"
       >
         {inner}
       </Link>
@@ -126,7 +134,7 @@ function CommandCard({
       type="button"
       disabled={busy}
       onClick={() => onRun(command)}
-      className="group w-full rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-left transition hover:border-amber-400/40 hover:bg-white/[0.06] disabled:opacity-60"
+      className="group w-full rounded-2xl border border-white/[0.06] bg-[#16191d] p-5 text-left transition hover:border-brand/40 hover:bg-white/[0.04] disabled:opacity-60"
     >
       {inner}
     </button>
@@ -204,7 +212,7 @@ export function CommandCenter() {
   }, [activeCommand, formJson]);
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
+    <div className="min-h-screen bg-background text-foreground">
       {bannerVisible && latest && (
         <div className="pointer-events-none fixed inset-x-0 top-0 z-[60] flex justify-center px-4 pt-4">
           <div
@@ -277,10 +285,10 @@ export function CommandCenter() {
         </div>
       )}
 
-      <header className="border-b border-white/10 bg-gradient-to-b from-emerald-950/40 to-neutral-950 px-6 py-10">
+      <header className="border-b border-white/[0.06] bg-surface px-6 py-10">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-amber-300/80">Poker Next-Gen</p>
+            <p className="text-xs uppercase tracking-[0.4em] text-gold/80">Poker Next-Gen</p>
             <h1 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">Command Center</h1>
             <p className="mt-3 max-w-2xl text-neutral-400">
               Every platform action — communities, wallets, cash games, tournaments, and the live table.
@@ -288,91 +296,58 @@ export function CommandCenter() {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Link
-              href="/stack"
-              className="rounded-xl border border-violet-500/40 bg-violet-950/40 px-5 py-3 text-sm font-semibold text-violet-200 hover:bg-violet-900/40"
-            >
+            <Link href="/stack" className={NAV_CHIP}>
               Live Stack →
             </Link>
-            <Link
-              href="/lobby"
-              className="rounded-xl border border-sky-500/40 bg-sky-950/40 px-5 py-3 text-sm font-semibold text-sky-200 hover:bg-sky-900/40"
-            >
+            <Link href="/lobby" className={NAV_CHIP}>
               Table Lobby →
             </Link>
             <a
               href={process.env.NEXT_PUBLIC_ODDSLINGERS_URL ?? "http://localhost:8888"}
               target="_blank"
               rel="noreferrer"
-              className="rounded-xl border border-amber-500/40 bg-amber-950/30 px-5 py-3 text-sm font-semibold text-amber-200 hover:bg-amber-900/30"
+              className={NAV_CHIP}
             >
               OddSlingers →
             </a>
-            <Link
-              href="/table"
-              className="rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-5 py-3 text-sm font-semibold text-emerald-200 hover:bg-emerald-900/40"
-            >
+            <Link href="/table" className={NAV_CHIP_RED}>
               Open Table →
             </Link>
-            <Link
-              href="/tournaments"
-              className="rounded-xl border border-violet-500/40 bg-violet-950/30 px-5 py-3 text-sm font-semibold text-violet-200 hover:bg-violet-900/30"
-            >
+            <Link href="/tournaments" className={NAV_CHIP}>
               Tournaments →
             </Link>
-            <Link
-              href="/membership"
-              className="rounded-xl border border-amber-400/50 bg-gradient-to-r from-amber-950/40 to-yellow-900/20 px-5 py-3 text-sm font-semibold text-amber-200 hover:from-amber-900/40"
-            >
+            <Link href="/membership" className={NAV_CHIP_GOLD}>
               Membership →
             </Link>
-            <Link
-              href="/clubs"
-              className="rounded-xl border border-amber-400/40 bg-amber-950/20 px-5 py-3 text-sm font-semibold text-amber-200 hover:bg-amber-900/20"
-            >
+            <Link href="/clubs" className={NAV_CHIP}>
               Clubs →
             </Link>
-            <Link
-              href="/capabilities"
-              className="rounded-xl border border-cyan/40 bg-cyan/5 px-5 py-3 text-sm font-semibold text-cyan hover:bg-cyan/10"
-            >
+            <Link href="/capabilities" className={NAV_CHIP}>
               Capabilities →
             </Link>
-            <Link
-              href="/studio"
-              className="rounded-xl border border-fuchsia-400/40 bg-fuchsia-950/20 px-5 py-3 text-sm font-semibold text-fuchsia-200 hover:bg-fuchsia-900/20"
-            >
+            <Link href="/studio" className={NAV_CHIP}>
               Character Studio →
             </Link>
-            <Link
-              href="/marketplace"
-              className="rounded-xl border border-fuchsia-400/40 bg-fuchsia-950/20 px-5 py-3 text-sm font-semibold text-fuchsia-200 hover:bg-fuchsia-900/20"
-            >
+            <Link href="/marketplace" className={NAV_CHIP}>
               Marketplace →
             </Link>
             <Link
               href="/provably-fair"
-              className="rounded-xl border border-emerald-400/40 bg-emerald-950/20 px-5 py-3 text-sm font-semibold text-emerald-200 hover:bg-emerald-900/20"
+              className="rounded-xl border border-cyan/40 bg-cyan/5 px-5 py-3 text-sm font-semibold text-cyan transition hover:bg-cyan/10"
             >
               Provably Fair →
             </Link>
-            <Link
-              href="/login"
-              className="rounded-xl border border-sky-500/40 bg-sky-950/30 px-5 py-3 text-sm font-semibold text-sky-200 hover:bg-sky-900/30"
-            >
+            <Link href="/login" className={NAV_CHIP}>
               Sign In →
             </Link>
             {roles.platform_admin && (
-              <Link
-                href="/admin"
-                className="rounded-xl border border-amber-500/40 bg-amber-950/20 px-5 py-3 text-sm font-semibold text-amber-200 hover:bg-amber-900/20"
-              >
+              <Link href="/admin" className={NAV_CHIP_RED}>
                 Admin →
               </Link>
             )}
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-4 py-3 text-center">
-              <p className="text-2xl font-bold text-emerald-300">{stats.live}</p>
-              <p className="text-[10px] uppercase tracking-wider text-neutral-400">Live Commands</p>
+            <div className="rounded-xl border border-green/30 bg-green/10 px-4 py-3 text-center">
+              <p className="text-2xl font-bold text-green">{stats.live}</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted">Live Commands</p>
             </div>
           </div>
         </div>
@@ -411,8 +386,8 @@ export function CommandCenter() {
           <div className="mt-4 space-y-3">
             {results.length === 0 && (
               <p className="text-sm text-neutral-500">
-                Run <strong className="text-emerald-400">Check Backend Health</strong> or{" "}
-                <strong className="text-emerald-400">View Player Profile</strong> to get started.
+                Run <strong className="text-green">Check Backend Health</strong> or{" "}
+                <strong className="text-green">View Player Profile</strong> to get started.
               </p>
             )}
             {results.map((result, i) => {
@@ -422,8 +397,8 @@ export function CommandCenter() {
                   key={`${result.at}-${i}`}
                   className={`rounded-xl border p-4 ${
                     result.ok
-                      ? "border-emerald-500/30 bg-emerald-950/20"
-                      : "border-amber-500/20 bg-amber-950/10"
+                      ? "border-green/30 bg-green/[0.08]"
+                      : "border-brand/30 bg-brand/[0.08]"
                   }`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -432,7 +407,7 @@ export function CommandCenter() {
                   </div>
                   <p className="mt-1 text-sm text-neutral-300">{result.message}</p>
                   {result.data !== undefined && (
-                    <pre className="mt-3 overflow-x-auto rounded-lg bg-black/40 p-3 text-xs text-emerald-200">
+                    <pre className="mt-3 overflow-x-auto rounded-lg bg-black/40 p-3 text-xs text-green">
                       {JSON.stringify(result.data, null, 2)}
                     </pre>
                   )}
@@ -448,7 +423,7 @@ export function CommandCenter() {
           <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-neutral-900 p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs uppercase tracking-wider text-amber-300/80">Run Command</p>
+                <p className="text-xs uppercase tracking-wider text-gold/80">Run Command</p>
                 <h3 className="mt-1 text-xl font-semibold">{activeCommand.title}</h3>
               </div>
               <StatusBadge />
@@ -462,7 +437,7 @@ export function CommandCenter() {
               value={formJson}
               onChange={(e) => setFormJson(e.target.value)}
               rows={10}
-              className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 p-3 font-mono text-xs text-emerald-100 outline-none focus:border-emerald-500/50"
+              className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 p-3 font-mono text-xs text-green outline-none focus:border-green/50"
             />
 
             <div className="mt-5 flex flex-wrap gap-3">
@@ -470,7 +445,7 @@ export function CommandCenter() {
                 type="button"
                 disabled={busyId !== null}
                 onClick={submitModal}
-                className="rounded-full bg-emerald-700 px-6 py-2.5 text-sm font-semibold uppercase tracking-wider text-white hover:bg-emerald-600 disabled:opacity-50"
+                className="rounded-full bg-[#0a7d43] px-6 py-2.5 text-sm font-semibold uppercase tracking-wider text-white hover:bg-[#1c9f57] disabled:opacity-50"
               >
                 Run
               </button>

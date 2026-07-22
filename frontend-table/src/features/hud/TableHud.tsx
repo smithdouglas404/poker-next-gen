@@ -42,7 +42,7 @@ export function TableHud({ children }: { children: React.ReactNode }) {
   const showGamePanels = !cinematic || hasGame;
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-neutral-950">
+    <div className="relative h-screen w-screen overflow-hidden bg-background">
       {children}
 
       <div className="pointer-events-none absolute inset-0 z-20 flex flex-col p-4">
@@ -88,7 +88,7 @@ export function TableHud({ children }: { children: React.ReactNode }) {
         {/* The offline "Failed to fetch" toast is noise on the demo/cinematic
             showcase (no server by design); keep it only for the classic path. */}
         {!cinematic && error && (
-          <div className="pointer-events-auto absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border border-red-500/40 bg-red-950/60 px-4 py-2 text-xs text-red-200">
+          <div className="pointer-events-auto absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border border-brand/40 bg-brand/15 px-4 py-2 text-xs text-[#ff9ba1]">
             {error}
           </div>
         )}

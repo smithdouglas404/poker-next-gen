@@ -6,12 +6,14 @@ import { cn } from "@/features/ui/tokens";
 
 import type { LobbyMeta } from "./types";
 
+// GGPoker chip tones: gold = rewards/premium, green = money/positive,
+// red = brand/hot. Cyan + purple are retired → clean neutral chips.
 const TONE: Record<NonNullable<LobbyMeta["tagTone"]>, string> = {
   gold: "border-gold/40 bg-gold/10 text-gold",
-  cyan: "border-cyan/40 bg-cyan/10 text-cyan",
-  green: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
-  purple: "border-purple-400/40 bg-purple-400/10 text-purple-300",
-  red: "border-red-400/40 bg-red-400/10 text-red-300",
+  cyan: "border-white/15 bg-white/[0.05] text-neutral-300",
+  green: "border-green/40 bg-green/10 text-green",
+  purple: "border-white/15 bg-white/[0.05] text-neutral-300",
+  red: "border-brand/45 bg-brand/10 text-[#ff2d3f]",
 };
 
 export function Tag({
@@ -52,11 +54,11 @@ export function Stat({
 }) {
   const valueTone =
     tone === "cyan"
-      ? "text-cyan"
+      ? "text-green"
       : tone === "gold"
         ? "text-gold"
         : tone === "green"
-          ? "text-emerald-300"
+          ? "text-green"
           : "text-white";
   return (
     <div className={cn("min-w-0", className)}>
@@ -81,9 +83,9 @@ export function KpiTile({
   tone?: "cyan" | "gold" | "green";
   hint?: string;
 }) {
-  const valueTone = tone === "gold" ? "text-gold" : tone === "green" ? "text-emerald-300" : "text-cyan";
+  const valueTone = tone === "gold" ? "text-gold" : tone === "green" ? "text-green" : "text-foreground";
   return (
-    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-4 backdrop-blur-xl">
+    <div className="rounded-xl border border-white/[0.06] bg-[#16191d] px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
       <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500">{label}</p>
       <p className={cn("mt-1.5 font-display text-2xl font-bold tabular-nums", valueTone)}>{value}</p>
       {hint && <p className="mt-0.5 text-[11px] text-neutral-500">{hint}</p>}
@@ -107,6 +109,6 @@ export function RowIcon({ tone = "cyan", glyph }: { tone?: LobbyMeta["tagTone"];
 
 export function Eyebrow({ children }: { children: ReactNode }) {
   return (
-    <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-cyan/70">{children}</p>
+    <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-muted">{children}</p>
   );
 }

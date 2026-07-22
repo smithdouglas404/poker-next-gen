@@ -129,7 +129,7 @@ export function LiveStatsBand() {
       label: "Players online",
       value: presence ? String(presence.online) : "—",
       numeric: presence?.online ?? 0,
-      accent: "#81ecff",
+      accent: "#22c55e",
       live: true,
     },
     {
@@ -137,7 +137,7 @@ export function LiveStatsBand() {
       label: "Seated now",
       value: presence ? String(presence.players_at_tables) : "—",
       numeric: presence?.players_at_tables ?? 0,
-      accent: "#22d3ee",
+      accent: "#ff2d3f",
       live: true,
     },
     {
@@ -145,28 +145,28 @@ export function LiveStatsBand() {
       label: "Hands dealt",
       value: stats ? compact(stats.hands) : "—",
       numeric: stats?.hands ?? 0,
-      accent: "#d4af37",
+      accent: "#f5c518",
     },
     {
       key: "players",
       label: "Members",
       value: stats ? compact(stats.players) : "—",
       numeric: stats?.players ?? 0,
-      accent: "#f3e2ad",
+      accent: "#f5f6f7",
     },
     {
       key: "clubs",
       label: "Clubs",
       value: stats ? compact(stats.clubs) : "—",
       numeric: stats?.clubs ?? 0,
-      accent: "#b44dff",
+      accent: "#ffd54a",
     },
     {
       key: "pot",
       label: "Chips in play",
       value: stats ? money(stats.pot_cents) : "—",
       numeric: stats?.pot_cents ?? 0,
-      accent: "#e9c46a",
+      accent: "#22c55e",
     },
   ];
 

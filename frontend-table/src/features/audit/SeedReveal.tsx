@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { BTN_GOLD, GLASS_PANEL, HEADING_SM, cn } from "@/features/ui/tokens";
+import { BTN_RED, GLASS_PANEL, HEADING_SM, cn } from "@/features/ui/tokens";
 import { downloadFile, proofBundle } from "@/features/provably/verifier";
 import { PlayingCard } from "./Card";
 import { auditVerifyHand } from "./auditRpc";
@@ -147,14 +147,14 @@ export function SeedReveal({ target }: Props) {
           </div>
           <div className="text-right">
             <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-500">Game Session ID</div>
-            <div className="mt-1 font-mono text-sm text-cyan">#{sessionId}</div>
+            <div className="mt-1 font-mono text-sm text-muted">#{sessionId}</div>
           </div>
         </div>
 
         {/* Locked server seed hash */}
-        <div className="mt-8 rounded-2xl border-l-2 border-cyan/50 bg-white/[0.02] p-5">
+        <div className="mt-8 rounded-2xl border-l-2 border-brand/50 bg-white/[0.02] p-5">
           <div className="flex items-center justify-between">
-            <span className={cn(HEADING_SM, "text-cyan")}>Server Seed Hash (Locked)</span>
+            <span className={cn(HEADING_SM, "text-foreground")}>Server Seed Hash (Locked)</span>
             <span className="text-neutral-500">🔒</span>
           </div>
           <div className="mt-3 break-all rounded-lg bg-black/60 p-4 font-mono text-xs leading-relaxed text-neutral-300">
@@ -174,13 +174,13 @@ export function SeedReveal({ target }: Props) {
             <input
               value={playerSeed}
               onChange={(e) => setPlayerSeed(e.target.value)}
-              className="rounded-xl border border-white/10 bg-black/40 px-4 py-3.5 text-sm text-white outline-none focus:border-cyan/40"
+              className="rounded-xl border border-white/10 bg-black/40 px-4 py-3.5 text-sm text-white outline-none focus:border-white/25"
             />
             <button
               onClick={reveal}
               disabled={busy}
               className={cn(
-                BTN_GOLD,
+                BTN_RED,
                 "inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold uppercase tracking-wider disabled:opacity-50",
               )}
             >
@@ -203,14 +203,14 @@ export function SeedReveal({ target }: Props) {
                 className={cn(
                   "flex h-11 w-11 items-center justify-center rounded-xl text-lg",
                   result.commitMatches
-                    ? "bg-emerald-500/15 text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.35)]"
-                    : "bg-red-500/15 text-red-300",
+                    ? "bg-green/15 text-green"
+                    : "bg-brand/15 text-brand",
                 )}
               >
                 {result.commitMatches ? "✔" : "✕"}
               </div>
               <div>
-                <h2 className={cn("font-display text-lg font-bold uppercase tracking-wider", result.commitMatches ? "text-emerald-300" : "text-red-300")}>
+                <h2 className={cn("font-display text-lg font-bold uppercase tracking-wider", result.commitMatches ? "text-green" : "text-brand")}>
                   {result.commitMatches ? "Verification Success" : "Verification Failed"}
                 </h2>
                 <p className="text-sm text-neutral-400">
@@ -250,8 +250,8 @@ export function SeedReveal({ target }: Props) {
 
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Node: {result.node}
+                <span className="inline-flex items-center gap-1.5 rounded-md border border-green/30 bg-green/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-green">
+                  <span className="h-1.5 w-1.5 rounded-full bg-green" /> Node: {result.node}
                 </span>
                 <span className="rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
                   Lat: {result.latencyMs}ms
@@ -259,7 +259,7 @@ export function SeedReveal({ target }: Props) {
               </div>
               <button
                 onClick={downloadJson}
-                className="text-xs font-bold uppercase tracking-wider text-cyan underline decoration-cyan/40 underline-offset-4 hover:decoration-cyan"
+                className="text-xs font-bold uppercase tracking-wider text-brand underline decoration-brand/40 underline-offset-4 hover:decoration-brand"
               >
                 Download Full JSON Log
               </button>

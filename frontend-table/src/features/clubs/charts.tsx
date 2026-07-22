@@ -5,7 +5,7 @@
 
 export function Sparkbars({
   values,
-  color = "#81ecff",
+  color = "#22c55e",
   height = 56,
 }: {
   values: number[];
@@ -88,7 +88,7 @@ export function Donut({
 
 export function ProgressBar({
   pct,
-  color = "#81ecff",
+  color = "#22c55e",
 }: {
   pct: number;
   color?: string;
@@ -98,7 +98,7 @@ export function ProgressBar({
     <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.08]">
       <div
         className="h-full rounded-full transition-all duration-500"
-        style={{ width: `${clamped * 100}%`, background: color, boxShadow: `0 0 8px ${color}` }}
+        style={{ width: `${clamped * 100}%`, background: color }}
       />
     </div>
   );

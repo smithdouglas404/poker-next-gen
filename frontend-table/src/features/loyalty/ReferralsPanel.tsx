@@ -56,7 +56,7 @@ export function ReferralsPanel({
         </p>
 
         <div className="mt-4 grid grid-cols-3 gap-2.5">
-          <StatTile label="Referrals" value={status?.total_referrals ?? 0} accent="cyan" />
+          <StatTile label="Referrals" value={status?.total_referrals ?? 0} accent="green" />
           <StatTile label="Pending" value={money(status?.pending_cents)} accent="gold" />
           <StatTile label="Earned" value={money(status?.earned_cents)} />
         </div>
@@ -79,7 +79,7 @@ export function ReferralsPanel({
       <GlassCard className="flex flex-col p-5">
         {!status?.was_referred ? (
           <>
-            <Eyebrow tone="cyan">Redeem a Code</Eyebrow>
+            <Eyebrow tone="green">Redeem a Code</Eyebrow>
             <Field label="Referral code" className="mt-2">
               <Input
                 value={applyCode}
@@ -103,7 +103,7 @@ export function ReferralsPanel({
           </>
         ) : (
           <div className="flex items-center gap-2">
-            <Eyebrow tone="cyan">Referred</Eyebrow>
+            <Eyebrow tone="green">Referred</Eyebrow>
             <Pill tone="emerald">Welcome bonus credited</Pill>
           </div>
         )}

@@ -86,13 +86,13 @@ export function HandHistoryPanel() {
   if (!matchId) return null;
 
   return (
-    <aside className="pointer-events-auto flex w-full max-w-xs flex-col rounded-2xl border border-white/10 bg-black/60 backdrop-blur-md">
+    <aside className="pointer-events-auto flex w-full max-w-xs flex-col rounded-2xl border border-white/[0.06] bg-surface shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex items-center justify-between px-4 py-3 text-left"
       >
-        <span className="text-xs uppercase tracking-[0.25em] text-amber-300/80">Hand History</span>
+        <span className="text-xs uppercase tracking-[0.25em] text-muted">Hand History</span>
         <span className="text-neutral-500">{open ? "▾" : "▸"}</span>
       </button>
 
@@ -109,7 +109,7 @@ export function HandHistoryPanel() {
                     type="button"
                     onClick={() => selectHand(n)}
                     className={`rounded px-2 py-0.5 text-[11px] font-semibold ${
-                      handNo === n ? "bg-amber-500 text-black" : "bg-white/5 text-neutral-300"
+                      handNo === n ? "bg-brand text-white" : "bg-white/5 text-neutral-300"
                     }`}
                   >
                     #{n}
@@ -125,7 +125,7 @@ export function HandHistoryPanel() {
                         key={i}
                         className={`rounded px-2 py-1 text-[11px] ${
                           i === step
-                            ? "bg-amber-400/15 text-amber-100"
+                            ? "bg-gold/15 text-gold"
                             : i < step
                               ? "text-neutral-400"
                               : "text-neutral-600"

@@ -72,7 +72,7 @@ export function FocusRail({
   return (
     <div className={cn(GLASS_PANEL, "flex flex-col gap-5 p-5")}>
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-cyan/70">Selected Focus</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-muted">Selected Focus</p>
         <h3 className="mt-1 font-display text-xl font-bold italic uppercase tracking-wide text-white">
           {tournament.name}
         </h3>
@@ -93,13 +93,13 @@ export function FocusRail({
           <span
             className={cn(
               "inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em]",
-              live ? "text-emerald-400" : "text-neutral-600",
+              live ? "text-green" : "text-neutral-600",
             )}
           >
             <span
               className={cn(
                 "h-1.5 w-1.5 rounded-full",
-                live ? "animate-pulse bg-emerald-400" : "bg-neutral-600",
+                live ? "animate-pulse bg-green" : "bg-neutral-600",
               )}
             />
             {live ? "Live" : "Pre-reg"}
@@ -119,7 +119,7 @@ export function FocusRail({
               <span
                 className={cn(
                   "w-6 font-display text-sm font-bold tabular-nums",
-                  e.rank === 1 ? "text-gold" : e.rank <= 3 ? "text-cyan" : "text-neutral-500",
+                  e.rank === 1 ? "text-gold" : e.rank <= 3 ? "text-neutral-200" : "text-neutral-500",
                 )}
               >
                 {String(e.rank).padStart(2, "0")}
@@ -129,7 +129,7 @@ export function FocusRail({
                 style={{
                   background:
                     e.rank === 1
-                      ? "linear-gradient(135deg,#f3e2ad,#d4af37)"
+                      ? "linear-gradient(135deg,#ffd54a,#f5c518)"
                       : "linear-gradient(135deg,#a8b0bd,#5b6270)",
                 }}
               >
@@ -153,7 +153,7 @@ export function FocusRail({
             Blind Structure
           </p>
           {live && cur && (
-            <span className="font-display text-xs font-bold tabular-nums text-cyan">
+            <span className="font-display text-xs font-bold tabular-nums text-foreground">
               in {clock(cur.remaining)}
             </span>
           )}
@@ -175,7 +175,7 @@ export function FocusRail({
                       key={lvl.id ?? `${lvl.level}-${i}`}
                       className={cn(
                         "border-t border-white/5 first:border-t-0",
-                        isCur && "bg-cyan/10",
+                        isCur && "bg-brand/10",
                       )}
                     >
                       <td className="px-3 py-1.5 font-semibold text-neutral-400">

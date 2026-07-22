@@ -22,11 +22,11 @@ export function HostPanel() {
   const curBb = Math.round((snapshot.big_blind ?? 0) / 100);
 
   return (
-    <aside className="pointer-events-auto flex w-full max-w-xs flex-col gap-2 rounded-2xl border border-fuchsia-400/20 bg-black/60 p-3 backdrop-blur-md">
+    <aside className="pointer-events-auto flex w-full max-w-xs flex-col gap-2 rounded-2xl border border-white/[0.06] bg-surface p-3 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
       <div className="flex items-center justify-between">
-        <p className="text-xs uppercase tracking-[0.25em] text-fuchsia-300/80">Host Controls</p>
+        <p className="text-xs uppercase tracking-[0.25em] text-muted">Host Controls</p>
         {paused && (
-          <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[9px] font-bold uppercase text-amber-300">
+          <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[9px] font-bold uppercase text-gold">
             Paused
           </span>
         )}
@@ -35,7 +35,7 @@ export function HostPanel() {
       <button
         type="button"
         onClick={() => void hostAction({ action: paused ? "resume" : "pause" })}
-        className="rounded-lg border border-amber-400/40 bg-amber-950/30 px-2 py-1.5 text-xs font-semibold text-amber-200 hover:bg-amber-900/40"
+        className="rounded-lg border border-gold/40 bg-gold/10 px-2 py-1.5 text-xs font-semibold text-gold hover:bg-gold/20"
       >
         {paused ? "▶ Resume dealing" : "❚❚ Pause dealing"}
       </button>
@@ -48,7 +48,7 @@ export function HostPanel() {
             min={1}
             defaultValue={curSb}
             onChange={(e) => setSb(Number(e.target.value) * 100)}
-            className="mt-0.5 w-full rounded border border-white/10 bg-black/50 px-1 py-1 text-xs text-white"
+            className="mt-0.5 w-full rounded border border-white/10 bg-black/40 px-1 py-1 text-xs text-white"
           />
         </label>
         <label className="flex flex-1 flex-col text-[9px] uppercase tracking-wider text-neutral-500">
@@ -58,7 +58,7 @@ export function HostPanel() {
             min={1}
             defaultValue={curBb}
             onChange={(e) => setBb(Number(e.target.value) * 100)}
-            className="mt-0.5 w-full rounded border border-white/10 bg-black/50 px-1 py-1 text-xs text-white"
+            className="mt-0.5 w-full rounded border border-white/10 bg-black/40 px-1 py-1 text-xs text-white"
           />
         </label>
         <button
@@ -70,7 +70,7 @@ export function HostPanel() {
               big_blind: bb || snapshot.big_blind,
             })
           }
-          className="rounded-lg bg-fuchsia-600/80 px-2 py-1.5 text-xs font-semibold text-white hover:bg-fuchsia-500"
+          className="rounded-lg bg-brand px-2 py-1.5 text-xs font-semibold text-white hover:bg-[#ff2d3f]"
         >
           Set
         </button>

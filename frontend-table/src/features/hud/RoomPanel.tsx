@@ -95,7 +95,7 @@ export function RoomPanel() {
     <div className="pointer-events-none fixed left-0 top-20 z-40 flex items-start">
       <aside
         className={cn(
-          "pointer-events-auto max-h-[calc(100vh-6rem)] w-72 overflow-y-auto rounded-r-2xl border border-l-0 border-white/10 bg-black/70 p-4 shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-out",
+          "pointer-events-auto max-h-[calc(100vh-6rem)] w-72 overflow-y-auto rounded-r-2xl border border-l-0 border-white/[0.06] bg-surface p-4 shadow-2xl transition-transform duration-300 ease-out",
           open ? "translate-x-0" : "-translate-x-full",
         )}
         aria-hidden={!open}
@@ -107,7 +107,7 @@ export function RoomPanel() {
           </div>
           <Link
             href="/lobby"
-            className="rounded-lg border border-cyan/30 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-cyan hover:bg-cyan/10"
+            className="rounded-lg border border-white/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted hover:bg-white/5 hover:text-foreground"
           >
             Lobby
           </Link>
@@ -115,11 +115,11 @@ export function RoomPanel() {
 
         <p className="mt-2 text-[10px] text-neutral-500">
           Buy-in {formatCents(MIN_BUY_IN_CENTS)}–{formatCents(MAX_BUY_IN_CENTS)} · selected{" "}
-          <span className="text-amber-300/90">{formatCents(buyInCents)}</span>
+          <span className="text-gold">{formatCents(buyInCents)}</span>
         </p>
 
         <div className="mt-3 rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-300/70">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">
             New table setup
           </p>
           <div className="mt-2 grid grid-cols-2 gap-2">
@@ -162,7 +162,7 @@ export function RoomPanel() {
                   onClick={() => setGameVariant(v.key)}
                   className={`flex flex-col items-start rounded-lg border px-2 py-1 text-left transition ${
                     gameVariant === v.key
-                      ? "border-amber-400/60 bg-amber-400/10 text-amber-100"
+                      ? "border-brand/60 bg-brand/15 text-white"
                       : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25"
                   }`}
                 >
@@ -213,7 +213,7 @@ export function RoomPanel() {
                   onClick={() => setDurationMins(d.mins)}
                   className={`rounded-lg border px-2 py-1 text-xs font-semibold transition ${
                     durationMins === d.mins
-                      ? "border-amber-400/60 bg-amber-400/10 text-amber-100"
+                      ? "border-brand/60 bg-brand/15 text-white"
                       : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25"
                   }`}
                 >
@@ -224,7 +224,7 @@ export function RoomPanel() {
           </div>
 
           {!blindsValid && (
-            <p className="mt-2 text-[10px] text-red-300">Big blind must be ≥ small blind.</p>
+            <p className="mt-2 text-[10px] text-[#ff9ba1]">Big blind must be ≥ small blind.</p>
           )}
         </div>
 
@@ -252,7 +252,7 @@ export function RoomPanel() {
             variant="outline"
             disabled={busy || matchmakerSearching}
             onClick={() => run(() => findMatch())}
-            className="w-full border-cyan/40 text-cyan hover:bg-cyan/10"
+            className="w-full border-white/20 text-neutral-200 hover:bg-white/5"
           >
             {matchmakerSearching ? "Searching…" : "Find Match"}
           </Button>
@@ -270,7 +270,7 @@ export function RoomPanel() {
               size="sm"
               disabled={busy || joinCode.trim().length < 4}
               onClick={() => run(() => joinByCode(joinCode.trim()))}
-              className="border-fuchsia-400/50 text-fuchsia-200 hover:bg-fuchsia-400/10"
+              className="border-white/20 text-neutral-200 hover:bg-white/5"
             >
               Join Code
             </Button>
@@ -288,7 +288,7 @@ export function RoomPanel() {
               size="sm"
               disabled={busy || !joinId.trim()}
               onClick={() => run(() => joinRoom(joinId.trim()))}
-              className="border-amber-400/50 text-amber-200 hover:bg-amber-400/10"
+              className="border-white/20 text-neutral-200 hover:bg-white/5"
             >
               Join
             </Button>
@@ -302,13 +302,13 @@ export function RoomPanel() {
                 void navigator.clipboard?.writeText(link);
               }}
               title="Copy invite link"
-              className="flex items-center justify-between rounded-lg border border-fuchsia-400/30 bg-fuchsia-950/20 px-3 py-2 text-left"
+              className="flex items-center justify-between rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-left"
             >
               <span className="text-[10px] uppercase tracking-wider text-neutral-400">Share code</span>
-              <span className="font-mono text-sm font-bold tracking-[0.3em] text-fuchsia-200">
+              <span className="font-mono text-sm font-bold tracking-[0.3em] text-gold">
                 {roomCode}
               </span>
-              <span className="text-[10px] text-fuchsia-300/80">copy link</span>
+              <span className="text-[10px] text-gold/80">copy link</span>
             </button>
           )}
 
@@ -318,7 +318,7 @@ export function RoomPanel() {
                 variant="outline"
                 disabled={busy || seated < 2}
                 onClick={() => run(() => startHand())}
-                className="w-full border-violet-400/40 text-violet-200 hover:bg-violet-500/10"
+                className="w-full border-green/40 text-[#bff5d3] hover:bg-green/10"
               >
                 Start Hand ({seated}/{seatCap} seated)
               </Button>
@@ -326,7 +326,7 @@ export function RoomPanel() {
                 variant="outline"
                 disabled={busy || seated >= seatCap}
                 onClick={() => run(() => addBot())}
-                className="w-full border-teal-400/40 text-teal-200 hover:bg-teal-500/10"
+                className="w-full border-white/20 text-neutral-200 hover:bg-white/5"
               >
                 + Add Bot
               </Button>
@@ -375,7 +375,7 @@ export function RoomPanel() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={open ? "Close room control" : "Open room control"}
-        className="pointer-events-auto mt-2 flex items-center gap-1 rounded-r-xl border border-l-0 border-amber-400/40 bg-black/70 px-2 py-3 text-[11px] font-semibold uppercase tracking-wider text-amber-200 shadow-lg backdrop-blur-xl transition hover:bg-amber-950/40 [writing-mode:vertical-rl]"
+        className="pointer-events-auto mt-2 flex items-center gap-1 rounded-r-xl border border-l-0 border-white/[0.08] bg-surface px-2 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted shadow-lg transition hover:bg-white/5 hover:text-foreground [writing-mode:vertical-rl]"
       >
         <span className="rotate-180">⚙ Room</span>
       </button>

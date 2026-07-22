@@ -68,7 +68,7 @@ export function SupportDialog({
           <>
             {" "}
             — or write us directly at{" "}
-            <a href={`mailto:${supportEmail}`} className="text-cyan hover:underline">
+            <a href={`mailto:${supportEmail}`} className="text-brand hover:underline">
               {supportEmail}
             </a>
           </>

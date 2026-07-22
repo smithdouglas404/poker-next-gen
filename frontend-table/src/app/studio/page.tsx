@@ -26,7 +26,7 @@ export default function StudioPage() {
           </div>
           <div className="flex items-center gap-3">
             <StatusPill online={studio.online} />
-            <Link href="/hub" className="text-sm text-cyan hover:underline">
+            <Link href="/hub" className="text-sm text-muted transition-colors hover:text-foreground">
               ← Command Center
             </Link>
           </div>
@@ -48,12 +48,12 @@ export default function StudioPage() {
             </div>
           )}
           {studio.notice && !studio.error && (
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-cyan/25 bg-cyan/5 px-4 py-2.5 text-sm text-cyan">
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-green/25 bg-green/5 px-4 py-2.5 text-sm text-green">
               <span>{studio.notice}</span>
               <button
                 type="button"
                 onClick={studio.clearMessages}
-                className="text-xs uppercase tracking-wider text-cyan/60 hover:text-cyan"
+                className="text-xs uppercase tracking-wider text-green/70 hover:text-green"
               >
                 Dismiss
               </button>
@@ -125,8 +125,8 @@ function StatusPill({ online }: { online: boolean | null }) {
       className={cn(
         "rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wider",
         online
-          ? "border-cyan/40 bg-cyan/10 text-cyan"
-          : "border-amber-500/40 bg-amber-500/10 text-amber-300",
+          ? "border-green/40 bg-green/10 text-green"
+          : "border-gold/40 bg-gold/10 text-gold",
       )}
     >
       {online ? "Live" : "Demo · offline"}

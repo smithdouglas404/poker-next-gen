@@ -54,7 +54,7 @@ function TabBtn({
       className={cn(
         "flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold uppercase tracking-wide transition",
         is
-          ? "bg-gradient-to-b from-[#d4af37] to-[#9a7b2c] text-black shadow-[0_0_18px_rgba(212,175,55,0.25)]"
+          ? "bg-brand text-white shadow-[0_6px_18px_-6px_rgba(224,30,43,0.4)]"
           : "text-neutral-400 hover:text-neutral-200",
       )}
     >
@@ -91,7 +91,7 @@ export function CreateTournamentPanel({
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-cyan/70">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-muted">
               Tournament Center
             </p>
             <h2 className="mt-1 font-display text-3xl font-bold uppercase tracking-tight text-white">
@@ -102,7 +102,7 @@ export function CreateTournamentPanel({
             <Button variant="outline" onClick={onClose} disabled={busy}>
               Cancel
             </Button>
-            <Button variant="gold" onClick={() => valid && onPublish(draft)} disabled={busy || !valid}>
+            <Button variant="primary" onClick={() => valid && onPublish(draft)} disabled={busy || !valid}>
               {busy ? "Publishing…" : "♛ Save & Publish"}
             </Button>
           </div>
@@ -189,7 +189,7 @@ export function CreateTournamentPanel({
                     type="checkbox"
                     checked={draft.lateReg}
                     onChange={(e) => set("lateReg", e.target.checked)}
-                    className="h-5 w-9 cursor-pointer appearance-none rounded-full bg-neutral-700 transition checked:bg-gold"
+                    className="h-5 w-9 cursor-pointer appearance-none rounded-full bg-neutral-700 transition checked:bg-green"
                   />
                 </label>
               </div>
@@ -276,7 +276,7 @@ export function CreateTournamentPanel({
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
                     Auto-Away on 2× Timeout
                   </span>
-                  <span className="text-[11px] text-gold">Enabled</span>
+                  <span className="text-[11px] text-green">Enabled</span>
                 </label>
                 <Field label="Time Bank">
                   <Select defaultValue="60">
@@ -315,7 +315,7 @@ export function CreateTournamentPanel({
               </div>
             </dl>
             <p className="mt-4 text-[11px] text-neutral-500">
-              Publishing calls <span className="text-cyan">tournament_create</span> and opens registration
+              Publishing calls <span className="text-brand">tournament_create</span> and opens registration
               immediately.
             </p>
           </div>
@@ -337,7 +337,7 @@ function SummaryRow({
   return (
     <div className="flex items-center justify-between">
       <dt className="text-neutral-500">{label}</dt>
-      <dd className={cn("font-semibold", tone === "cyan" ? "text-cyan" : "text-white")}>{value}</dd>
+      <dd className={cn("font-semibold", tone === "cyan" ? "text-green" : "text-white")}>{value}</dd>
     </div>
   );
 }

@@ -92,7 +92,7 @@ export function Games({
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="text-[13px] font-semibold text-cyan">
+                    <p className="text-[13px] font-semibold text-green">
                       {when.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                     </p>
                     <p className="text-[11px] text-white/45">

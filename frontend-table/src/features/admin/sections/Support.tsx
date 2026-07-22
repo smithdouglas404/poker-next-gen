@@ -110,7 +110,7 @@ export function Support({ notify }: { notify: Notify }) {
                             className={cn(
                               "rounded-xl border px-3 py-2 text-sm",
                               m.role === "admin"
-                                ? "border-cyan/20 bg-cyan/[0.05] text-cyan/90"
+                                ? "border-brand/25 bg-brand/[0.06] text-brand/90"
                                 : "border-white/[0.06] bg-white/[0.02] text-neutral-200",
                             )}
                           >

@@ -48,7 +48,7 @@ export default function MarketplacePage() {
   const [shopKind, setShopKind] = useState<string>("all");
   const [selected, setSelected] = useState<Cosmetic | null>(null);
   const [nft, setNft] = useState<Record<string, NFTStatus>>({});
-  const [dye, setDye] = useState({ primary: "#81ecff", secondary: "#d4af37", accent: "#b44dff" });
+  const [dye, setDye] = useState({ primary: "#e01e2b", secondary: "#f5c518", accent: "#22c55e" });
   const [loadoutName, setLoadoutName] = useState("");
 
   const ownedIds = useMemo(() => new Set(inventory.map((c) => c.id)), [inventory]);
@@ -226,10 +226,10 @@ export default function MarketplacePage() {
         <div className="mx-auto flex max-w-6xl flex-col gap-6">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-cyan/80">
-                Neon Vault
+              <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-muted">
+                Player Marketplace
               </p>
-              <h1 className="mt-1 bg-gradient-to-r from-[#f3e2ad] via-[#d4af37] to-[#9a7b2c] bg-clip-text font-display text-4xl font-bold uppercase tracking-wide text-transparent">
+              <h1 className="mt-1 bg-gradient-to-r from-[#ffd54a] via-[#f5c518] to-[#d4a80f] bg-clip-text font-display text-4xl font-bold uppercase tracking-wide text-transparent">
                 The Vault
               </h1>
               <p className="mt-1 text-sm text-neutral-400">
@@ -240,7 +240,7 @@ export default function MarketplacePage() {
               <Link href="/studio" className="text-gold hover:underline">
                 Studio
               </Link>
-              <Link href="/hub" className="text-cyan hover:underline">
+              <Link href="/hub" className="text-muted hover:text-foreground hover:underline">
                 ← Command Center
               </Link>
             </div>
@@ -256,14 +256,14 @@ export default function MarketplacePage() {
                 className={cn(
                   "flex-1 rounded-xl px-4 py-3 text-left transition",
                   tab === t.id
-                    ? "bg-white/[0.06] shadow-[0_0_24px_rgba(129,236,255,0.08)]"
+                    ? "bg-[#e01e2b]/12"
                     : "hover:bg-white/[0.03]",
                 )}
               >
                 <span
                   className={cn(
                     "font-display text-sm font-bold uppercase tracking-wider",
-                    tab === t.id ? "text-gold" : "text-neutral-300",
+                    tab === t.id ? "text-[#ff2d3f]" : "text-neutral-300",
                   )}
                 >
                   {t.label}
@@ -282,7 +282,7 @@ export default function MarketplacePage() {
           </div>
         )}
         {message && (
-          <div className="rounded-xl border border-cyan/25 bg-cyan/5 p-4 text-sm text-cyan">
+          <div className="rounded-xl border border-[#22c55e]/25 bg-[#22c55e]/10 p-4 text-sm text-green">
             {message}
           </div>
         )}
@@ -566,7 +566,7 @@ function ShopTab({
                       {c.price_cents > 0 ? usd(c.price_cents) : "Free"}
                     </span>
                     {owned && (
-                      <span className="rounded-full border border-cyan/30 px-2 py-0.5 text-[10px] uppercase tracking-wider text-cyan">
+                      <span className="rounded-full border border-[#22c55e]/30 px-2 py-0.5 text-[10px] uppercase tracking-wider text-green">
                         Owned
                       </span>
                     )}
@@ -676,7 +676,7 @@ function VaultTab({
                   <div className="relative">
                     <CosmeticThumb preview={c.preview_ref} kind={c.kind} rarity={c.rarity} />
                     {isEquipped && (
-                      <span className="absolute left-2 top-2 rounded-full border border-cyan/40 bg-black/60 px-2 py-0.5 text-[10px] uppercase tracking-wider text-cyan">
+                      <span className="absolute left-2 top-2 rounded-full border border-[#f5c518]/40 bg-black/60 px-2 py-0.5 text-[10px] uppercase tracking-wider text-gold">
                         Equipped
                       </span>
                     )}
@@ -768,7 +768,7 @@ function VaultTab({
 
             {/* Dye studio */}
             <div className="space-y-3 rounded-xl border border-white/10 bg-black/30 p-4">
-              <h4 className="font-display text-xs font-bold uppercase tracking-[0.2em] text-cyan/80">
+              <h4 className="font-display text-xs font-bold uppercase tracking-[0.2em] text-muted">
                 Dye Studio
               </h4>
               <div className="grid grid-cols-3 gap-3">

@@ -45,7 +45,7 @@ export function QuickStats({ data }: { data: QuickStatsData }) {
                   {r.label}
                 </p>
                 <p className="truncate text-sm font-semibold text-white">{r.value}</p>
-                <p className="text-[11px] text-cyan/70">{r.note}</p>
+                <p className="text-[11px] text-green">{r.note}</p>
               </div>
             </div>
           ))}
@@ -73,7 +73,7 @@ export function QuickStats({ data }: { data: QuickStatsData }) {
           ) : (
             data.activity.slice(0, 6).map((a) => (
               <div key={a.id} className="flex gap-2.5">
-                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan" />
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
                 <div className="min-w-0">
                   <p className="text-[13px] leading-snug text-white/80">{a.detail}</p>
                   <p className="text-[10px] text-white/35">{relTime(a.created_at)}</p>

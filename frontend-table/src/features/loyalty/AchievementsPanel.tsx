@@ -46,7 +46,7 @@ export function AchievementsPanel({
                 className={cn(
                   "rounded-xl border p-3.5 transition",
                   a.unlocked
-                    ? "border-gold/30 bg-gold/[0.06] shadow-[0_0_18px_rgba(212,175,55,0.08)]"
+                    ? "border-gold/30 bg-gold/[0.06] shadow-[0_0_18px_rgba(245,197,24,0.08)]"
                     : "border-white/10 bg-white/[0.015] opacity-60",
                 )}
               >
@@ -78,7 +78,7 @@ export function AchievementsPanel({
 
       {/* HRP history feed */}
       <div>
-        <Eyebrow tone="cyan">HRP History</Eyebrow>
+        <Eyebrow tone="green">HRP History</Eyebrow>
         {events.length === 0 ? (
           <div className="mt-3">
             <EmptyState icon="📈">
@@ -99,7 +99,7 @@ export function AchievementsPanel({
                 <span
                   className={cn(
                     "shrink-0 text-sm font-bold tabular-nums",
-                    ev.hrp >= 0 ? "text-cyan" : "text-red-300",
+                    ev.hrp >= 0 ? "text-green" : "text-red-300",
                   )}
                 >
                   {ev.hrp >= 0 ? "+" : ""}

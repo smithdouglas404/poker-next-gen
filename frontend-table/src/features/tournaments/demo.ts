@@ -34,7 +34,7 @@ export const DEMO_TOURNAMENTS: EnrichedTournament[] = [
       format: "NL Hold'em",
       speed: "Elite",
       featured: true,
-      heroArt: "radial-gradient(120% 120% at 80% 10%, rgba(212,175,55,0.20), transparent 55%), linear-gradient(135deg,#111318,#05070c)",
+      heroArt: "radial-gradient(120% 120% at 85% 0%, rgba(245,197,24,0.10), transparent 55%), #16191d",
     },
   },
   {
@@ -49,11 +49,11 @@ export const DEMO_TOURNAMENTS: EnrichedTournament[] = [
     scheduled_at: iso(-8),
     meta: {
       tag: "TURBO",
-      tagTone: "cyan",
+      tagTone: "red",
       format: "NL Hold'em",
       speed: "Turbo",
       featured: true,
-      heroArt: "radial-gradient(120% 120% at 20% 10%, rgba(129,236,255,0.18), transparent 55%), linear-gradient(135deg,#0a1418,#05070c)",
+      heroArt: "radial-gradient(120% 120% at 15% 0%, rgba(224,30,43,0.10), transparent 55%), #16191d",
     },
   },
   {

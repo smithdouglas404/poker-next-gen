@@ -45,17 +45,17 @@ export function OwnerShell({
   return (
     <div className="min-h-screen text-foreground">
       {/* Top bar: brand · bankroll · online · owner menu */}
-      <header className="sticky top-0 z-30 border-b border-white/[0.08] bg-black/40 backdrop-blur-2xl">
+      <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-[#16191d]">
         <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-4 px-4 md:px-6">
           <div className="flex items-center gap-3">
             <div
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-xl"
-              style={{ background: "linear-gradient(180deg,#f3e2ad,#d4af37)", color: "#3a2c07" }}
+              className="flex h-10 w-10 items-center justify-center rounded-xl font-display text-base font-bold text-white"
+              style={{ background: "linear-gradient(180deg,#ff2d3f,#b3151f)", boxShadow: "0 4px 14px -4px rgba(224,30,43,0.4)" }}
             >
-              ♜
+              {(clubName.slice(0, 2) || "CL").toUpperCase()}
             </div>
             <div className="hidden leading-tight sm:block">
-              <div className="font-display text-sm font-bold tracking-wide text-gold">
+              <div className="font-display text-sm font-bold tracking-wide text-foreground">
                 {clubName.toUpperCase()}
               </div>
               <div className="text-[10px] tracking-[0.35em] text-white/40">CLUB OWNER</div>
@@ -75,7 +75,7 @@ export function OwnerShell({
               <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40">
                 Online Members
               </span>
-              <p className="font-display text-lg font-bold leading-tight text-cyan">
+              <p className="font-display text-lg font-bold leading-tight text-green">
                 {onlineCount}
                 <span className="text-white/40">/{memberCount || "—"}</span>
               </p>
@@ -88,11 +88,11 @@ export function OwnerShell({
               <button
                 type="button"
                 onClick={() => setMenuOpen((v) => !v)}
-                className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm transition hover:border-white/25"
+                className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm transition hover:border-white/20"
               >
                 <span
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-black"
-                  style={{ background: "linear-gradient(180deg,#f3e2ad,#d4af37)" }}
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-[#231b00]"
+                  style={{ background: "linear-gradient(180deg,#ffd54a,#f5c518)" }}
                 >
                   {(role ?? "O").slice(0, 1).toUpperCase()}
                 </span>
@@ -100,7 +100,7 @@ export function OwnerShell({
                 <span className="text-white/40">▾</span>
               </button>
               {menuOpen && (
-                <div className="absolute right-0 mt-2 w-44 overflow-hidden rounded-xl border border-white/10 bg-black/80 py-1 text-sm backdrop-blur-2xl">
+                <div className="absolute right-0 mt-2 w-44 overflow-hidden rounded-xl border border-white/[0.06] bg-[#16191d] py-1 text-sm shadow-[0_8px_24px_rgba(0,0,0,0.5)]">
                   <Link href="/hub" className="block px-4 py-2 text-white/75 hover:bg-white/5">
                     Command Center
                   </Link>
@@ -131,14 +131,14 @@ export function OwnerShell({
                   className={cn(
                     "flex shrink-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition",
                     active
-                      ? "border border-gold/40 bg-gold/[0.1] text-gold shadow-[0_0_18px_rgba(212,175,55,0.12)]"
+                      ? "border border-transparent bg-gradient-to-r from-[#e01e2b] to-[#b3151f] text-white shadow-[0_6px_18px_-8px_rgba(224,30,43,0.5)]"
                       : "border border-transparent text-white/55 hover:bg-white/[0.04] hover:text-white/80",
                   )}
                 >
                   <span className="w-5 text-center opacity-80">{n.icon}</span>
                   <span className="font-medium">{n.label}</span>
                   {active && (
-                    <span className="ml-auto hidden text-[9px] font-bold uppercase tracking-[0.2em] text-gold/70 md:inline">
+                    <span className="ml-auto hidden text-[9px] font-bold uppercase tracking-[0.2em] text-white/70 md:inline">
                       Active
                     </span>
                   )}
@@ -150,7 +150,7 @@ export function OwnerShell({
             <button
               type="button"
               onClick={onBrowse}
-              className="mt-6 hidden text-left text-xs text-cyan/70 transition hover:text-cyan md:inline-block"
+              className="mt-6 hidden text-left text-xs text-muted transition hover:text-brand md:inline-block"
             >
               Browse other clubs →
             </button>

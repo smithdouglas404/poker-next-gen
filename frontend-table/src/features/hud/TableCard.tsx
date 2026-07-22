@@ -18,7 +18,7 @@ export function TableCard({
   const open = table.open_seats ?? 6 - seated;
 
   return (
-    <article className="flex flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-lg shadow-black/20 transition hover:border-emerald-500/40 hover:bg-white/[0.05]">
+    <article className="flex flex-col rounded-2xl border border-white/[0.06] bg-surface p-5 shadow-[0_2px_12px_rgba(0,0,0,0.4)] transition hover:border-white/[0.12] hover:bg-white/[0.02]">
       <div className="flex items-start justify-between gap-2">
         <div>
           <h3 className="text-lg font-semibold text-white">
@@ -26,12 +26,12 @@ export function TableCard({
           </h3>
           <p className="mt-1 text-xs text-neutral-500">$1 / $2 blinds · buy-in {buyInLabel}</p>
         </div>
-        <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-300">
+        <span className="rounded-full bg-green/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-green">
           Live
         </span>
       </div>
 
-      <div className="mt-6 flex flex-1 flex-col items-center justify-center rounded-xl bg-emerald-950/30 py-8">
+      <div className="mt-6 flex flex-1 flex-col items-center justify-center rounded-xl bg-white/[0.02] py-8">
         <div className="flex -space-x-2">
           {Array.from({ length: Math.min(seated, 6) }).map((_, i) => (
             <div
@@ -50,7 +50,7 @@ export function TableCard({
         type="button"
         disabled={busy || open <= 0}
         onClick={onJoin}
-        className="mt-4 w-full rounded-xl bg-emerald-700 py-2.5 text-sm font-semibold uppercase tracking-wider hover:bg-emerald-600 disabled:opacity-40"
+        className="mt-4 w-full rounded-xl bg-brand py-2.5 text-sm font-semibold uppercase tracking-wider text-white hover:bg-[#ff2d3f] disabled:opacity-40"
       >
         {open > 0 ? "Join Table" : "Full"}
       </button>

@@ -22,7 +22,7 @@ import {
 import { rgLimitsApi, emptyLimits, type RgLimits } from "@/features/wallet/rgLimitsRpc";
 
 const GOLD_TEXT =
-  "bg-gradient-to-r from-[#f3e2ad] via-[#d4af37] to-[#9a7b2c] bg-clip-text text-transparent";
+  "bg-gradient-to-r from-[#ffd54a] via-[#f5c518] to-[#d4a80f] bg-clip-text text-transparent";
 
 interface Toast {
   msg: string;
@@ -156,8 +156,8 @@ export default function WalletPage() {
       <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Header + hero balance */}
         <header className="mb-8">
-          <p className={cn(HEADING_SM, "text-gold/80")}>Cashier</p>
-          <h1 className={cn("font-display mt-1 text-3xl font-bold uppercase tracking-wider sm:text-4xl", GOLD_TEXT)}>
+          <p className={HEADING_SM}>Cashier</p>
+          <h1 className="font-display mt-1 text-3xl font-bold uppercase tracking-wider text-foreground sm:text-4xl">
             Wallet
           </h1>
         </header>
@@ -168,17 +168,10 @@ export default function WalletPage() {
             "relative mb-6 overflow-hidden p-6 sm:p-8",
           )}
         >
-          <div
-            className="pointer-events-none absolute inset-0 opacity-70"
-            style={{
-              background:
-                "radial-gradient(120% 140% at 85% 0%, rgba(212,175,55,0.10), transparent 55%), radial-gradient(120% 140% at 0% 100%, rgba(129,236,255,0.08), transparent 55%)",
-            }}
-          />
           <div className="relative flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className={cn(HEADING_SM, "text-neutral-400")}>Total Balance</p>
-              <p className="font-display mt-2 text-5xl font-bold tabular-nums tracking-tight text-foreground sm:text-6xl">
+              <p className={cn(HEADING_SM, "text-muted")}>Total Balance</p>
+              <p className={cn("font-display mt-2 text-5xl font-bold tabular-nums tracking-tight sm:text-6xl", GOLD_TEXT)}>
                 {loading ? (
                   <span className="text-neutral-600">— — —</span>
                 ) : (
@@ -298,7 +291,7 @@ function ClaimCard({
   return (
     <div className={cn(GLASS_PANEL, GLASS_PANEL_HOVER, "flex items-center justify-between gap-4 p-5")}>
       <div className="min-w-0">
-        <p className={cn(HEADING_SM, "text-cyan/70")}>{eyebrow}</p>
+        <p className={cn(HEADING_SM, "text-muted")}>{eyebrow}</p>
         <p className="font-display mt-1.5 truncate text-2xl font-bold tabular-nums text-foreground">
           {title}
         </p>
@@ -363,7 +356,7 @@ function DepositPanel({
   return (
     <div className={cn(GLASS_PANEL, "p-5")}>
       <div className="mb-4 flex items-center justify-between">
-        <p className={cn(HEADING_SM, "text-gold/80")}>Add Funds</p>
+        <p className={cn(HEADING_SM, "text-muted")}>Add Funds</p>
         <div className="flex gap-1 rounded-xl border border-white/10 bg-black/30 p-1">
           {(["crypto", "fiat"] as const).map((m) => (
             <button
@@ -373,7 +366,7 @@ function DepositPanel({
               className={cn(
                 "rounded-lg px-3 py-1 text-xs font-semibold uppercase tracking-wide transition",
                 method === m
-                  ? "bg-cyan/15 text-cyan shadow-[0_0_16px_rgba(129,236,255,0.15)]"
+                  ? "bg-[#e01e2b]/15 text-[#ff2d3f]"
                   : "text-neutral-400 hover:text-white",
               )}
             >
@@ -401,7 +394,7 @@ function DepositPanel({
             key={v}
             type="button"
             onClick={() => setAmount(String(v))}
-            className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-neutral-300 transition hover:border-cyan/40 hover:text-cyan"
+            className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-neutral-300 transition hover:border-[#e01e2b]/40 hover:text-white"
           >
             ${v}
           </button>
@@ -484,7 +477,7 @@ function WithdrawPanel({
 
   return (
     <div className={cn(GLASS_PANEL, "p-5")}>
-      <p className={cn(HEADING_SM, "mb-4 text-gold/80")}>Withdraw</p>
+      <p className={cn(HEADING_SM, "mb-4 text-muted")}>Withdraw</p>
 
       {!canWithdraw ? (
         <p className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-200/90">
@@ -623,7 +616,7 @@ function BucketsPanel({
   return (
     <div className={cn(GLASS_PANEL, "p-5")}>
       <div className="mb-4 flex items-center justify-between">
-        <p className={cn(HEADING_SM, "text-gold/80")}>Balance Buckets</p>
+        <p className={cn(HEADING_SM, "text-muted")}>Balance Buckets</p>
         <span className="text-[11px] text-neutral-500">Move funds between play pools</span>
       </div>
 
@@ -749,7 +742,7 @@ function DepositLimitsPanel({
   return (
     <div className={cn(GLASS_PANEL, "p-5")}>
       <div className="mb-4 flex items-center justify-between">
-        <p className={cn(HEADING_SM, "text-cyan/70")}>Deposit Limits</p>
+        <p className={cn(HEADING_SM, "text-muted")}>Deposit Limits</p>
         <span className="text-[11px] text-neutral-500">Play responsibly · 0 = no limit</span>
       </div>
 
@@ -793,7 +786,7 @@ function DepositLimitsPanel({
 function LedgerPanel({ entries, loading }: { entries: LedgerEntry[]; loading: boolean }) {
   return (
     <div className={cn(GLASS_PANEL, "p-5")}>
-      <p className={cn(HEADING_SM, "mb-4 text-gold/80")}>Transaction Ledger</p>
+      <p className={cn(HEADING_SM, "mb-4 text-muted")}>Transaction Ledger</p>
 
       {loading ? (
         <p className="py-10 text-center text-sm text-neutral-600">Loading ledger…</p>

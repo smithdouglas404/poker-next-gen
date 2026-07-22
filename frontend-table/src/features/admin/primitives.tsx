@@ -5,8 +5,8 @@ import type { ReactNode } from "react";
 import { GLASS_PANEL, GLASS_PANEL_HOVER, HEADING_LG, cn } from "@/features/ui/tokens";
 
 // Screen-local presentational primitives for the admin console. They compose
-// the shared Neon Vault tokens (GLASS_PANEL/HEADING_LG) so the console matches
-// the rest of the app without re-inventing glass.
+// the shared GGPoker tokens (GLASS_PANEL card / HEADING_LG) so the console
+// matches the rest of the app without re-inventing surfaces.
 
 /** Gold-gradient display heading used for section titles. */
 export function GoldHeading({ children, className }: { children: ReactNode; className?: string }) {
@@ -14,7 +14,7 @@ export function GoldHeading({ children, className }: { children: ReactNode; clas
     <h2
       className={cn(
         HEADING_LG,
-        "bg-gradient-to-r from-[#f3e2ad] via-[#d4af37] to-[#9a7b2c] bg-clip-text text-transparent",
+        "bg-gradient-to-r from-[#ffd54a] via-[#f5c518] to-[#d4a80f] bg-clip-text text-transparent",
         className,
       )}
     >
@@ -77,7 +77,7 @@ export function StatTile({
   label,
   value,
   sub,
-  accent = "cyan",
+  accent = "neutral",
 }: {
   label: string;
   value: ReactNode;
@@ -87,15 +87,16 @@ export function StatTile({
   const tone: Record<string, string> = {
     cyan: "text-cyan",
     gold: "text-gold",
-    red: "text-red-400",
-    green: "text-emerald-300",
+    red: "text-brand",
+    green: "text-green",
     neutral: "text-foreground",
   };
+  // GGPoker: clean cards with a soft shadow — no heavy neon glow.
   const glow: Record<string, string> = {
-    cyan: "shadow-[0_0_28px_rgba(129,236,255,0.06)]",
-    gold: "shadow-[0_0_28px_rgba(212,175,55,0.08)]",
-    red: "shadow-[0_0_28px_rgba(255,59,70,0.06)]",
-    green: "shadow-[0_0_28px_rgba(34,211,120,0.06)]",
+    cyan: "",
+    gold: "",
+    red: "",
+    green: "",
     neutral: "",
   };
   return (
@@ -110,10 +111,10 @@ export function StatTile({
 }
 
 const BADGE_TONES: Record<string, string> = {
-  gold: "border-amber-500/40 bg-amber-500/10 text-amber-300",
+  gold: "border-gold/40 bg-gold/10 text-gold",
   cyan: "border-cyan/40 bg-cyan/10 text-cyan",
-  green: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
-  red: "border-red-500/40 bg-red-500/10 text-red-300",
+  green: "border-green/30 bg-green/10 text-green",
+  red: "border-brand/40 bg-brand/10 text-brand",
   purple: "border-purple-500/40 bg-purple-500/10 text-purple-300",
   neutral: "border-white/15 bg-white/[0.04] text-neutral-300",
 };

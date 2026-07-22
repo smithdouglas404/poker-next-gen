@@ -75,9 +75,9 @@ export function Analytics({
     return acc;
   }, {});
   const roleSegments = [
-    { value: roleCounts.owner ?? 0, color: "#f3c14b", label: "Owner" },
-    { value: roleCounts.admin ?? 0, color: "#7fe9ff", label: "Admin" },
-    { value: roleCounts.member ?? 0, color: "#b44dff", label: "Member" },
+    { value: roleCounts.owner ?? 0, color: "#f5c518", label: "Owner" },
+    { value: roleCounts.admin ?? 0, color: "#22c55e", label: "Admin" },
+    { value: roleCounts.member ?? 0, color: "#e01e2b", label: "Member" },
   ].filter((s) => s.value > 0);
 
   const rank = clubStats
@@ -100,7 +100,7 @@ export function Analytics({
                 onClick={() => setPeriod(p)}
                 className={cn(
                   "rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide transition",
-                  p === period ? "bg-cyan/15 text-cyan" : "text-white/40 hover:text-white/70",
+                  p === period ? "bg-brand/15 text-brand" : "text-white/40 hover:text-white/70",
                 )}
               >
                 {p}
@@ -110,16 +110,16 @@ export function Analytics({
         </div>
         <div className="grid gap-4 sm:grid-cols-[200px_1fr]">
           <div className="space-y-3">
-            <StatTile label={`Rake (${period})`} value={money(report?.total_rake ?? 0)} accent="#f3e2ad" />
+            <StatTile label={`Rake (${period})`} value={money(report?.total_rake ?? 0)} accent="#f5c518" />
             <StatTile label="Hands raked" value={compact(report?.hand_count ?? 0)} />
-            <StatTile label="House balance" value={money(ledger?.house_balance ?? 0)} accent="#33d17a" />
+            <StatTile label="House balance" value={money(ledger?.house_balance ?? 0)} accent="#22c55e" />
           </div>
           <div className={cn(GLASS_PANEL, "flex flex-col justify-end p-4")}>
             <p className="mb-2 text-[10px] uppercase tracking-[0.22em] text-neutral-500">Daily rake</p>
             {series.length === 0 ? (
               <EmptyState>No rake recorded in this window.</EmptyState>
             ) : (
-              <Sparkbars values={series.map((s) => s.amount)} color="#f3c14b" />
+              <Sparkbars values={series.map((s) => s.amount)} color="#f5c518" />
             )}
           </div>
         </div>
@@ -156,7 +156,7 @@ export function Analytics({
           {clubStats && (
             <div className="mt-4 grid grid-cols-3 gap-2 border-t border-white/[0.06] pt-3 text-center">
               <div>
-                <p className="font-display text-lg font-bold text-cyan">
+                <p className="font-display text-lg font-bold text-green">
                   {((clubStats.win_rate_bps ?? 0) / 100).toFixed(1)}%
                 </p>
                 <p className="text-[10px] uppercase tracking-wider text-neutral-500">Win rate</p>
@@ -191,7 +191,7 @@ export function Analytics({
                     key={r.club_id}
                     className={cn(
                       "flex items-center justify-between rounded-lg px-3 py-2 text-sm",
-                      mine ? "border border-cyan/30 bg-cyan/[0.08]" : "bg-white/[0.02]",
+                      mine ? "border border-brand/30 bg-brand/[0.08]" : "bg-white/[0.02]",
                     )}
                   >
                     <span className="flex items-center gap-2">

@@ -33,8 +33,8 @@ export function TableSettings() {
   };
 
   return (
-    <aside className="pointer-events-auto flex w-full max-w-xs flex-col gap-2 rounded-2xl border border-white/10 bg-black/60 p-3 backdrop-blur-md">
-      <p className="text-xs uppercase tracking-[0.25em] text-amber-300/80">Table</p>
+    <aside className="pointer-events-auto flex w-full max-w-xs flex-col gap-2 rounded-2xl border border-white/[0.06] bg-surface p-3 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
+      <p className="text-xs uppercase tracking-[0.25em] text-muted">Table</p>
 
       <div className="flex items-center justify-between">
         <span className="text-[11px] text-neutral-300">Four-color deck</span>
@@ -44,7 +44,7 @@ export function TableSettings() {
           aria-checked={fourColor}
           onClick={() => setDeck(fourColor ? "two-color" : "four-color")}
           className={`relative h-5 w-9 rounded-full transition ${
-            fourColor ? "bg-amber-500" : "bg-white/15"
+            fourColor ? "bg-green" : "bg-white/15"
           }`}
         >
           <span
@@ -62,7 +62,7 @@ export function TableSettings() {
           role="switch"
           aria-checked={inBB}
           onClick={() => setStackUnit(inBB ? "chips" : "bb")}
-          className={`relative h-5 w-9 rounded-full transition ${inBB ? "bg-amber-500" : "bg-white/15"}`}
+          className={`relative h-5 w-9 rounded-full transition ${inBB ? "bg-green" : "bg-white/15"}`}
         >
           <span
             className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
@@ -98,7 +98,7 @@ export function TableSettings() {
               onClick={() => selectPack(p.key)}
               className={`flex flex-col items-start rounded-lg border px-2 py-1 text-left transition ${
                 pack === p.key
-                  ? "border-amber-400/60 bg-amber-400/10 text-amber-100"
+                  ? "border-brand/60 bg-brand/15 text-white"
                   : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25"
               }`}
             >

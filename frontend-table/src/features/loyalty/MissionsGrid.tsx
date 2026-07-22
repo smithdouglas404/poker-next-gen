@@ -24,14 +24,14 @@ function MissionCard({
       hover
       className={cn(
         "flex flex-col p-4",
-        claimable && "border-gold/30 shadow-[0_0_20px_rgba(212,175,55,0.1)]",
+        claimable && "border-gold/30 shadow-[0_0_20px_rgba(245,197,24,0.1)]",
         m.claimed && "opacity-60",
       )}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <Pill tone={m.kind === "weekly" ? "cyan" : "muted"}>{m.kind}</Pill>
+            <Pill tone={m.kind === "weekly" ? "green" : "muted"}>{m.kind}</Pill>
             {m.claimed && <Pill tone="emerald">Claimed</Pill>}
           </div>
           <p className="mt-1.5 truncate font-semibold text-white">{m.title}</p>
@@ -40,7 +40,7 @@ function MissionCard({
         <div className="shrink-0 text-right">
           <p className="text-sm font-bold text-gold tabular-nums">{money(m.reward_cents)}</p>
           {m.xp > 0 && (
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-green">
               +{m.xp} XP
             </p>
           )}
@@ -56,7 +56,7 @@ function MissionCard({
             <span className="text-neutral-600">resets in {untilLabel(m.expires_at)}</span>
           )}
         </div>
-        <ProgressBar value={frac} tone={claimable ? "gold" : "cyan"} />
+        <ProgressBar value={frac} tone={claimable ? "gold" : "green"} />
       </div>
 
       <Button
@@ -113,7 +113,7 @@ export function MissionsGrid({
       )}
       {weekly.length > 0 && (
         <div>
-          <Eyebrow tone="cyan">Weekly Missions</Eyebrow>
+          <Eyebrow tone="green">Weekly Missions</Eyebrow>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {weekly.map((m) => (
               <MissionCard key={m.id} m={m} busy={claimingId === m.id} onClaim={onClaim} />

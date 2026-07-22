@@ -53,15 +53,15 @@ function TierNode({
             ? "border-emerald-500/30 bg-emerald-950/20"
             : claimable
               ? gold
-                ? "border-gold/40 bg-gold/10 hover:shadow-[0_0_16px_rgba(212,175,55,0.25)]"
-                : "border-cyan/40 bg-cyan/10 hover:shadow-[0_0_16px_rgba(129,236,255,0.2)]"
+                ? "border-gold/40 bg-gold/10 hover:shadow-[0_0_16px_rgba(245,197,24,0.25)]"
+                : "border-green/40 bg-green/10 hover:shadow-[0_0_16px_rgba(34,197,94,0.2)]"
               : "border-white/10 bg-white/[0.02] opacity-55",
         )}
       >
         <span
           className={cn(
             "text-sm font-bold tabular-nums",
-            claimed ? "text-emerald-300" : gold ? "text-gold" : "text-cyan",
+            claimed ? "text-emerald-300" : gold ? "text-gold" : "text-green",
           )}
         >
           {money(cents)}
@@ -136,7 +136,7 @@ export function BattlePassTrack({
               <Pill tone={premium ? "gold" : "muted"}>
                 {premium ? "★ Premium unlocked" : "Free track"}
               </Pill>
-              <Pill tone="cyan">
+              <Pill tone="green">
                 Tier {unlocked_tier} / {season.max_tier}
               </Pill>
               <Pill tone="muted">{xp.toLocaleString()} XP</Pill>
@@ -162,7 +162,7 @@ export function BattlePassTrack({
               {intoTier.toLocaleString()} / {xpPerTier.toLocaleString()} XP
             </span>
           </div>
-          <ProgressBar value={tierFrac} tone="cyan" />
+          <ProgressBar value={tierFrac} tone="green" />
           <p className="mt-1.5 text-[11px] text-neutral-500">
             Earn XP by completing missions to unlock more tiers. Free rewards for everyone; premium
             rewards with the pass.
@@ -171,7 +171,7 @@ export function BattlePassTrack({
       </GlassCard>
 
       {tiers.length > 0 ? (
-        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 backdrop-blur-xl">
+        <div className="rounded-2xl border border-white/[0.06] bg-[#16191d] p-4 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
           <div className="mb-2 flex items-center gap-4 px-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-500">
             <span className="w-16">Free</span>
             <span className="text-gold/70">Premium</span>

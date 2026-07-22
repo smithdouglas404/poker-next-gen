@@ -16,31 +16,31 @@ const PILLARS = [
     body: "Every deck is committed before the deal, your cards are encrypted and never shared, and the record is anchored on-chain. Verify any hand yourself.",
     href: "/provably-fair",
     cta: "See how it works",
-    accent: "#34d399",
+    accent: "#22c55e",
   },
   {
     title: "Own Your Club",
     body: "Run your own room. Set your rake 0–10%, invite your community, manage members, and earn. Club owners are entrepreneurs here.",
     href: "/clubs",
     cta: "Start a club",
-    accent: "#81ecff",
+    accent: "#e01e2b",
   },
   {
     title: "Crypto & Card",
     body: "Fund your wallet with 200+ cryptocurrencies or card. Withdraw with AML review and automated payout. Membership tiers with real perks.",
     href: "/membership",
     cta: "View plans",
-    accent: "#d4af37",
+    accent: "#f5c518",
   },
 ];
 
 const FEATURES = [
-  ["GPU poker table", "Real WebGPU felt with cinematic dealing, chip, and showdown animation.", "#81ecff"],
-  ["3D characters", "Rigged, animated characters at every seat — generate your own with AI.", "#b44dff"],
-  ["Rust engine", "rs_poker: correct side pots, equity, and a GTO solver for live coaching.", "#34d399"],
-  ["Live table audio", "Spatial chip & card SFX, a music picker, and per-character voice taunts.", "#22d3ee"],
-  ["Marketplace", "Buy, sell, and trade character skins and cosmetics with other members.", "#d4af37"],
-  ["Tournaments", "Multi-table tournaments with blind timers and stacked prize ladders.", "#f3e2ad"],
+  ["GPU poker table", "Real WebGPU felt with cinematic dealing, chip, and showdown animation.", "#e01e2b"],
+  ["3D characters", "Rigged, animated characters at every seat — generate your own with AI.", "#f5c518"],
+  ["Rust engine", "rs_poker: correct side pots, equity, and a GTO solver for live coaching.", "#22c55e"],
+  ["Live table audio", "Spatial chip & card SFX, a music picker, and per-character voice taunts.", "#ff2d3f"],
+  ["Marketplace", "Buy, sell, and trade character skins and cosmetics with other members.", "#f5c518"],
+  ["Tournaments", "Multi-table tournaments with blind timers and stacked prize ladders.", "#ffd54a"],
 ] as const;
 
 export function LandingClient() {
@@ -74,15 +74,13 @@ export function LandingClient() {
       {/* Hero */}
       <section className="relative px-6 pt-24 pb-14 text-center">
         <div className="pointer-events-none absolute inset-0 -z-10">
-          <div className="absolute left-1/2 top-0 h-[440px] w-[860px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse,rgba(212,175,55,0.14),transparent_65%)]" />
-          <div className="absolute left-1/2 top-44 h-[380px] w-[760px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse,rgba(129,236,255,0.10),transparent_65%)]" />
-          <div className="absolute left-[12%] top-24 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(180,77,255,0.10),transparent_70%)]" />
+          <div className="absolute left-1/2 top-0 h-[440px] w-[860px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse,rgba(255,255,255,0.035),transparent_65%)]" />
         </div>
 
         <p className={cn(HEADING_SM, "text-gold/80 tracking-[0.35em]")}>{siteName}</p>
         <h1 className="font-display mx-auto mt-5 max-w-4xl text-5xl font-bold uppercase leading-[1.03] tracking-tight md:text-7xl">
           Where every hand is{" "}
-          <span className="bg-gradient-to-r from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad] bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-[#d4a80f] via-[#f5c518] to-[#ffd54a] bg-clip-text text-transparent">
             verified
           </span>
         </h1>
@@ -162,7 +160,7 @@ export function LandingClient() {
       {/* CTA */}
       <section className="mx-auto max-w-4xl px-6 pb-20 text-center">
         <div className={cn(GLASS_PANEL, "relative overflow-hidden border-gold/25 p-10")}>
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(212,175,55,0.12),transparent_60%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(245,197,24,0.10),transparent_60%)]" />
           <h2 className="font-display text-3xl font-bold uppercase tracking-wide">
             Ready to run your own room?
           </h2>
@@ -203,21 +201,21 @@ export function LandingClient() {
               <button
                 type="button"
                 onClick={() => setLegal("about")}
-                className="text-left text-sm text-neutral-400 transition hover:text-cyan"
+                className="text-left text-sm text-neutral-400 transition hover:text-foreground"
               >
                 About
               </button>
               <button
                 type="button"
                 onClick={() => setLegal("terms")}
-                className="text-left text-sm text-neutral-400 transition hover:text-cyan"
+                className="text-left text-sm text-neutral-400 transition hover:text-foreground"
               >
                 Terms
               </button>
               <button
                 type="button"
                 onClick={() => setLegal("privacy")}
-                className="text-left text-sm text-neutral-400 transition hover:text-cyan"
+                className="text-left text-sm text-neutral-400 transition hover:text-foreground"
               >
                 Privacy
               </button>
@@ -228,18 +226,18 @@ export function LandingClient() {
               <button
                 type="button"
                 onClick={() => setSupportOpen(true)}
-                className="text-left text-sm text-neutral-400 transition hover:text-cyan"
+                className="text-left text-sm text-neutral-400 transition hover:text-foreground"
               >
                 Contact support
               </button>
               <button
                 type="button"
                 onClick={() => setRecoveryOpen(true)}
-                className="text-left text-sm text-neutral-400 transition hover:text-cyan"
+                className="text-left text-sm text-neutral-400 transition hover:text-foreground"
               >
                 Recover account
               </button>
-              <Link href="/provably-fair" className="text-sm text-neutral-400 transition hover:text-cyan">
+              <Link href="/provably-fair" className="text-sm text-neutral-400 transition hover:text-foreground">
                 Verify a hand
               </Link>
             </nav>

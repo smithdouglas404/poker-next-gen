@@ -10,8 +10,8 @@ import type { AuditHistoryRow, DashboardData, ProofRow, ProofStatus } from "./au
 
 const STATUS_META: Record<ProofStatus, { label: string; cls: string }> = {
   in_progress: { label: "IN PROGRESS", cls: "bg-white/10 text-neutral-300" },
-  ready_to_reveal: { label: "READY TO REVEAL", cls: "bg-cyan/15 text-cyan" },
-  verified: { label: "VERIFIED", cls: "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30" },
+  ready_to_reveal: { label: "READY TO REVEAL", cls: "bg-gold/15 text-gold border border-gold/30" },
+  verified: { label: "VERIFIED", cls: "bg-green/15 text-green border border-green/30" },
 };
 
 function short(hash: string, head = 6, tail = 4): string {
@@ -140,7 +140,7 @@ export function FairnessDashboard({ onReveal }: { onReveal: (matchId: string, ha
             Fairness Audit Dashboard
           </h1>
           <p className="mt-2 flex items-center gap-2 text-sm text-neutral-400">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+            <span className="h-2 w-2 animate-pulse rounded-full bg-green" />
             Live cryptographic verification active for Table #{data.entropy.tableId}
             {data.demo && (
               <span className="ml-1 rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gold">
@@ -173,7 +173,7 @@ export function FairnessDashboard({ onReveal }: { onReveal: (matchId: string, ha
 
       {/* Recent cryptographic proofs */}
       <section className={cn(GLASS_PANEL, "p-6")}>
-        <h2 className={cn(HEADING_SM, "mb-4 flex items-center gap-2 text-cyan")}>
+        <h2 className={cn(HEADING_SM, "mb-4 flex items-center gap-2 text-foreground")}>
           <span>🛡</span> Recent Cryptographic Proofs
         </h2>
         <div className="overflow-x-auto">
@@ -189,7 +189,7 @@ export function FairnessDashboard({ onReveal }: { onReveal: (matchId: string, ha
             <tbody className="divide-y divide-white/[0.06]">
               {data.proofs.map((p) => (
                 <tr key={p.handId} className="group">
-                  <td className="py-4 font-display font-bold text-cyan">{p.handId}</td>
+                  <td className="py-4 font-display font-bold text-foreground">{p.handId}</td>
                   <td className="py-4 font-mono text-xs text-neutral-300">{short(p.commit, 6, 4)}</td>
                   <td className="py-4">
                     <span className={cn("rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider", STATUS_META[p.status].cls)}>
@@ -202,14 +202,14 @@ export function FairnessDashboard({ onReveal }: { onReveal: (matchId: string, ha
                     ) : p.status === "ready_to_reveal" ? (
                       <button
                         onClick={() => onReveal(p.matchId, p.handNo)}
-                        className="text-xs font-bold uppercase tracking-wider text-cyan underline decoration-cyan/40 underline-offset-4 hover:decoration-cyan"
+                        className="text-xs font-bold uppercase tracking-wider text-brand underline decoration-brand/40 underline-offset-4 hover:decoration-brand"
                       >
                         Reveal Proof
                       </button>
                     ) : (
                       <button
                         onClick={() => onReveal(p.matchId, p.handNo)}
-                        className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-emerald-300 hover:text-emerald-200"
+                        className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-green hover:text-green/80"
                         title="View verified proof"
                       >
                         ✔
@@ -235,7 +235,7 @@ export function FairnessDashboard({ onReveal }: { onReveal: (matchId: string, ha
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search Table or ID…"
-              className="w-64 rounded-lg border border-white/10 bg-black/40 py-2 pl-9 pr-3 text-sm text-white outline-none placeholder:text-neutral-600 focus:border-cyan/40"
+              className="w-64 rounded-lg border border-white/10 bg-black/40 py-2 pl-9 pr-3 text-sm text-white outline-none placeholder:text-neutral-600 focus:border-white/25"
             />
           </div>
         </div>
@@ -246,7 +246,7 @@ export function FairnessDashboard({ onReveal }: { onReveal: (matchId: string, ha
               className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-4 rounded-lg px-3 py-3 transition hover:bg-white/[0.03]"
             >
               <div className="flex items-center gap-3">
-                <span className={cn("h-2 w-2 rounded-full", row.verified ? "bg-emerald-400" : "bg-neutral-600")} />
+                <span className={cn("h-2 w-2 rounded-full", row.verified ? "bg-green" : "bg-neutral-600")} />
                 <div>
                   <div className="font-display text-sm font-bold text-white">{row.tableId}</div>
                   <div className="text-[10px] uppercase tracking-wider text-neutral-600">Table_ID</div>
@@ -265,7 +265,7 @@ export function FairnessDashboard({ onReveal }: { onReveal: (matchId: string, ha
                 className={cn(
                   "rounded-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider",
                   row.verified
-                    ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+                    ? "border border-green/30 bg-green/10 text-green hover:bg-green/20"
                     : "border border-white/15 text-neutral-300 hover:bg-white/5",
                 )}
               >
@@ -287,7 +287,7 @@ function EntropyStream({ data }: { data: DashboardData }) {
   return (
     <section className={cn(GLASS_PANEL, "p-6")}>
       <div className="mb-6 flex items-center justify-between">
-        <h2 className={cn(HEADING_SM, "flex items-center gap-2 text-cyan")}>
+        <h2 className={cn(HEADING_SM, "flex items-center gap-2 text-foreground")}>
           <span>▤</span> Live Entropy Stream
         </h2>
         <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-600">Real-time data packets</span>
@@ -299,17 +299,17 @@ function EntropyStream({ data }: { data: DashboardData }) {
           title="Chainlink VRF"
           sub={entropy.vrfSample}
         />
-        <div className="mx-2 h-px flex-1 bg-gradient-to-r from-cyan/10 via-cyan/40 to-cyan/10" />
+        <div className="mx-2 h-px flex-1 bg-gradient-to-r from-white/5 via-white/20 to-white/5" />
         <div className="flex flex-col items-center">
-          <div className="relative flex h-24 w-24 items-center justify-center rounded-full border-2 border-cyan/60 bg-cyan/5 shadow-[0_0_36px_rgba(129,236,255,0.35)]">
-            <span className="font-display text-2xl font-bold text-cyan">✦</span>
+          <div className="relative flex h-24 w-24 items-center justify-center rounded-full border border-white/10 bg-white/[0.03]">
+            <span className="font-display text-2xl font-bold text-brand">✦</span>
           </div>
           <div className="mt-3 text-center">
             <div className="font-display text-xs font-bold uppercase tracking-wider text-white">Master Seed</div>
-            <div className="mt-0.5 font-mono text-[10px] text-emerald-400">{entropy.masterSeedState}</div>
+            <div className="mt-0.5 font-mono text-[10px] text-green">{entropy.masterSeedState}</div>
           </div>
         </div>
-        <div className="mx-2 h-px flex-1 bg-gradient-to-r from-cyan/10 via-cyan/40 to-cyan/10" />
+        <div className="mx-2 h-px flex-1 bg-gradient-to-r from-white/5 via-white/20 to-white/5" />
         <EntropyNode
           icon="☌"
           title="User Entropy"
@@ -318,9 +318,9 @@ function EntropyStream({ data }: { data: DashboardData }) {
       </div>
 
       <div className="mt-6 grid grid-cols-3 gap-4 border-t border-white/[0.06] pt-6 text-center">
-        <Stat value={`${entropy.poolBits}-bit`} label="Pool Density" tone="cyan" />
-        <Stat value={`${entropy.randomnessScore}%`} label="Randomness Score" tone="emerald" />
-        <Stat value={entropy.hardwareStatus} label="Hardware Status" tone="emerald" />
+        <Stat value={`${entropy.poolBits}-bit`} label="Pool Density" tone="plain" />
+        <Stat value={`${entropy.randomnessScore}%`} label="Randomness Score" tone="green" />
+        <Stat value={entropy.hardwareStatus} label="Hardware Status" tone="green" />
       </div>
     </section>
   );
@@ -329,7 +329,7 @@ function EntropyStream({ data }: { data: DashboardData }) {
 function EntropyNode({ icon, title, sub }: { icon: string; title: string; sub: string }) {
   return (
     <div className="flex flex-col items-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-2xl text-cyan">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-2xl text-muted">
         {icon}
       </div>
       <div className="mt-3 text-center">
@@ -340,10 +340,10 @@ function EntropyNode({ icon, title, sub }: { icon: string; title: string; sub: s
   );
 }
 
-function Stat({ value, label, tone }: { value: string; label: string; tone: "cyan" | "emerald" }) {
+function Stat({ value, label, tone }: { value: string; label: string; tone: "plain" | "green" }) {
   return (
     <div>
-      <div className={cn("font-display text-2xl font-bold", tone === "cyan" ? "text-cyan" : "text-emerald-400")}>
+      <div className={cn("font-display text-2xl font-bold", tone === "green" ? "text-green" : "text-foreground")}>
         {value}
       </div>
       <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-neutral-500">{label}</div>
@@ -364,17 +364,17 @@ function SystemHealthPanel({
 }) {
   const { health } = data;
   return (
-    <section className={cn(GLASS_PANEL, "flex flex-col p-6 shadow-[0_0_28px_rgba(16,185,129,0.08)]")}>
+    <section className={cn(GLASS_PANEL, "flex flex-col p-6")}>
       <div className="mb-6 flex items-center justify-between">
-        <h2 className={cn(HEADING_SM, "flex items-center gap-2 text-emerald-400")}>
+        <h2 className={cn(HEADING_SM, "flex items-center gap-2 text-green")}>
           <span>((•))</span> System Health
         </h2>
         <span
           className={cn(
             "rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider",
             health.operational
-              ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
-              : "bg-red-500/15 text-red-300",
+              ? "bg-green/15 text-green border border-green/30"
+              : "bg-brand/15 text-brand border border-brand/30",
           )}
         >
           {health.operational ? "Operational" : "Degraded"}
@@ -394,7 +394,7 @@ function SystemHealthPanel({
         <button
           onClick={onRefresh}
           disabled={refreshing}
-          className="w-full rounded-lg border border-emerald-500/30 bg-emerald-500/5 py-3 text-xs font-bold uppercase tracking-wider text-emerald-300 transition hover:bg-emerald-500/10 disabled:opacity-50"
+          className="w-full rounded-lg border border-green/30 bg-green/5 py-3 text-xs font-bold uppercase tracking-wider text-green transition hover:bg-green/10 disabled:opacity-50"
         >
           {refreshing ? "Refreshing…" : "Real-time System Status"}
         </button>

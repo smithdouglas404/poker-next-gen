@@ -57,10 +57,10 @@ export default function KycPage() {
       {toast && (
         <div
           className={cn(
-            "fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-xl border px-4 py-2.5 text-sm backdrop-blur-xl",
+            "fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-xl border px-4 py-2.5 text-sm shadow-[0_4px_18px_rgba(0,0,0,0.5)]",
             toast.kind === "ok"
-              ? "border-emerald-500/30 bg-emerald-950/40 text-emerald-200"
-              : "border-red-500/30 bg-red-950/40 text-red-200",
+              ? "border-green/30 bg-green/15 text-green"
+              : "border-brand/40 bg-brand/15 text-[#ffb4b9]",
           )}
         >
           {toast.msg}
@@ -71,8 +71,8 @@ export default function KycPage() {
         {/* Header */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className={cn(HEADING_SM, "text-gold/80")}>Compliance &amp; Safer Play</p>
-            <h1 className="font-display mt-2 bg-gradient-to-r from-gold-lite via-gold to-[#9a7b2c] bg-clip-text text-3xl font-bold uppercase tracking-wide text-transparent sm:text-4xl">
+            <p className={cn(HEADING_SM, "text-muted")}>Compliance &amp; Safer Play</p>
+            <h1 className="font-display mt-2 text-3xl font-bold uppercase tracking-wide text-foreground sm:text-4xl">
               Identity &amp; Controls
             </h1>
             <p className="mt-2 max-w-xl text-sm text-neutral-400">
@@ -82,7 +82,7 @@ export default function KycPage() {
           </div>
           <Link
             href="/hub"
-            className="rounded-xl border border-white/15 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-neutral-300 transition hover:border-cyan/40 hover:text-cyan"
+            className="rounded-xl border border-white/15 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-neutral-300 transition hover:border-white/25 hover:text-foreground"
           >
             ← Command Center
           </Link>
@@ -103,7 +103,7 @@ export default function KycPage() {
               className={cn(
                 "rounded-xl px-5 py-2 text-xs font-semibold uppercase tracking-[0.15em] transition",
                 tab === t.id
-                  ? "bg-white/10 text-foreground shadow-[0_0_18px_rgba(129,236,255,0.12)]"
+                  ? "bg-brand text-white shadow-[0_6px_16px_-6px_rgba(224,30,43,0.4)]"
                   : "text-neutral-400 hover:text-neutral-200",
               )}
             >

@@ -247,7 +247,7 @@ export function GameModeModal({ open, onClose }: { open: boolean; onClose: () =>
             <p className={HEADING_SM}>
               {mode === "select" ? "New Game" : mode === "tournament" ? "Tournaments" : "Configure Table"}
             </p>
-            <h2 className="mt-1 bg-gradient-to-r from-[#f3e2ad] via-[#d4af37] to-[#9a7b2c] bg-clip-text font-display text-2xl font-bold uppercase tracking-wide text-transparent">
+            <h2 className="mt-1 bg-gradient-to-r from-[#ffd54a] via-[#f5c518] to-[#d4a80f] bg-clip-text font-display text-2xl font-bold uppercase tracking-wide text-transparent">
               {mode === "select"
                 ? "Choose Your Game Mode"
                 : mode === "private"
@@ -272,7 +272,7 @@ export function GameModeModal({ open, onClose }: { open: boolean; onClose: () =>
           </div>
         )}
         {notice && (
-          <div className="mt-4 rounded-xl border border-cyan/25 bg-cyan/5 p-3 text-sm text-cyan">
+          <div className="mt-4 rounded-xl border border-green/25 bg-green/5 p-3 text-sm text-green">
             {notice}
           </div>
         )}
@@ -282,7 +282,7 @@ export function GameModeModal({ open, onClose }: { open: boolean; onClose: () =>
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
             <ModeCard
               title="Private Table"
-              accent="cyan"
+              accent="red"
               blurb="Host your own Hold'em or PLO table. Set blinds, buy-in, seats and bots — share the room code with friends."
               onClick={() => setMode("private")}
             />
@@ -302,7 +302,7 @@ export function GameModeModal({ open, onClose }: { open: boolean; onClose: () =>
             />
             <ModeCard
               title="Tournament"
-              accent="purple"
+              accent="green"
               blurb="Register for scheduled multi-table tournaments with escalating blinds and prize pools."
               onClick={() => setMode("tournament")}
             />
@@ -372,7 +372,7 @@ export function GameModeModal({ open, onClose }: { open: boolean; onClose: () =>
                         className={cn(
                           "rounded-xl border px-3 py-2 text-sm font-semibold transition",
                           i === blindIdx
-                            ? "border-cyan/50 bg-cyan/10 text-cyan shadow-[0_0_16px_rgba(129,236,255,0.15)]"
+                            ? "border-brand/50 bg-brand/10 text-brand"
                             : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25",
                         )}
                       >
@@ -394,7 +394,7 @@ export function GameModeModal({ open, onClose }: { open: boolean; onClose: () =>
                       step={50}
                       value={buyInDollars}
                       onChange={(e) => setBuyInDollars(Number(e.target.value))}
-                      className="w-full accent-[#d4af37]"
+                      className="w-full accent-[#f5c518]"
                     />
                   </Field>
                   <Field label={`Seats — ${seats}`}>
@@ -409,7 +409,7 @@ export function GameModeModal({ open, onClose }: { open: boolean; onClose: () =>
                         setSeats(v);
                         if (bots > v - 1) setBots(v - 1);
                       }}
-                      className="w-full accent-cyan"
+                      className="w-full accent-[#e01e2b]"
                     />
                   </Field>
                 </div>
@@ -424,7 +424,7 @@ export function GameModeModal({ open, onClose }: { open: boolean; onClose: () =>
                         step={1}
                         value={bots}
                         onChange={(e) => setBots(Number(e.target.value))}
-                        className="w-full accent-cyan"
+                        className="w-full accent-[#e01e2b]"
                       />
                     </Field>
                     <Field label="Auto-close" hint="0 = table stays open indefinitely">
@@ -477,7 +477,7 @@ export function GameModeModal({ open, onClose }: { open: boolean; onClose: () =>
                 setMode("select");
                 setError(null);
               }}
-              className="text-xs uppercase tracking-[0.2em] text-neutral-500 transition hover:text-cyan"
+              className="text-xs uppercase tracking-[0.2em] text-neutral-500 transition hover:text-foreground"
             >
               ← Back to modes
             </button>
@@ -511,7 +511,7 @@ export function GameModeModal({ open, onClose }: { open: boolean; onClose: () =>
                         className={cn(
                           "rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider",
                           t.status === "running"
-                            ? "bg-cyan/15 text-cyan"
+                            ? "bg-green/15 text-green"
                             : t.status === "finished"
                               ? "bg-white/5 text-neutral-400"
                               : "bg-gold/15 text-gold",
@@ -534,8 +534,8 @@ export function GameModeModal({ open, onClose }: { open: boolean; onClose: () =>
                     className={cn(
                       "rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-wide transition disabled:opacity-40",
                       registered[t.id]
-                        ? "border border-cyan/40 text-cyan"
-                        : "bg-gradient-to-r from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad] text-black hover:shadow-[0_0_20px_rgba(212,175,55,0.35)]",
+                        ? "border border-green/40 text-green"
+                        : "bg-gradient-to-b from-[#ffd54a] via-[#f5c518] to-[#d4a80f] text-[#231b00] hover:shadow-[0_6px_18px_-6px_rgba(245,197,24,0.4)] hover:-translate-y-px",
                     )}
                   >
                     {registered[t.id] ? "Registered" : "Register"}
@@ -546,7 +546,7 @@ export function GameModeModal({ open, onClose }: { open: boolean; onClose: () =>
             <button
               type="button"
               onClick={() => setMode("select")}
-              className="text-xs uppercase tracking-[0.2em] text-neutral-500 transition hover:text-cyan"
+              className="text-xs uppercase tracking-[0.2em] text-neutral-500 transition hover:text-foreground"
             >
               ← Back to modes
             </button>
@@ -568,18 +568,18 @@ function ModeCard({
   title: string;
   blurb: string;
   onClick: () => void;
-  accent: "cyan" | "gold" | "purple";
+  accent: "red" | "gold" | "green";
   locked?: boolean;
   lockedHint?: string;
 }) {
   const ring =
     accent === "gold"
-      ? "hover:border-gold/50 hover:shadow-[0_0_28px_rgba(212,175,55,0.18)]"
-      : accent === "purple"
-        ? "hover:border-[#b44dff]/50 hover:shadow-[0_0_28px_rgba(180,77,255,0.18)]"
-        : "hover:border-cyan/50 hover:shadow-[0_0_28px_rgba(129,236,255,0.18)]";
+      ? "hover:border-gold/50 hover:shadow-[0_4px_18px_rgba(0,0,0,0.5)]"
+      : accent === "green"
+        ? "hover:border-green/50 hover:shadow-[0_4px_18px_rgba(0,0,0,0.5)]"
+        : "hover:border-brand/50 hover:shadow-[0_4px_18px_rgba(0,0,0,0.5)]";
   const dot =
-    accent === "gold" ? "bg-gold" : accent === "purple" ? "bg-[#b44dff]" : "bg-cyan";
+    accent === "gold" ? "bg-gold" : accent === "green" ? "bg-green" : "bg-brand";
 
   return (
     <button
@@ -603,7 +603,7 @@ function ModeCard({
         )}
       </span>
       <span className="mt-3 text-xs leading-relaxed text-neutral-400">{blurb}</span>
-      <span className="mt-4 text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-500 transition group-hover:text-cyan">
+      <span className="mt-4 text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-500 transition group-hover:text-foreground">
         Select →
       </span>
     </button>

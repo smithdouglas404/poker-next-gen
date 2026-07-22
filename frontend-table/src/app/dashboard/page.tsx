@@ -72,8 +72,11 @@ function Sidebar({ data }: { data: DashboardData }) {
   return (
     <aside className="hidden w-64 shrink-0 flex-col justify-between border-r border-white/[0.06] px-6 py-8 lg:flex">
       <div>
-        <div className="mb-12 px-2">
-          <span className="font-display text-xl font-bold uppercase tracking-[0.18em] text-cyan drop-shadow-[0_0_18px_rgba(129,236,255,0.35)]">
+        <div className="mb-12 flex items-center gap-3 px-2">
+          <span className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-b from-[#ff2d3f] to-[#b3151f] font-display text-sm font-bold text-white shadow-[0_4px_14px_-4px_rgba(224,30,43,0.5)]">
+            GG
+          </span>
+          <span className="font-display text-xl font-bold uppercase tracking-[0.18em] text-foreground">
             High Rollers
           </span>
         </div>
@@ -87,8 +90,8 @@ function Sidebar({ data }: { data: DashboardData }) {
                 className={cn(
                   "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition",
                   active
-                    ? "border border-cyan/30 bg-cyan/10 text-cyan shadow-[0_0_22px_rgba(129,236,255,0.12)]"
-                    : "text-neutral-400 hover:bg-white/[0.04] hover:text-white",
+                    ? "bg-gradient-to-r from-[#e01e2b] to-[#b3151f] text-white shadow-[0_6px_18px_-8px_rgba(224,30,43,0.5)]"
+                    : "text-muted hover:bg-white/[0.04] hover:text-white",
                 )}
               >
                 <NavIcon name={n.icon} />
@@ -101,7 +104,7 @@ function Sidebar({ data }: { data: DashboardData }) {
 
       <div className="space-y-4">
         <div className={cn(GLASS_PANEL, "flex items-center gap-3 p-3")}>
-          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-cyan/30 to-gold/30 text-sm font-bold text-white">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-[#f5c518]/40 to-neutral-700 text-sm font-bold text-white">
             {data.username.slice(0, 2).toUpperCase()}
           </div>
           <div className="min-w-0">
@@ -131,14 +134,14 @@ function TopBar({ mode }: { mode: DashboardData["mode"] }) {
   return (
     <header className="flex items-center justify-between gap-4 pb-8">
       <div className="flex items-center gap-3">
-        <h1 className="font-display text-xl font-bold uppercase italic tracking-wide text-cyan">
+        <h1 className="font-display text-xl font-bold uppercase italic tracking-wide text-foreground">
           High Rollers Club
         </h1>
         <ModeBadge mode={mode} />
       </div>
       <div className="flex items-center gap-3">
-        <label className="hidden items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 backdrop-blur-xl sm:flex">
-          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} className="text-neutral-500">
+        <label className="hidden items-center gap-2 rounded-xl border border-white/[0.06] bg-surface px-4 py-2.5 sm:flex">
+          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} className="text-muted">
             <circle cx="11" cy="11" r="7" />
             <path d="m20 20-3.2-3.2" />
           </svg>
@@ -151,19 +154,19 @@ function TopBar({ mode }: { mode: DashboardData["mode"] }) {
         <Link
           href="/loyalty"
           aria-label="Notifications"
-          className="grid h-10 w-10 place-items-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-neutral-300 transition hover:text-cyan"
+          className="grid h-10 w-10 place-items-center rounded-xl border border-white/[0.06] bg-surface text-neutral-300 transition hover:text-brand"
         >
           <span className="relative">
             <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
               <path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10.5 21a2 2 0 0 0 3 0" />
             </svg>
-            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-gold shadow-[0_0_8px_rgba(212,175,55,0.8)]" />
+            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-brand" />
           </span>
         </Link>
         <Link
           href="/wallet"
           aria-label="Vault"
-          className="grid h-10 w-10 place-items-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-neutral-300 transition hover:text-gold"
+          className="grid h-10 w-10 place-items-center rounded-xl border border-white/[0.06] bg-surface text-neutral-300 transition hover:text-gold"
         >
           <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
             <path d="M3 10 12 4l9 6M5 10v9h14v-9M9 19v-5h6v5" />
@@ -177,8 +180,8 @@ function TopBar({ mode }: { mode: DashboardData["mode"] }) {
 function ModeBadge({ mode }: { mode: DashboardData["mode"] }) {
   if (mode === "live") {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-300">
-        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]" />
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-green/30 bg-green/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-green">
+        <span className="h-1.5 w-1.5 rounded-full bg-green" />
         Live
       </span>
     );
@@ -193,14 +196,14 @@ function ModeBadge({ mode }: { mode: DashboardData["mode"] }) {
 
 /* ========================================================== profile + standing */
 
-function Stat({ label, value, accent }: { label: string; value: string; accent?: "cyan" | "gold" }) {
+function Stat({ label, value, accent }: { label: string; value: string; accent?: "green" | "gold" }) {
   return (
     <div>
       <p className={cn(HEADING_SM, "mb-1 text-neutral-500")}>{label}</p>
       <p
         className={cn(
           "font-display text-3xl font-bold tracking-tight",
-          accent === "cyan" ? "text-cyan" : accent === "gold" ? "text-gold" : "text-white",
+          accent === "green" ? "text-green" : accent === "gold" ? "text-gold" : "text-white",
         )}
       >
         {value}
@@ -223,7 +226,7 @@ function OperativeProfileCard({ data }: { data: DashboardData }) {
         <path d="M6 3h12l3 5-9 13L3 8l3-5Zm0 0 3 5m9-5-3 5M3 8h18M12 21 9 8m3 13 3-13" stroke="currentColor" fill="none" strokeWidth={0.8} />
       </svg>
 
-      <p className={cn(HEADING_SM, "mb-4 text-cyan/70")}>Operative Profile</p>
+      <p className={cn(HEADING_SM, "mb-4 text-muted")}>Operative Profile</p>
       <h2 className="font-display text-4xl font-bold uppercase tracking-tight text-white sm:text-5xl">
         {data.personaTitle}
       </h2>
@@ -232,12 +235,12 @@ function OperativeProfileCard({ data }: { data: DashboardData }) {
       <div className="mt-8 flex flex-wrap gap-12 border-t border-white/[0.06] pt-6">
         <div>
           <p className={cn(HEADING_SM, "mb-1 text-neutral-500")}>Total Bankroll</p>
-          <p className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+          <p className="font-display text-3xl font-bold tracking-tight text-gold sm:text-4xl">
             {dollars}
-            <span className="text-cyan">.{cents ?? "00"}</span>
+            <span className="text-gold/70">.{cents ?? "00"}</span>
           </p>
         </div>
-        <Stat label="Win Rate" value={`${data.winRatePct.toFixed(1)}%`} accent="cyan" />
+        <Stat label="Win Rate" value={`${data.winRatePct.toFixed(1)}%`} accent="green" />
       </div>
     </section>
   );
@@ -250,7 +253,6 @@ function GlobalStandingCard({ data }: { data: DashboardData }) {
       className={cn(
         GLASS_PANEL,
         "relative flex flex-col overflow-hidden p-6",
-        "border-cyan/25 shadow-[0_0_40px_rgba(129,236,255,0.06)]",
       )}
     >
       <div className="mb-6 flex items-center justify-between">
@@ -258,14 +260,14 @@ function GlobalStandingCard({ data }: { data: DashboardData }) {
           className={cn(
             "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest",
             live
-              ? "border border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
+              ? "border border-green/30 bg-green/10 text-green"
               : "border border-gold/30 bg-gold/10 text-gold",
           )}
         >
-          <span className={cn("h-1.5 w-1.5 rounded-full", live ? "bg-emerald-400" : "bg-gold")} />
+          <span className={cn("h-1.5 w-1.5 rounded-full", live ? "bg-green" : "bg-gold")} />
           {live ? "System Online" : "Demo Mode"}
         </span>
-        <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} className="text-cyan">
+        <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} className="text-muted">
           <path d="M5 12a7 7 0 0 1 14 0M8 12a4 4 0 0 1 8 0" />
           <circle cx="12" cy="12" r="1.3" fill="currentColor" />
         </svg>
@@ -279,7 +281,7 @@ function GlobalStandingCard({ data }: { data: DashboardData }) {
       </div>
       <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-white/[0.06]">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-cyan shadow-[0_0_12px_rgba(129,236,255,0.5)]"
+          className="h-full rounded-full bg-gradient-to-r from-[#0a7d43] to-[#22c55e]"
           style={{ width: `${Math.round(data.rankProgress * 100)}%` }}
         />
       </div>
@@ -304,10 +306,10 @@ function GlobalStandingCard({ data }: { data: DashboardData }) {
 /* ============================================================ high-stakes tables */
 
 const TABLE_TINTS = [
-  "from-rose-900/40 via-black/60 to-black",
-  "from-amber-800/50 via-black/60 to-black",
-  "from-cyan-900/40 via-black/60 to-black",
-  "from-purple-900/40 via-black/60 to-black",
+  "from-[#2a1416] to-[#12151a]",
+  "from-[#2a2410] to-[#12151a]",
+  "from-[#122019] to-[#12151a]",
+  "from-[#1c1f24] to-[#12151a]",
 ];
 
 function TableCardView({ card, index }: { card: TableCard; index: number }) {
@@ -315,7 +317,7 @@ function TableCardView({ card, index }: { card: TableCard; index: number }) {
     <article className={cn(GLASS_PANEL, GLASS_PANEL_HOVER, "flex flex-col overflow-hidden")}>
       <div className={cn("relative h-32 bg-gradient-to-br", TABLE_TINTS[index % TABLE_TINTS.length])}>
         <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white backdrop-blur">
-          <span className={cn("h-1.5 w-1.5 rounded-full", card.full ? "bg-neutral-500" : "bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.9)]")} />
+          <span className={cn("h-1.5 w-1.5 rounded-full", card.full ? "bg-neutral-500" : "bg-green")} />
           {card.suite}
         </span>
       </div>
@@ -330,7 +332,7 @@ function TableCardView({ card, index }: { card: TableCard; index: number }) {
             <p className="text-[10px] uppercase tracking-widest text-neutral-500">
               {card.full ? "Status" : "Pot"}
             </p>
-            <p className={cn("font-display text-sm font-bold", card.full ? "text-neutral-400" : "text-cyan")}>
+            <p className={cn("font-display text-sm font-bold", card.full ? "text-neutral-400" : "text-green")}>
               {card.full ? "Full" : card.potCents > 0 ? moneyCompact(card.potCents) : `${card.seated} seated`}
             </p>
           </div>
@@ -344,7 +346,7 @@ function TableCardView({ card, index }: { card: TableCard; index: number }) {
               className={cn(
                 "h-6 w-6 rounded-full border",
                 i < card.seated
-                  ? "border-cyan/40 bg-gradient-to-br from-cyan/30 to-purple-500/20"
+                  ? "border-green/40 bg-green/20"
                   : "border-white/10 bg-white/[0.03]",
               )}
             />
@@ -360,7 +362,7 @@ function TableCardView({ card, index }: { card: TableCard; index: number }) {
             "mt-4 flex items-center justify-center rounded-xl px-4 py-2.5 text-xs font-semibold uppercase tracking-wide transition",
             card.full
               ? "cursor-default border border-white/10 text-neutral-500"
-              : "border border-white/15 text-white hover:border-cyan/40 hover:bg-cyan/5 hover:text-cyan",
+              : "border border-brand/50 bg-brand/15 text-white hover:bg-brand/25",
           )}
         >
           {card.full ? "Spectate Only" : "Enter Table"}
@@ -378,7 +380,7 @@ function HighStakes({ tables }: { tables: TableCard[] }) {
           <h3 className="font-display text-xl font-bold uppercase tracking-wide text-white">Active High Stakes</h3>
           <p className="text-xs uppercase tracking-widest text-neutral-500">Live data feed from exclusive suites</p>
         </div>
-        <Link href="/lobby" className="text-xs font-bold uppercase tracking-widest text-cyan hover:text-cyan/80">
+        <Link href="/lobby" className="text-xs font-bold uppercase tracking-widest text-brand hover:text-brand/80">
           View All Tables
         </Link>
       </div>
@@ -417,7 +419,7 @@ function TournamentRowView({ row }: { row: TournamentRow }) {
         <p className="text-[10px] uppercase tracking-widest text-neutral-500">Buy-in</p>
         <p className="font-display text-base font-bold text-white">{money(row.buyInCents)}</p>
       </div>
-      <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="text-cyan">
+      <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="text-muted">
         <path d="m9 6 6 6-6 6" />
       </svg>
     </Link>
@@ -447,10 +449,10 @@ function EliteTournaments({ rows }: { rows: TournamentRow[] }) {
 
 function ActivityIcon({ kind }: { kind: ActivityRow["kind"] }) {
   const map = {
-    credit: { ring: "border-emerald-400/30 text-emerald-300", glyph: "M12 5v14M5 12h14" },
+    credit: { ring: "border-green/30 text-green", glyph: "M12 5v14M5 12h14" },
     win: { ring: "border-gold/30 text-gold", glyph: "M7 4h10v4a5 5 0 0 1-10 0V4ZM9 20h6M12 13v4" },
-    loss: { ring: "border-rose-500/30 text-rose-300", glyph: "M12 8v5M12 16.5v.01M12 3 2 20h20L12 3Z" },
-    neutral: { ring: "border-cyan/30 text-cyan", glyph: "M5 12h14" },
+    loss: { ring: "border-brand/30 text-brand", glyph: "M12 8v5M12 16.5v.01M12 3 2 20h20L12 3Z" },
+    neutral: { ring: "border-white/15 text-muted", glyph: "M5 12h14" },
   } as const;
   const m = map[kind];
   return (
@@ -484,7 +486,7 @@ function RecentActivity({ rows }: { rows: ActivityRow[] }) {
       )}
       <Link
         href="/wallet"
-        className="mt-6 border-t border-white/[0.06] pt-4 text-center text-[11px] font-bold uppercase tracking-[0.25em] text-neutral-500 transition hover:text-cyan"
+        className="mt-6 border-t border-white/[0.06] pt-4 text-center text-[11px] font-bold uppercase tracking-[0.25em] text-neutral-500 transition hover:text-brand"
       >
         Full History Log
       </Link>

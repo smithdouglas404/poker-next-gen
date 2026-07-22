@@ -52,7 +52,7 @@ function enrich(t: Tournament, index: number): EnrichedTournament {
     speed = "Regular";
   } else if (t.starting_stack <= 15_000) {
     tag = "TURBO";
-    tagTone = "cyan";
+    tagTone = "red";
     speed = "Turbo";
   }
   const featured = index < 2 || buyIn >= 10_000;
@@ -65,10 +65,11 @@ function enrich(t: Tournament, index: number): EnrichedTournament {
       speed,
       featured,
       lateReg: t.status === "running",
+      // Clean GGPoker CARD surface with a faint brand/gold wash — no neon depth.
       heroArt: featured
         ? tagTone === "gold"
-          ? "radial-gradient(120% 120% at 80% 10%, rgba(212,175,55,0.20), transparent 55%), linear-gradient(135deg,#111318,#05070c)"
-          : "radial-gradient(120% 120% at 20% 10%, rgba(129,236,255,0.18), transparent 55%), linear-gradient(135deg,#0a1418,#05070c)"
+          ? "radial-gradient(120% 120% at 85% 0%, rgba(245,197,24,0.10), transparent 55%), #16191d"
+          : "radial-gradient(120% 120% at 15% 0%, rgba(224,30,43,0.10), transparent 55%), #16191d"
         : undefined,
     },
   };
@@ -249,10 +250,10 @@ export default function TournamentsPage() {
   return (
     <div className="min-h-screen text-foreground">
       {/* Top bar */}
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-background/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#16191d]">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
           <div className="flex items-center gap-8">
-            <Link href="/hub" className="font-display text-lg font-bold uppercase tracking-wider text-cyan">
+            <Link href="/hub" className="font-display text-lg font-bold uppercase tracking-wider text-brand">
               Neon Vault
             </Link>
             <nav className="flex items-center gap-1">
@@ -263,7 +264,7 @@ export default function TournamentsPage() {
                   onClick={() => setTab(id)}
                   className={cn(
                     "rounded-lg px-4 py-2 text-sm font-semibold uppercase tracking-wide transition",
-                    tab === id ? "bg-white/10 text-white" : "text-neutral-400 hover:text-neutral-200",
+                    tab === id ? "bg-brand text-white" : "text-neutral-400 hover:text-neutral-200",
                   )}
                 >
                   {id === "lobby" ? "Lobby" : "Tournament Center"}
@@ -277,7 +278,7 @@ export default function TournamentsPage() {
                 Demo · Offline
               </span>
             )}
-            <Link href="/hub" className="text-sm text-cyan hover:underline">
+            <Link href="/hub" className="text-sm text-muted transition-colors hover:text-foreground">
               ← Command Center
             </Link>
           </div>
@@ -290,8 +291,8 @@ export default function TournamentsPage() {
           className={cn(
             "fixed left-1/2 top-20 z-50 -translate-x-1/2 rounded-xl border px-5 py-3 text-sm font-medium backdrop-blur-xl",
             toast.kind === "ok"
-              ? "border-emerald-400/30 bg-emerald-950/40 text-emerald-200"
-              : "border-red-400/30 bg-red-950/40 text-red-200",
+              ? "border-green/30 bg-green/10 text-green"
+              : "border-brand/40 bg-brand/10 text-[#ff9ba1]",
           )}
         >
           {toast.msg}

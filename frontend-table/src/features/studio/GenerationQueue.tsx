@@ -36,7 +36,7 @@ export function GenerationQueue({
                 <div className="flex items-start justify-between gap-2">
                   <p className="min-w-0 flex-1 truncate text-xs text-neutral-200">{job.prompt}</p>
                   {job.demo && (
-                    <span className="shrink-0 rounded border border-amber-500/40 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-300">
+                    <span className="shrink-0 rounded border border-gold/40 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-gold">
                       Demo
                     </span>
                   )}
@@ -46,7 +46,7 @@ export function GenerationQueue({
                   <div
                     className={cn(
                       "h-full rounded-full transition-all duration-500",
-                      failed ? "bg-red-500" : done ? "bg-cyan" : "bg-gold",
+                      failed ? "bg-brand" : done ? "bg-green" : "bg-gold",
                     )}
                     style={{ width: `${failed ? 100 : job.progress}%` }}
                   />
@@ -56,7 +56,7 @@ export function GenerationQueue({
                   <span
                     className={cn(
                       "text-[10px] font-semibold uppercase tracking-wider",
-                      failed ? "text-red-300" : done ? "text-cyan" : "text-neutral-400",
+                      failed ? "text-brand" : done ? "text-green" : "text-muted",
                     )}
                   >
                     {failed

@@ -36,10 +36,10 @@ export default function ProvablyFairPage() {
   return (
     <div className="min-h-screen text-foreground">
       {/* Top bar */}
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-background/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-20 border-b border-white/[0.06] bg-surface">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-4">
           <div className="flex items-center gap-8">
-            <span className="font-display text-lg font-bold uppercase tracking-wider text-cyan">
+            <span className="font-display text-lg font-bold uppercase tracking-wider text-brand">
               Neon Vault
             </span>
             <nav className="hidden items-center gap-1 md:flex">
@@ -49,11 +49,11 @@ export default function ProvablyFairPage() {
                   onClick={() => setTab(t.id)}
                   className={cn(
                     "rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-wider transition",
-                    tab === t.id ? "text-cyan" : "text-neutral-400 hover:text-white",
+                    tab === t.id ? "text-brand" : "text-neutral-400 hover:text-white",
                   )}
                 >
                   {t.label}
-                  {tab === t.id && <span className="mt-1 block h-0.5 rounded-full bg-cyan" />}
+                  {tab === t.id && <span className="mt-1 block h-0.5 rounded-full bg-brand" />}
                 </button>
               ))}
             </nav>
@@ -62,12 +62,12 @@ export default function ProvablyFairPage() {
             {target && tab !== "audit" && (
               <button
                 onClick={() => onAudit(target.matchId, target.handNo)}
-                className="text-xs font-bold uppercase tracking-wider text-gold hover:underline"
+                className="text-xs font-bold uppercase tracking-wider text-brand hover:underline"
               >
                 Open hand audit →
               </button>
             )}
-            <Link href="/hub" className="text-sm text-neutral-400 hover:text-cyan">
+            <Link href="/hub" className="text-sm text-neutral-400 hover:text-foreground">
               ← Command Center
             </Link>
           </div>
@@ -80,7 +80,7 @@ export default function ProvablyFairPage() {
               onClick={() => setTab(t.id)}
               className={cn(
                 "shrink-0 rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition",
-                tab === t.id ? "bg-cyan/10 text-cyan" : "text-neutral-400",
+                tab === t.id ? "bg-brand/10 text-brand" : "text-neutral-400",
               )}
             >
               {t.label}

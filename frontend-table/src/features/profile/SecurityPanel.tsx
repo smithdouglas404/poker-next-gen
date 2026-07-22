@@ -96,7 +96,7 @@ function TwoFactor({ notify }: { notify: (msg: string, kind?: "ok" | "err") => v
         <div className="mt-4 space-y-4">
           <div className="rounded-xl border border-white/10 bg-black/40 p-4">
             <p className="text-[11px] uppercase tracking-[0.2em] text-neutral-500">Manual entry secret</p>
-            <p className="mt-1 select-all break-all font-mono text-sm text-cyan">{setup.secret}</p>
+            <p className="mt-1 select-all break-all font-mono text-sm text-gold">{setup.secret}</p>
             <p className="mt-3 text-[11px] uppercase tracking-[0.2em] text-neutral-500">otpauth URL</p>
             <p className="mt-1 select-all break-all font-mono text-[11px] text-neutral-400">
               {setup.otpauth_url}
@@ -287,9 +287,9 @@ function ApiKeys({ notify }: { notify: (msg: string, kind?: "ok" | "err") => voi
       </div>
 
       {freshKey && (
-        <div className="mt-4 rounded-xl border border-cyan/30 bg-cyan/[0.05] p-4">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-cyan/80">New key — shown once</p>
-          <p className="mt-1 select-all break-all font-mono text-sm text-cyan">{freshKey}</p>
+        <div className="mt-4 rounded-xl border border-gold/30 bg-gold/[0.05] p-4">
+          <p className="text-[11px] uppercase tracking-[0.2em] text-gold/80">New key — shown once</p>
+          <p className="mt-1 select-all break-all font-mono text-sm text-gold">{freshKey}</p>
         </div>
       )}
 

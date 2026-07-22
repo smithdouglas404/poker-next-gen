@@ -179,7 +179,7 @@ export function Members({
           ) : (
             messages.map((msg) => (
               <div key={msg.id} className="text-[13px]">
-                <span className="font-semibold text-cyan/80">{msg.username || "player"}</span>
+                <span className="font-semibold text-green">{msg.username || "player"}</span>
                 <span className="ml-2 text-[10px] text-neutral-600">{relTime(msg.created_at)}</span>
                 <p className="text-white/80">{msg.text}</p>
               </div>

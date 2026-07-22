@@ -40,12 +40,12 @@ function SeatCard({
       <button
         type="button"
         onClick={onSit}
-        className="group flex w-32 flex-col items-center gap-1.5 rounded-2xl border border-dashed border-amber-400/40 bg-white/[0.03] px-3 py-3 text-amber-200/80 backdrop-blur-xl transition-all duration-300 hover:border-amber-300/70 hover:bg-amber-400/[0.06] hover:shadow-[0_0_22px_rgba(212,175,55,0.25)]"
+        className="group flex w-32 flex-col items-center gap-1.5 rounded-2xl border border-dashed border-white/15 bg-surface px-3 py-3 text-neutral-200 shadow-[0_2px_12px_rgba(0,0,0,0.4)] transition-all duration-300 hover:border-brand/60 hover:bg-white/[0.04]"
       >
-        <span className="text-2xl leading-none text-amber-300/90 transition group-hover:scale-110">+</span>
+        <span className="text-2xl leading-none text-gold transition group-hover:scale-110">+</span>
         <span className="text-xs font-bold uppercase tracking-wider">Sit Here</span>
         <span className="text-[10px] text-neutral-500">Seat {seat.index + 1}</span>
-        <span className="text-[10px] font-semibold text-amber-300/80">{buyInLabel}</span>
+        <span className="text-[10px] font-semibold text-gold">{buyInLabel}</span>
       </button>
     );
   }
@@ -58,7 +58,7 @@ function SeatCard({
 
   return (
     <div
-      className="flex w-36 flex-col items-center rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3 py-3 backdrop-blur-xl"
+      className="flex w-36 flex-col items-center rounded-2xl border border-white/[0.06] bg-surface px-3 py-3"
       style={{ boxShadow: `0 0 0 1px ${accent}55, 0 8px 26px ${glow}` }}
     >
       {mode === "3d" || (mode === "mix" && !!seat.model_url) ? (
@@ -87,7 +87,7 @@ function SeatCard({
       >
         {seat.username}
       </p>
-      <p className="text-xs font-semibold text-emerald-300">
+      <p className="text-xs font-semibold text-green">
         {formatStack(seat.stack, bigBlind, stackUnit, formatCents)}
       </p>
       {!folded && <ChipStack cents={seat.stack} />}
@@ -155,25 +155,25 @@ export function SeatHud() {
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10">
-      <div className="pointer-events-auto absolute right-4 top-20 z-20 flex overflow-hidden rounded-full border border-white/15 bg-black/60 text-[11px] font-bold backdrop-blur-md">
+      <div className="pointer-events-auto absolute right-4 top-20 z-20 flex overflow-hidden rounded-full border border-white/[0.08] bg-surface text-[11px] font-bold shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
         <button
           type="button"
           onClick={() => setMode("2d")}
-          className={`px-3 py-1 ${mode === "2d" ? "bg-amber-500 text-black" : "text-neutral-300"}`}
+          className={`px-3 py-1 ${mode === "2d" ? "bg-brand text-white" : "text-neutral-300"}`}
         >
           2.5D
         </button>
         <button
           type="button"
           onClick={() => setMode("3d")}
-          className={`px-3 py-1 ${mode === "3d" ? "bg-amber-500 text-black" : "text-neutral-300"}`}
+          className={`px-3 py-1 ${mode === "3d" ? "bg-brand text-white" : "text-neutral-300"}`}
         >
           3D
         </button>
         <button
           type="button"
           onClick={() => setMode("mix")}
-          className={`px-3 py-1 ${mode === "mix" ? "bg-amber-500 text-black" : "text-neutral-300"}`}
+          className={`px-3 py-1 ${mode === "mix" ? "bg-brand text-white" : "text-neutral-300"}`}
         >
           Mix
         </button>

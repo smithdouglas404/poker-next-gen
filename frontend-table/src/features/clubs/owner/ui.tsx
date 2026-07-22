@@ -51,9 +51,9 @@ export function MemberAvatar({
 }
 
 const ROLE_COLOR: Record<string, string> = {
-  owner: "#f3c14b",
-  admin: "#7fe9ff",
-  manager: "#7fe9ff",
+  owner: "#f5c518",
+  admin: "#22c55e",
+  manager: "#22c55e",
   member: "rgba(255,255,255,0.55)",
 };
 export function roleColor(role: string): string {
@@ -64,11 +64,11 @@ export function roleColor(role: string): string {
 export function StatusPill({ status }: { status: string }) {
   const s = (status || "active").toLowerCase();
   const map: Record<string, { label: string; cls: string }> = {
-    active: { label: "Active", cls: "border-emerald-500/40 text-emerald-300 bg-emerald-500/10" },
-    online: { label: "In Game", cls: "border-cyan/40 text-cyan bg-cyan/10" },
-    away: { label: "Away", cls: "border-amber-500/40 text-amber-300 bg-amber-500/10" },
-    pending: { label: "Pending Approval", cls: "border-amber-500/50 text-amber-300 bg-amber-500/10" },
-    banned: { label: "Banned", cls: "border-red-500/50 text-red-300 bg-red-500/10" },
+    active: { label: "Active", cls: "border-[#22c55e]/40 text-[#22c55e] bg-[#22c55e]/10" },
+    online: { label: "In Game", cls: "border-[#e01e2b]/42 text-[#ffcdd1] bg-[#e01e2b]/12" },
+    away: { label: "Away", cls: "border-[#f5c518]/34 text-[#ffe9a6] bg-[#f5c518]/10" },
+    pending: { label: "Pending Approval", cls: "border-[#f5c518]/45 text-[#ffe9a6] bg-[#f5c518]/10" },
+    banned: { label: "Banned", cls: "border-[#e01e2b]/50 text-[#ff9ba1] bg-[#e01e2b]/10" },
   };
   const m = map[s] ?? map.active;
   return (
@@ -84,15 +84,15 @@ export function StatusPill({ status }: { status: string }) {
   );
 }
 
-/** Thin cyan/gold progress meter used under vault balances. */
+/** Thin progress meter used under vault balances. */
 export function Meter({ value, tone = "cyan" }: { value: number; tone?: "cyan" | "gold" | "red" }) {
   const pct = Math.max(2, Math.min(100, value));
   const bar =
     tone === "gold"
-      ? "linear-gradient(90deg,#9a7b2c,#d4af37,#f3e2ad)"
+      ? "linear-gradient(90deg,#d4a80f,#f5c518,#ffd54a)"
       : tone === "red"
-        ? "linear-gradient(90deg,#7f1d1d,#ff3b46)"
-        : "linear-gradient(90deg,#22d3ee,#81ecff)";
+        ? "linear-gradient(90deg,#b3151f,#ff2d3f)"
+        : "linear-gradient(90deg,#0a7d43,#22c55e)";
   return (
     <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-white/10">
       <div className="h-full rounded-full" style={{ width: `${pct}%`, background: bar }} />

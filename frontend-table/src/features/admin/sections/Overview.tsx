@@ -74,7 +74,7 @@ export function Overview({ notify }: { notify: Notify }) {
           label="Wallet Float"
           value={moneyCompact(fin?.wallet_float_cents)}
           sub="Player liability held"
-          accent="cyan"
+          accent="green"
         />
         <StatTile
           label="Deposits Credited"
@@ -93,7 +93,7 @@ export function Overview({ notify }: { notify: Notify }) {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile label="Users" value={compactNum(fin?.user_count)} sub={`${fin?.banned_count ?? 0} banned`} accent="neutral" />
         <StatTile label="Hands Dealt" value={compactNum(gs?.hands)} accent="neutral" />
-        <StatTile label="Open Tables" value={compactNum(gs?.open_tables)} accent="cyan" />
+        <StatTile label="Open Tables" value={compactNum(gs?.open_tables)} accent="green" />
         <StatTile label="Clubs" value={compactNum(gs?.clubs)} accent="gold" />
       </div>
 

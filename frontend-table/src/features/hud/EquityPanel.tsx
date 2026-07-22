@@ -74,10 +74,10 @@ export function EquityPanel() {
   if (!category) return null;
 
   return (
-    <div className="pointer-events-auto rounded-xl border border-violet-400/30 bg-violet-950/30 px-3 py-2 text-xs">
-      <p className="text-[10px] uppercase tracking-wider text-violet-300/70">rs_poker strength</p>
-      <p className="font-semibold capitalize text-violet-100">{category}</p>
-      {equity !== null && <p className="text-violet-200/90">Showdown equity {equity}%</p>}
+    <div className="pointer-events-auto rounded-xl border border-white/[0.06] bg-surface px-3 py-2 text-xs shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
+      <p className="text-[10px] uppercase tracking-wider text-muted">rs_poker strength</p>
+      <p className="font-semibold capitalize text-foreground">{category}</p>
+      {equity !== null && <p className="text-green">Showdown equity {equity}%</p>}
     </div>
   );
 }

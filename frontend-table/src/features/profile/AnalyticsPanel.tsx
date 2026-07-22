@@ -31,7 +31,7 @@ function LeakCard({ leak }: { leak: Leak }) {
         <span className="ml-auto text-[10px] uppercase tracking-[0.2em] text-neutral-500">{s.label}</span>
       </div>
       <p className="mt-2 text-sm text-neutral-300">{leak.detail}</p>
-      <p className="mt-2 text-xs text-cyan/80">→ {leak.suggestion}</p>
+      <p className="mt-2 text-xs text-green/90">→ {leak.suggestion}</p>
     </div>
   );
 }
@@ -106,14 +106,14 @@ export function AnalyticsPanel({
         {stats && (
           <>
             <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <RadialGauge label="VPIP" value={stats.vpip_pct} ideal={[18, 28]} accent="#81ecff" />
-              <RadialGauge label="PFR" value={stats.pfr_pct} ideal={[14, 22]} accent="#22d3ee" />
-              <RadialGauge label="WTSD" value={stats.wtsd_pct} ideal={[24, 30]} accent="#b44dff" />
-              <RadialGauge label="AF" value={stats.af} max={6} ideal={[2, 3.5]} accent="#e9c46a" suffix="" />
+              <RadialGauge label="VPIP" value={stats.vpip_pct} ideal={[18, 28]} accent="#e01e2b" />
+              <RadialGauge label="PFR" value={stats.pfr_pct} ideal={[14, 22]} accent="#f5c518" />
+              <RadialGauge label="WTSD" value={stats.wtsd_pct} ideal={[24, 30]} accent="#22c55e" />
+              <RadialGauge label="AF" value={stats.af} max={6} ideal={[2, 3.5]} accent="#ffd54a" suffix="" />
             </div>
             <div className="mt-6 grid gap-5 sm:grid-cols-3">
-              <StatMeter label="Win rate" value={stats.win_rate_pct} accent="#34d399" ideal={50} />
-              <StatMeter label="Won at showdown" value={stats.wsd_pct} accent="#81ecff" ideal={52} />
+              <StatMeter label="Win rate" value={stats.win_rate_pct} accent="#22c55e" ideal={50} />
+              <StatMeter label="Won at showdown" value={stats.wsd_pct} accent="#e01e2b" ideal={52} />
               <div className={cn(GLASS_PANEL, "flex items-center justify-between px-4 py-3")}>
                 <NetTile label="Net result" value={stats.net} cents={stats.net_cents} />
               </div>
@@ -177,7 +177,7 @@ export function AnalyticsPanel({
           <div className={cn(GLASS_PANEL, GLASS_PANEL_HOVER, "mt-5 p-5")}>
             <div className="grid grid-cols-3 items-center gap-2 text-center">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.2em] text-cyan/80">You</p>
+                <p className="text-[11px] uppercase tracking-[0.2em] text-brand/90">You</p>
                 <p className="font-display text-3xl font-bold text-foreground">{h2h.my_wins}</p>
               </div>
               <div className="text-neutral-500">

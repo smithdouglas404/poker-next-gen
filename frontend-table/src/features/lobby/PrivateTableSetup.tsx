@@ -188,7 +188,7 @@ export function PrivateTableSetup({
                   className={cn(
                     "rounded-xl border px-4 py-3 text-left text-sm font-semibold transition",
                     c.id === sponsorClub
-                      ? "border-gold/50 bg-gold/10 text-gold shadow-[0_0_16px_rgba(212,175,55,0.15)]"
+                      ? "border-gold/50 bg-gold/10 text-gold"
                       : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25",
                   )}
                 >
@@ -232,7 +232,7 @@ export function PrivateTableSetup({
                 type="checkbox"
                 checked={customBlinds}
                 onChange={(e) => setCustomBlinds(e.target.checked)}
-                className="accent-cyan"
+                className="accent-[#e01e2b]"
               />
               Custom
             </label>
@@ -248,7 +248,7 @@ export function PrivateTableSetup({
                   className={cn(
                     "rounded-xl border px-3 py-2 text-sm font-semibold transition",
                     i === blindIdx
-                      ? "border-cyan/50 bg-cyan/10 text-cyan shadow-[0_0_16px_rgba(129,236,255,0.15)]"
+                      ? "border-brand/50 bg-brand/10 text-brand"
                       : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25",
                   )}
                 >
@@ -295,7 +295,7 @@ export function PrivateTableSetup({
               step={50}
               value={buyInDollars}
               onChange={(e) => setBuyInDollars(Number(e.target.value))}
-              className="mt-3 w-full accent-[#d4af37]"
+              className="mt-3 w-full accent-[#f5c518]"
             />
             <div className="mt-1 flex justify-between text-[10px] text-neutral-500">
               <span>{formatCents(MIN_BUY_IN_CENTS)}</span>
@@ -320,7 +320,7 @@ export function PrivateTableSetup({
                 className={cn(
                   "h-11 w-11 rounded-xl border text-sm font-bold transition",
                   n === seats
-                    ? "border-gold/50 bg-gradient-to-br from-[#f3e2ad]/20 to-[#9a7b2c]/20 text-gold shadow-[0_0_16px_rgba(212,175,55,0.18)]"
+                    ? "border-gold/50 bg-gradient-to-br from-[#ffd54a]/20 to-[#d4a80f]/20 text-gold"
                     : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25",
                 )}
               >
@@ -335,7 +335,7 @@ export function PrivateTableSetup({
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
                   AI Bots
                 </span>
-                <span className="text-sm font-semibold text-cyan">{bots}</span>
+                <span className="text-sm font-semibold text-brand">{bots}</span>
               </div>
               <input
                 type="range"
@@ -344,7 +344,7 @@ export function PrivateTableSetup({
                 step={1}
                 value={bots}
                 onChange={(e) => setBots(Number(e.target.value))}
-                className="mt-3 w-full accent-cyan"
+                className="mt-3 w-full accent-[#e01e2b]"
               />
               <p className="mt-1 text-[10px] text-neutral-600">
                 Fill empty seats with AI opponents — at least one seat stays open for you.
@@ -395,7 +395,7 @@ export function PrivateTableSetup({
                   className={cn(
                     "rounded-xl border px-3 py-2 text-xs font-semibold transition",
                     d.mins === durationMins
-                      ? "border-cyan/50 bg-cyan/10 text-cyan"
+                      ? "border-brand/50 bg-brand/10 text-brand"
                       : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25",
                   )}
                 >
@@ -409,7 +409,7 @@ export function PrivateTableSetup({
         <button
           type="button"
           onClick={onBack}
-          className="text-xs uppercase tracking-[0.2em] text-neutral-500 transition hover:text-cyan"
+          className="text-xs uppercase tracking-[0.2em] text-neutral-500 transition hover:text-foreground"
         >
           ← Back to game modes
         </button>
@@ -462,7 +462,7 @@ export function PrivateTableSetup({
               type="button"
               disabled={busy || matchmakerSearching}
               onClick={() => void findMatch()}
-              className="mt-2 w-full rounded-xl border border-cyan/40 px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-cyan transition hover:bg-cyan/5 disabled:opacity-40"
+              className="mt-2 w-full rounded-xl border border-brand/40 px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-brand transition hover:bg-brand/5 disabled:opacity-40"
             >
               {matchmakerSearching ? "Searching…" : "Quick Match Instead"}
             </button>
@@ -482,7 +482,7 @@ export function PrivateTableSetup({
             )}
           >
             <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-gold shadow-[0_0_10px_rgba(212,175,55,0.6)]" />
+              <span className="h-2 w-2 rounded-full bg-gold shadow-[0_0_10px_rgba(245,197,24,0.6)]" />
               <p className={cn(HEADING_SM, "text-gold")}>
                 {created.demo ? "Demo (offline)" : "Table Created"}
               </p>
@@ -495,7 +495,7 @@ export function PrivateTableSetup({
             {created.code && (
               <div className="mt-3">
                 <p className="text-[10px] uppercase tracking-[0.2em] text-neutral-500">Room Code</p>
-                <p className="mt-1 font-mono text-2xl font-bold tracking-[0.3em] text-cyan">
+                <p className="mt-1 font-mono text-2xl font-bold tracking-[0.3em] text-green">
                   {created.code}
                 </p>
                 <p className="mt-1 text-[11px] text-neutral-500">
@@ -555,7 +555,7 @@ function Segmented<T extends string>({
           className={cn(
             "rounded-xl border px-3 py-2.5 text-sm font-semibold transition",
             o.value === value
-              ? "border-cyan/50 bg-cyan/10 text-cyan shadow-[0_0_16px_rgba(129,236,255,0.15)]"
+              ? "border-brand/50 bg-brand/10 text-brand"
               : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25",
           )}
         >
@@ -584,12 +584,12 @@ function ToggleRow({
       className={cn(
         "flex items-start justify-between gap-3 rounded-xl border p-3 text-left transition",
         on
-          ? "border-cyan/40 bg-cyan/[0.06]"
+          ? "border-green/40 bg-green/[0.06]"
           : "border-white/10 bg-white/[0.02] hover:border-white/25",
       )}
     >
       <span>
-        <span className={cn("text-sm font-semibold", on ? "text-cyan" : "text-foreground")}>
+        <span className={cn("text-sm font-semibold", on ? "text-green" : "text-foreground")}>
           {label}
         </span>
         <span className="mt-0.5 block text-[10px] leading-relaxed text-neutral-500">{blurb}</span>
@@ -597,13 +597,13 @@ function ToggleRow({
       <span
         className={cn(
           "mt-0.5 flex h-5 w-9 shrink-0 items-center rounded-full border p-0.5 transition",
-          on ? "border-cyan/50 bg-cyan/20" : "border-white/15 bg-white/5",
+          on ? "border-green/50 bg-green/20" : "border-white/15 bg-white/5",
         )}
       >
         <span
           className={cn(
             "h-3.5 w-3.5 rounded-full transition",
-            on ? "translate-x-4 bg-cyan shadow-[0_0_8px_rgba(129,236,255,0.6)]" : "bg-neutral-500",
+            on ? "translate-x-4 bg-green shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-neutral-500",
           )}
         />
       </span>
@@ -621,8 +621,8 @@ function SeatRing({ seats, bots }: { seats: number; bots: number }) {
         className="absolute inset-x-4 inset-y-8 rounded-[50%] border border-gold/25"
         style={{
           background:
-            "radial-gradient(60% 60% at 50% 45%, rgba(28,125,78,0.55), rgba(15,95,57,0.25) 60%, rgba(5,56,33,0.1))",
-          boxShadow: "0 0 30px rgba(28,125,78,0.25), inset 0 0 24px rgba(0,0,0,0.5)",
+            "radial-gradient(60% 60% at 50% 45%, rgba(10,125,67,0.5), rgba(10,125,67,0.2) 60%, rgba(5,56,33,0.1))",
+          boxShadow: "inset 0 0 24px rgba(0,0,0,0.5)",
         }}
       />
       {Array.from({ length: seats }).map((_, i) => {
@@ -637,9 +637,9 @@ function SeatRing({ seats, bots }: { seats: number; bots: number }) {
             className={cn(
               "absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border transition",
               isHero
-                ? "border-gold bg-gradient-to-br from-[#f3e2ad] to-[#9a7b2c] shadow-[0_0_12px_rgba(212,175,55,0.5)]"
+                ? "border-gold bg-gradient-to-br from-[#ffd54a] to-[#d4a80f] shadow-[0_0_12px_rgba(245,197,24,0.5)]"
                 : isBot
-                  ? "border-cyan/50 bg-cyan/20 shadow-[0_0_10px_rgba(129,236,255,0.3)]"
+                  ? "border-green/50 bg-green/20 shadow-[0_0_10px_rgba(34,197,94,0.3)]"
                   : "border-white/15 bg-white/[0.03]",
             )}
             style={{ left: `${x}%`, top: `${y}%` }}

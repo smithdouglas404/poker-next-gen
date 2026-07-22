@@ -154,7 +154,7 @@ export default function MembershipPage() {
           </div>
           <Link
             href="/hub"
-            className="text-xs font-semibold uppercase tracking-wider text-cyan transition hover:text-cyan/70"
+            className="text-xs font-semibold uppercase tracking-wider text-muted transition hover:text-foreground"
           >
             ← Command Center
           </Link>
@@ -229,7 +229,7 @@ export default function MembershipPage() {
 
         {/* Identity gate — only shown when a provider is live and caller isn't fully verified */}
         {showIdentityGate && (
-          <section className={cn(GLASS_PANEL, "border-cyan/20 p-5")}>
+          <section className={cn(GLASS_PANEL, "border-gold/25 p-5")}>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <p className={HEADING_SM}>Identity verification</p>
@@ -279,7 +279,7 @@ export default function MembershipPage() {
                 className={cn(
                   "rounded-lg px-4 py-1.5 font-semibold uppercase tracking-wider transition",
                   interval === opt
-                    ? "bg-gradient-to-r from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad] text-black"
+                    ? "bg-gradient-to-r from-[#ffd54a] via-[#f5c518] to-[#d4a80f] text-[#231b00]"
                     : "text-neutral-400 hover:text-white",
                 )}
               >

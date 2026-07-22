@@ -4,7 +4,7 @@ import { useMemo } from "react";
 
 import { formatCents } from "@/features/game/GameProvider";
 import type { TableListItem } from "@/features/game/protocol";
-import { GLASS_PANEL, GLASS_PANEL_HOVER, cn } from "@/features/ui/tokens";
+import { BTN_RED, GLASS_PANEL, GLASS_PANEL_HOVER, cn } from "@/features/ui/tokens";
 
 import { DEMO_PUBLIC_TABLES, type PublicTableRow } from "./lobbyData";
 
@@ -115,7 +115,7 @@ export function PublicLobbyList({
               </div>
               <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad]"
+                  className="h-full rounded-full bg-gradient-to-r from-[#0a7d43] to-[#22c55e]"
                   style={{ width: `${pct}%` }}
                 />
               </div>
@@ -138,7 +138,7 @@ export function PublicLobbyList({
                 "disabled:cursor-not-allowed disabled:opacity-40",
                 full || r.demo
                   ? "border border-white/15 text-neutral-400"
-                  : "bg-gradient-to-r from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad] text-black hover:shadow-[0_0_22px_rgba(212,175,55,0.35)]",
+                  : cn(BTN_RED, "shadow-none"),
               )}
             >
               {r.demo ? "Demo" : full ? "Full" : "Join"}

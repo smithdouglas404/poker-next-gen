@@ -32,11 +32,11 @@ export function ActionTimer() {
     <div className="pointer-events-none absolute left-1/2 top-[46%] z-30 w-48 -translate-x-1/2">
       <div className="h-1.5 overflow-hidden rounded-full bg-black/50">
         <div
-          className="h-full rounded-full bg-amber-400 transition-[width] duration-200"
+          className="h-full rounded-full bg-gold transition-[width] duration-200"
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="mt-1 text-center text-[10px] uppercase tracking-wider text-amber-200/80">Your turn</p>
+      <p className="mt-1 text-center text-[10px] uppercase tracking-wider text-gold">Your turn</p>
     </div>
   );
 }

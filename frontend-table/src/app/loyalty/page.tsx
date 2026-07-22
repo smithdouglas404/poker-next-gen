@@ -226,7 +226,7 @@ export default function LoyaltyPage() {
           </div>
           <Link
             href="/hub"
-            className="shrink-0 text-sm text-cyan transition hover:text-cyan/80"
+            className="shrink-0 text-sm text-brand transition hover:text-brand/80"
           >
             ← Command Center
           </Link>
@@ -256,7 +256,7 @@ export default function LoyaltyPage() {
             </section>
 
             {/* Tabs */}
-            <nav className="flex flex-wrap gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-1.5 backdrop-blur-xl">
+            <nav className="flex flex-wrap gap-1.5 rounded-2xl border border-white/[0.06] bg-[#16191d] p-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
               {TABS.map((t) => {
                 const active = tab === t.id;
                 const badge =
@@ -269,7 +269,7 @@ export default function LoyaltyPage() {
                     className={cn(
                       "relative flex-1 rounded-xl px-4 py-2 text-sm font-semibold uppercase tracking-wide transition",
                       active
-                        ? "bg-gradient-to-b from-gold/20 to-gold/5 text-gold shadow-[0_0_18px_rgba(212,175,55,0.12)]"
+                        ? "bg-gradient-to-b from-gold/20 to-gold/5 text-gold shadow-[0_0_18px_rgba(245,197,24,0.12)]"
                         : "text-neutral-400 hover:bg-white/5 hover:text-white",
                     )}
                   >

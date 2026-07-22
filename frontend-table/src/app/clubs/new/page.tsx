@@ -18,7 +18,7 @@ import {
 } from "@/features/clubs/setup/setupRpc";
 
 const GOLD_TEXT =
-  "bg-gradient-to-r from-[#f3e2ad] via-[#d4af37] to-[#9a7b2c] bg-clip-text text-transparent";
+  "bg-gradient-to-r from-[#ffd54a] via-[#f5c518] to-[#d4a80f] bg-clip-text text-transparent";
 
 interface Toast {
   msg: string;
@@ -121,22 +121,13 @@ export default function ClubSetupPage() {
 
   return (
     <div className="relative min-h-screen bg-background text-foreground">
-      {/* ambient vault glow */}
-      <div
-        className="pointer-events-none fixed inset-0 opacity-80"
-        style={{
-          background:
-            "radial-gradient(900px 500px at 50% -10%, rgba(212,175,55,0.10), transparent 60%), radial-gradient(700px 400px at 85% 5%, rgba(129,236,255,0.06), transparent 55%)",
-        }}
-      />
-
       {toast && (
         <div
           className={cn(
-            "fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-xl border px-4 py-2.5 text-sm backdrop-blur-xl",
+            "fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-xl border px-4 py-2.5 text-sm",
             toast.kind === "ok"
-              ? "border-emerald-500/30 bg-emerald-950/50 text-emerald-200"
-              : "border-amber-500/30 bg-amber-950/50 text-amber-100",
+              ? "border-[#22c55e]/30 bg-[#0a7d43]/25 text-[#bff5d3]"
+              : "border-[#e01e2b]/35 bg-[#b3151f]/25 text-[#ffcdd1]",
           )}
         >
           {toast.msg}
@@ -146,7 +137,7 @@ export default function ClubSetupPage() {
       <div className="relative mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
         {/* Header + crest */}
         <header className="mb-8 flex flex-col items-center text-center">
-          <p className={cn(HEADING_SM, "text-cyan/70")}>Ownership Onboarding</p>
+          <p className={cn(HEADING_SM, "text-muted")}>Ownership Onboarding</p>
           <h1
             className={cn(
               "font-display mt-2 text-3xl font-bold uppercase tracking-[0.18em] sm:text-4xl",

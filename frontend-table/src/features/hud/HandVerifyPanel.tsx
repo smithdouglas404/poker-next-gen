@@ -108,11 +108,11 @@ export function HandVerifyPanel() {
   }, [commit, revealedSeed, snapshot?.hand_no]);
 
   return (
-    <div className="pointer-events-auto rounded-xl border border-white/10 bg-black/50 p-3 text-xs">
+    <div className="pointer-events-auto rounded-xl border border-white/[0.06] bg-surface p-3 text-xs shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
       <div className="flex items-center justify-between">
-        <p className="text-[10px] uppercase tracking-wider text-neutral-500">Provably fair</p>
+        <p className="text-[10px] uppercase tracking-wider text-muted">Provably fair</p>
         <span
-          className="rounded-full border border-emerald-500/40 bg-emerald-950/40 px-2 py-0.5 text-[9px] font-bold text-emerald-300"
+          className="rounded-full border border-cyan/40 bg-cyan/10 px-2 py-0.5 text-[9px] font-bold text-cyan"
           title={revealedSeed ? "Seed revealed — the shuffle is fully re-runnable" : "Deck committed before the deal"}
         >
           {revealedSeed ? "🔓 Verifiable" : "🔒 Committed"}
@@ -120,14 +120,14 @@ export function HandVerifyPanel() {
       </div>
 
       {commit ? (
-        <p className="mt-1 break-all font-mono text-[10px] text-amber-200/90" title={commit}>
+        <p className="mt-1 break-all font-mono text-[10px] text-neutral-400" title={commit}>
           Commit: {commit.slice(0, 16)}…
         </p>
       ) : (
         <p className="mt-1 text-neutral-500">No active hand commitment</p>
       )}
       {revealedSeed && (
-        <p className="mt-0.5 break-all font-mono text-[10px] text-cyan-200/80" title={revealedSeed}>
+        <p className="mt-0.5 break-all font-mono text-[10px] text-cyan" title={revealedSeed}>
           Seed: {revealedSeed.slice(0, 16)}…
         </p>
       )}
@@ -136,7 +136,7 @@ export function HandVerifyPanel() {
         type="button"
         onClick={verifyHand}
         disabled={loading || !(roomId || matchId)}
-        className="mt-2 w-full rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-2 py-1.5 text-emerald-200 hover:bg-emerald-900/50 disabled:opacity-40"
+        className="mt-2 w-full rounded-lg border border-green/40 bg-green/10 px-2 py-1.5 text-[#bff5d3] hover:bg-green/20 disabled:opacity-40"
       >
         {loading ? "Verifying…" : "Verify hand audit"}
       </button>
@@ -145,7 +145,7 @@ export function HandVerifyPanel() {
         onClick={downloadVerifier}
         disabled={!commit || !revealedSeed}
         title={!revealedSeed ? "Available once the hand reaches showdown" : "Download a stdlib-only Python verifier"}
-        className="mt-1.5 w-full rounded-lg border border-cyan-500/40 bg-cyan-950/30 px-2 py-1.5 text-cyan-200 hover:bg-cyan-900/40 disabled:opacity-40"
+        className="mt-1.5 w-full rounded-lg border border-cyan/40 bg-cyan/10 px-2 py-1.5 text-cyan hover:bg-cyan/20 disabled:opacity-40"
       >
         ⬇ Re-verify in Python
       </button>

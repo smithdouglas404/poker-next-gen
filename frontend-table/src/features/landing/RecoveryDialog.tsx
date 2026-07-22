@@ -98,7 +98,7 @@ export function RecoveryDialog({ open, onClose }: { open: boolean; onClose: () =
       className={cn(
         "flex-1 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wide transition",
         method === m
-          ? "bg-white/[0.06] text-white ring-1 ring-cyan/40"
+          ? "bg-white/[0.06] text-white ring-1 ring-brand/50"
           : "text-neutral-400 hover:text-white",
       )}
     >
