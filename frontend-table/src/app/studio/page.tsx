@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { SectionHeader } from "@/features/ui";
 import { cn } from "@/features/ui/tokens";
@@ -10,9 +12,37 @@ import { CharacterGallery } from "@/features/studio/CharacterGallery";
 import { GenerationQueue } from "@/features/studio/GenerationQueue";
 import { WardrobePanel } from "@/features/studio/WardrobePanel";
 import { LoadoutPanel } from "@/features/studio/LoadoutPanel";
+import { NanoBananaRender } from "@/features/studio/NanoBananaRender";
+import { DyeShop } from "@/features/studio/DyeShop";
 import { useStudio } from "@/features/studio/useStudio";
 
 export default function StudioPage() {
+  return (
+    <Suspense fallback={null}>
+      <StudioRouter />
+    </Suspense>
+  );
+}
+
+/**
+ * /studio hosts three states, selected by the `screen` query param:
+ *   • (default)     — the Character Studio home (compose / gallery / wardrobe)
+ *   • ?screen=render — the Nano Banana render-progress monitor (optional &gen=<id>)
+ *   • ?screen=dye    — the Avatar Dye Shop
+ */
+function StudioRouter() {
+  const params = useSearchParams();
+  const screen = params.get("screen");
+  if (screen === "render") {
+    return <NanoBananaRender generationId={params.get("gen")} />;
+  }
+  if (screen === "dye") {
+    return <DyeShop />;
+  }
+  return <StudioHome />;
+}
+
+function StudioHome() {
   const studio = useStudio();
   const busy = studio.jobs.some((j) => j.status === "running");
 
@@ -26,6 +56,18 @@ export default function StudioPage() {
           </div>
           <div className="flex items-center gap-3">
             <StatusPill online={studio.online} />
+            <Link
+              href="/studio?screen=dye"
+              className="rounded-full border border-white/15 px-3 py-1 text-xs uppercase tracking-wider text-neutral-300 transition-colors hover:border-gold/40 hover:text-gold"
+            >
+              Dye Shop
+            </Link>
+            <Link
+              href="/studio?screen=render"
+              className="rounded-full border border-white/15 px-3 py-1 text-xs uppercase tracking-wider text-neutral-300 transition-colors hover:border-gold/40 hover:text-gold"
+            >
+              Render Monitor
+            </Link>
             <Link href="/hub" className="text-sm text-muted transition-colors hover:text-foreground">
               ← Command Center
             </Link>

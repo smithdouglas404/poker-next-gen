@@ -18,6 +18,18 @@ import {
   type TableSettingsValues,
   type WaitingEntry,
 } from "./adminSession";
+import {
+  GamePausedOverlay,
+  PlayerGameReportModal,
+  PlayerKickBanModal,
+  BreakingNewsModal,
+  BreakingNewsComposeModal,
+  OverlayDevControl,
+  useTableOverlays,
+  type OverlayDemoState,
+  type KickTarget,
+} from "./overlays";
+import { DEMO_KICK_TARGET } from "./overlays/overlaySession";
 
 /* ------------------------------ primitives ------------------------------ */
 
@@ -145,11 +157,15 @@ function AdminControl({
   onSettings,
   onPlayers,
   onSummary,
+  onReport,
+  onNews,
 }: {
   admin: TableAdmin;
   onSettings: () => void;
   onPlayers: () => void;
   onSummary: () => void;
+  onReport: () => void;
+  onNews: () => void;
 }) {
   const [open, setOpen] = useState(true);
   return (
@@ -167,6 +183,8 @@ function AdminControl({
           <MenuRow label="Table Settings" glyph="⚙" onClick={onSettings} />
           <MenuRow label="Player Management" glyph="👥" onClick={onPlayers} />
           <MenuRow label="Session Report" glyph="📊" onClick={onSummary} />
+          <MenuRow label="Player Game Report" glyph="🧾" onClick={onReport} />
+          <MenuRow label="Broadcast News" glyph="📣" onClick={onNews} />
         </div>
       )}
     </div>
@@ -348,7 +366,15 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 /* --------------------------- Player Management --------------------------- */
 
-function PlayerManagementModal({ admin, onClose }: { admin: TableAdmin; onClose: () => void }) {
+function PlayerManagementModal({
+  admin,
+  onClose,
+  onKickBan,
+}: {
+  admin: TableAdmin;
+  onClose: () => void;
+  onKickBan: (target: KickTarget) => void;
+}) {
   return (
     <ModalShell title="Player Management" onClose={onClose}>
       <div className="space-y-2 px-6 py-5">
@@ -370,6 +396,21 @@ function PlayerManagementModal({ admin, onClose }: { admin: TableAdmin; onClose:
                 className="rounded-lg border border-red-500/40 bg-red-950/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-red-200 hover:bg-red-900/40"
               >
                 Remove
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  onKickBan({
+                    userId: p.userId,
+                    name: p.name,
+                    handle: p.name.toLowerCase(),
+                    avatar: p.avatar,
+                    seat: p.seat,
+                  })
+                }
+                className="rounded-lg border border-red-500/40 bg-red-950/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-red-200 hover:bg-red-900/40"
+              >
+                Kick / Ban
               </button>
             </div>
           ))
@@ -497,31 +538,81 @@ function FinancialSummaryModal({ admin, onClose }: { admin: TableAdmin; onClose:
 
 /* -------------------------------- root ---------------------------------- */
 
-type ModalKind = "settings" | "players" | "summary" | null;
+type ModalKind = "settings" | "players" | "summary" | "report" | "kickban" | "news" | null;
 
 export function TableAdminOverlay({ demo }: { demo: boolean }) {
   const admin = useTableAdmin(demo);
+  const overlays = useTableOverlays(demo, admin);
   const [modal, setModal] = useState<ModalKind>(null);
+  const [kickTarget, setKickTarget] = useState<KickTarget | null>(null);
 
   useEffect(() => {
     if (admin.canAdmin) void admin.loadWaiting();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [admin.canAdmin, admin.clubId, admin.demo]);
 
-  if (!admin.canAdmin) return null;
+  // Seated players receive breaking-news broadcasts even without admin rights.
+  useEffect(() => {
+    void overlays.loadNews();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const openKickBan = (target: KickTarget) => {
+    setKickTarget(target);
+    setModal("kickban");
+  };
+
+  // Dev-control (demo) → open any of the six overlay states.
+  const openDemo = (state: OverlayDemoState) => {
+    if (state === "paused") overlays.setDemoPaused(true);
+    else if (state === "news") overlays.showDemoNews();
+    else if (state === "kickban") openKickBan(DEMO_KICK_TARGET);
+    else setModal(state); // "summary" | "settings" | "report"
+  };
 
   return (
     <>
-      <AdminControl
-        admin={admin}
-        onSettings={() => setModal("settings")}
-        onPlayers={() => setModal("players")}
-        onSummary={() => setModal("summary")}
-      />
-      <WaitingList admin={admin} />
-      {modal === "settings" && <TableSettingsModal admin={admin} onClose={() => setModal(null)} />}
-      {modal === "players" && <PlayerManagementModal admin={admin} onClose={() => setModal(null)} />}
-      {modal === "summary" && <FinancialSummaryModal admin={admin} onClose={() => setModal(null)} />}
+      {/* Player-facing states — shown to every seated player, admin or not. */}
+      {overlays.showPaused && (
+        <GamePausedOverlay
+          canResume={overlays.canResume}
+          onResume={() => void overlays.resume()}
+          onQuit={() => void overlays.quit()}
+        />
+      )}
+      {overlays.activeNews && (
+        <BreakingNewsModal news={overlays.activeNews} onDismiss={overlays.dismissNews} />
+      )}
+      {modal === "report" && (
+        <PlayerGameReportModal overlays={overlays} onClose={() => setModal(null)} />
+      )}
+      {modal === "kickban" && kickTarget && (
+        <PlayerKickBanModal overlays={overlays} target={kickTarget} onClose={() => setModal(null)} />
+      )}
+
+      {/* Admin chrome — host / platform / club admin only. */}
+      {admin.canAdmin && (
+        <>
+          <AdminControl
+            admin={admin}
+            onSettings={() => setModal("settings")}
+            onPlayers={() => setModal("players")}
+            onSummary={() => setModal("summary")}
+            onReport={() => setModal("report")}
+            onNews={() => setModal("news")}
+          />
+          <WaitingList admin={admin} />
+          {demo && <OverlayDevControl onOpen={openDemo} />}
+          {modal === "settings" && <TableSettingsModal admin={admin} onClose={() => setModal(null)} />}
+          {modal === "players" && (
+            <PlayerManagementModal admin={admin} onClose={() => setModal(null)} onKickBan={openKickBan} />
+          )}
+          {modal === "summary" && <FinancialSummaryModal admin={admin} onClose={() => setModal(null)} />}
+          {modal === "news" && (
+            <BreakingNewsComposeModal overlays={overlays} onClose={() => setModal(null)} />
+          )}
+        </>
+      )}
     </>
   );
 }

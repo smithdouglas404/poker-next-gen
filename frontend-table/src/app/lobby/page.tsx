@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { GameProvider, formatCents, useGame } from "@/features/game/GameProvider";
 import { GameModeCards, type ModeCardDef } from "@/features/lobby/GameModeCards";
+import { JoinPrivateGame } from "@/features/lobby/JoinPrivateGame";
 import { PrivateTableSetup } from "@/features/lobby/PrivateTableSetup";
 import { PublicLobbyList } from "@/features/lobby/PublicLobbyList";
 import {
@@ -47,6 +48,7 @@ function LobbyContent() {
   const [code, setCode] = useState("");
   const [codeError, setCodeError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [joinPrivateOpen, setJoinPrivateOpen] = useState(false);
 
   useEffect(() => {
     if (connected) void listTables();
@@ -305,6 +307,13 @@ function LobbyContent() {
                     Join
                   </button>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setJoinPrivateOpen(true)}
+                  className="mt-3 text-left text-[11px] font-semibold uppercase tracking-[0.15em] text-gold transition hover:text-gold/80"
+                >
+                  Enter code with table preview →
+                </button>
               </div>
             </section>
 
@@ -459,6 +468,8 @@ function LobbyContent() {
           <Link href="/hub" className="transition hover:text-foreground">Privacy</Link>
         </footer>
       </main>
+
+      <JoinPrivateGame open={joinPrivateOpen} onClose={() => setJoinPrivateOpen(false)} />
     </div>
   );
 }

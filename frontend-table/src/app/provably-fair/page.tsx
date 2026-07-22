@@ -1,24 +1,37 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { cn } from "@/features/ui/tokens";
 import { FairnessDashboard } from "@/features/audit/FairnessDashboard";
 import { SeedReveal } from "@/features/audit/SeedReveal";
 import { HandAudit } from "@/features/audit/HandAudit";
+import { HandHistoryPicker } from "@/features/audit/HandHistoryPicker";
 
-type Tab = "dashboard" | "reveal" | "audit";
+type Tab = "dashboard" | "history" | "reveal" | "audit";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "dashboard", label: "Audit Log" },
+  { id: "history", label: "Hand History" },
   { id: "reveal", label: "Seed Reveal" },
   { id: "audit", label: "Hand Audit" },
 ];
 
+function isTab(v: string | null): v is Tab {
+  return v === "dashboard" || v === "history" || v === "reveal" || v === "audit";
+}
+
 export default function ProvablyFairPage() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [target, setTarget] = useState<{ matchId: string; handNo: number } | null>(null);
+
+  // Honor a `?tab=` deep-link (e.g. the audit-detail route's "History" link)
+  // without pulling in useSearchParams' static-generation Suspense requirement.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("tab");
+    if (isTab(q)) setTab(q);
+  }, []);
 
   // Dashboard "Reveal Proof" / history "Verify" jumps into the Seed Reveal view
   // with that hand pre-selected.
@@ -91,6 +104,7 @@ export default function ProvablyFairPage() {
 
       <main className="mx-auto max-w-7xl px-6 py-10">
         {tab === "dashboard" && <FairnessDashboard onReveal={onReveal} />}
+        {tab === "history" && <HandHistoryPicker />}
         {tab === "reveal" && <SeedReveal target={target} />}
         {tab === "audit" && <HandAudit target={target} />}
       </main>

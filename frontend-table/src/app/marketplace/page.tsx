@@ -31,6 +31,14 @@ const TABS: { id: Tab; label: string; blurb: string }[] = [
 export default function MarketplacePage() {
   const [tab, setTab] = useState<Tab>("market");
 
+  // Honor a deep-link tab (e.g. checkout's "View in Wardrobe" → ?tab=vault).
+  // Read from window in an effect to avoid the useSearchParams SSR-bailout.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t === "market" || t === "shop" || t === "vault") setTab(t);
+  }, []);
+
   // Data
   const [myUserId, setMyUserId] = useState<string>("");
   const [listings, setListings] = useState<Listing[]>([]);
@@ -237,6 +245,9 @@ export default function MarketplacePage() {
               </p>
             </div>
             <div className="flex items-center gap-4 text-sm">
+              <Link href="/marketplace/checkout" className="text-gold hover:underline">
+                Checkout
+              </Link>
               <Link href="/studio" className="text-gold hover:underline">
                 Studio
               </Link>
