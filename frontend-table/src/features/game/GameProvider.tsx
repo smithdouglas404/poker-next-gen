@@ -311,32 +311,28 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const numBots = Math.min(seats - 1, Math.max(0, Math.round(opts?.numBots ?? 0)));
       const variant = opts?.variant === "plo" ? "plo" : "holdem";
       const durationMins = Math.max(0, Math.round(opts?.durationMins ?? 0));
-      const res = await fetch("/api/nakama/table/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: opts?.name ?? (variant === "plo" ? "PLO Table" : "Hold'em Table"),
-          small_blind: smallBlind,
-          big_blind: bigBlind,
-          buy_in: buyIn,
-          max_seats: seats,
-          num_bots: numBots,
-          variant,
-          duration_mins: durationMins,
-        }),
-      });
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.error ?? "Create room failed");
-      setRoomId(json.data.room_id);
+      // Use the authenticated session RPC, not the http_key proxy: table_create
+      // now requires a real user session (SEC-1), so the server-key path 401s.
+      const data = (await callSessionRpc("table_create", {
+        name: opts?.name ?? (variant === "plo" ? "PLO Table" : "Hold'em Table"),
+        small_blind: smallBlind,
+        big_blind: bigBlind,
+        buy_in: buyIn,
+        max_seats: seats,
+        num_bots: numBots,
+        variant,
+        duration_mins: durationMins,
+      })) as { match_id: string; room_id: string; code?: string };
+      setRoomId(data.room_id);
       setMaxSeats(seats);
-      const code = json.data.code as string | undefined;
+      const code = data.code;
       if (code) setRoomCode(code);
       pushLog(
         `Room created · buy-in ${formatCents(buyIn)} · blinds ${formatCents(smallBlind)}/${formatCents(bigBlind)} · ${seats} seats${numBots ? ` · ${numBots} bot${numBots > 1 ? "s" : ""}` : ""}`,
         "info",
       );
       if (code) pushLog(`Share code ${code} — friends can join at /lobby?code=${code}`, "info");
-      await joinRoom(json.data.match_id);
+      await joinRoom(data.match_id);
     },
     [buyInCents, maxSeats, joinRoom, pushLog],
   );

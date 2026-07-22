@@ -11,6 +11,7 @@ import { GameStatusRail } from "@/features/hud/GameStatusRail";
 import { EquityPanel } from "@/features/hud/EquityPanel";
 import { HandVerifyPanel } from "@/features/hud/HandVerifyPanel";
 import { BuyInSlider, TableLog } from "@/features/hud/TableLog";
+import { TableEmptyState } from "@/features/hud/TableEmptyState";
 import { ChatPanel } from "@/features/hud/ChatPanel";
 import { HandHistoryPanel } from "@/features/hud/HandHistoryPanel";
 import { HostPanel } from "@/features/hud/HostPanel";
@@ -71,6 +72,9 @@ export function TableHud({ children }: { children: React.ReactNode }) {
                 still renders (avatar-preset toggle only) so 2.5D/3D/Mix stays
                 switchable. */}
             <SeatHud />
+            {/* Path to the money action while the hero isn't seated (self-hides
+                once seated) — P0-7. */}
+            <TableEmptyState />
             <ActionTimer />
             {/* Live-hand status chrome (current bet / hand strength / sit-out) —
                 cinematic-only, matching the HRC flop-dealt master. */}

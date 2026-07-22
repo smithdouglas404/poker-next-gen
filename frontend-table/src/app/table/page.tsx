@@ -182,7 +182,9 @@ function GraphicsToggle() {
     <div
       className={cn(
         GLASS_PANEL,
-        "pointer-events-auto absolute left-1/2 top-3 z-30 flex -translate-x-1/2 overflow-hidden rounded-full p-0.5 text-[11px] font-bold",
+        // Sits BELOW the header bar (P0-6): at top-3 it collided with the ROOM
+        // label and nav. The header is ~64px, so clear it.
+        "pointer-events-auto absolute left-1/2 top-[5.25rem] z-30 flex -translate-x-1/2 overflow-hidden rounded-full p-0.5 text-[11px] font-bold",
       )}
     >
       {options.map((o) => (
