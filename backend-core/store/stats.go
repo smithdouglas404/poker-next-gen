@@ -60,6 +60,77 @@ func (s *StatsStore) Aggregate(ctx context.Context, userID, clubID string) (*Sta
 	return &a, nil
 }
 
+// HandStatRow is one player's per-hand analytics row, written from the match
+// showdown/settlement path (attributeHand). It feeds player_stats, leak_report
+// and head-to-head.
+type HandStatRow struct {
+	UserID            string
+	ClubID            string
+	MatchID           string
+	HandNo            int
+	VPIP              bool
+	PFR               bool
+	WentToShowdown    bool
+	Won               bool
+	NetCents          int64
+	ContributionCents int64
+	StreetReached     int
+	BetsRaises        int
+	Calls             int
+}
+
+// SaveHandStat writes one per-player per-hand stat row. Idempotent on
+// (user_id, match_id, hand_no) so a retried settlement never double-counts.
+func (s *StatsStore) SaveHandStat(ctx context.Context, r HandStatRow) error {
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO poker_hand_stats
+			(id, user_id, club_id, match_id, hand_no, vpip, pfr, went_to_showdown, won,
+			 net_cents, contribution_cents, street_reached, bets_raises, calls, created_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW())
+		ON CONFLICT (user_id, match_id, hand_no) DO NOTHING`,
+		NewID("hs"), r.UserID, r.ClubID, r.MatchID, r.HandNo, r.VPIP, r.PFR,
+		r.WentToShowdown, r.Won, r.NetCents, r.ContributionCents, r.StreetReached,
+		r.BetsRaises, r.Calls)
+	return err
+}
+
+// HandIndexInsert is one searchable hand-list row, written once per hand from
+// the settlement path. Powers hand_history.
+type HandIndexInsert struct {
+	MatchID     string
+	RoomID      string
+	TableLabel  string
+	HandNo      int
+	UserIDs     []string
+	WinnerSeats []int
+	Pot         int64
+	Rake        int64
+	DeckCommit  string
+}
+
+// SaveHandIndex writes one hand-index row. Idempotent on (match_id, hand_no).
+func (s *StatsStore) SaveHandIndex(ctx context.Context, r HandIndexInsert) error {
+	users := r.UserIDs
+	if users == nil {
+		users = []string{}
+	}
+	winners := r.WinnerSeats
+	if winners == nil {
+		winners = []int{}
+	}
+	usersJSON, _ := json.Marshal(users)
+	winnersJSON, _ := json.Marshal(winners)
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO poker_hand_index
+			(id, match_id, room_id, table_label, hand_no, user_ids_json, winner_seats_json,
+			 pot, rake, deck_commit, anchored, anchor_tx, created_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,FALSE,'',NOW())
+		ON CONFLICT (match_id, hand_no) DO NOTHING`,
+		NewID("hi"), r.MatchID, r.RoomID, r.TableLabel, r.HandNo, usersJSON, winnersJSON,
+		r.Pot, r.Rake, r.DeckCommit)
+	return err
+}
+
 // H2HRecord is one player's head-to-head record versus a single opponent, over
 // the hands they both played.
 type H2HRecord struct {

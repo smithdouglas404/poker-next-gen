@@ -607,6 +607,15 @@ CREATE TABLE IF NOT EXISTS poker_battlepass_progress (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (user_id, season_id)
 );
+-- Seed one active battle-pass season so battlepass_status activates out of the
+-- box. Idempotent: only inserts when no active, unexpired season already exists.
+INSERT INTO poker_battlepass_season (id, name, starts_at, ends_at, status, xp_per_tier, max_tier, premium_cents, tiers_json, created_at)
+SELECT 'bps_genesis', 'Genesis Season', NOW(), NOW() + INTERVAL '90 days', 'active', 1000, 50, 4999,
+       '[{"tier":1,"free_cents":100,"premium_cents":250},{"tier":2,"free_cents":150,"premium_cents":300},{"tier":3,"free_cents":200,"premium_cents":400},{"tier":5,"free_cents":300,"premium_cents":600},{"tier":10,"free_cents":600,"premium_cents":1200},{"tier":25,"free_cents":1500,"premium_cents":3000},{"tier":50,"free_cents":5000,"premium_cents":10000}]',
+       NOW()
+WHERE NOT EXISTS (
+    SELECT 1 FROM poker_battlepass_season WHERE status='active' AND ends_at > NOW()
+);
 CREATE TABLE IF NOT EXISTS poker_referral (
     id                    TEXT PRIMARY KEY,
     referrer_user_id      TEXT NOT NULL,

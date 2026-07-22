@@ -58,6 +58,9 @@ type MatchState struct {
 	HostUserID       string
 	HostPaused       bool
 	HostClosed       bool
+	// Per-hand behavioural tracking (userID -> counters), reset each hand start
+	// and drained into poker_hand_stats at settlement. Feeds VPIP/PFR/AF.
+	HandTrack        map[string]*playerHandTrack
 }
 
 // autoDealDelayTicks is the breather between hands on a self-dealing table
@@ -528,7 +531,10 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		}
 		recordWinnings(ctx, nk, s, res)
 		creditRake(ctx, db, s, potBefore)
-		accrueLoyalty(ctx, db, s, res) // HRP + achievements (before seats reset)
+		accrueLoyalty(ctx, db, nk, s, res) // HRP + achievements (before seats reset)
+		// Per-hand analytics + mission progress (best-effort; must not break the
+		// match loop). Uses seat state before ResetBetweenHands clears it.
+		attributeHand(ctx, logger, db, s, res, plan, potBefore)
 		// TODO(league-accrual): fan out league-standing accrual (store.LeagueStore.
 		// AccrueStanding) and club-war per-hand settlement (store.ClubWarStore.AddHand,
 		// keyed off a war_id match param) from here. Deferred out of the match hot path
@@ -634,6 +640,8 @@ func matchIDForAudit(s *MatchState) string {
 }
 
 func emitHandStarted(ctx context.Context, s *MatchState) {
+	// Start a fresh per-hand behavioural tracker (VPIP/PFR/AF derivation).
+	s.HandTrack = map[string]*playerHandTrack{}
 	if s.Audit == nil {
 		return
 	}
@@ -728,6 +736,7 @@ func emitHandSettled(ctx context.Context, s *MatchState, res poker.ShowdownResul
 }
 
 func emitPlayerAction(ctx context.Context, s *MatchState, userID, action string, amount int64) {
+	trackAction(s, userID, action)
 	if s.Audit == nil {
 		return
 	}
@@ -861,7 +870,7 @@ func recordWinnings(ctx context.Context, nk runtime.NakamaModule, s *MatchState,
 // winning, times their subscription-tier multiplier) and unlocks any newly-earned
 // achievements. HRP is earned by PLAYING, so losers still progress. Called before
 // ResetBetweenHands, while seats still carry the hand's state.
-func accrueLoyalty(ctx context.Context, db *sql.DB, s *MatchState, res poker.ShowdownResult) {
+func accrueLoyalty(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *MatchState, res poker.ShowdownResult) {
 	winners := map[int]string{} // seat -> winning hand category
 	for _, r := range res.Resolutions {
 		for _, seat := range r.Winners {
@@ -869,6 +878,7 @@ func accrueLoyalty(ctx context.Context, db *sql.DB, s *MatchState, res poker.Sho
 		}
 	}
 	ls := store.NewLoyaltyStore(db)
+	ss := store.NewStatsStore(db)
 	for _, seat := range s.Table.Seats {
 		if seat == nil || seat.IsBot || seat.UserID == "" {
 			continue
@@ -894,10 +904,17 @@ func accrueLoyalty(ctx context.Context, db *sql.DB, s *MatchState, res poker.Sho
 		if err != nil {
 			continue
 		}
+		// Ledger the HRP event (loyalty_history) and feed the native HRP + hands
+		// leaderboards (best-effort — never break the hand).
+		_ = ss.RecordHRP(ctx, seat.UserID, hrp, "hand_played", nil)
+		social.RecordHRP(ctx, nk, seat.UserID, seat.Username, hrp)
+		social.RecordHands(ctx, nk, seat.UserID, seat.Username, 1)
 		for _, code := range loyalty.AchievementsForResult(l.HandsPlayed, l.HandsWon, won, cat) {
 			if newly, _ := ls.UnlockAchievement(ctx, seat.UserID, code); newly {
 				if a, ok := loyalty.Catalog[code]; ok && a.HRP > 0 {
 					_, _ = ls.Award(ctx, seat.UserID, a.HRP, 0, 0)
+					_ = ss.RecordHRP(ctx, seat.UserID, a.HRP, "achievement:"+code, nil)
+					social.RecordHRP(ctx, nk, seat.UserID, seat.Username, a.HRP)
 				}
 			}
 		}
@@ -954,6 +971,17 @@ func (h *Handler) MatchSignal(ctx context.Context, logger runtime.Logger, db *sq
 			if seat != nil && seat.Stack <= 0 {
 				s.Table.StandUp(i)
 			}
+		}
+		broadcastSnapshot(ctx, db, dispatcher, s, nil)
+	case "close":
+		// Admin-initiated teardown (admin_table_close RPC). Flag the table so the
+		// loop closes it between hands — refunding seated stacks without abandoning
+		// a live pot. If already idle, close immediately.
+		s.HostClosed = true
+		narrate(dispatcher, s, "An administrator is closing this table…")
+		if s.Phase == poker.PhaseWaiting && s.Table.Street == poker.StreetWaiting {
+			closeTable(ctx, db, dispatcher, s, "closed by an administrator")
+			return nil, ""
 		}
 		broadcastSnapshot(ctx, db, dispatcher, s, nil)
 	case "add_bot":
