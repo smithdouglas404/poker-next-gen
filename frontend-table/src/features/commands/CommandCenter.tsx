@@ -46,6 +46,7 @@ import {
   TYPED_CONFIRM_THRESHOLD_MINOR,
 } from "./schemaForm/confirm";
 import type { RpcSchema } from "./schemaForm/schemaTypes";
+import { CardHandForm, hasCardForm } from "./schemaForm/CardHandForm";
 
 const CATEGORY_ORDER: CommandCategory[] = [
   "platform",
@@ -265,6 +266,9 @@ function CommandCenterInner() {
           setFormValues(
             initialValues(schema, activeClubId ? { club_id: activeClubId } : {}),
           );
+        } else if (hasCardForm(command.id)) {
+          // Visual card picker form (P1-6) for card-notation commands.
+          setFormValues((command.example as Record<string, unknown>) ?? {});
         } else {
           // Legacy fallback: raw JSON for commands without a generated form yet.
           setFormJson(JSON.stringify(command.example ?? {}, null, 2));
@@ -699,6 +703,29 @@ function CommandCenterInner() {
                     className="rounded-full bg-gradient-to-r from-[#9a7b2c] via-gold to-gold-lite px-6 py-2.5 text-sm font-bold uppercase tracking-wider text-black transition hover:shadow-[0_0_22px_rgba(212,175,55,0.35)] disabled:opacity-50"
                   >
                     {needsConfirm(activeCommand.rpc ?? "") ? "Review & Run" : "Run"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="rounded-full border border-white/20 px-6 py-2.5 text-sm font-semibold uppercase tracking-wider text-neutral-300 hover:bg-white/5"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : hasCardForm(activeCommand.id) ? (
+              <>
+                <div className="mt-5">
+                  <CardHandForm commandId={activeCommand.id} values={formValues} onChange={setFormValues} />
+                </div>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    disabled={busyId !== null}
+                    onClick={executeActive}
+                    className="rounded-full bg-gradient-to-r from-[#9a7b2c] via-gold to-gold-lite px-6 py-2.5 text-sm font-bold uppercase tracking-wider text-black transition hover:shadow-[0_0_22px_rgba(212,175,55,0.35)] disabled:opacity-50"
+                  >
+                    Run
                   </button>
                   <button
                     type="button"

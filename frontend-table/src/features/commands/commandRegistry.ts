@@ -209,7 +209,6 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
     category: "game",
     status: "live",
     rpc: "hand_rank",
-    href: "/table",
     icon: "♠",
     example: { cards: "AsKsQsJs2c" },
   },

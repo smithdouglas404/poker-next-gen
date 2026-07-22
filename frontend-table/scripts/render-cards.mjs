@@ -1,0 +1,18 @@
+import { chromium } from "playwright-core";
+const CHROME = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const BASE = process.env.BASE;
+const OUT = "/tmp/claude-0/-home-user-poker-next-gen/392cc787-6489-50fa-8651-c53dd904e186/scratchpad/forms";
+const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64").replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
+const jwt = `${b64({alg:"HS256",typ:"JWT"})}.${b64({exp:Math.floor(Date.now()/1000)+86400,uid:"u1",usn:"doug_s"})}.s`;
+const blob = JSON.stringify({token:jwt,refresh_token:jwt,user_id:"u1",username:"doug_s"});
+const b = await chromium.launch({executablePath:CHROME,headless:true,args:["--no-sandbox","--disable-dev-shm-usage"]});
+const ctx = await b.newContext({viewport:{width:1440,height:1100}});
+await ctx.addInitScript((s)=>{try{localStorage.setItem("png-nakama-session",s)}catch{}},blob);
+const p = await ctx.newPage(); p.on("pageerror",()=>{});
+await p.route("**/v2/rpc/**", r => r.fulfill({status:200,contentType:"application/json",body:JSON.stringify({payload:JSON.stringify({ok:true})})}));
+await p.goto(BASE+"/hub",{waitUntil:"domcontentloaded"}).catch(()=>{}); await p.waitForTimeout(2500);
+await p.getByRole("button",{name:/Hand Rank/i}).first().click({timeout:5000}); await p.waitForTimeout(800);
+await p.screenshot({path:`${OUT}/c1-card-form.png`});
+await p.getByRole("button",{name:/^Pick$/}).first().click({timeout:4000}); await p.waitForTimeout(700);
+await p.screenshot({path:`${OUT}/c2-card-picker.png`});
+console.log("OK cards"); await b.close();
