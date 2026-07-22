@@ -52,7 +52,7 @@ export default function LiveStackPage() {
   const onCompose = health?.runtime?.mode === "compose";
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
+    <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-white/10 px-6 py-10">
         <div className="mx-auto flex max-w-4xl flex-wrap items-end justify-between gap-4">
           <div>
@@ -116,7 +116,7 @@ export default function LiveStackPage() {
           {health?.services.map((svc) => (
             <article
               key={svc.id}
-              className="rounded-2xl border border-white/10 bg-white/[0.03] p-5"
+              className="rounded-xl border border-white/[0.06] bg-[#16191d] p-5 shadow-[0_2px_12px_rgba(0,0,0,0.4)]"
             >
               <div className="flex items-center justify-between gap-2">
                 <h2 className="font-semibold">{svc.name}</h2>
@@ -139,7 +139,7 @@ export default function LiveStackPage() {
           ))}
         </section>
 
-        <section className="rounded-2xl border border-white/10 p-6">
+        <section className="rounded-xl border border-white/[0.06] bg-[#16191d] p-6 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
           <h2 className="text-lg font-semibold">
             {onRailway ? "Fix on Railway" : onCompose ? "Fix missing services (Docker)" : "Deploy the stack"}
           </h2>
@@ -161,7 +161,7 @@ export default function LiveStackPage() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-white/10 p-6">
+        <section className="rounded-xl border border-white/[0.06] bg-[#16191d] p-6 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
           <h2 className="text-lg font-semibold">Open in browser</h2>
           <ul className="mt-4 space-y-2 text-sm">
             {health &&

@@ -99,12 +99,12 @@ export function SocialShell({
             </div>
             <Link
               href="/hub"
-              className="shrink-0 text-sm text-cyan transition hover:text-cyan/80"
+              className="shrink-0 text-sm text-neutral-400 transition hover:text-white"
             >
               ← Command Center
             </Link>
           </div>
-          <nav className="mt-5 inline-flex gap-1 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-1 backdrop-blur-xl">
+          <nav className="mt-5 inline-flex gap-1 rounded-xl border border-white/[0.06] bg-[#16191d] p-1">
             {TABS.map((t) => {
               const active = pathname === t.href;
               return (
@@ -112,9 +112,9 @@ export function SocialShell({
                   key={t.href}
                   href={t.href}
                   className={cn(
-                    "font-display rounded-xl px-4 py-2 text-[12px] font-bold uppercase tracking-wider transition",
+                    "font-display rounded-lg px-4 py-2 text-[12px] font-bold uppercase tracking-wider transition",
                     active
-                      ? "bg-cyan/15 text-cyan shadow-[0_0_18px_rgba(129,236,255,0.15)]"
+                      ? "bg-brand/15 text-brand"
                       : "text-neutral-400 hover:text-white",
                   )}
                 >
@@ -133,7 +133,7 @@ export function SocialShell({
 // ---- Status badge ----
 
 const STATUS_TONE: Record<string, string> = {
-  registering: "border-cyan/30 bg-cyan/10 text-cyan",
+  registering: "border-brand/30 bg-brand/10 text-brand",
   pending: "border-amber-400/30 bg-amber-400/10 text-amber-300",
   active: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300",
   completed: "border-white/15 bg-white/5 text-neutral-400",

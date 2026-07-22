@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { Panel, SectionHeader } from "@/features/ui";
+import { BTN_GOLD, cn } from "@/features/ui/tokens";
 
 interface Capability {
   title: string;
@@ -20,7 +21,7 @@ const GROUPS: Group[] = [
   {
     heading: "Provably-Fair Engine",
     blurb: "A real poker engine, not a scripted table — server-authoritative and verifiable.",
-    accent: "#d4af37",
+    accent: "#f5c518",
     items: [
       { title: "Authoritative match runtime", detail: "Every deal, bet, and showdown is resolved on the server (Nakama match handler) — clients can't forge state." },
       { title: "rs_poker hand evaluation", detail: "Rust-powered hand ranking, correct multi-way side-pots, and showdown resolution. No shortcuts." },
@@ -31,7 +32,7 @@ const GROUPS: Group[] = [
   {
     heading: "Real-Money Economy",
     blurb: "A single authoritative ledger with the full deposit → play → cash-out loop.",
-    accent: "#34d399",
+    accent: "#22c55e",
     items: [
       { title: "Memberships & tiers", detail: "Five recurring tiers (Stripe subscriptions) unlocking stakes, limits, rakeback, and perks." },
       { title: "Crypto + card funding", detail: "Deposit with 200+ cryptocurrencies (NOWPayments) or card (Stripe). Wallet credited on confirmation." },
@@ -42,7 +43,7 @@ const GROUPS: Group[] = [
   {
     heading: "Private Clubs",
     blurb: "Run your own room — the heart of the network.",
-    accent: "#22d3ee",
+    accent: "#e01e2b",
     items: [
       { title: "Owner-operated clubs", detail: "Create a club (one-time ownership fee), set custom rake, and run your own tables." },
       { title: "Member management", detail: "Roles (owner / admin / member), invites, kicks, and per-tier member capacity." },
@@ -53,7 +54,7 @@ const GROUPS: Group[] = [
   {
     heading: "Tournaments & Social",
     blurb: "Native Nakama social features, wired in.",
-    accent: "#a855f7",
+    accent: "#9aa0a6",
     items: [
       { title: "Multi-table tournaments", detail: "MTT scheduling, blind timers, prize ladders, and table balancing." },
       { title: "Leaderboards", detail: "Native Nakama leaderboards updated from authoritative results." },
@@ -64,7 +65,7 @@ const GROUPS: Group[] = [
   {
     heading: "Premium Experience",
     blurb: "The look and feel that sets us apart from every other client.",
-    accent: "#f472b6",
+    accent: "#ffd54a",
     items: [
       { title: "3D / 2.5D characters", detail: "Animated characters seated at the felt — idle, turn, win, and fold reactions." },
       { title: "Spatial audio", detail: "Positional chip/card SFX, a synth chip engine, and an in-game music picker." },
@@ -81,13 +82,13 @@ export default function CapabilitiesPage() {
         <div className="mx-auto flex max-w-6xl flex-col gap-4">
           <div className="flex items-center justify-between">
             <SectionHeader>What sets us apart</SectionHeader>
-            <Link href="/hub" className="text-sm text-cyan hover:underline">
+            <Link href="/hub" className="text-sm text-neutral-400 transition hover:text-white">
               ← Command Center
             </Link>
           </div>
           <h1 className="font-display text-4xl font-bold md:text-5xl">
             A poker network built like{" "}
-            <span className="bg-gradient-to-r from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad] bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#d4a80f] via-[#f5c518] to-[#ffd54a] bg-clip-text text-transparent">
               nothing else
             </span>
           </h1>
@@ -127,7 +128,7 @@ export default function CapabilitiesPage() {
           </p>
           <Link
             href="/clubs"
-            className="mt-5 inline-block rounded-xl bg-gradient-to-r from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad] px-6 py-3 text-sm font-bold text-black transition hover:shadow-[0_0_22px_rgba(212,175,55,0.35)]"
+            className={cn(BTN_GOLD, "mt-5 inline-block rounded-xl px-6 py-3 text-sm")}
           >
             Start a club →
           </Link>

@@ -155,7 +155,7 @@ export default function ClubWarsPage() {
       <Toast toast={toast} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex gap-1 rounded-xl border border-white/[0.08] bg-white/[0.03] p-1">
+        <div className="inline-flex gap-1 rounded-xl border border-white/[0.06] bg-[#16191d] p-1">
           {filters.map((f) => (
             <button
               key={f.id || "all"}
@@ -163,7 +163,7 @@ export default function ClubWarsPage() {
               onClick={() => setFilter(f.id)}
               className={cn(
                 "rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition",
-                filter === f.id ? "bg-cyan/15 text-cyan" : "text-neutral-400 hover:text-white",
+                filter === f.id ? "bg-brand/15 text-brand" : "text-neutral-400 hover:text-white",
               )}
             >
               {f.label}
@@ -341,7 +341,7 @@ function WarSide({
       <p
         className={cn(
           "truncate text-sm font-semibold",
-          winner ? "text-gold" : lead ? "text-cyan" : "text-white",
+          winner ? "text-gold" : lead ? "text-green" : "text-white",
         )}
       >
         {name}
@@ -350,7 +350,7 @@ function WarSide({
       <p
         className={cn(
           "font-display text-3xl font-bold",
-          winner ? "text-gold" : lead ? "text-cyan" : "text-white/70",
+          winner ? "text-gold" : lead ? "text-green" : "text-white/70",
         )}
       >
         {score}

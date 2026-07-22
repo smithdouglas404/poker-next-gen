@@ -76,14 +76,14 @@ export default function LoginPage() {
           {mode === "login" ? (
             <>
               No account?{" "}
-              <button type="button" onClick={() => setMode("signup")} className="text-cyan hover:underline">
+              <button type="button" onClick={() => setMode("signup")} className="text-brand hover:underline">
                 Sign up
               </button>
             </>
           ) : (
             <>
               Have an account?{" "}
-              <button type="button" onClick={() => setMode("login")} className="text-cyan hover:underline">
+              <button type="button" onClick={() => setMode("login")} className="text-brand hover:underline">
                 Sign in
               </button>
             </>

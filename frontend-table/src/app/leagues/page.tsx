@@ -379,7 +379,7 @@ function StandingsTable({
                     </span>
                   )}
                 </td>
-                <td className="px-2 py-2 text-right font-semibold text-cyan">{s.points}</td>
+                <td className="px-2 py-2 text-right font-semibold text-gold">{s.points}</td>
                 <td className="px-2 py-2 text-right text-white/70">{s.wins}</td>
                 <td className="px-2 py-2 text-right text-white/70">{s.losses}</td>
               </tr>
