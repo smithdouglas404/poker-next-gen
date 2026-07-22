@@ -54,6 +54,9 @@ type CustomRakeConfiguration struct {
 	NoFlopNoDrop bool     `json:"no_flop_no_drop" db:"no_flop_no_drop"`
 	MinPotMinor int64     `json:"min_pot_minor" db:"min_pot_minor"`
 	IsActive    bool      `json:"is_active" db:"is_active"`
+	// Public: when the club owner opts in, the rake config is readable by anyone
+	// (a transparency signal). Default false — otherwise it is club-members-only.
+	Public      bool      `json:"public" db:"is_public"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
 }

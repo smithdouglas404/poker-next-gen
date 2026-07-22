@@ -44,9 +44,12 @@ CREATE TABLE IF NOT EXISTS poker_rake_config (
     no_flop_no_drop BOOLEAN NOT NULL DEFAULT TRUE,
     min_pot_minor BIGINT NOT NULL DEFAULT 0,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_public BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- Rake transparency is opt-in (owner toggles it); back-fill existing rows as private.
+ALTER TABLE poker_rake_config ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS poker_tournament (
     id TEXT PRIMARY KEY,

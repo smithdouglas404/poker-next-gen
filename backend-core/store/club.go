@@ -197,18 +197,18 @@ func (s *ClubStore) SetRake(ctx context.Context, r *models.CustomRakeConfigurati
 	now := time.Now().UTC()
 	r.CreatedAt, r.UpdatedAt = now, now
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO poker_rake_config (id,club_id,name,percent_bps,cap_minor,no_flop_no_drop,min_pot_minor,is_active,created_at,updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-		r.ID, r.ClubID, r.Name, r.PercentBps, r.CapMinor, r.NoFlopNoDrop, r.MinPotMinor, r.IsActive, r.CreatedAt, r.UpdatedAt)
+		INSERT INTO poker_rake_config (id,club_id,name,percent_bps,cap_minor,no_flop_no_drop,min_pot_minor,is_active,is_public,created_at,updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+		r.ID, r.ClubID, r.Name, r.PercentBps, r.CapMinor, r.NoFlopNoDrop, r.MinPotMinor, r.IsActive, r.Public, r.CreatedAt, r.UpdatedAt)
 	return err
 }
 
 func (s *ClubStore) GetRake(ctx context.Context, clubID string) (*models.CustomRakeConfiguration, error) {
 	var r models.CustomRakeConfiguration
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id,club_id,name,percent_bps,cap_minor,no_flop_no_drop,min_pot_minor,is_active,created_at,updated_at
+		SELECT id,club_id,name,percent_bps,cap_minor,no_flop_no_drop,min_pot_minor,is_active,is_public,created_at,updated_at
 		FROM poker_rake_config WHERE club_id=$1 AND is_active ORDER BY created_at DESC LIMIT 1`, clubID).
-		Scan(&r.ID, &r.ClubID, &r.Name, &r.PercentBps, &r.CapMinor, &r.NoFlopNoDrop, &r.MinPotMinor, &r.IsActive, &r.CreatedAt, &r.UpdatedAt)
+		Scan(&r.ID, &r.ClubID, &r.Name, &r.PercentBps, &r.CapMinor, &r.NoFlopNoDrop, &r.MinPotMinor, &r.IsActive, &r.Public, &r.CreatedAt, &r.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

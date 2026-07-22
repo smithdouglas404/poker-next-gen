@@ -424,10 +424,10 @@ func RakeConfigSet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 	return string(out), nil
 }
 
-// RakeConfigGet is intentionally PUBLIC (SEC-1 decision): a club's rake rate is a
-// trust/transparency signal players should be able to read before sitting, so it
-// is not gated. The write path (RakeConfigSet) remains requireClubConfigurer-only.
-// If a deployment prefers members-only visibility, gate this to club membership.
+// RakeConfigGet exposes a club's rake rule. Rake transparency is OPT-IN: it is
+// readable by anyone only when the club owner has toggled the config public
+// (RakeConfigSet with "public": true). Otherwise it is restricted to club members
+// and configurers. The write path stays requireClubConfigurer-only.
 func RakeConfigGet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	var req struct {
 		ClubID string `json:"club_id"`
@@ -435,9 +435,23 @@ func RakeConfigGet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 	if err := json.Unmarshal([]byte(payload), &req); err != nil {
 		return "", runtime.NewError("invalid payload", 3)
 	}
-	rake, err := store.NewClubStore(db).GetRake(ctx, req.ClubID)
+	cs := store.NewClubStore(db)
+	rake, err := cs.GetRake(ctx, req.ClubID)
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
+	}
+	// Gate unless the owner has opted this config into public visibility.
+	if rake == nil || !rake.Public {
+		uid, aerr := callerID(ctx)
+		if aerr != nil {
+			return "", runtime.NewError("rake config is private to this club", 7)
+		}
+		mem, _ := cs.GetMembership(ctx, req.ClubID, uid)
+		if mem == nil {
+			if _, cerr := requireClubConfigurer(ctx, db, req.ClubID); cerr != nil {
+				return "", runtime.NewError("rake config is private to this club", 7)
+			}
+		}
 	}
 	out, _ := json.Marshal(rake)
 	return string(out), nil
