@@ -209,7 +209,10 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		HostUserID:   hostUserID,
 	}
 	label := buildLabel(state)
-	return state, 1, label
+	// 10 ticks/sec: a 1 Hz loop made deals, chip moves, and action prompts update
+	// only once per second (visibly sluggish) and paced self-dealing tables at ~7s
+	// per hand. 10 Hz keeps the table responsive without meaningful extra cost.
+	return state, 10, label
 }
 
 func (h *Handler) MatchJoinAttempt(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, presence runtime.Presence, metadata map[string]string) (interface{}, bool, string) {
@@ -836,11 +839,22 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		s.PendingShowdown = nil
 
 		if res.Err != nil {
-			logger.Error("showdown failed: %v", res.Err)
-			s.Phase = poker.PhaseBetting
+			// A showdown-resolution error must NEVER leave the table stuck in
+			// PhaseBetting (nobody can act → the whole table hangs). Refund every
+			// contributor their chips and reset to waiting so play continues.
+			logger.Error("showdown failed, refunding pot and resetting: %v", res.Err)
+			for _, seat := range s.Table.Seats {
+				if seat != nil && seat.TotalContributed > 0 {
+					seat.Stack += seat.TotalContributed
+				}
+			}
+			s.Table.Pot = 0
 			for _, p := range s.Presences {
 				sendError(dispatcher, p, "showdown_failed", res.Err.Error())
 			}
+			s.Table.ResetBetweenHands()
+			standUpBusted(s)
+			s.Phase = poker.PhaseWaiting
 			return true
 		}
 
@@ -873,8 +887,9 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		// safely requires a war_id/league_id match label + per-seat club resolution and
 		// a single batched write, tracked as the unified attributeHand() hook in the plan.
 		s.Table.ResetBetweenHands()
-		s.Phase = poker.PhaseWaiting
 		reportTournamentBusts(ctx, db, nk, s)
+		standUpBusted(s) // cash tables: clear felted players so the table stays playable
+		s.Phase = poker.PhaseWaiting
 		return true
 	default:
 		return false
@@ -1285,6 +1300,21 @@ func accrueLoyalty(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *
 	}
 }
 
+// standUpBusted removes any seat with no chips left after a hand settles. On a
+// cash table a felted player (bot or human) must leave the seat — leaving them
+// seated at $0 wastes a seat and, before the allMatched() fix, could deadlock the
+// betting round. Tournaments keep busted seats for elimination reporting.
+func standUpBusted(s *MatchState) {
+	if s.TournamentID != "" {
+		return
+	}
+	for i, seat := range s.Table.Seats {
+		if seat != nil && seat.Stack <= 0 {
+			s.Table.StandUp(i)
+		}
+	}
+}
+
 func reportTournamentBusts(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *MatchState) {
 	if s.TournamentID == "" {
 		return
@@ -1557,12 +1587,16 @@ func broadcastShowdownFromResult(ctx context.Context, db *sql.DB, dispatcher run
 			if s.Table.Seats[seat] == nil {
 				continue
 			}
-			if handCat == "" {
-				cat, err := poker.HandCategory(seat, s.Table)
-				if err != nil {
-					return err
+			// Only rank a made hand when a full 5-card board exists. An uncontested
+			// pot (everyone folded) is won without a showdown and has an incomplete
+			// board — ranking it would call rs_poker with <5 cards and error.
+			if handCat == "" && len(s.Table.Board) >= 5 {
+				if cat, err := poker.HandCategory(seat, s.Table); err == nil {
+					handCat = cat
 				}
-				handCat = cat
+			}
+			if handCat == "" {
+				handCat = "uncontested"
 			}
 			winnerViews = append(winnerViews, map[string]interface{}{
 				"seat":     seat,

@@ -522,7 +522,10 @@ func (t *Table) allMatched() bool {
 		if s.Status == SeatSeated && s.Bet < t.CurrentBet && s.Stack > 0 {
 			return false
 		}
-		if !t.ActedThisRound[s.Index] && s.Status == SeatSeated {
+		// A seated player with no chips cannot act, so nextActiveSeat never gives
+		// them a turn — requiring them to have "acted" here would deadlock the
+		// round forever (e.g. a busted-but-still-seated bot on a cash table).
+		if !t.ActedThisRound[s.Index] && s.Status == SeatSeated && s.Stack > 0 {
 			return false
 		}
 	}
