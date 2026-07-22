@@ -56,7 +56,7 @@ function HandStrengthPill() {
   return (
     <div
       className={cn(GLASS_PANEL, "pointer-events-auto border-gold/40 px-4 py-2 text-right")}
-      style={{ background: "#1c2128", boxShadow: "0 0 20px rgba(245,197,24,0.15)" }}
+      style={{ background: "#262d38", boxShadow: "0 0 20px rgba(245,197,24,0.15)" }}
     >
       <p className="text-[10px] uppercase tracking-[0.2em] text-neutral-400">Current Hand Strength</p>
       <p className="font-display text-sm font-bold uppercase tracking-wider text-gold">{category}</p>
@@ -71,7 +71,7 @@ function CurrentBetPill() {
   return (
     <div
       className={cn(GLASS_PANEL, "pointer-events-none border-white/12 px-4 py-1.5 text-right")}
-      style={{ background: "#1c2128" }}
+      style={{ background: "#262d38" }}
     >
       <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-400">Current Bet </span>
       <span className="font-semibold text-white">{formatCents(bet)}</span>
@@ -97,7 +97,7 @@ function SitOutToggle() {
         "pointer-events-auto flex items-center gap-3 px-4 py-2 text-sm transition-colors",
         away ? "border-gold/50 text-gold" : "border-white/12 text-neutral-300 hover:border-white/25",
       )}
-      style={{ background: "#1c2128" }}
+      style={{ background: "#262d38" }}
       aria-pressed={away}
     >
       <span className="font-semibold uppercase tracking-wider">Sit Out / Away</span>

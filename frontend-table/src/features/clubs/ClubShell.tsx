@@ -41,7 +41,7 @@ export function ClubShell({
     <div className="min-h-screen text-foreground">
       <div className="mx-auto flex min-h-screen w-full max-w-[1280px] flex-col px-3 py-4 md:px-6 md:py-6">
         <div
-          className="relative flex flex-1 flex-col overflow-hidden rounded-2xl border border-white/[0.06] bg-[#1c2128] md:flex-row"
+          className="relative flex flex-1 flex-col overflow-hidden rounded-2xl border border-white/[0.06] bg-[#262d38] md:flex-row"
           style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.4)" }}
         >
           {/* Sidebar */}

@@ -6,7 +6,7 @@
 // is no longer a glassmorphism surface — it is now the GGPoker solid "CARD".
 
 export const GLASS_PANEL =
-  "rounded-xl border border-white/[0.06] bg-[#1c2128] shadow-[0_2px_12px_rgba(0,0,0,0.4)]";
+  "rounded-xl border border-white/[0.06] bg-[#262d38] shadow-[0_2px_12px_rgba(0,0,0,0.4)]";
 
 export const GLASS_PANEL_HOVER =
   "transition-all duration-200 hover:border-white/[0.12] hover:shadow-[0_4px_18px_rgba(0,0,0,0.5)] hover:-translate-y-px";

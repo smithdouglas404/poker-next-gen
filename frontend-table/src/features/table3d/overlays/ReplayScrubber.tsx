@@ -50,7 +50,7 @@ export function ReplayScrubber({
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-24 z-30 flex justify-center px-4">
-      <div className={cn(GLASS_PANEL, "pointer-events-auto w-full max-w-2xl border-gold/25 px-5 py-4")} style={{ background: "#1c2128" }}>
+      <div className={cn(GLASS_PANEL, "pointer-events-auto w-full max-w-2xl border-gold/25 px-5 py-4")} style={{ background: "#262d38" }}>
         <div className="flex items-center justify-between">
           <span className="text-[11px] uppercase tracking-[0.25em] text-neutral-400">
             Hand {hand.handNo ? `#${hand.handNo}` : hand.handId}

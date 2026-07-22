@@ -69,8 +69,8 @@ export function BasisPointsInput({
       <p className="mt-1 text-[11px] text-neutral-400">
         <span className="font-semibold text-gold">{bpsToPercentNumber(value || 0)}%</span>
         {suffixHint ? ` ${suffixHint}` : ""}
-        {aboveMax && <span className="text-brand"> · max {bpsToPercentNumber(max!)}%</span>}
-        {belowMin && <span className="text-brand"> · min {bpsToPercentNumber(min!)}%</span>}
+        {aboveMax && <span className="text-red-400"> · max {bpsToPercentNumber(max!)}%</span>}
+        {belowMin && <span className="text-red-400"> · min {bpsToPercentNumber(min!)}%</span>}
       </p>
     </div>
   );

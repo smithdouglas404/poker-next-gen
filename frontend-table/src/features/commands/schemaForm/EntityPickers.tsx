@@ -50,9 +50,9 @@ export function ClubPicker({
       onChange={(e) => onChange(e.target.value)}
       className={`${FIELD} ${invalid ? "border-brand/60" : ""}`}
     >
-      <option value="" className="bg-neutral-900">Select a club…</option>
+      <option value="" className="bg-surface-2">Select a club…</option>
       {clubs.map((c) => (
-        <option key={c.id} value={c.id} className="bg-neutral-900 text-white">
+        <option key={c.id} value={c.id} className="bg-surface-2 text-white">
           {c.name}
         </option>
       ))}
@@ -156,7 +156,7 @@ export function UserPicker({
         </span>
       )}
       {open && filtered.length > 0 && (
-        <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-white/10 bg-neutral-900 py-1 shadow-2xl">
+        <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-white/10 bg-surface-2 py-1 shadow-2xl">
           {filtered.map((m) => (
             <li key={m.user_id}>
               <button

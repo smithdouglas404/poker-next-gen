@@ -1,7 +1,7 @@
 "use client";
 
 // Shared DOM primitives for the in-table overlay states (paused, player report,
-// kick/ban, breaking news). GGPoker look: solid #1c2128 cards, hairline borders,
+// kick/ban, breaking news). GGPoker look: solid #262d38 cards, hairline borders,
 // gold headings, red destructive, green money. All text lives in the DOM
 // (CLAUDE.md DOM-overlay-for-text rule); nothing is baked into WebGL.
 
@@ -58,7 +58,7 @@ export function OverlayModal({
           "relative flex max-h-[90vh] w-full flex-col overflow-hidden border-gold/25 shadow-[0_0_60px_rgba(0,0,0,0.7)]",
           wide ? "max-w-3xl" : "max-w-lg",
         )}
-        style={{ background: "#1c2128" }}
+        style={{ background: "#262d38" }}
       >
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
           <h2 className={cn(HEADING_LG, "text-gold")}>{title}</h2>

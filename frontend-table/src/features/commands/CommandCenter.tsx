@@ -64,7 +64,7 @@ const NO_PAYLOAD_COMMANDS = new Set(["healthz", "club_list", "table_list", "tour
 const NAV_CHIP =
   "rounded-xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-semibold text-neutral-200 transition hover:border-white/20 hover:bg-white/[0.06]";
 const NAV_CHIP_RED =
-  "rounded-xl border border-brand/50 bg-brand/10 px-5 py-3 text-sm font-semibold text-brand transition hover:bg-brand/15";
+  "rounded-xl border border-red-400/40 bg-red-400/10 px-5 py-3 text-sm font-semibold text-red-300 transition hover:bg-red-400/15";
 const NAV_CHIP_GOLD =
   "rounded-xl border border-gold/50 bg-gold/10 px-5 py-3 text-sm font-semibold text-gold transition hover:bg-gold/15";
 
@@ -121,7 +121,7 @@ async function runLiveCommand(
 
 function StatusBadge() {
   return (
-    <span className="rounded-full bg-green/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-green">
+    <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
       Live
     </span>
   );
@@ -141,12 +141,12 @@ function CommandCard({
   const inner = (
     <>
       <div className="flex items-start justify-between gap-3">
-        <span className="text-2xl leading-none text-gold">{command.icon}</span>
+        <span aria-hidden="true" className="text-2xl leading-none text-gold">{command.icon}</span>
         <StatusBadge />
       </div>
       <h3 className="mt-4 text-base font-semibold text-white">{command.title}</h3>
       <p className="mt-2 text-sm leading-relaxed text-neutral-300">{command.description}</p>
-      <div className="mt-4 text-xs font-semibold uppercase tracking-wider text-brand">
+      <div className="mt-4 text-xs font-semibold uppercase tracking-wider text-gold">
         {isLink ? "Open →" : "Run Command →"}
       </div>
     </>
@@ -156,7 +156,7 @@ function CommandCard({
     return (
       <Link
         href={command.href!}
-        className="group rounded-2xl border border-white/[0.06] bg-[#1c2128] p-5 transition hover:border-brand/40 hover:bg-white/[0.04]"
+        className="group rounded-2xl border border-white/[0.06] bg-[#262d38] p-5 transition hover:border-brand/40 hover:bg-white/[0.04]"
       >
         {inner}
       </Link>
@@ -168,7 +168,7 @@ function CommandCard({
       type="button"
       disabled={busy}
       onClick={() => onRun(command)}
-      className="group w-full rounded-2xl border border-white/[0.06] bg-[#1c2128] p-5 text-left transition hover:border-brand/40 hover:bg-white/[0.04] disabled:opacity-60"
+      className="group w-full rounded-2xl border border-white/[0.06] bg-[#262d38] p-5 text-left transition hover:border-brand/40 hover:bg-white/[0.04] disabled:opacity-60"
     >
       {inner}
     </button>
@@ -288,6 +288,19 @@ function CommandCenterInner() {
     setTypedConfirm("");
     setFormValues({});
   }, []);
+
+  // Escape closes the top-most overlay (accessibility P1-5): confirm, then
+  // wizard, then the command form.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      if (confirmOpen) setConfirmOpen(false);
+      else if (wizardOpen) setWizardOpen(false);
+      else if (activeCommand) closeModal();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [confirmOpen, wizardOpen, activeCommand, closeModal]);
 
   // Execute the active command with the current form values (after confirm).
   const executeActive = useCallback(async () => {
@@ -466,7 +479,7 @@ function CommandCenterInner() {
             </Link>
             <Link
               href="/provably-fair"
-              className="rounded-xl border border-cyan/40 bg-cyan/5 px-5 py-3 text-sm font-semibold text-cyan transition hover:bg-cyan/10"
+              className="rounded-xl border border-cyan-400/40 bg-cyan-400/10 px-5 py-3 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-400/15"
             >
               Provably Fair →
             </Link>
@@ -530,8 +543,8 @@ function CommandCenterInner() {
             if (commands.length === 0 && !showSetupCta) return null;
             return (
               <section key={workspace} className="mb-12">
-                <div className={`mb-5 flex items-center gap-3 rounded-2xl border p-5 ${meta.accent}`}>
-                  <span className="text-2xl text-gold">{meta.icon}</span>
+                <div className={`mb-5 flex items-center gap-3 rounded-2xl border bg-surface/60 p-5 ${meta.accent}`}>
+                  <span aria-hidden="true" className="text-2xl text-gold">{meta.icon}</span>
                   <div>
                     <h2 className="text-xl font-semibold text-white">{meta.label}</h2>
                     <p className="mt-0.5 text-sm text-neutral-400">{meta.subtitle}</p>
@@ -594,10 +607,10 @@ function CommandCenterInner() {
 
         <section className="rounded-2xl border border-white/10 bg-black/30 p-6">
           <h2 className="text-lg font-semibold text-white">Command Log</h2>
-          <p className="mt-1 text-sm text-neutral-500">Responses from live RPCs appear here.</p>
+          <p className="mt-1 text-sm text-neutral-400">Responses from live RPCs appear here.</p>
           <div className="mt-4 space-y-3">
             {results.length === 0 && (
-              <p className="text-sm text-neutral-500">
+              <p className="text-sm text-neutral-400">
                 Run <strong className="text-green">Check Backend Health</strong> or{" "}
                 <strong className="text-green">View Player Profile</strong> to get started.
               </p>
@@ -631,8 +644,16 @@ function CommandCenterInner() {
       </main>
 
       {activeCommand && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-neutral-900 p-6 shadow-2xl">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Run command: ${activeCommand.title}`}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeModal();
+          }}
+        >
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-surface-2 p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs uppercase tracking-wider text-gold/80">Run Command</p>
@@ -710,8 +731,13 @@ function CommandCenterInner() {
         const confirmWord = risk === "destructive" ? "DELETE" : "CONFIRM";
         const typedOk = !needsTyped || typedConfirm.trim().toUpperCase() === confirmWord;
         return (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-2xl border-2 border-gold/40 bg-neutral-900 p-6 shadow-2xl">
+          <div
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+            role="alertdialog"
+            aria-modal="true"
+            aria-label={desc.title}
+          >
+            <div className="w-full max-w-md rounded-2xl border-2 border-gold/40 bg-surface-2 p-6 shadow-2xl">
               <p className="text-xs uppercase tracking-[0.3em] text-gold/80">
                 {risk === "destructive" ? "Destructive action" : risk === "money" ? "Money movement" : "Confirm"}
               </p>
@@ -728,7 +754,7 @@ function CommandCenterInner() {
 
               {needsTyped && (
                 <div className="mt-4">
-                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-brand">
+                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-red-400">
                     Type {confirmWord} to authorize this {money >= TYPED_CONFIRM_THRESHOLD_MINOR ? "large " : ""}action
                   </label>
                   <input

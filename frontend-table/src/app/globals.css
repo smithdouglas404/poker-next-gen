@@ -8,17 +8,17 @@
 :root {
   /* Elevation ramp (dark-only). Panels sit a clear step above the base so cards
      read as surfaces, not voids; muted text meets WCAG AA on the base. */
-  --background: #101319;
-  --foreground: #f5f6f7;
-  --surface: #1c2128;      /* card / panel base — clearly above --background */
-  --surface-2: #242a33;    /* elevated: modals, hovered cards, popovers */
+  --background: #191d25;   /* dark slate base — lifted well off near-black */
+  --foreground: #f6f7f8;
+  --surface: #262d38;      /* card / panel base — a clear step above --background */
+  --surface-2: #313a46;    /* elevated: modals, hovered cards, popovers */
   --brand: #e01e2b;
   --brand-bright: #ff2d3f;
   --green: #22c55e;
   --green-deep: #0a7d43;
   --gold: #f5c518;
   --gold-lite: #ffd54a;
-  --muted: #b2b8c0;        /* brightened from #9aa0a6 for AA on the base */
+  --muted: #c2c8d0;        /* meets WCAG AA (>7:1) on the slate base */
   /* demoted: muted cyan for a verified/provably-fair tech badge only */
   --cyan: #4a9eb0;
 }
@@ -50,6 +50,33 @@ body {
 
 h1, h2, h3, .font-display {
   font-family: var(--font-display), var(--font-body), sans-serif;
+}
+
+/* ── Accessibility (UI review P1-5) ────────────────────────────────────────
+   A visible keyboard-focus ring — the dark theme hides the browser default, so
+   keyboard users were flying blind. Applies only to keyboard focus so mouse
+   clicks stay clean. */
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* Inputs/selects get a cyan ring to distinguish field focus from action focus. */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline-color: var(--cyan);
+}
+/* Respect reduced-motion for all non-essential animation. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ── Character (2.5D) animations ───────────────────────────────────────── */

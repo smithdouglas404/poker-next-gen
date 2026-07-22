@@ -79,8 +79,8 @@ export function MoneyInput({
           {sym}
           {minorToDecimalString(value || 0)}
         </span>
-        {belowMin && <span className="text-brand"> · minimum {sym}{minorToDecimalString(min!)}</span>}
-        {aboveMax && <span className="text-brand"> · maximum {sym}{minorToDecimalString(max!)}</span>}
+        {belowMin && <span className="text-red-400"> · minimum {sym}{minorToDecimalString(min!)}</span>}
+        {aboveMax && <span className="text-red-400"> · maximum {sym}{minorToDecimalString(max!)}</span>}
       </p>
     </div>
   );

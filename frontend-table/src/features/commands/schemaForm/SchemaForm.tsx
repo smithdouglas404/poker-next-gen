@@ -74,7 +74,7 @@ export function SchemaForm({
             rows={12}
             className="w-full rounded-xl border border-white/10 bg-black/40 p-3 font-mono text-xs text-green outline-none focus:border-green/50"
           />
-          {jsonError && <p className="mt-1 text-xs text-brand">{jsonError}</p>}
+          {jsonError && <p className="mt-1 text-xs text-red-400">{jsonError}</p>}
         </div>
       )}
 
@@ -87,7 +87,7 @@ export function SchemaForm({
           {advanced ? "← Back to form" : "Advanced: raw JSON"}
         </button>
         {!advanced && errors.length > 0 && (
-          <span className="text-[11px] text-brand">{errors.length} field{errors.length > 1 ? "s" : ""} need attention</span>
+          <span className="text-[11px] text-red-400">{errors.length} field{errors.length > 1 ? "s" : ""} need attention</span>
         )}
       </div>
     </div>
@@ -117,7 +117,7 @@ function Field({
         )}
       </label>
       {children}
-      {error && <p className="mt-1 text-[11px] text-brand">{error}</p>}
+      {error && <p className="mt-1 text-[11px] text-red-400">{error}</p>}
       {required && null}
     </div>
   );

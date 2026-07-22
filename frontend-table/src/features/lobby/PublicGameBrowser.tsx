@@ -103,7 +103,7 @@ export function PublicGameBrowser({
             className="rounded-full border border-white/12 bg-black/40 px-4 py-1.5 text-xs font-semibold text-white outline-none transition focus:border-gold/40 focus:ring-2 focus:ring-gold/15"
           >
             {GAME_TYPE_OPTIONS.map((g) => (
-              <option key={g.value} value={g.value} className="bg-[#1c2128]">
+              <option key={g.value} value={g.value} className="bg-[#262d38]">
                 {g.label}
               </option>
             ))}

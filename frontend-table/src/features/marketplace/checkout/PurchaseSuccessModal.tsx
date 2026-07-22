@@ -92,7 +92,7 @@ export function PurchaseSuccessModal({
       <div
         className={cn(
           "relative w-full max-w-lg overflow-hidden rounded-2xl border border-[#f5c518]/35",
-          "bg-gradient-to-b from-[#1c1a12] via-[#1c2128] to-[#0b0d0f]",
+          "bg-gradient-to-b from-[#1c1a12] via-[#262d38] to-[#0b0d0f]",
           "shadow-[0_0_60px_-10px_rgba(245,197,24,0.35)]",
         )}
       >

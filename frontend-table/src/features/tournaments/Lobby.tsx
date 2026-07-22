@@ -66,7 +66,7 @@ function HeroCard({
           ? "border-brand/60 shadow-[0_4px_18px_rgba(0,0,0,0.5)]"
           : "border-white/[0.06] hover:border-white/[0.14]",
       )}
-      style={{ background: t.meta?.heroArt ?? "#1c2128" }}
+      style={{ background: t.meta?.heroArt ?? "#262d38" }}
     >
       <div className="pointer-events-none absolute inset-0 bg-black/10" />
       <div className="relative flex flex-col gap-4">
@@ -155,7 +155,7 @@ function EventRow({
     <div
       className={cn(
         "flex items-center gap-4 rounded-xl border p-3.5 transition-all",
-        selected ? "border-brand/50 bg-brand/[0.06]" : "border-white/[0.06] bg-[#1c2128] hover:border-white/[0.14]",
+        selected ? "border-brand/50 bg-brand/[0.06]" : "border-white/[0.06] bg-[#262d38] hover:border-white/[0.14]",
       )}
     >
       <RowIcon tone={tone} glyph={GLYPH[tone]} />

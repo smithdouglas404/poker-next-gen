@@ -104,7 +104,7 @@ export function SocialShell({
               ← Command Center
             </Link>
           </div>
-          <nav className="mt-5 inline-flex gap-1 rounded-xl border border-white/[0.06] bg-[#1c2128] p-1">
+          <nav className="mt-5 inline-flex gap-1 rounded-xl border border-white/[0.06] bg-[#262d38] p-1">
             {TABS.map((t) => {
               const active = pathname === t.href;
               return (

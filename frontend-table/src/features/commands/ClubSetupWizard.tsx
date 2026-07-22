@@ -90,8 +90,13 @@ export function ClubSetupWizard({
     isMoney && schema ? describeSubmission("balance_allocate", schema, values) : null;
 
   return (
-    <div className="fixed inset-0 z-[65] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-      <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-gold/30 bg-neutral-900 p-6 shadow-2xl">
+    <div
+      className="fixed inset-0 z-[65] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Club setup wizard"
+    >
+      <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-gold/30 bg-surface-2 p-6 shadow-2xl">
         {/* Progress */}
         <div className="mb-5 flex items-center gap-2">
           {STEPS.map((s, i) => (

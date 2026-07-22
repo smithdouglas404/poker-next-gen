@@ -50,46 +50,46 @@ export const CATEGORY_META: Record<
   platform: {
     label: "Platform",
     subtitle: "Connection, auth, and system health",
-    accent: "border-white/[0.06] bg-[#1c2128]",
+    accent: "border-white/[0.06] bg-[#262d38]",
   },
   community: {
     label: "Community & Clubs",
     subtitle: "Private clubs, owners, balances, rake",
-    accent: "border-gold/25 bg-[#1c2128]",
+    accent: "border-gold/25 bg-[#262d38]",
   },
   game: {
     label: "Cash Games",
     subtitle: "Create and join live tables",
-    accent: "border-green/25 bg-[#1c2128]",
+    accent: "border-green/25 bg-[#262d38]",
   },
   tournament: {
     label: "Tournaments",
     subtitle: "MTT brackets, blinds, and prize pools",
-    accent: "border-brand/25 bg-[#1c2128]",
+    accent: "border-brand/25 bg-[#262d38]",
   },
   math: {
     label: "Math & GTO",
     subtitle: "Equity, Omaha, and GTO analysis",
-    accent: "border-cyan/25 bg-[#1c2128]",
+    accent: "border-cyan/25 bg-[#262d38]",
   },
   coaching: {
     label: "Coaching",
     subtitle: "Smart HUD tips and mistake alerts",
-    accent: "border-gold/25 bg-[#1c2128]",
+    accent: "border-gold/25 bg-[#262d38]",
   },
   security: {
     label: "Security",
     subtitle: "Anti-bot pattern monitoring",
-    accent: "border-brand/25 bg-[#1c2128]",
+    accent: "border-brand/25 bg-[#262d38]",
   },
   audit: {
     label: "Audit & Verify",
     subtitle: "Hand history, hash chain, deck proofs",
-    accent: "border-white/[0.06] bg-[#1c2128]",
+    accent: "border-white/[0.06] bg-[#262d38]",
   },
   table: {
     label: "Table Canvas",
     subtitle: "Visual poker surface and animations",
-    accent: "border-green/25 bg-[#1c2128]",
+    accent: "border-green/25 bg-[#262d38]",
   },
 };

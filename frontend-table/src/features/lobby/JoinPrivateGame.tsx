@@ -434,7 +434,7 @@ export function JoinPrivateGame({ open, onClose }: { open: boolean; onClose: () 
               className="w-full rounded-lg border border-white/10 bg-black/40 px-4 py-2.5 text-sm text-white outline-none transition focus:border-gold/40 focus:ring-2 focus:ring-gold/15"
             >
               {TURN_TIMER_OPTIONS.map((t) => (
-                <option key={t} value={t} className="bg-[#1c2128]">
+                <option key={t} value={t} className="bg-[#262d38]">
                   {t} Seconds
                 </option>
               ))}
