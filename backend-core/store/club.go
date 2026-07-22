@@ -100,6 +100,77 @@ func (s *ClubStore) ClubsAdministeredBy(ctx context.Context, userID string) ([]s
 	return out, rows.Err()
 }
 
+// ClubRole is the caller's fine-grained standing in one club, used to drive
+// role-aware UI. Operator=true means an owner-seat (poker_owner) whose Role is
+// owner|manager|agent; Operator=false means a plain roster member whose Role is
+// admin|member. CanConfigure mirrors the owner-seat flag (owners always can).
+type ClubRole struct {
+	ClubID       string `json:"club_id"`
+	Role         string `json:"role"`
+	CanConfigure bool   `json:"can_configure"`
+	Operator     bool   `json:"operator"`
+}
+
+// RolesFor returns the caller's fine role in every active club they belong to.
+// Owner-seat (poker_owner) beats a plain membership row when both exist.
+func (s *ClubStore) RolesFor(ctx context.Context, userID string) ([]ClubRole, error) {
+	byClub := map[string]ClubRole{}
+
+	// Owner seats (operators): owner | manager | agent + can_configure.
+	oRows, err := s.db.QueryContext(ctx, `
+		SELECT o.club_id, o.role, (o.can_configure OR o.role='owner')
+		FROM poker_owner o
+		JOIN poker_club c ON c.id=o.club_id AND c.is_active
+		WHERE o.user_id=$1`, userID)
+	if err != nil {
+		return nil, err
+	}
+	for oRows.Next() {
+		var r ClubRole
+		if err := oRows.Scan(&r.ClubID, &r.Role, &r.CanConfigure); err != nil {
+			oRows.Close()
+			return nil, err
+		}
+		r.Operator = true
+		byClub[r.ClubID] = r
+	}
+	oRows.Close()
+	if err := oRows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Plain memberships: admin | member (only when no owner seat already set).
+	mRows, err := s.db.QueryContext(ctx, `
+		SELECT m.club_id, m.role
+		FROM poker_club_member m
+		JOIN poker_club c ON c.id=m.club_id AND c.is_active
+		WHERE m.user_id=$1`, userID)
+	if err != nil {
+		return nil, err
+	}
+	for mRows.Next() {
+		var clubID, role string
+		if err := mRows.Scan(&clubID, &role); err != nil {
+			mRows.Close()
+			return nil, err
+		}
+		if _, ok := byClub[clubID]; ok {
+			continue // owner seat wins
+		}
+		byClub[clubID] = ClubRole{ClubID: clubID, Role: role, CanConfigure: false, Operator: false}
+	}
+	mRows.Close()
+	if err := mRows.Err(); err != nil {
+		return nil, err
+	}
+
+	out := make([]ClubRole, 0, len(byClub))
+	for _, r := range byClub {
+		out = append(out, r)
+	}
+	return out, nil
+}
+
 // CountMembers returns the number of members in a club (poker_club_member).
 // Used to enforce the tier's member limit on join.
 func (s *ClubStore) CountMembers(ctx context.Context, clubID string) (int, error) {

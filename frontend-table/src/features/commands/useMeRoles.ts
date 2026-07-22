@@ -8,12 +8,22 @@ import type { CommandDefinition } from "./types";
 // The caller's roles, used purely to decide what the Command Center reveals.
 // Every action is still enforced server-side (requireClubConfigurer / isAdmin),
 // so hiding here is UX, not a security boundary.
+/** The caller's fine standing in one club (mirrors backend store.ClubRole). */
+export interface ClubRole {
+  club_id: string;
+  role: string; // owner | manager | agent (operator) OR admin | member
+  can_configure: boolean;
+  operator: boolean; // true = owner-seat (poker_owner)
+}
+
 export interface MeRoles {
   platform_admin: boolean;
   club_admin_of: string[];
+  clubs: ClubRole[];
+  loaded: boolean;
 }
 
-const EMPTY: MeRoles = { platform_admin: false, club_admin_of: [] };
+const EMPTY: MeRoles = { platform_admin: false, club_admin_of: [], clubs: [], loaded: false };
 
 export function useMeRoles(): MeRoles {
   const [roles, setRoles] = useState<MeRoles>(EMPTY);
@@ -26,10 +36,13 @@ export function useMeRoles(): MeRoles {
           setRoles({
             platform_admin: !!data.platform_admin,
             club_admin_of: Array.isArray(data.club_admin_of) ? data.club_admin_of : [],
+            clubs: Array.isArray(data.clubs) ? (data.clubs as ClubRole[]) : [],
+            loaded: true,
           });
         }
       } catch {
-        /* default: no privileges — least-visible is the safe fallback */
+        // default: no privileges — least-visible is the safe fallback
+        if (!cancelled) setRoles({ ...EMPTY, loaded: true });
       }
     })();
     return () => {
@@ -37,6 +50,12 @@ export function useMeRoles(): MeRoles {
     };
   }, []);
   return roles;
+}
+
+/** The caller's fine role in a specific club, or null if they don't belong. */
+export function roleInClub(roles: MeRoles, clubId: string | null): ClubRole | null {
+  if (!clubId) return null;
+  return roles.clubs.find((c) => c.club_id === clubId) ?? null;
 }
 
 /** Whether a command (by its `requires`) should be shown to a user with `roles`. */

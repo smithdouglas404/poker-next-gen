@@ -7,6 +7,7 @@ import { COMMAND_REGISTRY, commandsByCategory, getCommand } from "./commandRegis
 import type { CommandCategory, CommandDefinition, CommandResult } from "./types";
 import { CATEGORY_META } from "./types";
 import { canAccessCommand, canSeeCommand, useMeRoles, useMeVerification } from "./useMeRoles";
+import { canRunInClub, clubStandingLabel } from "./access";
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { getRpcSchema } from "./schemas";
 import { SchemaForm } from "./schemaForm/SchemaForm";
@@ -411,6 +412,15 @@ function CommandCenterInner() {
           </div>
           <div className="flex flex-wrap gap-3">
             <ActiveClubSwitcher />
+            <div
+              className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2"
+              title="Your role in the active club drives which commands are shown. The server enforces every action."
+            >
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted">You are</span>
+              <span className="text-sm font-semibold text-white">
+                {clubStandingLabel(roles, activeClubId)}
+              </span>
+            </div>
             <Link href="/stack" className={NAV_CHIP}>
               Live Stack →
             </Link>
@@ -472,7 +482,10 @@ function CommandCenterInner() {
         {CATEGORY_ORDER.map((category) => {
           const meta = CATEGORY_META[category];
           const commands = commandsByCategory(category).filter(
-            (c) => canSeeCommand(c, roles) && canAccessCommand(c, verification),
+            (c) =>
+              canSeeCommand(c, roles) &&
+              canAccessCommand(c, verification) &&
+              canRunInClub(c.id, roles, activeClubId),
           );
           if (commands.length === 0) return null;
           return (

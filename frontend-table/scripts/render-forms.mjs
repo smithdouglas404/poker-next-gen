@@ -1,6 +1,6 @@
 import { chromium } from "playwright-core";
 const CHROME = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
-const BASE = "http://127.0.0.1:3300";
+const BASE = "http://127.0.0.1:3311";
 const OUT = "/tmp/claude-0/-home-user-poker-next-gen/392cc787-6489-50fa-8651-c53dd904e186/scratchpad/forms";
 import { mkdirSync } from "fs";
 mkdirSync(OUT, { recursive: true });
@@ -43,7 +43,14 @@ await p.route("**/v2/rpc/**", async (route) => {
       { user_id: "u_kai_0003", username: "kai_the_grinder", role: "member" },
     ]};
   } else if (url.includes("me_roles")) {
-    payload = { platform_admin: true, club_admin: true };
+    payload = {
+      platform_admin: false,
+      club_admin_of: ["club_demo_1"],
+      clubs: [
+        { club_id: "club_demo_1", role: "owner", can_configure: true, operator: true },
+        { club_id: "club_demo_2", role: "member", can_configure: false, operator: false },
+      ],
+    };
   } else {
     payload = { ok: true };
   }
@@ -54,7 +61,21 @@ await p.route("**/v2/rpc/**", async (route) => {
 await p.goto(BASE + "/hub", { waitUntil: "domcontentloaded" }).catch(() => {});
 await w(2500);
 await p.screenshot({ path: `${OUT}/00-command-center.png`, fullPage: true });
-console.log("OK command center");
+console.log("OK command center (owner of club_demo_1)");
+
+// RBAC proof: switch the active club to one where the caller is only a MEMBER —
+// the operator commands (Allocate Balance, Configure Rake, Add Owner, tournament
+// structure) must disappear.
+try {
+  const sw = p.locator("header select").first();
+  await sw.selectOption({ label: "River Kings Club" });
+  await w(1500);
+  await p.screenshot({ path: `${OUT}/00b-command-center-member.png`, fullPage: true });
+  console.log("OK member view (club_demo_2)");
+  // switch back to owner club for the form captures below
+  await sw.selectOption({ label: "Midnight Hold'em Society" });
+  await w(1200);
+} catch (e) { console.log("rbac switch skip", e.message.split("\n")[0]); }
 
 async function openCard(title, shot) {
   // Reset to top and click the card whose heading matches.
