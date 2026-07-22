@@ -160,7 +160,7 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
     id: "game_create",
     capability: "guest",
     title: "Create Cash Game",
-    description: "Open a new 6-max Texas Hold'em table with blinds and buy-in.",
+    description: "Open a cash table — set the seat count, blinds, buy-in, and how many players are needed to start.",
     category: "game",
     status: "live",
     rpc: "table_create",

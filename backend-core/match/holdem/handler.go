@@ -53,6 +53,7 @@ type MatchState struct {
 	SessionKeys      map[string][]byte
 	// Self-managing table lifecycle (no operator babysitting):
 	DurationSecs     int   // auto-close after this many seconds (0 = no limit)
+	MinPlayers       int   // players required before hands auto-start (default 2)
 	AutoDeal         bool  // auto-start each hand (cash tables); tournaments deal via director
 	NextDealTick     int64 // tick at which to auto-deal the next hand (0 = unset)
 	// Host controls (the table creator can pause/kick/adjust/close live):
@@ -149,6 +150,16 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	if numBots > maxSeats-1 {
 		numBots = maxSeats - 1
 	}
+	// Minimum players required before hands auto-start. Operator-configurable
+	// (default 2 — heads-up); clamped to [2, maxSeats] so a table can never be
+	// set to start with fewer than two players or need more than it can seat.
+	minPlayers := 2
+	if v, ok := numParam(params, "min_players"); ok && v >= 2 {
+		minPlayers = int(v)
+	}
+	if minPlayers > maxSeats {
+		minPlayers = maxSeats
+	}
 	durationSecs := 0
 	if v, ok := numParam(params, "duration_secs"); ok && v > 0 {
 		durationSecs = int(v)
@@ -212,6 +223,7 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		Insurance:    map[string]insurancePolicy{},
 		InsOffered:   map[string]insurancePolicy{},
 		DurationSecs: durationSecs,
+		MinPlayers:   minPlayers,
 		// Cash tables deal themselves (no operator babysitting); tournament tables
 		// are driven by the tournament director, so they opt out.
 		AutoDeal:     tournamentID == "",
@@ -222,6 +234,15 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	// only once per second (visibly sluggish) and paced self-dealing tables at ~7s
 	// per hand. 10 Hz keeps the table responsive without meaningful extra cost.
 	return state, 10, label
+}
+
+// minToStart is the number of seated players required before a hand starts,
+// defaulting to 2 for tables created before min_players existed.
+func (s *MatchState) minToStart() int {
+	if s.MinPlayers >= 2 {
+		return s.MinPlayers
+	}
+	return 2
 }
 
 func (h *Handler) MatchJoinAttempt(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, presence runtime.Presence, metadata map[string]string) (interface{}, bool, string) {
@@ -319,7 +340,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			closeTable(ctx, db, dispatcher, s, "scheduled time reached")
 			return nil // ending the match releases the handler
 		}
-		if s.AutoDeal && !s.HostPaused && s.Table.SeatedCount() >= 2 && len(s.Presences) >= 1 {
+		if s.AutoDeal && !s.HostPaused && s.Table.SeatedCount() >= s.minToStart() && len(s.Presences) >= 1 {
 			if s.NextDealTick == 0 {
 				s.NextDealTick = tick + autoDealDelayTicks
 			} else if tick >= s.NextDealTick {
@@ -481,7 +502,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			handleInsuranceAccept(ctx, db, dispatcher, s, userID, presence, msg.GetData())
 
 		case protocol.OpStartHand:
-			if s.Table.SeatedCount() >= 2 && s.Phase == poker.PhaseWaiting && s.Table.Street == poker.StreetWaiting {
+			if s.Table.SeatedCount() >= s.minToStart() && s.Phase == poker.PhaseWaiting && s.Table.Street == poker.StreetWaiting {
 				if err := s.Table.StartHand(s.SmallBlind, s.BigBlind); err != nil {
 					sendError(dispatcher, presence, "engine_unavailable", err.Error())
 					continue

@@ -85,6 +85,7 @@ var Registry = []Entry{
 			"big_blind":   200,
 			"buy_in":      100000,
 			"max_seats":   6,
+			"min_players": 2,
 			"num_bots":    5,
 			"variant":     "holdem",
 		},

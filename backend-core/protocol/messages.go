@@ -112,7 +112,8 @@ type TableCreateRequest struct {
 	SmallBlind int64  `json:"small_blind" validate:"min=0" unit:"money_minor" label:"Small Blind"`
 	BigBlind   int64  `json:"big_blind" validate:"min=0" unit:"money_minor" label:"Big Blind"`
 	BuyIn      int64  `json:"buy_in" validate:"min=0" unit:"money_minor" label:"Buy-in"`
-	MaxSeats   int    `json:"max_seats" validate:"min=2,max=9" unit:"count" label:"Max Seats"`
+	MaxSeats   int    `json:"max_seats" validate:"min=2,max=9" unit:"count" label:"Seats at the table"`
+	MinPlayers int    `json:"min_players" validate:"min=2,max=9" unit:"count" label:"Players needed to start"`
 	NumBots    int    `json:"num_bots" validate:"min=0,max=8" unit:"count" label:"Bots"`
 	Variant    string `json:"variant" enum:"holdem,plo" label:"Variant"`       // "holdem" | "plo"; empty => holdem
 	DurationMins int  `json:"duration_mins" validate:"min=0,max=720" unit:"minutes" label:"Auto-close (minutes)"` // auto-close after N minutes (0 = no limit)

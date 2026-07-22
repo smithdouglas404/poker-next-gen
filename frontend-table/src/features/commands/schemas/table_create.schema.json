@@ -6,22 +6,22 @@
     "allow_bomb_pot": {
       "title": "Allow Bomb Pot",
       "type": "boolean",
-      "x-order": 10
+      "x-order": 11
     },
     "allow_insurance": {
       "title": "Allow Insurance",
       "type": "boolean",
-      "x-order": 12
+      "x-order": 13
     },
     "allow_run_it_twice": {
       "title": "Allow Run It Twice",
       "type": "boolean",
-      "x-order": 13
+      "x-order": 14
     },
     "allow_straddle": {
       "title": "Allow Straddle",
       "type": "boolean",
-      "x-order": 9
+      "x-order": 10
     },
     "big_blind": {
       "title": "Big Blind",
@@ -35,7 +35,7 @@
       "type": "integer",
       "minimum": 0,
       "x-unit": "money_minor",
-      "x-order": 11
+      "x-order": 12
     },
     "buy_in": {
       "title": "Buy-in",
@@ -57,15 +57,23 @@
       "minimum": 0,
       "maximum": 720,
       "x-unit": "minutes",
-      "x-order": 8
+      "x-order": 9
     },
     "max_seats": {
-      "title": "Max Seats",
+      "title": "Seats at the table",
       "type": "integer",
       "minimum": 2,
       "maximum": 9,
       "x-unit": "count",
       "x-order": 5
+    },
+    "min_players": {
+      "title": "Players needed to start",
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 9,
+      "x-unit": "count",
+      "x-order": 6
     },
     "name": {
       "title": "Table Name",
@@ -78,7 +86,7 @@
       "minimum": 0,
       "maximum": 8,
       "x-unit": "count",
-      "x-order": 6
+      "x-order": 7
     },
     "small_blind": {
       "title": "Small Blind",
@@ -94,7 +102,7 @@
         "holdem",
         "plo"
       ],
-      "x-order": 7
+      "x-order": 8
     }
   },
   "examples": [
@@ -102,6 +110,7 @@
       "big_blind": 200,
       "buy_in": 100000,
       "max_seats": 6,
+      "min_players": 2,
       "name": "High Rollers",
       "num_bots": 5,
       "small_blind": 100,

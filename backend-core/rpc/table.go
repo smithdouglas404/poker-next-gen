@@ -70,6 +70,16 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		numBots = maxSeats - 1
 	}
 
+	// Minimum players before hands auto-start (operator-configurable). Default 2
+	// (heads-up); clamp to [2, maxSeats] so it can never exceed the seat count.
+	minPlayers := 2
+	if req.MinPlayers >= 2 {
+		minPlayers = req.MinPlayers
+	}
+	if minPlayers > maxSeats {
+		minPlayers = maxSeats
+	}
+
 	variant := poker.VariantHoldem
 	if req.Variant == poker.VariantPLO {
 		variant = poker.VariantPLO
@@ -103,6 +113,7 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		"big_blind":     bb,
 		"buy_in":        buyIn,
 		"max_seats":     maxSeats,
+		"min_players":   minPlayers,
 		"num_bots":      numBots,
 		"variant":       variant,
 		"duration_secs": durationSecs,
