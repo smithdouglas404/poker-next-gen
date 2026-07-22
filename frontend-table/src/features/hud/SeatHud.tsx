@@ -28,7 +28,7 @@ function SeatCard({
   onSit: () => void;
   active?: boolean;
   winner?: boolean;
-  mode: "2d" | "3d";
+  mode: "2d" | "3d" | "mix";
   bigBlind: number;
   stackUnit: "chips" | "bb";
 }) {
@@ -60,7 +60,7 @@ function SeatCard({
       className="flex w-36 flex-col items-center rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3 py-3 backdrop-blur-xl"
       style={{ boxShadow: `0 0 0 1px ${accent}55, 0 8px 26px ${glow}` }}
     >
-      {mode === "3d" ? (
+      {mode === "3d" || (mode === "mix" && !!seat.model_url) ? (
         <Character3DGL
           identity={identity}
           name={seat.username}
@@ -166,6 +166,13 @@ export function SeatHud() {
           className={`px-3 py-1 ${mode === "3d" ? "bg-amber-500 text-black" : "text-neutral-300"}`}
         >
           3D
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("mix")}
+          className={`px-3 py-1 ${mode === "mix" ? "bg-amber-500 text-black" : "text-neutral-300"}`}
+        >
+          Mix
         </button>
       </div>
       {positions.length > 0 &&

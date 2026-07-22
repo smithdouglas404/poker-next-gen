@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 
 import { GameProvider, useGame } from "@/features/game/GameProvider";
 import { TableHud } from "@/features/hud/TableHud";
+import { useTableGraphics } from "@/features/table/tableGraphics";
+import { cn, GLASS_PANEL } from "@/features/ui/tokens";
 import { drawTableLayer } from "@/features/table/drawTableScene";
 import { runDealAnimation } from "@/features/table/dealAnimation";
 import { chipsToPot, potToWinner } from "@/features/table/chipAnimation";
@@ -13,6 +16,11 @@ import { heroSeatIndex, syncGameToCanvas } from "@/features/table/syncGameToCanv
 import { useDeckStyle } from "@/features/table/deckStyle";
 import { MAX_SEATS, MIN_SEATS } from "@/features/game/protocol";
 import type { TableLayout } from "@/features/table/tableLayout";
+
+// R3F touches WebGL and must never be imported during SSR (Golden rule 3).
+const LiveCinematicTable = dynamic(() => import("@/features/table3d/LiveCinematicTable"), {
+  ssr: false,
+});
 
 type Backend = "webgpu" | "webgl" | "unknown";
 
@@ -164,11 +172,51 @@ function TableCanvas() {
   );
 }
 
+function GraphicsToggle() {
+  const [graphics, setGraphics] = useTableGraphics();
+  const options: Array<{ id: "cinematic" | "classic"; label: string }> = [
+    { id: "cinematic", label: "Cinematic" },
+    { id: "classic", label: "Classic" },
+  ];
+  return (
+    <div
+      className={cn(
+        GLASS_PANEL,
+        "pointer-events-auto absolute left-1/2 top-3 z-30 flex -translate-x-1/2 overflow-hidden rounded-full p-0.5 text-[11px] font-bold",
+      )}
+    >
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          onClick={() => setGraphics(o.id)}
+          className={cn(
+            "rounded-full px-3 py-1 transition-colors",
+            graphics === o.id ? "bg-amber-500 text-black" : "text-neutral-300 hover:text-white",
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function TableSurface() {
+  const [graphics] = useTableGraphics();
+  return (
+    <>
+      {graphics === "cinematic" ? <LiveCinematicTable /> : <TableCanvas />}
+      <GraphicsToggle />
+    </>
+  );
+}
+
 export default function TablePage() {
   return (
     <GameProvider>
       <TableHud>
-        <TableCanvas />
+        <TableSurface />
       </TableHud>
     </GameProvider>
   );
