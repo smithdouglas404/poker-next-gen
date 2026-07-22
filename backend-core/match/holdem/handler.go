@@ -529,6 +529,13 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		recordWinnings(ctx, nk, s, res)
 		creditRake(ctx, db, s, potBefore)
 		accrueLoyalty(ctx, db, s, res) // HRP + achievements (before seats reset)
+		// TODO(league-accrual): fan out league-standing accrual (store.LeagueStore.
+		// AccrueStanding) and club-war per-hand settlement (store.ClubWarStore.AddHand,
+		// keyed off a war_id match param) from here. Deferred out of the match hot path
+		// to avoid destabilizing the handler: standings and war scores are currently
+		// driven by the admin RPCs (league_standings_set, clubwar_result). Wiring this
+		// safely requires a war_id/league_id match label + per-seat club resolution and
+		// a single batched write, tracked as the unified attributeHand() hook in the plan.
 		s.Table.ResetBetweenHands()
 		s.Phase = poker.PhaseWaiting
 		reportTournamentBusts(ctx, db, nk, s)

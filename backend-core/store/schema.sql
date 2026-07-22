@@ -426,3 +426,74 @@ CREATE TABLE IF NOT EXISTS poker_room_code (
     match_id   TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Per-club competitive ELO, used to rank clubs and settle club wars. Default
+-- 1500; recomputed at the end of each completed war.
+ALTER TABLE poker_club ADD COLUMN IF NOT EXISTS elo INT NOT NULL DEFAULT 1500;
+
+-- Alliances: a federation of clubs. A founding club creates the alliance and
+-- other clubs join. A club belongs to at most one alliance (UNIQUE club_id).
+CREATE TABLE IF NOT EXISTS poker_alliance (
+    id               TEXT PRIMARY KEY,
+    name             TEXT NOT NULL,
+    founding_club_id TEXT NOT NULL,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS poker_alliance_member (
+    alliance_id TEXT NOT NULL REFERENCES poker_alliance(id) ON DELETE CASCADE,
+    club_id     TEXT NOT NULL,
+    joined_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (alliance_id, club_id),
+    UNIQUE (club_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_alliance_member_club ON poker_alliance_member(club_id);
+
+-- Leagues: a competitive season across clubs. Standings accrue points/wins/
+-- losses; an admin (or the accrual hook) sets standings and completes the season.
+CREATE TABLE IF NOT EXISTS poker_league (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    starts_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ends_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    status     TEXT NOT NULL DEFAULT 'registering', -- registering | active | completed
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS poker_league_standing (
+    league_id TEXT NOT NULL REFERENCES poker_league(id) ON DELETE CASCADE,
+    club_id   TEXT NOT NULL,
+    points    INT NOT NULL DEFAULT 0,
+    wins      INT NOT NULL DEFAULT 0,
+    losses    INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (league_id, club_id)
+);
+
+-- Club wars: a head-to-head competition between two clubs. Per-hand deltas are
+-- recorded in poker_club_war_hand; the war is settled (winner + ELO) at the end.
+CREATE TABLE IF NOT EXISTS poker_club_war (
+    id           TEXT PRIMARY KEY,
+    club_a       TEXT NOT NULL,
+    club_b       TEXT NOT NULL,
+    status       TEXT NOT NULL DEFAULT 'pending', -- pending | active | completed
+    winner_id    TEXT NOT NULL DEFAULT '',
+    scheduled_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    score_a      BIGINT NOT NULL DEFAULT 0,
+    score_b      BIGINT NOT NULL DEFAULT 0,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_club_war_status ON poker_club_war(status, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS poker_club_war_hand (
+    id         TEXT PRIMARY KEY,
+    war_id     TEXT NOT NULL REFERENCES poker_club_war(id) ON DELETE CASCADE,
+    match_id   TEXT NOT NULL DEFAULT '',
+    hand_no    INT NOT NULL DEFAULT 0,
+    club_id    TEXT NOT NULL,
+    delta      BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_club_war_hand_war ON poker_club_war_hand(war_id);
