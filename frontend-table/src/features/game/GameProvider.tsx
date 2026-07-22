@@ -157,7 +157,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             pushLog(`Hand #${(payload as TableSnapshot)?.hand_no ?? "?"} started`, "action");
             const commit = (payload as TableSnapshot)?.deck_commit_hash;
             if (commit) {
-              pushLog(`Deck commit ${commit.slice(0, 10)}…`, "info");
+              pushLog("Shuffle committed — provably fair", "info");
             }
             setShowdown(null);
             setDealTrigger((n) => n + 1);
@@ -262,7 +262,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     socketRef.current = socket;
     wireSocket(socket);
     setConnected(true);
-    pushLog("Connected to Nakama realtime", "info");
+    pushLog("Connected to the table", "info");
   }, [wireSocket, pushLog]);
 
   useEffect(() => {
@@ -288,7 +288,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setHoleCards([]);
       setActionRequired(null);
       setShowdown(null);
-      pushLog(`Joined match ${id.slice(0, 8)}…`, "info");
+      pushLog("You joined the table", "info");
     },
     [pushLog],
   );

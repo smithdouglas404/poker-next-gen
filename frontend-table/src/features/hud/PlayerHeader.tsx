@@ -16,7 +16,20 @@ export function PlayerHeader() {
         </div>
         <div>
           <p className="text-sm font-semibold text-white">{profile.username}</p>
-          <p className="text-xs text-neutral-400">Player ID · {profile.userId.slice(0, 8) || "…"}</p>
+          {/* No raw internal id in the player-facing header (P0-6). Offer it only
+              on demand for support, via a copy affordance. */}
+          <button
+            type="button"
+            title="Copy your account id (for support)"
+            onClick={() => {
+              if (typeof navigator !== "undefined" && navigator.clipboard) {
+                void navigator.clipboard.writeText(profile.userId);
+              }
+            }}
+            className="text-xs text-neutral-400 hover:text-neutral-200"
+          >
+            Copy account ID
+          </button>
         </div>
       </div>
 
