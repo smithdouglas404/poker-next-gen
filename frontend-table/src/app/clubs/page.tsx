@@ -1,317 +1,196 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { callSessionRpc } from "@/lib/nakama/sessionRpc";
-import { Button, Field, Input, Panel, SectionHeader } from "@/features/ui";
+import { ClubShell } from "@/features/clubs/ClubShell";
+import { clubApi } from "@/features/clubs/clubRpc";
+import { Dashboard } from "@/features/clubs/sections/Dashboard";
+import { Members } from "@/features/clubs/sections/Members";
+import { Games } from "@/features/clubs/sections/Games";
+import { Settings } from "@/features/clubs/sections/Settings";
+import { Alliances } from "@/features/clubs/sections/Alliances";
+import { Analytics } from "@/features/clubs/sections/Analytics";
+import type { Club, ClubDetail, ClubSection } from "@/features/clubs/types";
+import { Button, Field, Input } from "@/features/ui";
+import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
-interface Club {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string;
-}
-
-interface Member {
-  user_id: string;
-  username: string;
-  role: string;
-}
-
-interface ClubDetail {
-  club: Club;
-  members: Member[];
-  my_membership: Member | null;
-  create_fee_cents: number;
+interface Toast {
+  msg: string;
+  kind: "ok" | "err";
 }
 
 export default function ClubsPage() {
   const [clubs, setClubs] = useState<Club[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ClubDetail | null>(null);
+  const [section, setSection] = useState<ClubSection>("dashboard");
+  const [toast, setToast] = useState<Toast | null>(null);
   const [newName, setNewName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const notify = useCallback((msg: string, kind: "ok" | "err" = "ok") => {
+    setToast({ msg, kind });
+    window.setTimeout(() => setToast(null), 3200);
+  }, []);
 
   const loadClubs = useCallback(async () => {
-    setError(null);
     try {
-      const data = (await callSessionRpc("club_list", {})) as { clubs?: Club[] };
-      setClubs(data.clubs ?? []);
+      const data = await clubApi.list();
+      const list = data.clubs ?? [];
+      setClubs(list);
+      setActiveId((prev) => prev ?? list[0]?.id ?? null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load clubs");
+      notify(e instanceof Error ? e.message : "Failed to load clubs", "err");
+    } finally {
+      setLoading(false);
     }
-  }, []);
+  }, [notify]);
 
-  const [rakePct, setRakePct] = useState(5);
-  const openClub = useCallback(async (id: string) => {
-    setMessage(null);
-    try {
-      const d = (await callSessionRpc("club_get", { club_id: id })) as ClubDetail;
-      setDetail(d);
+  const loadDetail = useCallback(
+    async (id: string) => {
       try {
-        const rc = (await callSessionRpc("rake_config_get", { club_id: id })) as {
-          percent_bps?: number;
-        };
-        setRakePct(Math.round((rc.percent_bps ?? 500) / 100));
-      } catch {
-        setRakePct(5);
+        setDetail(await clubApi.get(id));
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Failed to open club", "err");
+        setDetail(null);
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to open club");
-    }
-  }, []);
+    },
+    [notify],
+  );
 
   useEffect(() => {
     void loadClubs();
   }, [loadClubs]);
 
-  const act = useCallback(
-    async (key: string, fn: () => Promise<void>) => {
-      setBusy(key);
-      setMessage(null);
-      setError(null);
-      try {
-        await fn();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Action failed");
-      } finally {
-        setBusy(null);
-      }
-    },
-    [],
-  );
+  useEffect(() => {
+    if (activeId) void loadDetail(activeId);
+    else setDetail(null);
+  }, [activeId, loadDetail]);
 
   const createClub = () =>
-    act("create", async () => {
-      await callSessionRpc("club_create", { name: newName.trim() });
-      setMessage(`Club "${newName.trim()}" created.`);
-      setNewName("");
-      await loadClubs();
-    });
+    void (async () => {
+      if (newName.trim() === "") return;
+      setCreating(true);
+      try {
+        const created = await clubApi.create(newName.trim());
+        notify(`Club "${newName.trim()}" created.`);
+        setNewName("");
+        await loadClubs();
+        if (created?.id) setActiveId(created.id);
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Create failed", "err");
+      } finally {
+        setCreating(false);
+      }
+    })();
 
-  const isOwnerAdmin = detail?.my_membership && ["owner", "admin"].includes(detail.my_membership.role);
+  const myRole = detail?.my_membership?.role ?? null;
+  const isConfigurer = myRole === "owner" || myRole === "admin";
+  const isOwner = myRole === "owner";
+
+  const content = useMemo(() => {
+    if (!activeId || !detail) return null;
+    switch (section) {
+      case "dashboard":
+        return <Dashboard clubId={activeId} isConfigurer={isConfigurer} toast={notify} />;
+      case "members":
+        return (
+          <Members
+            clubId={activeId}
+            isConfigurer={isConfigurer}
+            fallbackMembers={detail.members}
+            toast={notify}
+          />
+        );
+      case "games":
+        return <Games clubId={activeId} isConfigurer={isConfigurer} toast={notify} />;
+      case "settings":
+        return (
+          <Settings
+            club={detail.club}
+            members={detail.members}
+            isConfigurer={isConfigurer}
+            isOwner={isOwner}
+            toast={notify}
+            onChanged={() => void loadDetail(activeId)}
+            onDeleted={() => {
+              setActiveId(null);
+              setSection("dashboard");
+              void loadClubs();
+            }}
+          />
+        );
+      case "alliances":
+        return <Alliances clubId={activeId} isConfigurer={isConfigurer} toast={notify} />;
+      case "analytics":
+        return <Analytics clubId={activeId} isConfigurer={isConfigurer} toast={notify} />;
+      default:
+        return null;
+    }
+  }, [activeId, detail, section, isConfigurer, isOwner, notify, loadDetail, loadClubs]);
+
+  // No club yet → onboarding.
+  if (!loading && clubs.length === 0) {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-4 text-foreground">
+        <div className={cn(GLASS_PANEL, "w-full max-w-md p-8")}>
+          <p className="font-display text-[11px] font-bold uppercase tracking-[0.25em] text-gold/80">
+            Private Clubs
+          </p>
+          <h1 className="font-display mt-1 text-2xl font-bold uppercase tracking-wide">Start your club</h1>
+          <p className="mt-2 text-sm text-neutral-400">
+            A one-time ownership fee applies from your wallet. You become the owner and manage members,
+            rake, games, and settings.
+          </p>
+          <Field label="Club name" className="mt-5">
+            <Input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="High Rollers Lounge"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") createClub();
+              }}
+            />
+          </Field>
+          <Button onClick={createClub} disabled={creating || newName.trim() === ""} className="mt-4 w-full">
+            {creating ? "Creating…" : "Create Club"}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen text-white">
-      <header className="border-b border-white/10 px-6 py-8">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
-          <div>
-            <SectionHeader>Clubs</SectionHeader>
-            <h1 className="font-display mt-1 text-3xl font-bold">Private Clubs</h1>
-          </div>
-          <Link href="/hub" className="text-sm text-cyan hover:underline">
-            ← Command Center
-          </Link>
-        </div>
-      </header>
-
-      <main className="mx-auto grid max-w-6xl gap-6 px-6 py-10 lg:grid-cols-[1fr_1.2fr]">
-        {error && (
-          <div className="rounded-xl border border-red-500/30 bg-red-950/20 p-4 text-red-200 lg:col-span-2">
-            {error}
-          </div>
-        )}
-        {message && (
-          <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 text-emerald-200 lg:col-span-2">
-            {message}
-          </div>
-        )}
-
-        <div className="space-y-6">
-          <Panel className="p-6">
-            <h2 className="font-display text-lg font-bold">Start a club</h2>
-            <p className="mt-1 text-xs text-neutral-400">
-              A one-time ownership fee applies (from your wallet). You become the owner and
-              can manage members, rake, and settings.
-            </p>
-            <Field label="Club name" className="mt-4">
-              <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="High Rollers Lounge" />
-            </Field>
-            <Button
-              disabled={busy !== null || newName.trim() === ""}
-              onClick={createClub}
-              className="mt-3 w-full"
-            >
-              {busy === "create" ? "Creating…" : "Create club"}
-            </Button>
-          </Panel>
-
-          <Panel className="p-6">
-            <h2 className="font-display text-lg font-bold">All clubs</h2>
-            <ul className="mt-3 space-y-2">
-              {clubs.length === 0 && <li className="text-sm text-neutral-500">No clubs yet.</li>}
-              {clubs.map((c) => (
-                <li key={c.id}>
-                  <button
-                    type="button"
-                    onClick={() => void openClub(c.id)}
-                    className={`w-full rounded-xl border px-4 py-2.5 text-left text-sm transition ${
-                      detail?.club.id === c.id
-                        ? "border-amber-400/50 bg-amber-400/10"
-                        : "border-white/10 bg-white/[0.02] hover:border-white/25"
-                    }`}
-                  >
-                    <span className="font-semibold">{c.name}</span>
-                    {c.description && <span className="block text-xs text-neutral-500">{c.description}</span>}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </Panel>
-        </div>
-
-        <div>
-          {detail ? (
-            <Panel className="p-6">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="font-display text-2xl font-bold">{detail.club.name}</h2>
-                  <p className="text-xs text-neutral-500">
-                    {detail.members.length} member{detail.members.length === 1 ? "" : "s"}
-                    {detail.my_membership && (
-                      <span className="text-amber-300"> · you are {detail.my_membership.role}</span>
-                    )}
-                  </p>
-                </div>
-                {!detail.my_membership ? (
-                  <Button
-                    size="sm"
-                    disabled={busy !== null}
-                    onClick={() =>
-                      act("join", async () => {
-                        await callSessionRpc("club_join", { club_id: detail.club.id });
-                        await openClub(detail.club.id);
-                      })
-                    }
-                  >
-                    Join
-                  </Button>
-                ) : detail.my_membership.role !== "owner" ? (
-                  <Button
-                    size="sm"
-                    variant="danger"
-                    disabled={busy !== null}
-                    onClick={() =>
-                      act("leave", async () => {
-                        await callSessionRpc("club_leave", { club_id: detail.club.id });
-                        await openClub(detail.club.id);
-                      })
-                    }
-                  >
-                    Leave
-                  </Button>
-                ) : null}
-              </div>
-
-              {isOwnerAdmin && (
-                <div className="mt-5 rounded-xl border border-amber-400/25 bg-amber-950/10 p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-amber-200">
-                      House rake
-                    </span>
-                    <span className="text-lg font-bold text-amber-300">{rakePct}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={10}
-                    step={1}
-                    value={rakePct}
-                    onChange={(e) => setRakePct(Number(e.target.value))}
-                    className="mt-2 w-full accent-amber-400"
-                  />
-                  <div className="mt-1 flex justify-between text-[10px] text-neutral-500">
-                    <span>0%</span>
-                    <span>10% max</span>
-                  </div>
-                  <Button
-                    size="sm"
-                    disabled={busy !== null}
-                    onClick={() =>
-                      act("rake", async () => {
-                        await callSessionRpc("rake_config_set", {
-                          club_id: detail.club.id,
-                          name: "Standard",
-                          percent_bps: rakePct * 100,
-                        });
-                        setMessage(`Rake set to ${rakePct}%.`);
-                      })
-                    }
-                    className="mt-3"
-                  >
-                    Save rake
-                  </Button>
-                </div>
-              )}
-
-              <div className="mt-5 space-y-2">
-                {detail.members.map((m) => (
-                  <div
-                    key={m.user_id}
-                    className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-sm"
-                  >
-                    <span>
-                      {m.username || m.user_id.slice(0, 8)}
-                      <span
-                        className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
-                          m.role === "owner"
-                            ? "bg-amber-500/20 text-amber-300"
-                            : m.role === "admin"
-                              ? "bg-cyan/20 text-cyan"
-                              : "bg-white/5 text-neutral-400"
-                        }`}
-                      >
-                        {m.role}
-                      </span>
-                    </span>
-                    {isOwnerAdmin && m.role !== "owner" && (
-                      <span className="flex gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            act("role" + m.user_id, async () => {
-                              await callSessionRpc("club_member_role", {
-                                club_id: detail.club.id,
-                                user_id: m.user_id,
-                                role: m.role === "admin" ? "member" : "admin",
-                              });
-                              await openClub(detail.club.id);
-                            })
-                          }
-                          className="rounded border border-cyan/30 px-2 py-0.5 text-[10px] font-semibold text-cyan hover:bg-cyan/10"
-                        >
-                          {m.role === "admin" ? "Demote" : "Make admin"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            act("kick" + m.user_id, async () => {
-                              await callSessionRpc("club_kick", {
-                                club_id: detail.club.id,
-                                user_id: m.user_id,
-                              });
-                              await openClub(detail.club.id);
-                            })
-                          }
-                          className="rounded border border-red-500/30 px-2 py-0.5 text-[10px] font-semibold text-red-300 hover:bg-red-950/30"
-                        >
-                          Kick
-                        </button>
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </Panel>
-          ) : (
-            <Panel className="flex h-full items-center justify-center p-10 text-sm text-neutral-500">
-              Select a club to view members and manage it.
-            </Panel>
+    <>
+      {toast && (
+        <div
+          className={cn(
+            "fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-xl border px-4 py-2.5 text-sm backdrop-blur-xl",
+            toast.kind === "ok"
+              ? "border-emerald-500/30 bg-emerald-950/40 text-emerald-200"
+              : "border-red-500/30 bg-red-950/40 text-red-200",
           )}
+        >
+          {toast.msg}
         </div>
-      </main>
-    </div>
+      )}
+      <ClubShell
+        section={section}
+        onSection={setSection}
+        clubs={clubs}
+        activeClubId={activeId}
+        onSelectClub={(id) => setActiveId(id)}
+        clubName={detail?.club.name ?? (loading ? "Loading…" : "Select a club")}
+        memberCount={detail?.members.length ?? null}
+        role={myRole}
+      >
+        {content ?? (
+          <div className={cn(GLASS_PANEL, "flex h-64 items-center justify-center text-sm text-neutral-500")}>
+            {loading ? "Loading club…" : "Select a club to begin."}
+          </div>
+        )}
+      </ClubShell>
+    </>
   );
 }

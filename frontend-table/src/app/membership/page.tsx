@@ -1,562 +1,326 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { callSessionRpc } from "@/lib/nakama/sessionRpc";
+import { TierCard } from "@/features/membership/TierCard";
+import { membershipApi } from "@/features/membership/membershipRpc";
+import { accentFor } from "@/features/membership/tierMeta";
+import type {
+  BillingInterval,
+  KycState,
+  MeVerification,
+  StatusResponse,
+  TierDef,
+} from "@/features/membership/types";
+import { Button } from "@/features/ui";
+import { GLASS_PANEL, HEADING_LG, HEADING_SM, cn } from "@/features/ui/tokens";
 
-interface TierDef {
-  id: string;
-  name: string;
-  monthly_price_cents: number;
-  annual_price_cents: number;
-  rakeback_percent: number;
-  benefits: string[];
-}
+type Toast = { msg: string; kind: "ok" | "err" };
 
-interface Subscription {
-  tier: string;
-  status: string;
-  expires_at?: string | null;
-}
-
-interface StatusResponse {
-  subscription: Subscription;
-  tier: TierDef;
-  billing_configured: boolean;
-}
-
-interface KycState {
-  status: string; // none | pending | verified | rejected
-  level: string;
-  rejection_reason?: string;
-}
-
-interface BonusState {
-  chips: number;
-  can_claim: boolean;
-  streak: number;
-  next_claim_at?: string | null;
-}
-
-interface Withdrawal {
-  id: string;
-  amount_cents: number;
-  status: string;
-  destination: string;
-}
-
-interface RakebackState {
-  balance_cents: number;
-  lifetime_cents: number;
-  percent: number;
-}
-
-const ACCENT: Record<string, string> = {
-  free: "border-white/15",
-  bronze: "border-amber-700/50",
-  silver: "border-slate-300/40",
-  gold: "border-amber-400/60",
-  platinum: "border-cyan-300/50",
-};
-
-function dollars(cents: number): string {
-  if (cents === 0) return "Free";
-  return `$${(cents / 100).toFixed(2)}`;
-}
+const FEATURED_TIER = "gold";
 
 export default function MembershipPage() {
   const [tiers, setTiers] = useState<TierDef[]>([]);
+  const [order, setOrder] = useState<string[]>([]);
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [kyc, setKyc] = useState<KycState | null>(null);
-  const [bonus, setBonus] = useState<BonusState | null>(null);
-  const [rakeback, setRakeback] = useState<RakebackState | null>(null);
-  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
-  const [interval, setIntervalChoice] = useState<"month" | "year">("month");
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [verification, setVerification] = useState<MeVerification | null>(null);
+  const [interval, setIntervalChoice] = useState<BillingInterval>("month");
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [toast, setToast] = useState<Toast | null>(null);
+
+  const notify = useCallback((msg: string, kind: "ok" | "err" = "ok") => {
+    setToast({ msg, kind });
+    window.setTimeout(() => setToast(null), 4200);
+  }, []);
 
   const load = useCallback(async () => {
-    setError(null);
+    setLoading(true);
     try {
-      const [t, s, k, b, w, rb] = await Promise.all([
-        callSessionRpc("subscription_tiers", {}),
-        callSessionRpc("subscription_status", {}),
-        callSessionRpc("kyc_status", {}),
-        callSessionRpc("daily_bonus_status", {}),
-        callSessionRpc("withdrawal_list", {}),
-        callSessionRpc("rakeback_status", {}),
+      const [t, s, k, v] = await Promise.all([
+        membershipApi.tiers(),
+        membershipApi.status(),
+        membershipApi.kycStatus(),
+        membershipApi.meVerification(),
       ]);
-      setTiers((t as { tiers?: TierDef[] }).tiers ?? []);
-      setStatus(s as StatusResponse);
-      setKyc((k as { kyc?: KycState }).kyc ?? null);
-      setBonus(b as BonusState);
-      setWithdrawals((w as { withdrawals?: Withdrawal[] }).withdrawals ?? []);
-      setRakeback(rb as RakebackState);
+      setTiers(t.tiers ?? []);
+      setOrder(t.order ?? []);
+      setStatus(s);
+      setKyc(k.kyc ?? null);
+      setVerification(v);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load membership");
-    }
-  }, []);
-
-  const submitKyc = useCallback(async () => {
-    setBusy("kyc");
-    setMessage(null);
-    setError(null);
-    try {
-      const res = (await callSessionRpc("kyc_submit", { level: "standard", data: {} })) as {
-        kyc?: KycState;
-      };
-      setKyc(res.kyc ?? null);
-      setMessage("Identity submitted — pending review. You'll be able to upgrade once verified.");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "KYC submission failed");
+      notify(e instanceof Error ? e.message : "Failed to load membership", "err");
     } finally {
-      setBusy(null);
+      setLoading(false);
     }
-  }, []);
+  }, [notify]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  const currentTier = status?.subscription.tier ?? "free";
+  const rankOf = useCallback(
+    (id: string) => {
+      const i = order.indexOf(id);
+      return i === -1 ? tiers.findIndex((t) => t.id === id) : i;
+    },
+    [order, tiers],
+  );
+  const currentRank = rankOf(currentTier);
+
   const upgrade = useCallback(
     async (tierId: string) => {
       setBusy(tierId);
-      setMessage(null);
-      setError(null);
       try {
-        const res = (await callSessionRpc("subscription_checkout", {
-          tier: tierId,
-          interval,
-        })) as { configured?: boolean; checkout_url?: string; kyc_required?: boolean; message?: string };
+        const res = await membershipApi.checkout(tierId, interval);
         if (res.kyc_required) {
-          setMessage(res.message ?? "Identity verification is required for this tier.");
+          notify(res.message ?? "Identity verification is required for this tier.", "err");
           return;
         }
         if (res.configured && res.checkout_url) {
           window.location.href = res.checkout_url;
           return;
         }
-        setMessage(res.message ?? "Billing is not configured yet.");
+        notify(res.message ?? "Billing is not configured yet.", "err");
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Checkout failed");
+        notify(e instanceof Error ? e.message : "Checkout failed", "err");
       } finally {
         setBusy(null);
       }
     },
-    [interval],
+    [interval, notify],
   );
 
-  const [depositAmount, setDepositAmount] = useState("25");
-  const depositCrypto = useCallback(async () => {
-    setBusy("deposit");
-    setMessage(null);
-    setError(null);
-    try {
-      const cents = Math.round(parseFloat(depositAmount || "0") * 100);
-      const res = (await callSessionRpc("wallet_deposit_crypto", { amount_cents: cents })) as {
-        configured?: boolean;
-        invoice_url?: string;
-        message?: string;
-      };
-      if (res.configured && res.invoice_url) {
-        window.location.href = res.invoice_url;
-        return;
+  const startVerification = useCallback(
+    async (kind: "biometric" | "kyc_aml") => {
+      setBusy(`kyc:${kind}`);
+      try {
+        const res = await membershipApi.kycStart(kind);
+        if (res.url) {
+          window.location.href = res.url;
+          return;
+        }
+        notify("Verification session opened.", "ok");
+        await load();
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Could not start verification", "err");
+      } finally {
+        setBusy(null);
       }
-      setMessage(res.message ?? "Crypto deposits are not configured yet.");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Deposit failed");
-    } finally {
-      setBusy(null);
-    }
-  }, [depositAmount]);
+    },
+    [load, notify],
+  );
 
-  const depositFiat = useCallback(async () => {
-    setBusy("deposit-fiat");
-    setMessage(null);
-    setError(null);
-    try {
-      const cents = Math.round(parseFloat(depositAmount || "0") * 100);
-      const res = (await callSessionRpc("wallet_deposit_fiat", { amount_cents: cents })) as {
-        configured?: boolean;
-        checkout_url?: string;
-        message?: string;
-      };
-      if (res.configured && res.checkout_url) {
-        window.location.href = res.checkout_url;
-        return;
-      }
-      setMessage(res.message ?? "Card deposits are not configured yet.");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Deposit failed");
-    } finally {
-      setBusy(null);
-    }
-  }, [depositAmount]);
+  const currentDef = status?.tier ?? null;
+  const accent = accentFor(currentTier);
 
-  const [wdAmount, setWdAmount] = useState("25");
-  const [wdDest, setWdDest] = useState("");
-  const [wdCurrency, setWdCurrency] = useState("");
-  const withdraw = useCallback(async () => {
-    setBusy("withdraw");
-    setMessage(null);
-    setError(null);
-    try {
-      const cents = Math.round(parseFloat(wdAmount || "0") * 100);
-      await callSessionRpc("wallet_withdraw", {
-        amount_cents: cents,
-        destination: wdDest.trim(),
-        currency: wdCurrency.trim(),
-      });
-      setMessage("Withdrawal requested — pending review.");
-      setWdDest("");
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Withdrawal failed");
-    } finally {
-      setBusy(null);
-    }
-  }, [wdAmount, wdDest, wdCurrency, load]);
+  const nextTier = useMemo(() => {
+    const sorted = tiers
+      .filter((t) => rankOf(t.id) > currentRank)
+      .sort((a, b) => rankOf(a.id) - rankOf(b.id));
+    return sorted[0] ?? null;
+  }, [tiers, rankOf, currentRank]);
 
-  const claimBonus = useCallback(async () => {
-    setBusy("bonus");
-    setMessage(null);
-    setError(null);
-    try {
-      const res = (await callSessionRpc("daily_bonus_claim", {})) as {
-        claimed?: boolean;
-        chips?: number;
-        message?: string;
-      };
-      setMessage(
-        res.claimed ? `Claimed ${res.chips?.toLocaleString()} chips!` : res.message ?? "Already claimed.",
-      );
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Claim failed");
-    } finally {
-      setBusy(null);
-    }
-  }, [load]);
-
-  const claimRakeback = useCallback(async () => {
-    setBusy("rakeback");
-    setMessage(null);
-    setError(null);
-    try {
-      const res = (await callSessionRpc("rakeback_claim", {})) as { claimed_cents?: number };
-      const c = res.claimed_cents ?? 0;
-      setMessage(c > 0 ? `Claimed $${(c / 100).toFixed(2)} rakeback!` : "No rakeback to claim yet.");
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Claim failed");
-    } finally {
-      setBusy(null);
-    }
-  }, [load]);
-
-  const currentTier = status?.subscription.tier ?? "free";
+  const enforced = verification?.enforced ?? false;
+  const biometricVerified = verification?.verifications.biometric === "verified";
+  const amlVerified = verification?.verifications.kyc_aml === "verified";
+  // The identity gate only matters once a provider is live and the caller is not
+  // fully verified — otherwise the backend runs in dormant mode and all upgrades pass.
+  const showIdentityGate = enforced && (!biometricVerified || !amlVerified);
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
-      <header className="border-b border-white/10 px-6 py-8">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+    <div className="min-h-screen text-foreground">
+      {toast && (
+        <div
+          className={cn(
+            "fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-xl border px-4 py-2.5 text-sm backdrop-blur-xl",
+            toast.kind === "ok"
+              ? "border-emerald-500/30 bg-emerald-950/40 text-emerald-200"
+              : "border-red-500/30 bg-red-950/40 text-red-200",
+          )}
+        >
+          {toast.msg}
+        </div>
+      )}
+
+      <header className="border-b border-white/[0.06] px-6 py-8">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-amber-300/80">Membership</p>
-            <h1 className="mt-1 text-3xl font-semibold">High Rollers Club</h1>
+            <p className={HEADING_SM}>Membership</p>
+            <h1 className={cn(HEADING_LG, "mt-1 text-2xl")}>High Rollers Club</h1>
           </div>
-          <Link href="/hub" className="text-sm text-emerald-400 hover:underline">
+          <Link
+            href="/hub"
+            className="text-xs font-semibold uppercase tracking-wider text-cyan transition hover:text-cyan/70"
+          >
             ← Command Center
           </Link>
         </div>
       </header>
 
       <main className="mx-auto max-w-6xl space-y-8 px-6 py-10">
-        {error && (
-          <div className="rounded-xl border border-red-500/30 bg-red-950/20 p-4 text-red-200">{error}</div>
-        )}
-        {message && (
-          <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-amber-200">
-            {message}
-          </div>
-        )}
-
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="text-sm text-neutral-300">
-            Current plan:{" "}
-            <span className="font-semibold text-amber-300">
-              {status?.tier.name ?? "Free"}
-            </span>
-            {status?.subscription.expires_at && currentTier !== "free" && (
-              <span className="text-neutral-500">
-                {" "}
-                · renews {new Date(status.subscription.expires_at).toLocaleDateString()}
-              </span>
-            )}
-            {status && !status.billing_configured && (
-              <span className="ml-2 rounded bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-300">
-                billing not configured
-              </span>
-            )}
-          </div>
-          <div className="inline-flex rounded-full border border-white/15 p-0.5 text-xs">
-            <button
-              type="button"
-              onClick={() => setIntervalChoice("month")}
-              className={`rounded-full px-3 py-1 font-semibold ${
-                interval === "month" ? "bg-amber-500 text-black" : "text-neutral-300"
-              }`}
-            >
-              Monthly
-            </button>
-            <button
-              type="button"
-              onClick={() => setIntervalChoice("year")}
-              className={`rounded-full px-3 py-1 font-semibold ${
-                interval === "year" ? "bg-amber-500 text-black" : "text-neutral-300"
-              }`}
-            >
-              Annual <span className="opacity-70">(2 mo free)</span>
-            </button>
-          </div>
-        </div>
-
-        {kyc && (
-          <div
-            className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
-              kyc.status === "verified"
-                ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-200"
-                : kyc.status === "pending"
-                  ? "border-sky-500/30 bg-sky-950/20 text-sky-200"
-                  : kyc.status === "rejected"
-                    ? "border-red-500/30 bg-red-950/20 text-red-200"
-                    : "border-white/15 bg-white/[0.03] text-neutral-300"
-            }`}
-          >
-            <span>
-              <span className="font-semibold">Identity verification:</span>{" "}
-              {kyc.status === "verified"
-                ? "Verified ✓ — Gold & Platinum unlocked"
-                : kyc.status === "pending"
-                  ? "Pending review"
-                  : kyc.status === "rejected"
-                    ? `Rejected${kyc.rejection_reason ? ` — ${kyc.rejection_reason}` : ""}`
-                    : "Required for Gold & Platinum"}
-            </span>
-            {(kyc.status === "none" || kyc.status === "rejected") && (
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() => void submitKyc()}
-                className="rounded-full border border-amber-400/50 px-4 py-1.5 text-xs font-bold text-amber-200 transition hover:bg-amber-400/10 disabled:opacity-40"
-              >
-                {busy === "kyc" ? "Submitting…" : "Verify identity"}
-              </button>
-            )}
-          </div>
-        )}
-
-        <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
-          {tiers.map((t) => {
-            const price = interval === "year" ? t.annual_price_cents : t.monthly_price_cents;
-            const isCurrent = t.id === currentTier;
-            return (
-              <div
-                key={t.id}
-                className={`flex flex-col rounded-2xl border bg-white/[0.03] p-5 backdrop-blur-xl ${
-                  ACCENT[t.id] ?? "border-white/15"
-                } ${isCurrent ? "ring-2 ring-amber-400/60" : ""}`}
-              >
-                <div className="flex items-baseline justify-between">
-                  <h3 className="text-lg font-black uppercase tracking-wider">{t.name}</h3>
-                  {isCurrent && (
-                    <span className="rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-300">
-                      Current
-                    </span>
-                  )}
-                </div>
-                <p className="mt-2 text-2xl font-bold text-amber-200">
-                  {dollars(price)}
-                  {price > 0 && (
-                    <span className="text-xs font-normal text-neutral-500">
-                      /{interval === "year" ? "yr" : "mo"}
-                    </span>
-                  )}
-                </p>
-
-                <ul className="mt-4 flex-1 space-y-1.5 text-xs text-neutral-300">
-                  {t.benefits.map((b, i) => (
-                    <li key={i} className="flex gap-2">
-                      <span className="text-emerald-400">✓</span>
-                      <span>{b}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <button
-                  type="button"
-                  disabled={t.id === "free" || isCurrent || busy !== null}
-                  onClick={() => void upgrade(t.id)}
-                  className="mt-5 rounded-xl bg-gradient-to-r from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad] px-4 py-2.5 text-sm font-bold text-black transition hover:shadow-[0_0_20px_rgba(212,175,55,0.3)] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
-                >
-                  {isCurrent ? "Active" : t.id === "free" ? "—" : busy === t.id ? "Starting…" : "Upgrade"}
-                </button>
+        {/* Current status hero */}
+        <section
+          className={cn(GLASS_PANEL, "relative overflow-hidden p-6")}
+          style={{ boxShadow: `inset 0 0 60px ${accent.glow}` }}
+        >
+          <div className="flex flex-wrap items-start justify-between gap-6">
+            <div className="min-w-0">
+              <p className={HEADING_SM}>Current plan</p>
+              <div className="mt-1 flex flex-wrap items-center gap-3">
+                <h2 className={cn("font-display text-3xl font-bold uppercase tracking-wide", accent.text)}>
+                  {currentDef?.name ?? "Free"}
+                </h2>
+                {status && (
+                  <span
+                    className={cn(
+                      "rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+                      status.subscription.status === "active"
+                        ? "border-emerald-500/40 text-emerald-300"
+                        : "border-white/15 text-neutral-400",
+                    )}
+                  >
+                    {status.subscription.status}
+                  </span>
+                )}
+                {status && !status.billing_configured && (
+                  <span className="rounded-full bg-gold/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gold/90">
+                    Billing not configured
+                  </span>
+                )}
               </div>
-            );
-          })}
-        </section>
-
-        {bonus && (
-          <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/30 bg-gradient-to-r from-amber-950/30 to-yellow-900/10 p-5">
-            <div>
-              <h2 className="text-sm font-black uppercase tracking-wider text-amber-200">Daily bonus</h2>
-              <p className="mt-1 text-xs text-neutral-300">
-                {bonus.chips.toLocaleString()} chips
-                {bonus.streak > 1 && <span className="text-amber-300"> · {bonus.streak}-day streak</span>}
-                {!bonus.can_claim && bonus.next_claim_at && (
-                  <span className="text-neutral-500">
+              <p className="mt-2 max-w-xl text-sm text-neutral-400">
+                {currentDef && currentDef.rakeback_percent > 0
+                  ? `Earning ${currentDef.rakeback_percent}% rakeback with ${currentDef.name}.`
+                  : "Upgrade for real-money stakes, rakeback, higher limits, and club creation."}
+                {status?.subscription.expires_at && currentTier !== "free" && (
+                  <span className="text-neutral-600">
                     {" "}
-                    · next {new Date(bonus.next_claim_at).toLocaleTimeString()}
+                    · renews {new Date(status.subscription.expires_at).toLocaleDateString()}
                   </span>
                 )}
               </p>
             </div>
-            <button
-              type="button"
-              disabled={!bonus.can_claim || busy !== null}
-              onClick={() => void claimBonus()}
-              className="rounded-xl bg-gradient-to-r from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad] px-5 py-2.5 text-sm font-bold text-black transition hover:shadow-[0_0_20px_rgba(212,175,55,0.3)] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
-            >
-              {busy === "bonus" ? "Claiming…" : bonus.can_claim ? "Claim" : "Claimed"}
-            </button>
-          </section>
-        )}
 
-        {rakeback && rakeback.percent > 0 && (
-          <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-400/25 bg-emerald-950/10 p-5">
-            <div>
-              <h2 className="text-sm font-black uppercase tracking-wider text-emerald-200">
-                Rakeback · {rakeback.percent}%
-              </h2>
-              <p className="mt-1 text-xs text-neutral-300">
-                ${(rakeback.balance_cents / 100).toFixed(2)} available
-                <span className="text-neutral-500">
-                  {" "}
-                  · ${(rakeback.lifetime_cents / 100).toFixed(2)} lifetime
-                </span>
-              </p>
-            </div>
-            <button
-              type="button"
-              disabled={rakeback.balance_cents <= 0 || busy !== null}
-              onClick={() => void claimRakeback()}
-              className="rounded-xl border border-emerald-400/50 px-5 py-2.5 text-sm font-bold text-emerald-200 transition hover:bg-emerald-400/10 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {busy === "rakeback" ? "Claiming…" : "Claim rakeback"}
-            </button>
-          </section>
-        )}
-
-        <section className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl">
-            <h2 className="text-lg font-black uppercase tracking-wider text-amber-200">Add funds</h2>
-            <p className="mt-1 text-xs text-neutral-400">
-              Fund your wallet with crypto (200+ coins) or card. Requires a paid membership;
-              your balance is credited automatically once payment confirms.
-            </p>
-            <div className="mt-4 flex items-center gap-1 rounded-lg border border-white/10 bg-black/50 px-3 py-2">
-              <span className="text-neutral-500">$</span>
-              <input
-                type="number"
-                min={5}
-                step={5}
-                value={depositAmount}
-                onChange={(e) => setDepositAmount(e.target.value)}
-                className="w-24 bg-transparent text-white focus:outline-none"
-              />
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() => void depositCrypto()}
-                className="rounded-xl bg-gradient-to-r from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad] px-4 py-2 text-sm font-bold text-black transition hover:shadow-[0_0_20px_rgba(212,175,55,0.3)] disabled:opacity-40"
-              >
-                {busy === "deposit" ? "Starting…" : "Crypto →"}
-              </button>
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() => void depositFiat()}
-                className="rounded-xl border border-amber-400/50 px-4 py-2 text-sm font-bold text-amber-200 transition hover:bg-amber-400/10 disabled:opacity-40"
-              >
-                {busy === "deposit-fiat" ? "Starting…" : "Card →"}
-              </button>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl">
-            <h2 className="text-lg font-black uppercase tracking-wider text-amber-200">Withdraw</h2>
-            <p className="mt-1 text-xs text-neutral-400">
-              Cash out to a crypto address or account. Requests are reviewed before payout.
-            </p>
-            <div className="mt-4 flex items-center gap-1 rounded-lg border border-white/10 bg-black/50 px-3 py-2">
-              <span className="text-neutral-500">$</span>
-              <input
-                type="number"
-                min={5}
-                step={5}
-                value={wdAmount}
-                onChange={(e) => setWdAmount(e.target.value)}
-                className="w-24 bg-transparent text-white focus:outline-none"
-              />
-            </div>
-            <input
-              type="text"
-              value={wdDest}
-              onChange={(e) => setWdDest(e.target.value)}
-              placeholder="Payout destination (crypto address / account)"
-              className="mt-2 w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:border-amber-400/50 focus:outline-none"
-            />
-            <input
-              type="text"
-              value={wdCurrency}
-              onChange={(e) => setWdCurrency(e.target.value)}
-              placeholder="Coin for auto-payout (e.g. btc, usdttrc20) — blank = manual"
-              className="mt-2 w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-xs text-white placeholder:text-neutral-600 focus:border-amber-400/50 focus:outline-none"
-            />
-            <button
-              type="button"
-              disabled={busy !== null || wdDest.trim() === ""}
-              onClick={() => void withdraw()}
-              className="mt-3 rounded-xl border border-white/20 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/5 disabled:opacity-40"
-            >
-              {busy === "withdraw" ? "Requesting…" : "Request withdrawal"}
-            </button>
-
-            {withdrawals.length > 0 && (
-              <ul className="mt-4 space-y-1 text-xs">
-                {withdrawals.slice(0, 5).map((w) => (
-                  <li key={w.id} className="flex justify-between text-neutral-400">
-                    <span>${(w.amount_cents / 100).toFixed(2)}</span>
-                    <span
-                      className={
-                        w.status === "paid"
-                          ? "text-emerald-400"
-                          : w.status === "rejected"
-                            ? "text-red-400"
-                            : "text-amber-300"
-                      }
-                    >
-                      {w.status}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+            {nextTier && (
+              <div className="shrink-0 text-right">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+                  Recommended next
+                </p>
+                <p className={cn("font-display text-xl font-bold uppercase", accentFor(nextTier.id).text)}>
+                  {nextTier.name}
+                </p>
+                <Button
+                  variant="gold"
+                  size="sm"
+                  className="mt-2"
+                  disabled={busy !== null}
+                  onClick={() => void upgrade(nextTier.id)}
+                >
+                  {busy === nextTier.id ? "Starting…" : "Upgrade now"}
+                </Button>
+              </div>
             )}
           </div>
         </section>
+
+        {/* Identity gate — only shown when a provider is live and caller isn't fully verified */}
+        {showIdentityGate && (
+          <section className={cn(GLASS_PANEL, "border-cyan/20 p-5")}>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className={HEADING_SM}>Identity verification</p>
+                <p className="mt-1 text-sm text-neutral-400">
+                  Biometric unlocks paid memberships. KYC/AML unlocks Gold &amp; Platinum and fiat
+                  cashier.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={biometricVerified ? "ghost" : "outline"}
+                  size="sm"
+                  disabled={biometricVerified || busy !== null}
+                  onClick={() => void startVerification("biometric")}
+                >
+                  {biometricVerified
+                    ? "Biometric ✓"
+                    : busy === "kyc:biometric"
+                      ? "Opening…"
+                      : "Verify biometric"}
+                </Button>
+                <Button
+                  variant={amlVerified ? "ghost" : "outline"}
+                  size="sm"
+                  disabled={amlVerified || busy !== null}
+                  onClick={() => void startVerification("kyc_aml")}
+                >
+                  {amlVerified ? "KYC/AML ✓" : busy === "kyc:kyc_aml" ? "Opening…" : "Verify KYC/AML"}
+                </Button>
+              </div>
+            </div>
+            {kyc?.status === "rejected" && kyc.rejection_reason && (
+              <p className="mt-3 text-xs text-red-300">Last review: {kyc.rejection_reason}</p>
+            )}
+          </section>
+        )}
+
+        {/* Interval toggle */}
+        <div className="flex items-center justify-between gap-4">
+          <p className={HEADING_SM}>Choose your plan</p>
+          <div className={cn(GLASS_PANEL, "inline-flex p-1 text-xs")}>
+            {(["month", "year"] as const).map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => setIntervalChoice(opt)}
+                className={cn(
+                  "rounded-lg px-4 py-1.5 font-semibold uppercase tracking-wider transition",
+                  interval === opt
+                    ? "bg-gradient-to-r from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad] text-black"
+                    : "text-neutral-400 hover:text-white",
+                )}
+              >
+                {opt === "month" ? "Monthly" : "Annual"}
+                {opt === "year" && <span className="ml-1 opacity-70">· 2 mo free</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Pricing cards */}
+        {loading ? (
+          <div className={cn(GLASS_PANEL, "flex h-64 items-center justify-center text-sm text-neutral-500")}>
+            Loading membership…
+          </div>
+        ) : (
+          <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
+            {tiers.map((tier) => (
+              <TierCard
+                key={tier.id}
+                tier={tier}
+                interval={interval}
+                isCurrent={tier.id === currentTier}
+                isDowngrade={rankOf(tier.id) < currentRank && tier.id !== currentTier}
+                featured={tier.id === FEATURED_TIER}
+                busy={busy === tier.id}
+                locked={
+                  enforced &&
+                  (tier.id === "gold" || tier.id === "platinum") &&
+                  !amlVerified
+                }
+                onSelect={() => void upgrade(tier.id)}
+              />
+            ))}
+          </section>
+        )}
+
+        <p className="pb-4 text-center text-[11px] text-neutral-600">
+          Plans renew automatically. Payments are processed securely via Stripe; your tier activates
+          only after payment confirms. Cancel anytime.
+        </p>
       </main>
     </div>
   );

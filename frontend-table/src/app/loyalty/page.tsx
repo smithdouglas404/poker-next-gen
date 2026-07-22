@@ -1,180 +1,322 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { callSessionRpc } from "@/lib/nakama/sessionRpc";
+import { AchievementsPanel } from "@/features/loyalty/AchievementsPanel";
+import { BattlePassTrack } from "@/features/loyalty/BattlePassTrack";
+import { LoyaltyHero } from "@/features/loyalty/LoyaltyHero";
+import { MissionsGrid } from "@/features/loyalty/MissionsGrid";
+import { DailyBonusCard, RakebackCard } from "@/features/loyalty/QuickClaims";
+import { ReferralsPanel } from "@/features/loyalty/ReferralsPanel";
+import { Eyebrow, GoldHeading } from "@/features/loyalty/ui";
+import type {
+  BattlePassStatus,
+  DailyBonusStatus,
+  HRPEvent,
+  LoyaltyData,
+  Mission,
+  RakebackStatus,
+  ReferralStatus,
+} from "@/features/loyalty/loyaltyRpc";
+import { loyaltyApi } from "@/features/loyalty/loyaltyRpc";
+import { cn } from "@/features/ui/tokens";
 
-interface Level {
-  level: number;
-  name: string;
-  badge: string;
-  hrp_required: number;
-}
+type Tab = "overview" | "missions" | "battlepass" | "referrals";
 
-interface Achievement {
-  code: string;
-  name: string;
-  description: string;
-  hrp: number;
-  unlocked: boolean;
-  unlocked_at?: string;
-}
+const TABS: { id: Tab; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "missions", label: "Missions" },
+  { id: "battlepass", label: "Battle Pass" },
+  { id: "referrals", label: "Referrals" },
+];
 
-interface LoyaltyData {
-  hrp_total: number;
-  hands_played: number;
-  hands_won: number;
-  tier: string;
-  multiplier: number;
-  level: Level;
-  next_level: Level | null;
-  progress: number;
-  achievements: Achievement[];
+interface Toast {
+  msg: string;
+  kind: "ok" | "err";
 }
 
 export default function LoyaltyPage() {
-  const [data, setData] = useState<LoyaltyData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<Tab>("overview");
+  const [toast, setToast] = useState<Toast | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // Server state — every field comes from a real RPC; empties render gracefully.
+  const [loyalty, setLoyalty] = useState<LoyaltyData | null>(null);
+  const [daily, setDaily] = useState<DailyBonusStatus | null>(null);
+  const [rakeback, setRakeback] = useState<RakebackStatus | null>(null);
+  const [missions, setMissions] = useState<Mission[]>([]);
+  const [battlePass, setBattlePass] = useState<BattlePassStatus | null>(null);
+  const [referral, setReferral] = useState<ReferralStatus | null>(null);
+  const [history, setHistory] = useState<HRPEvent[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Per-action busy flags (keeps buttons honest, no optimistic state).
+  const [claimingMission, setClaimingMission] = useState<string | null>(null);
+  const [claimingBp, setClaimingBp] = useState<{ tier: number; track: "free" | "premium" } | null>(
+    null,
+  );
+  const [buyingPremium, setBuyingPremium] = useState(false);
+  const [claimingDaily, setClaimingDaily] = useState(false);
+  const [claimingRake, setClaimingRake] = useState(false);
+  const [claimingReferral, setClaimingReferral] = useState(false);
+  const [applyingReferral, setApplyingReferral] = useState(false);
+
+  const notify = useCallback((msg: string, kind: "ok" | "err" = "ok") => {
+    setToast({ msg, kind });
+    window.setTimeout(() => setToast(null), 3200);
+  }, []);
+
+  const loadAll = useCallback(async () => {
     setError(null);
+    // loyalty_get is the spine — surface its error. The rest load best-effort so
+    // one empty/failed sub-feature never blanks the whole page.
     try {
-      setData((await callSessionRpc("loyalty_get", {})) as LoyaltyData);
+      setLoyalty(await loyaltyApi.get());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load loyalty");
-    } finally {
-      setLoading(false);
     }
+    const settle = <T,>(p: Promise<T>, set: (v: T) => void) =>
+      p.then(set).catch(() => undefined);
+    await Promise.all([
+      settle(loyaltyApi.dailyBonus(), setDaily),
+      settle(loyaltyApi.rakeback(), setRakeback),
+      settle(loyaltyApi.missions(), (r) => setMissions(r.missions ?? [])),
+      settle(loyaltyApi.battlePass(), setBattlePass),
+      settle(loyaltyApi.referralStatus(), setReferral),
+      settle(loyaltyApi.history(25, 0), (r) => setHistory(r.events ?? [])),
+    ]);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void loadAll();
+  }, [loadAll]);
 
-  const achievements = (data?.achievements ?? []).slice().sort((a, b) => {
-    if (a.unlocked !== b.unlocked) return a.unlocked ? -1 : 1;
-    return a.hrp - b.hrp;
-  });
-  const unlockedCount = achievements.filter((a) => a.unlocked).length;
+  // ---- Action handlers (each calls a real RPC, then reloads authoritative state) ----
+
+  const claimDaily = () =>
+    void (async () => {
+      setClaimingDaily(true);
+      try {
+        const r = await loyaltyApi.claimDailyBonus();
+        if (r.claimed) notify(`Daily bonus claimed — +${(r.chips ?? 0).toLocaleString()} chips.`);
+        else notify(r.message ?? "Already claimed — come back later.", "err");
+        setDaily(await loyaltyApi.dailyBonus());
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Claim failed", "err");
+      } finally {
+        setClaimingDaily(false);
+      }
+    })();
+
+  const claimRake = () =>
+    void (async () => {
+      setClaimingRake(true);
+      try {
+        const r = await loyaltyApi.claimRakeback();
+        notify(`Rakeback claimed — ${(r.claimed_cents / 100).toLocaleString(undefined, { style: "currency", currency: "USD" })}.`);
+        setRakeback(await loyaltyApi.rakeback());
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Claim failed", "err");
+      } finally {
+        setClaimingRake(false);
+      }
+    })();
+
+  const claimMission = (id: string) =>
+    void (async () => {
+      setClaimingMission(id);
+      try {
+        const r = await loyaltyApi.claimMission(id);
+        notify(`Mission reward claimed — ${r.reward} (+${r.xp_awarded} XP).`);
+        const [m, bp] = await Promise.all([loyaltyApi.missions(), loyaltyApi.battlePass()]);
+        setMissions(m.missions ?? []);
+        setBattlePass(bp);
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Claim failed", "err");
+      } finally {
+        setClaimingMission(null);
+      }
+    })();
+
+  const claimBpTier = (t: { tier: number; track: "free" | "premium" }) =>
+    void (async () => {
+      setClaimingBp(t);
+      try {
+        const r = await loyaltyApi.claimBattlePass(t.tier, t.track);
+        notify(`Tier ${r.tier} ${r.track} reward claimed — ${r.reward}.`);
+        setBattlePass(await loyaltyApi.battlePass());
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Claim failed", "err");
+      } finally {
+        setClaimingBp(null);
+      }
+    })();
+
+  const buyPremium = () =>
+    void (async () => {
+      setBuyingPremium(true);
+      try {
+        await loyaltyApi.buyBattlePassPremium();
+        notify("Premium pass unlocked — premium rewards are now claimable.");
+        setBattlePass(await loyaltyApi.battlePass());
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Purchase failed", "err");
+      } finally {
+        setBuyingPremium(false);
+      }
+    })();
+
+  const claimReferral = () =>
+    void (async () => {
+      setClaimingReferral(true);
+      try {
+        const r = await loyaltyApi.claimReferral();
+        notify(`Referral rewards claimed — ${r.total} (${r.claimed_count}).`);
+        setReferral(await loyaltyApi.referralStatus());
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Claim failed", "err");
+      } finally {
+        setClaimingReferral(false);
+      }
+    })();
+
+  const applyReferral = (code: string) =>
+    void (async () => {
+      if (!code) return;
+      setApplyingReferral(true);
+      try {
+        const r = await loyaltyApi.applyReferral(code);
+        notify(`Code applied — welcome bonus ${r.reward} credited.`);
+        setReferral(await loyaltyApi.referralStatus());
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Invalid code", "err");
+      } finally {
+        setApplyingReferral(false);
+      }
+    })();
+
+  const missionsReady = useMemo(
+    () => missions.filter((m) => m.completed && !m.claimed).length,
+    [missions],
+  );
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
-      <header className="border-b border-white/10 px-6 py-8">
-        <div className="mx-auto flex max-w-4xl items-center justify-between gap-4">
+    <div className="min-h-screen text-foreground">
+      {toast && (
+        <div
+          className={cn(
+            "fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-xl border px-4 py-2.5 text-sm shadow-lg backdrop-blur-xl",
+            toast.kind === "ok"
+              ? "border-emerald-500/30 bg-emerald-950/50 text-emerald-200"
+              : "border-red-500/30 bg-red-950/50 text-red-200",
+          )}
+        >
+          {toast.msg}
+        </div>
+      )}
+
+      <header className="border-b border-white/[0.06] px-6 py-8">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-amber-300/80">High Roller Points</p>
-            <h1 className="mt-1 text-3xl font-semibold">Loyalty</h1>
+            <Eyebrow>High Rollers Program</Eyebrow>
+            <GoldHeading className="mt-1 text-3xl sm:text-4xl">Loyalty</GoldHeading>
           </div>
-          <Link href="/hub" className="text-sm text-emerald-400 hover:underline">
+          <Link
+            href="/hub"
+            className="shrink-0 text-sm text-cyan transition hover:text-cyan/80"
+          >
             ← Command Center
           </Link>
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl space-y-8 px-6 py-10">
+      <main className="mx-auto max-w-6xl space-y-6 px-6 py-8">
         {error && (
-          <div className="rounded-xl border border-red-500/30 bg-red-950/20 p-4 text-red-200">{error}</div>
+          <div className="rounded-xl border border-red-500/30 bg-red-950/20 p-4 text-sm text-red-200">
+            {error}
+          </div>
         )}
-        {loading && <p className="text-neutral-500">Loading…</p>}
 
-        {data && (
+        {loading && !loyalty && (
+          <div className="flex h-64 items-center justify-center text-sm text-neutral-500">
+            Loading your loyalty profile…
+          </div>
+        )}
+
+        {loyalty && (
           <>
-            <section className="rounded-2xl border border-amber-400/20 bg-gradient-to-b from-amber-950/20 to-black/40 p-6">
-              <div className="flex items-center gap-4">
-                <div className="text-5xl">{data.level.badge}</div>
-                <div className="flex-1">
-                  <p className="text-xs uppercase tracking-wider text-neutral-500">
-                    Level {data.level.level}
-                  </p>
-                  <p className="text-2xl font-bold text-amber-100">{data.level.name}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-amber-300">{data.hrp_total.toLocaleString()}</p>
-                  <p className="text-[10px] uppercase tracking-wider text-neutral-500">HRP earned</p>
-                </div>
-              </div>
+            <LoyaltyHero data={loyalty} />
 
-              {data.next_level ? (
-                <div className="mt-5">
-                  <div className="mb-1 flex justify-between text-[11px] text-neutral-400">
-                    <span>
-                      {data.level.name} → {data.next_level.name}
-                    </span>
-                    <span>
-                      {data.hrp_total.toLocaleString()} / {data.next_level.hrp_required.toLocaleString()} HRP
-                    </span>
-                  </div>
-                  <div className="h-2.5 overflow-hidden rounded-full bg-white/10">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-300"
-                      style={{ width: `${Math.round(data.progress * 100)}%` }}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <p className="mt-5 text-center text-sm font-semibold text-amber-300">
-                  🌈 Immortal — maximum loyalty reached
-                </p>
-              )}
-
-              <div className="mt-5 grid grid-cols-3 gap-3 text-center">
-                <Stat label="Hands Played" value={data.hands_played.toLocaleString()} />
-                <Stat label="Hands Won" value={data.hands_won.toLocaleString()} />
-                <Stat
-                  label={`${data.tier || "free"} multiplier`}
-                  value={`${data.multiplier}×`}
-                />
-              </div>
-              <p className="mt-3 text-center text-[11px] text-neutral-500">
-                HRP is earned by <span className="text-neutral-300">playing</span> — win or lose. Higher
-                subscription tiers earn faster.
-              </p>
+            <section className="grid gap-4 sm:grid-cols-2">
+              <DailyBonusCard status={daily} busy={claimingDaily} onClaim={claimDaily} />
+              <RakebackCard status={rakeback} busy={claimingRake} onClaim={claimRake} />
             </section>
 
-            <section>
-              <div className="mb-3 flex items-baseline justify-between">
-                <h2 className="text-lg font-semibold">Achievements</h2>
-                <span className="text-xs text-neutral-500">
-                  {unlockedCount}/{achievements.length} unlocked
-                </span>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {achievements.map((a) => (
-                  <div
-                    key={a.code}
-                    className={`rounded-xl border p-4 ${
-                      a.unlocked
-                        ? "border-amber-400/40 bg-amber-950/15"
-                        : "border-white/10 bg-white/[0.02] opacity-60"
-                    }`}
+            {/* Tabs */}
+            <nav className="flex flex-wrap gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-1.5 backdrop-blur-xl">
+              {TABS.map((t) => {
+                const active = tab === t.id;
+                const badge =
+                  t.id === "missions" && missionsReady > 0 ? missionsReady : null;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setTab(t.id)}
+                    className={cn(
+                      "relative flex-1 rounded-xl px-4 py-2 text-sm font-semibold uppercase tracking-wide transition",
+                      active
+                        ? "bg-gradient-to-b from-gold/20 to-gold/5 text-gold shadow-[0_0_18px_rgba(212,175,55,0.12)]"
+                        : "text-neutral-400 hover:bg-white/5 hover:text-white",
+                    )}
                   >
-                    <div className="flex items-center justify-between">
-                      <p className={`font-semibold ${a.unlocked ? "text-amber-100" : "text-neutral-300"}`}>
-                        {a.unlocked ? "🏅 " : "🔒 "}
-                        {a.name}
-                      </p>
-                      <span className="text-xs font-semibold text-amber-300">+{a.hrp} HRP</span>
-                    </div>
-                    <p className="mt-1 text-xs text-neutral-500">{a.description}</p>
-                  </div>
-                ))}
-              </div>
+                    {t.label}
+                    {badge !== null && (
+                      <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-bold text-black">
+                        {badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+
+            <section>
+              {tab === "overview" && (
+                <AchievementsPanel achievements={loyalty.achievements ?? []} events={history} />
+              )}
+              {tab === "missions" && (
+                <MissionsGrid
+                  missions={missions}
+                  claimingId={claimingMission}
+                  onClaim={claimMission}
+                />
+              )}
+              {tab === "battlepass" && (
+                <BattlePassTrack
+                  status={battlePass}
+                  claiming={claimingBp}
+                  buying={buyingPremium}
+                  onClaimTier={claimBpTier}
+                  onBuyPremium={buyPremium}
+                />
+              )}
+              {tab === "referrals" && (
+                <ReferralsPanel
+                  status={referral}
+                  claiming={claimingReferral}
+                  applying={applyingReferral}
+                  onClaim={claimReferral}
+                  onApply={applyReferral}
+                />
+              )}
             </section>
           </>
         )}
       </main>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-black/30 p-3">
-      <p className="text-lg font-bold text-white">{value}</p>
-      <p className="text-[10px] uppercase tracking-wider text-neutral-500">{label}</p>
     </div>
   );
 }

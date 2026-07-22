@@ -1,5 +1,5 @@
-import { Landing } from "@/features/marketing/Landing";
+import { LandingClient } from "@/features/landing/LandingClient";
 
 export default function Home() {
-  return <Landing />;
+  return <LandingClient />;
 }
