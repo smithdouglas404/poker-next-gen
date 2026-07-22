@@ -12,6 +12,11 @@ import "time"
 type TournamentBracket struct {
 	ID              string    `json:"id" db:"id"`
 	Name            string    `json:"name" db:"name"`
+	// ClubID owns the tournament (empty = a platform tournament); CreatedBy is the
+	// creator's user id. Both drive authorization for start/structure mutations —
+	// only the creator or a configurer of the owning club may edit or start it.
+	ClubID          string    `json:"club_id" db:"club_id"`
+	CreatedBy       string    `json:"created_by" db:"created_by"`
 	Variant         string    `json:"variant" db:"variant"` // e.g. "texas-holdem"
 	BuyInMinor      int64     `json:"buy_in_minor" db:"buy_in_minor"`
 	FeeMinor        int64     `json:"fee_minor" db:"fee_minor"`

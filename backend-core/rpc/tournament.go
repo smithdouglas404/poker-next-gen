@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/heroiclabs/nakama-common/runtime"
@@ -13,11 +14,52 @@ import (
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
 
+// requireTournamentOwner authorizes a mutation on an existing tournament: the
+// caller must be its creator, or a configurer of its owning club. Returns the
+// caller id. (SEC-1 — these RPCs were previously unauthenticated.)
+func requireTournamentOwner(ctx context.Context, db *sql.DB, tournamentID string) (string, error) {
+	uid, err := callerID(ctx)
+	if err != nil {
+		return "", err
+	}
+	if tournamentID == "" {
+		return "", runtime.NewError("tournament_id required", 3)
+	}
+	t, err := store.NewTournamentStore(db).Get(ctx, tournamentID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	if t == nil {
+		return "", runtime.NewError("tournament not found", 5)
+	}
+	if t.CreatedBy != "" && t.CreatedBy == uid {
+		return uid, nil
+	}
+	if t.ClubID != "" {
+		if _, cerr := requireClubConfigurer(ctx, db, t.ClubID); cerr == nil {
+			return uid, nil
+		}
+	}
+	return "", runtime.NewError("forbidden: not the tournament owner", 7)
+}
+
 func TournamentCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	var req models.TournamentBracket
 	if err := json.Unmarshal([]byte(payload), &req); err != nil {
 		return "", runtime.NewError("invalid payload", 3)
 	}
+	// Auth mandatory: record the creator, and if the tournament is club-owned the
+	// caller must be a configurer of that club.
+	uid, err := callerID(ctx)
+	if err != nil {
+		return "", err
+	}
+	if req.ClubID != "" {
+		if _, cerr := requireClubConfigurer(ctx, db, req.ClubID); cerr != nil {
+			return "", cerr
+		}
+	}
+	req.CreatedBy = uid
 	if req.Name == "" {
 		return "", runtime.NewError("name required", 3)
 	}
@@ -95,8 +137,8 @@ func BlindLevelAdd(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 	if err := json.Unmarshal([]byte(payload), &req); err != nil {
 		return "", runtime.NewError("invalid payload", 3)
 	}
-	if req.TournamentID == "" {
-		return "", runtime.NewError("tournament_id required", 3)
+	if _, err := requireTournamentOwner(ctx, db, req.TournamentID); err != nil {
+		return "", err
 	}
 	if req.DurationSecs == 0 {
 		req.DurationSecs = 600
@@ -128,8 +170,8 @@ func PrizePoolAdd(ctx context.Context, logger runtime.Logger, db *sql.DB, nk run
 	if err := json.Unmarshal([]byte(payload), &req); err != nil {
 		return "", runtime.NewError("invalid payload", 3)
 	}
-	if req.TournamentID == "" {
-		return "", runtime.NewError("tournament_id required", 3)
+	if _, err := requireTournamentOwner(ctx, db, req.TournamentID); err != nil {
+		return "", err
 	}
 	if err := store.NewTournamentStore(db).AddPrizeTier(ctx, &req); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
@@ -158,8 +200,8 @@ func BalancingRuleSet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk
 	if err := json.Unmarshal([]byte(payload), &req); err != nil {
 		return "", runtime.NewError("invalid payload", 3)
 	}
-	if req.TournamentID == "" {
-		return "", runtime.NewError("tournament_id required", 3)
+	if _, err := requireTournamentOwner(ctx, db, req.TournamentID); err != nil {
+		return "", err
 	}
 	if req.Strategy == "" {
 		req.Strategy = "balanced"
@@ -184,8 +226,29 @@ func TournamentStart(ctx context.Context, logger runtime.Logger, db *sql.DB, nk 
 	if err := json.Unmarshal([]byte(payload), &req); err != nil {
 		return "", runtime.NewError("invalid payload", 3)
 	}
-	if req.TournamentID == "" {
-		return "", runtime.NewError("tournament_id required", 3)
+	if _, err := requireTournamentOwner(ctx, db, req.TournamentID); err != nil {
+		return "", err
+	}
+	// Structure invariant (SEC-1 / P0-8): a tournament may only start with at
+	// least one blind level and prize tiers that sum to exactly 100% (10000 bps).
+	tStore := store.NewTournamentStore(db)
+	blinds, err := tStore.ListBlinds(ctx, req.TournamentID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	if len(blinds) == 0 {
+		return "", runtime.NewError("cannot start: no blind levels defined", 9)
+	}
+	prizes, err := tStore.ListPrizes(ctx, req.TournamentID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	var totalBps int32
+	for _, p := range prizes {
+		totalBps += p.PayoutBps
+	}
+	if totalBps != 10000 {
+		return "", runtime.NewError(fmt.Sprintf("cannot start: prize tiers must total 100%% (10000 bps), got %d", totalBps), 9)
 	}
 	directorID, tables, err := tournament.StartTournament(ctx, nk, db, req.TournamentID)
 	if err != nil {

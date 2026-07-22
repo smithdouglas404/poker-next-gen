@@ -35,14 +35,19 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		buyIn = req.BuyIn
 	}
 
+	// Auth mandatory (SEC-1): fail closed. Previously the tier cap was applied
+	// only when a session happened to be present, so an unauthenticated caller
+	// could create a table and dodge the stakes limit entirely.
+	userID, uerr := callerID(ctx)
+	if uerr != nil {
+		return "", uerr
+	}
 	// Tier gate: cap the big blind to what the caller's plan allows. Free plays
 	// the default $1/$2; higher stakes require an upgrade (platinum = unlimited).
-	if userID, uerr := callerID(ctx); uerr == nil {
-		tier := store.SubscriptionTier(ctx, db, userID)
-		if maxBB := billing.EffectiveMaxBigBlindCents(tier); bb > maxBB {
-			return "", runtime.NewError(
-				fmt.Sprintf("stakes exceed your plan (max big blind %d¢) — upgrade to play higher", maxBB), 7)
-		}
+	tier := store.SubscriptionTier(ctx, db, userID)
+	if maxBB := billing.EffectiveMaxBigBlindCents(tier); bb > maxBB {
+		return "", runtime.NewError(
+			fmt.Sprintf("stakes exceed your plan (max big blind %d¢) — upgrade to play higher", maxBB), 7)
 	}
 
 	roomID := req.Name

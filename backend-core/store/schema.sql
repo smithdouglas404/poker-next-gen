@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS poker_rake_config (
 CREATE TABLE IF NOT EXISTS poker_tournament (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
+    club_id TEXT NOT NULL DEFAULT '',
+    created_by TEXT NOT NULL DEFAULT '',
     variant TEXT NOT NULL DEFAULT 'texas-holdem',
     buy_in_minor BIGINT NOT NULL DEFAULT 0,
     fee_minor BIGINT NOT NULL DEFAULT 0,
@@ -62,6 +64,10 @@ CREATE TABLE IF NOT EXISTS poker_tournament (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- Ownership columns for authorization (SEC-1): back-fill on databases created
+-- before these existed. Idempotent — no-op once present.
+ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS club_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS created_by TEXT NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS poker_tournament_registration (
     id TEXT PRIMARY KEY,

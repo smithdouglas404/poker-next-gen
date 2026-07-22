@@ -16,8 +16,15 @@ func AntibotScore(ctx context.Context, logger runtime.Logger, db *sql.DB, nk run
 	if payload != "" {
 		_ = json.Unmarshal([]byte(payload), &req)
 	}
-	if req.UserID == "" {
-		return "", runtime.NewError("user_id required", 3)
+	// SEC-1: the scored user comes from the session, not the payload. Only an
+	// admin may score a user other than themselves — otherwise any caller could
+	// probe any user's anti-bot score.
+	caller, err := callerID(ctx)
+	if err != nil {
+		return "", err
+	}
+	if req.UserID == "" || (req.UserID != caller && !isAdmin(caller)) {
+		req.UserID = caller
 	}
 	score := antibot.AnalyzeBettingPatterns(req)
 	out, _ := json.Marshal(score)

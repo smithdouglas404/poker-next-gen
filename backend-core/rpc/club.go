@@ -424,6 +424,10 @@ func RakeConfigSet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 	return string(out), nil
 }
 
+// RakeConfigGet is intentionally PUBLIC (SEC-1 decision): a club's rake rate is a
+// trust/transparency signal players should be able to read before sitting, so it
+// is not gated. The write path (RakeConfigSet) remains requireClubConfigurer-only.
+// If a deployment prefers members-only visibility, gate this to club membership.
 func RakeConfigGet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	var req struct {
 		ClubID string `json:"club_id"`
