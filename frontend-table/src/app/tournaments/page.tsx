@@ -286,7 +286,7 @@ export default function TournamentsPage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
           <div className="flex items-center gap-8">
             <Link href="/hub" className="font-display text-lg font-bold uppercase tracking-wider text-brand">
-              Neon Vault
+              High Rollers
             </Link>
             <nav className="flex items-center gap-1">
               {(["lobby", "center", "board"] as TopTab[]).map((id) => (

@@ -34,7 +34,7 @@ export function HandAuditDetail({ matchId, handNo }: Props) {
               ←
             </Link>
             <span className="font-display text-lg font-bold uppercase tracking-wider text-brand">
-              Neon Vault
+              Proof of Play
             </span>
           </div>
           <div className="flex items-center gap-5 text-xs font-bold uppercase tracking-wider">

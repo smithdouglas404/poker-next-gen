@@ -53,7 +53,7 @@ export default function ProvablyFairPage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-4">
           <div className="flex items-center gap-8">
             <span className="font-display text-lg font-bold uppercase tracking-wider text-brand">
-              Neon Vault
+              Proof of Play
             </span>
             <nav className="hidden items-center gap-1 md:flex">
               {TABS.map((t) => (
