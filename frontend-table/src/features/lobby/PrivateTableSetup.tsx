@@ -521,7 +521,7 @@ export function PrivateTableSetup({
             <Field label="Min Players to Start">
               <Select value={minPlayers} onChange={(e) => setMinPlayers(Number(e.target.value))}>
                 {MIN_PLAYERS_OPTIONS.map((n) => (
-                  <option key={n} value={n} className="bg-[#16191d]">
+                  <option key={n} value={n} className="bg-[#1c2128]">
                     {n} players
                   </option>
                 ))}
@@ -530,7 +530,7 @@ export function PrivateTableSetup({
             <Field label="Decision Time">
               <Select value={decisionSecs} onChange={(e) => setDecisionSecs(Number(e.target.value))}>
                 {DECISION_TIME_OPTIONS.map((d) => (
-                  <option key={d.secs} value={d.secs} className="bg-[#16191d]">
+                  <option key={d.secs} value={d.secs} className="bg-[#1c2128]">
                     {d.label}
                   </option>
                 ))}

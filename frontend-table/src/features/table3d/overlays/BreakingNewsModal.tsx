@@ -21,7 +21,7 @@ export function BreakingNewsModal({ news, onDismiss }: { news: NewsItem; onDismi
           GLASS_PANEL,
           "relative w-full max-w-lg overflow-hidden border-gold/40 shadow-[0_0_70px_rgba(0,0,0,0.8)]",
         )}
-        style={{ background: "#16191d" }}
+        style={{ background: "#1c2128" }}
       >
         <div className="border-b border-gold/30 bg-gradient-to-b from-[#ffd54a] via-[#f5c518] to-[#d4a80f] px-6 py-3 text-center">
           <h2 className={cn(HEADING_LG, "text-[#231b00]")}>{news.title}</h2>

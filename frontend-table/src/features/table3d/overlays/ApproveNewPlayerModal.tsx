@@ -52,7 +52,7 @@ export function ApproveNewPlayerModal({
           GLASS_PANEL,
           "relative flex w-full max-w-md flex-col items-center overflow-hidden border-gold/30 px-8 py-7 shadow-[0_0_60px_rgba(0,0,0,0.7)]",
         )}
-        style={{ background: "#16191d" }}
+        style={{ background: "#1c2128" }}
       >
         <h2 className={cn(HEADING_LG, "text-gold")}>Approve New Player</h2>
 

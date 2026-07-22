@@ -124,7 +124,7 @@ function CommandCard({
         <StatusBadge />
       </div>
       <h3 className="mt-4 text-base font-semibold text-white">{command.title}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-neutral-400">{command.description}</p>
+      <p className="mt-2 text-sm leading-relaxed text-neutral-300">{command.description}</p>
       {command.rpc && (
         <p className="mt-3 font-mono text-[10px] text-green/80">rpc/{command.rpc}</p>
       )}
@@ -138,7 +138,7 @@ function CommandCard({
     return (
       <Link
         href={command.href!}
-        className="group rounded-2xl border border-white/[0.06] bg-[#16191d] p-5 transition hover:border-brand/40 hover:bg-white/[0.04]"
+        className="group rounded-2xl border border-white/[0.06] bg-[#1c2128] p-5 transition hover:border-brand/40 hover:bg-white/[0.04]"
       >
         {inner}
       </Link>
@@ -150,7 +150,7 @@ function CommandCard({
       type="button"
       disabled={busy}
       onClick={() => onRun(command)}
-      className="group w-full rounded-2xl border border-white/[0.06] bg-[#16191d] p-5 text-left transition hover:border-brand/40 hover:bg-white/[0.04] disabled:opacity-60"
+      className="group w-full rounded-2xl border border-white/[0.06] bg-[#1c2128] p-5 text-left transition hover:border-brand/40 hover:bg-white/[0.04] disabled:opacity-60"
     >
       {inner}
     </button>
@@ -534,7 +534,7 @@ function CommandCenterInner() {
       </main>
 
       {activeCommand && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-neutral-900 p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -613,7 +613,7 @@ function CommandCenterInner() {
         const confirmWord = risk === "destructive" ? "DELETE" : "CONFIRM";
         const typedOk = !needsTyped || typedConfirm.trim().toUpperCase() === confirmWord;
         return (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4">
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
             <div className="w-full max-w-md rounded-2xl border-2 border-gold/40 bg-neutral-900 p-6 shadow-2xl">
               <p className="text-xs uppercase tracking-[0.3em] text-gold/80">
                 {risk === "destructive" ? "Destructive action" : risk === "money" ? "Money movement" : "Confirm"}

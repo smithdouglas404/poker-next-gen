@@ -73,8 +73,8 @@ function enrich(t: Tournament, index: number): EnrichedTournament {
       // Clean GGPoker CARD surface with a faint brand/gold wash — no neon depth.
       heroArt: featured
         ? tagTone === "gold"
-          ? "radial-gradient(120% 120% at 85% 0%, rgba(245,197,24,0.10), transparent 55%), #16191d"
-          : "radial-gradient(120% 120% at 15% 0%, rgba(224,30,43,0.10), transparent 55%), #16191d"
+          ? "radial-gradient(120% 120% at 85% 0%, rgba(245,197,24,0.10), transparent 55%), #1c2128"
+          : "radial-gradient(120% 120% at 15% 0%, rgba(224,30,43,0.10), transparent 55%), #1c2128"
         : undefined,
     },
   };
@@ -282,7 +282,7 @@ export default function TournamentsPage() {
   return (
     <div className="min-h-screen text-foreground">
       {/* Top bar */}
-      <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#16191d]">
+      <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#1c2128]">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
           <div className="flex items-center gap-8">
             <Link href="/hub" className="font-display text-lg font-bold uppercase tracking-wider text-brand">

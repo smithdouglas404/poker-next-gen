@@ -6,16 +6,19 @@
    Cyan is retired as a primary and demoted to a muted "provably-fair" tech
    accent only. */
 :root {
-  --background: #0b0d0f;
+  /* Elevation ramp (dark-only). Panels sit a clear step above the base so cards
+     read as surfaces, not voids; muted text meets WCAG AA on the base. */
+  --background: #101319;
   --foreground: #f5f6f7;
-  --surface: #16191d;
+  --surface: #1c2128;      /* card / panel base — clearly above --background */
+  --surface-2: #242a33;    /* elevated: modals, hovered cards, popovers */
   --brand: #e01e2b;
   --brand-bright: #ff2d3f;
   --green: #22c55e;
   --green-deep: #0a7d43;
   --gold: #f5c518;
   --gold-lite: #ffd54a;
-  --muted: #9aa0a6;
+  --muted: #b2b8c0;        /* brightened from #9aa0a6 for AA on the base */
   /* demoted: muted cyan for a verified/provably-fair tech badge only */
   --cyan: #4a9eb0;
 }
@@ -24,6 +27,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
   --color-brand: var(--brand);
   --color-green: var(--green);
   --color-gold: var(--gold);

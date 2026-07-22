@@ -65,7 +65,7 @@ export function PlayerKickBanModal({
             className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2.5 text-sm text-white focus:border-gold/50 focus:outline-none"
           >
             {REASONS.map((r) => (
-              <option key={r} value={r} className="bg-[#16191d]">
+              <option key={r} value={r} className="bg-[#1c2128]">
                 {r}
               </option>
             ))}

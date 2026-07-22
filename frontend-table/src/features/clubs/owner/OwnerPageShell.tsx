@@ -2,7 +2,7 @@
 
 // Shared chrome for the standalone club-owner sub-pages. Left sidebar of owner
 // tools (mirrors the HRC "Club Owner Tools" nav) + a title header, rendered in
-// the GGPoker theme (near-black base, #16191d cards, red brand, gold accents).
+// the GGPoker theme (near-black base, #1c2128 cards, red brand, gold accents).
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";

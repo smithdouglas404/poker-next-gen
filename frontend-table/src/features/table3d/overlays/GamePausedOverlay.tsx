@@ -24,7 +24,7 @@ export function GamePausedOverlay({
           GLASS_PANEL,
           "relative flex w-full max-w-2xl flex-col items-center gap-6 border-gold/30 px-10 py-12 text-center shadow-[0_0_80px_rgba(0,0,0,0.8)]",
         )}
-        style={{ background: "#16191d" }}
+        style={{ background: "#1c2128" }}
       >
         <div className="w-full">
           <h1 className="font-display text-4xl font-bold uppercase tracking-[0.15em] text-gold sm:text-5xl">

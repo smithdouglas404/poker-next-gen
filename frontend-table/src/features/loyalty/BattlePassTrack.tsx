@@ -171,7 +171,7 @@ export function BattlePassTrack({
       </GlassCard>
 
       {tiers.length > 0 ? (
-        <div className="rounded-2xl border border-white/[0.06] bg-[#16191d] p-4 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
+        <div className="rounded-2xl border border-white/[0.06] bg-[#1c2128] p-4 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
           <div className="mb-2 flex items-center gap-4 px-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-500">
             <span className="w-16">Free</span>
             <span className="text-gold/70">Premium</span>

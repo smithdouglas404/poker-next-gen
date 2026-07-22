@@ -256,7 +256,7 @@ export default function LoyaltyPage() {
             </section>
 
             {/* Tabs */}
-            <nav className="flex flex-wrap gap-1.5 rounded-2xl border border-white/[0.06] bg-[#16191d] p-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
+            <nav className="flex flex-wrap gap-1.5 rounded-2xl border border-white/[0.06] bg-[#1c2128] p-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
               {TABS.map((t) => {
                 const active = tab === t.id;
                 const badge =

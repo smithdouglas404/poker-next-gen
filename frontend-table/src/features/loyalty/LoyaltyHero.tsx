@@ -26,7 +26,7 @@ export function LoyaltyHero({ data }: { data: LoyaltyData }) {
   return (
     <section className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
       {/* Level + HRP hero */}
-      <div className="relative overflow-hidden rounded-2xl border border-gold/25 bg-gradient-to-b from-gold/[0.06] via-[#16191d] to-[#16191d] p-6 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
+      <div className="relative overflow-hidden rounded-2xl border border-gold/25 bg-gradient-to-b from-gold/[0.06] via-[#1c2128] to-[#1c2128] p-6 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
         <div
           aria-hidden
           className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-gold/10 blur-3xl"
@@ -89,7 +89,7 @@ export function LoyaltyHero({ data }: { data: LoyaltyData }) {
       </div>
 
       {/* Level ladder */}
-      <div className="rounded-2xl border border-white/[0.06] bg-[#16191d] p-5 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
+      <div className="rounded-2xl border border-white/[0.06] bg-[#1c2128] p-5 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
         <Eyebrow tone="muted">Loyalty Ladder</Eyebrow>
         <div className="mt-3 space-y-1">
           {LEVELS.map((lvl) => {

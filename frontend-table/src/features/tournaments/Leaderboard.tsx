@@ -169,7 +169,7 @@ export function Leaderboard({
         <select
           value={selected.id}
           onChange={(e) => onSelect(e.target.value)}
-          className="rounded-lg border border-white/10 bg-[#16191d] px-4 py-2 text-sm font-semibold text-neutral-200 outline-none focus:border-brand/40"
+          className="rounded-lg border border-white/10 bg-[#1c2128] px-4 py-2 text-sm font-semibold text-neutral-200 outline-none focus:border-brand/40"
         >
           {tournaments.map((t) => (
             <option key={t.id} value={t.id}>

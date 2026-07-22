@@ -39,7 +39,7 @@ function Portrait({ id, className }: { id: string; className?: string }) {
     return (
       <div
         className={cn("flex items-center justify-center font-display text-4xl font-bold text-black", className)}
-        style={{ background: `linear-gradient(135deg, ${def.border}, #16191d)` }}
+        style={{ background: `linear-gradient(135deg, ${def.border}, #1c2128)` }}
       >
         {def.name.slice(0, 1)}
       </div>

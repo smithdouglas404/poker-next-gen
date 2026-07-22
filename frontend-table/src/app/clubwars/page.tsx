@@ -155,7 +155,7 @@ export default function ClubWarsPage() {
       <Toast toast={toast} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex gap-1 rounded-xl border border-white/[0.06] bg-[#16191d] p-1">
+        <div className="inline-flex gap-1 rounded-xl border border-white/[0.06] bg-[#1c2128] p-1">
           {filters.map((f) => (
             <button
               key={f.id || "all"}

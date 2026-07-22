@@ -211,7 +211,7 @@ function ModalShell({
           "relative flex max-h-[90vh] w-full flex-col overflow-hidden border-gold/25 shadow-[0_0_60px_rgba(0,0,0,0.7)]",
           wide ? "max-w-5xl" : "max-w-lg",
         )}
-        style={{ background: "#16191d" }}
+        style={{ background: "#1c2128" }}
       >
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
           <h2 className={cn(HEADING_LG, "text-gold")}>

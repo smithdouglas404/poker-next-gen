@@ -85,7 +85,7 @@ export function KpiTile({
 }) {
   const valueTone = tone === "gold" ? "text-gold" : tone === "green" ? "text-green" : "text-foreground";
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-[#16191d] px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
+    <div className="rounded-xl border border-white/[0.06] bg-[#1c2128] px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
       <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500">{label}</p>
       <p className={cn("mt-1.5 font-display text-2xl font-bold tabular-nums", valueTone)}>{value}</p>
       {hint && <p className="mt-0.5 text-[11px] text-neutral-500">{hint}</p>}
