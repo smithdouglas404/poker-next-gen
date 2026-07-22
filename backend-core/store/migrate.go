@@ -24,19 +24,22 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 }
 
 func splitSQL(raw string) []string {
-	parts := strings.Split(raw, ";")
+	// Strip `--` line comments BEFORE splitting on `;`. A comment may itself
+	// contain a semicolon (e.g. "-- writes status; clients read it"); splitting
+	// first would break the comment across statements and leak its trailing text
+	// into the next CREATE, producing a syntax error on a fresh database.
+	var b strings.Builder
+	for _, line := range strings.Split(raw, "\n") {
+		if i := strings.Index(line, "--"); i >= 0 {
+			line = line[:i]
+		}
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	parts := strings.Split(b.String(), ";")
 	out := make([]string, 0, len(parts))
 	for _, part := range parts {
-		// Strip full-line SQL comments before checking if the statement is empty.
-		var lines []string
-		for _, line := range strings.Split(part, "\n") {
-			trimmed := strings.TrimSpace(line)
-			if trimmed == "" || strings.HasPrefix(trimmed, "--") {
-				continue
-			}
-			lines = append(lines, line)
-		}
-		stmt := strings.TrimSpace(strings.Join(lines, "\n"))
+		stmt := strings.TrimSpace(part)
 		if stmt == "" {
 			continue
 		}

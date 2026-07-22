@@ -83,20 +83,41 @@ const autoDealDelayTicks = 4
 
 type Handler struct{}
 
+// numParam reads a numeric match param regardless of concrete type. Params set
+// via nk.MatchCreate from Go arrive as native int/int64; the same params set from
+// a JSON path arrive as float64. Asserting only float64 silently dropped every
+// numeric table setting (blinds, buy-in, seats, bots) created through the RPC.
+func numParam(params map[string]interface{}, key string) (int64, bool) {
+	switch v := params[key].(type) {
+	case float64:
+		return int64(v), true
+	case float32:
+		return int64(v), true
+	case int64:
+		return v, true
+	case int:
+		return int64(v), true
+	case int32:
+		return int64(v), true
+	default:
+		return 0, false
+	}
+}
+
 func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, params map[string]interface{}) (interface{}, int, string) {
 	sb := int64(100)
 	bb := int64(200)
 	buyIn := int64(100000)
 	roomID := "room"
 	clubID := ""
-	if v, ok := params["small_blind"].(float64); ok {
-		sb = int64(v)
+	if v, ok := numParam(params, "small_blind"); ok {
+		sb = v
 	}
-	if v, ok := params["big_blind"].(float64); ok {
-		bb = int64(v)
+	if v, ok := numParam(params, "big_blind"); ok {
+		bb = v
 	}
-	if v, ok := params["buy_in"].(float64); ok {
-		buyIn = int64(v)
+	if v, ok := numParam(params, "buy_in"); ok {
+		buyIn = v
 	}
 	if v, ok := params["room_id"].(string); ok {
 		roomID = v
@@ -109,18 +130,18 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		tournamentID = v
 	}
 	maxSeats := 6
-	if v, ok := params["max_seats"].(float64); ok && v >= 2 {
+	if v, ok := numParam(params, "max_seats"); ok && v >= 2 {
 		maxSeats = int(v)
 	}
 	numBots := 0
-	if v, ok := params["num_bots"].(float64); ok && v > 0 {
+	if v, ok := numParam(params, "num_bots"); ok && v > 0 {
 		numBots = int(v)
 	}
 	if numBots > maxSeats-1 {
 		numBots = maxSeats - 1
 	}
 	durationSecs := 0
-	if v, ok := params["duration_secs"].(float64); ok && v > 0 {
+	if v, ok := numParam(params, "duration_secs"); ok && v > 0 {
 		durationSecs = int(v)
 	}
 	hostUserID := ""
@@ -144,8 +165,8 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	if v, ok := params["allow_bomb_pot"].(bool); ok {
 		table.AllowBombPot = v
 	}
-	if v, ok := params["bomb_pot_ante"].(float64); ok && v > 0 {
-		table.BombPotAnte = int64(v)
+	if v, ok := numParam(params, "bomb_pot_ante"); ok && v > 0 {
+		table.BombPotAnte = v
 	}
 	if v, ok := params["allow_insurance"].(bool); ok {
 		table.AllowInsurance = v
