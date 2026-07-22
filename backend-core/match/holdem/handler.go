@@ -334,8 +334,13 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 		// Straddle-arming and run-it-twice votes are lightweight opt-ins that may
 		// arrive between hands (like chat / standing up), so they bypass the
 		// betting-phase gate; their handlers validate table state themselves.
+		// Sitting down and standing up (like chat) are table-management actions,
+		// not in-hand game actions — a player must be able to take a seat between
+		// hands, not only mid-betting. Only fold/check/call/raise are gated to the
+		// betting phase.
 		if !s.Phase.AllowsPlayerActions() &&
-			msg.GetOpCode() != protocol.OpStandUp && msg.GetOpCode() != protocol.OpChatSend &&
+			msg.GetOpCode() != protocol.OpSitDown && msg.GetOpCode() != protocol.OpStandUp &&
+			msg.GetOpCode() != protocol.OpChatSend &&
 			msg.GetOpCode() != protocol.OpPostStraddle && msg.GetOpCode() != protocol.OpRunItTwice {
 			sendError(dispatcher, presence, "hand_busy", "showdown in progress")
 			continue
@@ -374,6 +379,12 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				releaseBuyIn(ctx, db, s.ClubID, userID, buyIn)
 				sendError(dispatcher, presence, "sit_failed", err.Error())
 				continue
+			}
+			// If a hand is already in progress, the new player sits out until it
+			// finishes (folded = excluded from the current pot/showdown). The next
+			// ResetBetweenHands restores them to Seated so they are dealt in.
+			if s.Phase != poker.PhaseWaiting && s.Table.Seats[req.Seat] != nil {
+				s.Table.Seats[req.Seat].Status = poker.SeatFolded
 			}
 			_ = seatReg.Register(ctx, userID, matchKey)
 			dispatcher.MatchLabelUpdate(buildLabel(s))

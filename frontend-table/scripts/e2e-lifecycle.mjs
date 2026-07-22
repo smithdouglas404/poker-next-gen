@@ -207,8 +207,15 @@ async function playHands(client, session, matchId) {
   };
 
   await socket.joinMatch(matchId);
-  // Kick sit-down attempts periodically until seated (handles the join race).
-  const sitTimer = setInterval(() => { if (!seated && !sitPending) { socket.sendMatchState(matchId, 1, enc({ seat: mySeat >= 0 ? mySeat : 7, buy_in: BUY_IN })); sitPending = true; } }, 1500);
+  // Sit immediately on join (before the first auto-deal), then retry fast on the
+  // known-open seat — at 10 Hz the between-hands "waiting" window is only ~0.4s,
+  // so poll quickly to catch it. mySeat is refined from snapshots (trySit).
+  socket.sendMatchState(matchId, 1, enc({ seat: 7, buy_in: BUY_IN }));
+  const sitTimer = setInterval(() => {
+    if (seated) return;
+    const seat = mySeat >= 0 ? mySeat : 7;
+    socket.sendMatchState(matchId, 1, enc({ seat, buy_in: BUY_IN }));
+  }, 300);
 
   const start = Date.now();
   const CAP = 1_800_000; // 30 min — match ticks at 1 Hz so 200 hands ≈ 23 min
