@@ -9,6 +9,13 @@ import { CATEGORY_META } from "./types";
 import { canAccessCommand, canSeeCommand, useMeRoles, useMeVerification } from "./useMeRoles";
 import { canRunInClub, clubStandingLabel } from "./access";
 import { ResultView } from "./ResultView";
+import { ClubSetupWizard } from "./ClubSetupWizard";
+import {
+  WORKSPACE_META,
+  WORKSPACE_ORDER,
+  workspaceForCommand,
+  type Workspace,
+} from "./workspaces";
 
 // Relative/local timestamp for the command log (UI review P1-2): "2s ago",
 // "3m ago", else a local time — never a raw ISO string.
@@ -179,7 +186,7 @@ export function CommandCenter() {
 function CommandCenterInner() {
   const roles = useMeRoles();
   const verification = useMeVerification();
-  const { clubs, activeClubId } = useActiveClub();
+  const { clubs, activeClubId, refresh: refreshClubs } = useActiveClub();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [activeCommand, setActiveCommand] = useState<CommandDefinition | null>(null);
   const [formJson, setFormJson] = useState("");
@@ -190,6 +197,8 @@ function CommandCenterInner() {
   const [results, setResults] = useState<CommandResult[]>([]);
   const [dismissedKey, setDismissedKey] = useState<string | null>(null);
   const [bannerExpanded, setBannerExpanded] = useState(false);
+  const [view, setView] = useState<"workspaces" | "console">("workspaces");
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   // The generated schema for the active command, if it has a form (P0-1).
   const activeSchema: RpcSchema | undefined = activeCommand?.rpc
@@ -478,34 +487,110 @@ function CommandCenterInner() {
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-10">
-        {CATEGORY_ORDER.map((category) => {
-          const meta = CATEGORY_META[category];
-          const commands = commandsByCategory(category).filter(
-            (c) =>
-              canSeeCommand(c, roles) &&
-              canAccessCommand(c, verification) &&
-              canRunInClub(c.id, roles, activeClubId),
-          );
-          if (commands.length === 0) return null;
-          return (
-            <section key={category} className="mb-12">
-              <div className={`mb-5 rounded-2xl border p-5 ${meta.accent}`}>
-                <h2 className="text-xl font-semibold text-white">{meta.label}</h2>
-                <p className="mt-1 text-sm text-neutral-400">{meta.subtitle}</p>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {commands.map((command) => (
-                  <CommandCard
-                    key={command.id}
-                    command={command}
-                    busy={busyId !== null}
-                    onRun={handleRun}
-                  />
-                ))}
-              </div>
-            </section>
-          );
-        })}
+        {/* View toggle: operator jobs (default) vs the flat command console. */}
+        <div className="mb-8 flex items-center justify-between gap-4">
+          <div className="inline-flex rounded-xl border border-white/10 bg-white/[0.03] p-1">
+            <button
+              type="button"
+              onClick={() => setView("workspaces")}
+              className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition ${
+                view === "workspaces" ? "bg-gold text-black" : "text-neutral-300 hover:text-white"
+              }`}
+            >
+              Workspaces
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("console")}
+              className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition ${
+                view === "console" ? "bg-gold text-black" : "text-neutral-300 hover:text-white"
+              }`}
+            >
+              Console
+            </button>
+          </div>
+          <p className="text-xs text-muted">
+            {view === "workspaces"
+              ? "Organized around what you're trying to do."
+              : "Every command, grouped by system."}
+          </p>
+        </div>
+
+        {view === "workspaces" ? (
+          WORKSPACE_ORDER.map((workspace: Workspace) => {
+            const meta = WORKSPACE_META[workspace];
+            const commands = COMMAND_REGISTRY.filter(
+              (c) =>
+                workspaceForCommand(c) === workspace &&
+                canSeeCommand(c, roles) &&
+                canAccessCommand(c, verification) &&
+                canRunInClub(c.id, roles, activeClubId),
+            );
+            const showSetupCta = workspace === "my_club" && clubs.length === 0;
+            if (commands.length === 0 && !showSetupCta) return null;
+            return (
+              <section key={workspace} className="mb-12">
+                <div className={`mb-5 flex items-center gap-3 rounded-2xl border p-5 ${meta.accent}`}>
+                  <span className="text-2xl text-gold">{meta.icon}</span>
+                  <div>
+                    <h2 className="text-xl font-semibold text-white">{meta.label}</h2>
+                    <p className="mt-0.5 text-sm text-neutral-400">{meta.subtitle}</p>
+                  </div>
+                </div>
+
+                {showSetupCta && (
+                  <button
+                    type="button"
+                    onClick={() => setWizardOpen(true)}
+                    className="mb-4 flex w-full items-center justify-between gap-4 rounded-2xl border border-gold/40 bg-gradient-to-r from-gold/10 to-transparent p-5 text-left transition hover:border-gold/60"
+                  >
+                    <div>
+                      <p className="text-base font-semibold text-white">Set up your club</p>
+                      <p className="mt-1 text-sm text-neutral-300">
+                        A guided walkthrough: create → set rake → add a manager → allocate a balance.
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-gradient-to-r from-[#9a7b2c] via-gold to-gold-lite px-5 py-2 text-sm font-bold uppercase tracking-wider text-black">
+                      Start →
+                    </span>
+                  </button>
+                )}
+
+                {commands.length > 0 && (
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {commands.map((command) => (
+                      <CommandCard key={command.id} command={command} busy={busyId !== null} onRun={handleRun} />
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })
+        ) : (
+          CATEGORY_ORDER.map((category) => {
+            const meta = CATEGORY_META[category];
+            const commands = commandsByCategory(category).filter(
+              (c) =>
+                canSeeCommand(c, roles) &&
+                canAccessCommand(c, verification) &&
+                canRunInClub(c.id, roles, activeClubId),
+            );
+            if (commands.length === 0) return null;
+            return (
+              <section key={category} className="mb-12">
+                <div className={`mb-5 rounded-2xl border p-5 ${meta.accent}`}>
+                  <h2 className="text-xl font-semibold text-white">{meta.label}</h2>
+                  <p className="mt-1 text-sm text-neutral-400">{meta.subtitle}</p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {commands.map((command) => (
+                    <CommandCard key={command.id} command={command} busy={busyId !== null} onRun={handleRun} />
+                  ))}
+                </div>
+              </section>
+            );
+          })
+        )}
 
         <section className="rounded-2xl border border-white/10 bg-black/30 p-6">
           <h2 className="text-lg font-semibold text-white">Command Log</h2>
@@ -677,6 +762,25 @@ function CommandCenterInner() {
           </div>
         );
       })()}
+
+      {wizardOpen && (
+        <ClubSetupWizard
+          onClose={() => setWizardOpen(false)}
+          onComplete={(clubId) => {
+            setWizardOpen(false);
+            void refreshClubs();
+            if (clubId) setResults((prev) => [
+              {
+                ok: true,
+                commandId: "club_create",
+                message: "Club setup complete.",
+                at: new Date().toISOString(),
+              },
+              ...prev.slice(0, 9),
+            ]);
+          }}
+        />
+      )}
     </div>
   );
 }

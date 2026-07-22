@@ -1,6 +1,6 @@
 import { chromium } from "playwright-core";
 const CHROME = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
-const BASE = "http://127.0.0.1:3312";
+const BASE = "http://127.0.0.1:3313";
 const OUT = "/tmp/claude-0/-home-user-poker-next-gen/392cc787-6489-50fa-8651-c53dd904e186/scratchpad/forms";
 import { mkdirSync } from "fs";
 mkdirSync(OUT, { recursive: true });
@@ -61,7 +61,17 @@ await p.route("**/v2/rpc/**", async (route) => {
 await p.goto(BASE + "/hub", { waitUntil: "domcontentloaded" }).catch(() => {});
 await w(2500);
 await p.screenshot({ path: `${OUT}/00-command-center.png`, fullPage: true });
-console.log("OK command center (owner of club_demo_1)");
+console.log("OK command center (owner of club_demo_1) — workspace view");
+
+// P1-1: the Console toggle (flat category grid) for devs.
+try {
+  await p.getByRole("button", { name: /^Console$/ }).click({ timeout: 3000 });
+  await w(800);
+  await p.screenshot({ path: `${OUT}/00c-console-view.png`, fullPage: true });
+  await p.getByRole("button", { name: /^Workspaces$/ }).click({ timeout: 3000 });
+  await w(500);
+  console.log("OK console toggle");
+} catch (e) { console.log("console skip", e.message.split("\n")[0]); }
 
 // RBAC proof: switch the active club to one where the caller is only a MEMBER —
 // the operator commands (Allocate Balance, Configure Rake, Add Owner, tournament
@@ -152,6 +162,36 @@ try {
   await p.screenshot({ path: `${OUT}/08-result_table.png`, fullPage: true });
   console.log("OK result table (club_list)");
 } catch (e) { console.log("result skip", e.message.split("\n")[0]); }
+
+// P1-1b: the first-time club setup wizard (shows when the operator has no club).
+try {
+  const ctx2 = await b.newContext({ viewport: { width: 1440, height: 1100 } });
+  await ctx2.addInitScript((blob) => {
+    try { localStorage.setItem("png-nakama-session", blob); localStorage.removeItem("png.activeClubId"); } catch {}
+  }, sessionBlob);
+  const p2 = await ctx2.newPage();
+  p2.on("pageerror", () => {});
+  await p2.route("**/v2/rpc/**", async (route) => {
+    const url = route.request().url();
+    let payload = { ok: true };
+    if (url.includes("club_list")) payload = { clubs: [] }; // no clubs -> setup CTA
+    else if (url.includes("me_roles")) payload = { platform_admin: false, club_admin_of: [], clubs: [] };
+    else if (url.includes("club_create")) payload = { id: "club_new_1", name: "Aces High", currency: "USD" };
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ payload: JSON.stringify(payload) }) });
+  });
+  await p2.goto(BASE + "/hub", { waitUntil: "domcontentloaded" }).catch(() => {});
+  await p2.waitForTimeout(2500);
+  await p2.getByRole("button", { name: /Set up your club/i }).click({ timeout: 4000 });
+  await p2.waitForTimeout(900);
+  await p2.screenshot({ path: `${OUT}/09-wizard-step1.png` });
+  console.log("OK wizard step 1");
+  // advance to step 2 (rake)
+  await p2.getByRole("button", { name: /Create club/i }).click({ timeout: 4000 });
+  await p2.waitForTimeout(1200);
+  await p2.screenshot({ path: `${OUT}/10-wizard-step2-rake.png` });
+  console.log("OK wizard step 2");
+  await ctx2.close();
+} catch (e) { console.log("wizard skip", e.message.split("\n")[0]); }
 
 await b.close();
 console.log("done");
