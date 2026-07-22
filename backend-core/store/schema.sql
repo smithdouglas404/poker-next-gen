@@ -497,3 +497,464 @@ CREATE TABLE IF NOT EXISTS poker_club_war_hand (
 );
 
 CREATE INDEX IF NOT EXISTS idx_poker_club_war_hand_war ON poker_club_war_hand(war_id);
+
+-- ============================================================
+-- stats domain
+-- ============================================================
+CREATE TABLE IF NOT EXISTS poker_hand_stats (
+    id TEXT PRIMARY KEY DEFAULT '',
+    user_id TEXT NOT NULL,
+    club_id TEXT NOT NULL DEFAULT '',
+    match_id TEXT NOT NULL,
+    hand_no INT NOT NULL,
+    vpip BOOLEAN NOT NULL DEFAULT FALSE,
+    pfr BOOLEAN NOT NULL DEFAULT FALSE,
+    went_to_showdown BOOLEAN NOT NULL DEFAULT FALSE,
+    won BOOLEAN NOT NULL DEFAULT FALSE,
+    net_cents BIGINT NOT NULL DEFAULT 0,
+    contribution_cents BIGINT NOT NULL DEFAULT 0,
+    street_reached INT NOT NULL DEFAULT 0,
+    bets_raises INT NOT NULL DEFAULT 0,
+    calls INT NOT NULL DEFAULT 0,
+    opponents_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id, match_id, hand_no)
+);
+CREATE INDEX IF NOT EXISTS idx_poker_hand_stats_user ON poker_hand_stats(user_id);
+CREATE INDEX IF NOT EXISTS idx_poker_hand_stats_user_club ON poker_hand_stats(user_id, club_id);
+CREATE INDEX IF NOT EXISTS idx_poker_hand_stats_match_hand ON poker_hand_stats(match_id, hand_no);
+
+CREATE TABLE IF NOT EXISTS poker_hand_index (
+    id TEXT PRIMARY KEY,
+    match_id TEXT NOT NULL,
+    room_id TEXT NOT NULL DEFAULT '',
+    table_label TEXT NOT NULL DEFAULT '',
+    hand_no INT NOT NULL,
+    user_ids_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+    winner_seats_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+    pot BIGINT NOT NULL DEFAULT 0,
+    rake BIGINT NOT NULL DEFAULT 0,
+    deck_commit TEXT NOT NULL DEFAULT '',
+    anchored BOOLEAN NOT NULL DEFAULT FALSE,
+    anchor_tx TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(match_id, hand_no)
+);
+CREATE INDEX IF NOT EXISTS idx_poker_hand_index_match_hand ON poker_hand_index(match_id, hand_no);
+CREATE INDEX IF NOT EXISTS idx_poker_hand_index_created ON poker_hand_index(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_poker_hand_index_anchored ON poker_hand_index(anchored);
+
+CREATE TABLE IF NOT EXISTS poker_hrp_event (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    hrp BIGINT NOT NULL DEFAULT 0,
+    reason TEXT NOT NULL DEFAULT '',
+    meta_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_poker_hrp_event_user ON poker_hrp_event(user_id, created_at DESC);
+
+-- ============================================================
+-- missions domain
+-- ============================================================
+CREATE TABLE IF NOT EXISTS poker_mission (
+    id           TEXT PRIMARY KEY,
+    code         TEXT NOT NULL,
+    title        TEXT NOT NULL,
+    description  TEXT NOT NULL DEFAULT '',
+    kind         TEXT NOT NULL DEFAULT 'daily',
+    metric       TEXT NOT NULL DEFAULT '',
+    goal         BIGINT NOT NULL DEFAULT 1,
+    reward_cents BIGINT NOT NULL DEFAULT 0,
+    xp           BIGINT NOT NULL DEFAULT 0,
+    period_key   TEXT NOT NULL DEFAULT '',
+    active       BOOLEAN NOT NULL DEFAULT TRUE,
+    expires_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (code, period_key)
+);
+CREATE INDEX IF NOT EXISTS poker_mission_active_idx ON poker_mission(active, expires_at);
+CREATE INDEX IF NOT EXISTS poker_mission_metric_idx ON poker_mission(metric);
+CREATE TABLE IF NOT EXISTS poker_mission_progress (
+    user_id    TEXT NOT NULL,
+    mission_id TEXT NOT NULL,
+    progress   BIGINT NOT NULL DEFAULT 0,
+    claimed    BOOLEAN NOT NULL DEFAULT FALSE,
+    claimed_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, mission_id)
+);
+CREATE TABLE IF NOT EXISTS poker_battlepass_season (
+    id            TEXT PRIMARY KEY,
+    name          TEXT NOT NULL,
+    starts_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ends_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    status        TEXT NOT NULL DEFAULT 'active',
+    xp_per_tier   BIGINT NOT NULL DEFAULT 1000,
+    max_tier      INTEGER NOT NULL DEFAULT 50,
+    premium_cents BIGINT NOT NULL DEFAULT 0,
+    tiers_json    TEXT NOT NULL DEFAULT '[]',
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS poker_battlepass_season_status_idx ON poker_battlepass_season(status, starts_at);
+CREATE TABLE IF NOT EXISTS poker_battlepass_progress (
+    user_id         TEXT NOT NULL,
+    season_id       TEXT NOT NULL,
+    xp              BIGINT NOT NULL DEFAULT 0,
+    premium         BOOLEAN NOT NULL DEFAULT FALSE,
+    claimed_free    TEXT NOT NULL DEFAULT '[]',
+    claimed_premium TEXT NOT NULL DEFAULT '[]',
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, season_id)
+);
+CREATE TABLE IF NOT EXISTS poker_referral (
+    id                    TEXT PRIMARY KEY,
+    referrer_user_id      TEXT NOT NULL,
+    code                  TEXT NOT NULL,
+    referred_user_id      TEXT NOT NULL DEFAULT '',
+    status                TEXT NOT NULL DEFAULT 'issued',
+    reward_cents          BIGINT NOT NULL DEFAULT 0,
+    referred_reward_cents BIGINT NOT NULL DEFAULT 0,
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    applied_at            TIMESTAMPTZ,
+    claimed_at            TIMESTAMPTZ,
+    UNIQUE (referrer_user_id, referred_user_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS poker_referral_referred_unique ON poker_referral(referred_user_id) WHERE referred_user_id <> '';
+CREATE INDEX IF NOT EXISTS poker_referral_code_idx ON poker_referral(code);
+
+-- ============================================================
+-- responsible domain
+-- ============================================================
+CREATE TABLE IF NOT EXISTS poker_rg_limit (
+    user_id TEXT PRIMARY KEY,
+    deposit_daily_cents BIGINT NOT NULL DEFAULT 0,
+    deposit_weekly_cents BIGINT NOT NULL DEFAULT 0,
+    deposit_monthly_cents BIGINT NOT NULL DEFAULT 0,
+    loss_daily_cents BIGINT NOT NULL DEFAULT 0,
+    session_minutes BIGINT NOT NULL DEFAULT 0,
+    cool_off_until TIMESTAMPTZ,
+    self_excluded_until TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS poker_user_2fa (
+    user_id TEXT PRIMARY KEY,
+    totp_secret TEXT NOT NULL DEFAULT '',
+    enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    backup_codes TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS poker_recovery_code (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    email TEXT NOT NULL,
+    code_hash TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_recovery_code_lookup ON poker_recovery_code(email, code_hash);
+
+CREATE TABLE IF NOT EXISTS poker_api_key (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    label TEXT NOT NULL DEFAULT '',
+    prefix TEXT NOT NULL DEFAULT '',
+    key_hash TEXT NOT NULL,
+    revoked BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_used_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_api_key_user ON poker_api_key(user_id, created_at DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_poker_api_key_hash ON poker_api_key(key_hash);
+
+-- ============================================================
+-- clubsext domain
+-- ============================================================
+ALTER TABLE poker_club
+    ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS require_approval BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS tag TEXT NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS avatar_ref TEXT NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS banner_ref TEXT NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS settings_json JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+CREATE TABLE IF NOT EXISTS poker_club_invitation (
+    id TEXT PRIMARY KEY,
+    club_id TEXT NOT NULL REFERENCES poker_club(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL,
+    username TEXT NOT NULL DEFAULT '',
+    inviter TEXT NOT NULL DEFAULT '',
+    type TEXT NOT NULL DEFAULT 'invite',
+    role TEXT NOT NULL DEFAULT 'member',
+    credit_limit_cents BIGINT NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'pending',
+    message TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    reviewed_at TIMESTAMPTZ,
+    reviewed_by TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_club_inv_club ON poker_club_invitation(club_id, type, status);
+CREATE INDEX IF NOT EXISTS idx_poker_club_inv_user ON poker_club_invitation(user_id, type, status);
+
+CREATE TABLE IF NOT EXISTS poker_club_stats (
+    club_id TEXT PRIMARY KEY REFERENCES poker_club(id) ON DELETE CASCADE,
+    member_count INT NOT NULL DEFAULT 0,
+    active_7d INT NOT NULL DEFAULT 0,
+    hands BIGINT NOT NULL DEFAULT 0,
+    win_rate_bps INT NOT NULL DEFAULT 0,
+    chips_won BIGINT NOT NULL DEFAULT 0,
+    tourney_wins INT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS poker_club_announcement (
+    id TEXT PRIMARY KEY,
+    club_id TEXT NOT NULL REFERENCES poker_club(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL DEFAULT '',
+    severity TEXT NOT NULL DEFAULT 'info',
+    created_by TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_club_ann_club ON poker_club_announcement(club_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS poker_club_event (
+    id TEXT PRIMARY KEY,
+    club_id TEXT NOT NULL REFERENCES poker_club(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    scheduled_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    small_blind BIGINT NOT NULL DEFAULT 0,
+    big_blind BIGINT NOT NULL DEFAULT 0,
+    variant TEXT NOT NULL DEFAULT 'texas-holdem',
+    format TEXT NOT NULL DEFAULT 'cash',
+    created_by TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_club_event_club ON poker_club_event(club_id, scheduled_at);
+
+CREATE TABLE IF NOT EXISTS poker_club_chat (
+    id TEXT PRIMARY KEY,
+    club_id TEXT NOT NULL REFERENCES poker_club(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL,
+    username TEXT NOT NULL DEFAULT '',
+    text TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_club_chat_club ON poker_club_chat(club_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS poker_club_activity (
+    id TEXT PRIMARY KEY,
+    club_id TEXT NOT NULL REFERENCES poker_club(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL DEFAULT '',
+    kind TEXT NOT NULL DEFAULT '',
+    detail TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_club_activity_club ON poker_club_activity(club_id, created_at DESC);
+
+-- ============================================================
+-- economy domain
+-- ============================================================
+CREATE TABLE IF NOT EXISTS poker_wallet_bucket (
+  user_id    TEXT NOT NULL,
+  bucket     TEXT NOT NULL,
+  balance    BIGINT NOT NULL DEFAULT 0,
+  currency   TEXT NOT NULL DEFAULT 'USD',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, bucket)
+);
+CREATE TABLE IF NOT EXISTS poker_cosmetic_wishlist (
+  user_id     TEXT NOT NULL,
+  cosmetic_id TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, cosmetic_id)
+);
+CREATE TABLE IF NOT EXISTS poker_cosmetic_dye (
+  user_id     TEXT NOT NULL,
+  cosmetic_id TEXT NOT NULL,
+  params_json TEXT NOT NULL DEFAULT '{}',
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, cosmetic_id)
+);
+CREATE TABLE IF NOT EXISTS poker_loadout (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  slots_json TEXT NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_poker_loadout_user ON poker_loadout(user_id);
+CREATE TABLE IF NOT EXISTS poker_cosmetic_nft (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL,
+  cosmetic_id TEXT NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'pending',
+  tx_hash     TEXT NOT NULL DEFAULT '',
+  chain       TEXT NOT NULL DEFAULT 'polygon',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_poker_cosmetic_nft_user ON poker_cosmetic_nft(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_poker_cosmetic_nft_cos ON poker_cosmetic_nft(cosmetic_id);
+
+-- ============================================================
+-- admin domain
+-- ============================================================
+CREATE TABLE IF NOT EXISTS poker_user_status (
+    user_id TEXT PRIMARY KEY,
+    banned BOOLEAN NOT NULL DEFAULT FALSE,
+    reason TEXT NOT NULL DEFAULT '',
+    banned_by TEXT NOT NULL DEFAULT '',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS poker_platform_setting (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT '',
+    updated_by TEXT NOT NULL DEFAULT '',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS poker_admin_audit (
+    id TEXT PRIMARY KEY,
+    admin_user_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    target TEXT NOT NULL DEFAULT '',
+    detail JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_admin_audit_created ON poker_admin_audit(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS poker_ip_rule (
+    id TEXT PRIMARY KEY,
+    cidr TEXT NOT NULL,
+    rule TEXT NOT NULL DEFAULT 'deny',
+    reason TEXT NOT NULL DEFAULT '',
+    created_by TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS poker_hitl_queue (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL DEFAULT '',
+    subject_user_id TEXT NOT NULL DEFAULT '',
+    payload JSONB NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL DEFAULT 'pending',
+    note TEXT NOT NULL DEFAULT '',
+    reviewed_by TEXT,
+    reviewed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_hitl_queue_status ON poker_hitl_queue(status, created_at);
+
+CREATE TABLE IF NOT EXISTS poker_settlement (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL DEFAULT '',
+    reference TEXT NOT NULL DEFAULT '',
+    counterparty TEXT NOT NULL DEFAULT '',
+    amount_cents BIGINT NOT NULL DEFAULT 0,
+    currency TEXT NOT NULL DEFAULT 'usd',
+    status TEXT NOT NULL DEFAULT 'pending',
+    note TEXT NOT NULL DEFAULT '',
+    detail JSONB NOT NULL DEFAULT '{}',
+    created_by TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    verified_by TEXT,
+    verified_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_poker_settlement_kind ON poker_settlement(kind, status, created_at DESC);
+
+-- ============================================================
+-- aiproc domain
+-- ============================================================
+CREATE TABLE IF NOT EXISTS poker_antibot_score (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    score DOUBLE PRECISION NOT NULL DEFAULT 0,
+    risk TEXT NOT NULL DEFAULT 'low',
+    flags_json JSONB NOT NULL DEFAULT '[]',
+    sample_size INT NOT NULL DEFAULT 0,
+    banned BOOLEAN NOT NULL DEFAULT FALSE,
+    banned_reason TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_poker_antibot_score_risk ON poker_antibot_score(risk, score DESC);
+
+CREATE TABLE IF NOT EXISTS poker_collusion_flag (
+    id TEXT PRIMARY KEY,
+    user_a TEXT NOT NULL,
+    user_b TEXT NOT NULL,
+    match_id TEXT NOT NULL DEFAULT '',
+    reason TEXT NOT NULL DEFAULT '',
+    score DOUBLE PRECISION NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'open',
+    reviewed_by TEXT NOT NULL DEFAULT '',
+    review_note TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    reviewed_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_poker_collusion_flag_status ON poker_collusion_flag(status, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS poker_announcement (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL DEFAULT '',
+    severity TEXT NOT NULL DEFAULT 'info',
+    audience TEXT NOT NULL DEFAULT 'all',
+    starts_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ends_at TIMESTAMPTZ,
+    created_by TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_poker_announcement_window ON poker_announcement(starts_at DESC, ends_at);
+
+CREATE TABLE IF NOT EXISTS poker_support_ticket (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL DEFAULT '',
+    email TEXT NOT NULL DEFAULT '',
+    subject TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'general',
+    priority TEXT NOT NULL DEFAULT 'normal',
+    status TEXT NOT NULL DEFAULT 'open',
+    messages_json JSONB NOT NULL DEFAULT '[]',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_poker_support_ticket_user ON poker_support_ticket(user_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_poker_support_ticket_status ON poker_support_ticket(status, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS poker_device_fingerprint (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    fingerprint TEXT NOT NULL,
+    ip TEXT NOT NULL DEFAULT '',
+    user_agent TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id, fingerprint)
+);
+CREATE INDEX IF NOT EXISTS idx_poker_device_fingerprint_fp ON poker_device_fingerprint(fingerprint);
+
+-- ============================================================
+-- tournext domain
+-- ============================================================
+ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS late_reg_secs INT NOT NULL DEFAULT 0;
+ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS time_bank_secs INT NOT NULL DEFAULT 0;
+ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS format TEXT NOT NULL DEFAULT 'mtt';
