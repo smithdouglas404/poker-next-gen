@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Manrope } from "next/font/google";
 import "./globals.css";
+import { SiteNav } from "@/features/nav/SiteNav";
 
 // Neon Vault type system (matches HighRollersClub): Space Grotesk for display,
 // Manrope for body.

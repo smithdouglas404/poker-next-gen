@@ -21,9 +21,24 @@ export default function LoginPage() {
     setError(null);
     try {
       await authenticate("email", { email, password, username }, mode === "signup");
-      router.push("/");
+      router.push("/hub"); // land members on their home, not the marketing page
     } catch (e) {
       setError(e instanceof Error ? e.message : "Authentication failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Play now without an account — device (guest) auth. Guests can play and enter
+  // access codes; club creation / paid features still require a verified account.
+  const continueAsGuest = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await authenticate("device", {}, true);
+      router.push("/hub");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not start a guest session");
     } finally {
       setBusy(false);
     }
@@ -70,6 +85,19 @@ export default function LoginPage() {
           <Button variant="outline" size="lg" disabled={busy} onClick={() => void googleLogin()} className="w-full">
             Continue with Google
           </Button>
+          <div className="flex items-center gap-3 py-1">
+            <span className="h-px flex-1 bg-white/10" />
+            <span className="text-[10px] uppercase tracking-[0.25em] text-neutral-600">or</span>
+            <span className="h-px flex-1 bg-white/10" />
+          </div>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void continueAsGuest()}
+            className="w-full rounded-xl border border-white/15 py-3 text-sm font-bold uppercase tracking-wide text-neutral-200 transition hover:border-white/30 hover:text-white disabled:opacity-40"
+          >
+            Play now as guest
+          </button>
         </div>
 
         <p className="mt-6 text-center text-sm text-neutral-500">
