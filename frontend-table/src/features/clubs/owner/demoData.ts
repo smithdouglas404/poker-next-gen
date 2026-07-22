@@ -4,9 +4,12 @@
 // shapes match the real RPC responses exactly so the live path is identical.
 
 import type {
+  ClubAnnouncement,
+  ClubChatMessage,
   JoinRequest,
   OwnerClub,
   QuickStats,
+  RakeConfig,
   RakeLedger,
   RakeReport,
   RosterRow,
@@ -97,3 +100,48 @@ export const DEMO_RAKE_LEDGER: RakeLedger = {
 export function totalBankrollCents(roster: RosterRow[], houseBalance: number): number {
   return houseBalance + roster.reduce((s, m) => s + (m.balance ?? 0) + (m.locked_amount ?? 0), 0);
 }
+
+// ---- Global Announcement Control Center ------------------------------------
+
+export const DEMO_ANNOUNCEMENTS: ClubAnnouncement[] = [
+  { id: "clann-1", club_id: DEMO_CLUB.id, title: "Special Tournament Starts in 1 Hour", body: "ATTENTION ALL PLAYERS: The Gold Cup qualifier begins at the top of the hour. Double XP event is now LIVE!", severity: "critical", created_by: "owner", created_at: minsAgo(52) },
+  { id: "clann-2", club_id: DEMO_CLUB.id, title: "New High-Stakes Table Opened", body: "The $500/$1k Neon Vault table is now seating. First 6 players get a rakeback boost.", severity: "info", created_by: "owner", created_at: minsAgo(340) },
+  { id: "clann-3", club_id: DEMO_CLUB.id, title: "Scheduled Maintenance Sunday 04:00 UTC", body: "Brief downtime for the vault ledger migration. All balances are safe.", severity: "warning", created_by: "owner", created_at: daysAgo(2) },
+];
+
+// ---- Overview right-rail: Global Club Chat ---------------------------------
+
+export const DEMO_CHAT: ClubChatMessage[] = [
+  { id: "cm-1", club_id: DEMO_CLUB.id, user_id: "u-elena", username: "Elena Thorne", text: "Any room open at the high-stakes table?", created_at: minsAgo(14) },
+  { id: "cm-2", club_id: DEMO_CLUB.id, user_id: "u-viktor", username: "AceKing", text: "GL everyone at the Gold Cup qualifier tonight 🏆", created_at: minsAgo(11) },
+  { id: "cm-3", club_id: DEMO_CLUB.id, user_id: "u-soren", username: "Soren Kael", text: "Just booked a $50k pot on table 3 😮", created_at: minsAgo(6) },
+  { id: "cm-4", club_id: DEMO_CLUB.id, user_id: "u-mina", username: "Mina Oh", text: "Congrats! Railing you now.", created_at: minsAgo(3) },
+];
+
+export const DEMO_RAKE_CONFIG: RakeConfig = {
+  club_id: DEMO_CLUB.id,
+  name: "Standard",
+  percent_bps: 500, // 5.0%
+  cap_minor: 300_00, // $300 cap
+  no_flop_no_drop: true,
+  min_pot_minor: 1_00,
+  is_active: true,
+};
+
+/** 12-month analytics series for the Member Analytics dashboard. */
+export const DEMO_ANALYTICS = {
+  months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+  activeMembers: [22, 58, 96, 150, 176, 190, 214, 240, 262, 288, 312, 342],
+  tableVolumeCents: [14_000_00, 11_500_00, 15_800_00, 21_000_00, 17_400_00, 22_400_00, 15_000_00, 12_600_00, 16_800_00, 19_200_00, 20_400_00, 24_800_00],
+  newPlayers: 33,
+  returningPlayers: 57,
+};
+
+/** Overview sparkline series (one per stat card). */
+export const DEMO_OVERVIEW_SPARKS = {
+  members: [980, 1010, 1044, 1090, 1120, 1165, 1205, 1245],
+  tables: [11, 12, 10, 14, 15, 13, 17, 18],
+  volumeCents: [8_400_000_00, 9_100_000_00, 10_800_000_00, 12_200_000_00, 13_900_000_00, 12_600_000_00, 14_800_000_00, 15_450_000_00],
+  potCents: [9_800_00, 10_400_00, 11_100_00, 10_600_00, 12_000_00, 11_500_00, 12_200_00, 12_500_00],
+  rakeCents: [320_000_00, 355_000_00, 380_000_00, 410_000_00, 400_000_00, 430_000_00, 445_000_00, 450_000_00],
+};

@@ -11,15 +11,19 @@ import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 export type OverlayDemoState =
   | "summary" // Final Hand History Log + Financial Summary
   | "paused" // Game Paused by Admin
-  | "settings" // Comprehensive Admin Table Settings
+  | "settings" // Table Settings (Blinds Configuration)
   | "report" // Player Game Report
   | "kickban" // Player Kick/Ban Confirmation
-  | "news"; // Breaking News
+  | "news" // Breaking News
+  | "approve" // Approve New Player card
+  | "dashboard"; // Global Dashboard / club home
 
 const ITEMS: Array<{ id: OverlayDemoState; label: string }> = [
+  { id: "approve", label: "Approve New Player" },
+  { id: "settings", label: "Table Settings" },
+  { id: "dashboard", label: "Global Dashboard" },
   { id: "summary", label: "Hand History + Financials" },
   { id: "paused", label: "Game Paused by Admin" },
-  { id: "settings", label: "Admin Table Settings" },
   { id: "report", label: "Player Game Report" },
   { id: "kickban", label: "Player Kick / Ban" },
   { id: "news", label: "Breaking News" },

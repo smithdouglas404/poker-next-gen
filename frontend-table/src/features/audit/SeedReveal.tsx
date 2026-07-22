@@ -140,8 +140,8 @@ export function SeedReveal({ target }: Props) {
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <p className={cn(HEADING_SM, "flex items-center gap-2 text-cyan/80")}>
-              <span className="text-cyan">▪</span> Secure Protocol V2.4
+            <p className={cn(HEADING_SM, "flex items-center gap-2 text-green/80")}>
+              <span className="text-green">▪</span> Secure Protocol V2.4
             </p>
             <h1 className="mt-2 font-display text-4xl font-bold uppercase tracking-wide">Seed Reveal</h1>
           </div>
@@ -229,7 +229,7 @@ export function SeedReveal({ target }: Props) {
             <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className={cn(GLASS_PANEL, "p-5")}>
                 <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-500">Calculated Combined Seed</div>
-                <div className="mt-3 break-all rounded-lg bg-black/50 p-3 font-mono text-xs text-cyan">
+                <div className="mt-3 break-all rounded-lg bg-black/50 p-3 font-mono text-xs text-green">
                   {result.combinedSeed.slice(0, 10)}...{result.combinedSeed.slice(-16)}
                 </div>
               </div>

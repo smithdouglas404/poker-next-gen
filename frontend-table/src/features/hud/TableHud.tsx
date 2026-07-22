@@ -7,6 +7,7 @@ import { SeatHud } from "@/features/hud/SeatHud";
 import { ActionBar } from "@/features/hud/ActionBar";
 import { PreActionBar } from "@/features/hud/PreActionBar";
 import { ActionTimer } from "@/features/hud/ActionTimer";
+import { GameStatusRail } from "@/features/hud/GameStatusRail";
 import { EquityPanel } from "@/features/hud/EquityPanel";
 import { HandVerifyPanel } from "@/features/hud/HandVerifyPanel";
 import { BuyInSlider, TableLog } from "@/features/hud/TableLog";
@@ -71,6 +72,9 @@ export function TableHud({ children }: { children: React.ReactNode }) {
                 switchable. */}
             <SeatHud />
             <ActionTimer />
+            {/* Live-hand status chrome (current bet / hand strength / sit-out) —
+                cinematic-only, matching the HRC flop-dealt master. */}
+            {cinematic && <GameStatusRail />}
             {!cinematic && (
               <CommunityCards board={snapshot?.board ?? []} phase={snapshot?.phase ?? "waiting"} />
             )}

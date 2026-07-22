@@ -8,6 +8,9 @@ import { Button, Field, Input, Panel, Select } from "@/features/ui";
 import { BTN_GOLD, GLASS_PANEL, GLASS_PANEL_HOVER, HEADING_LG, cn } from "@/features/ui/tokens";
 import { CosmeticThumb } from "@/features/marketplace/CosmeticThumb";
 import { rarityKey, rarityStyle, usd } from "@/features/marketplace/rarity";
+import { AvatarTiers } from "@/features/marketplace/AvatarTiers";
+import { PremiumMarket } from "@/features/marketplace/PremiumMarket";
+import { isDemoCosmeticId } from "@/features/marketplace/avatars";
 import type {
   Cosmetic,
   Equipped,
@@ -16,7 +19,7 @@ import type {
   NFTStatus,
 } from "@/features/marketplace/types";
 
-type Tab = "market" | "shop" | "vault";
+type Tab = "market" | "shop" | "tiers" | "premium" | "vault";
 
 async function rpc<T>(id: string, payload: Record<string, unknown> = {}): Promise<T> {
   return (await callSessionRpc(id, payload)) as T;
@@ -25,6 +28,8 @@ async function rpc<T>(id: string, payload: Record<string, unknown> = {}): Promis
 const TABS: { id: Tab; label: string; blurb: string }[] = [
   { id: "market", label: "Marketplace", blurb: "Player-to-player trading floor" },
   { id: "shop", label: "Shop", blurb: "Official cosmetics catalog" },
+  { id: "tiers", label: "Avatars & Tiers", blurb: "Premium & basic avatar drops" },
+  { id: "premium", label: "Premium", blurb: "Mythic & 1/1 exclusives" },
   { id: "vault", label: "Vault", blurb: "Your collection · dye · loadouts" },
 ];
 
@@ -36,7 +41,9 @@ export default function MarketplacePage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const t = new URLSearchParams(window.location.search).get("tab");
-    if (t === "market" || t === "shop" || t === "vault") setTab(t);
+    if (t === "market" || t === "shop" || t === "tiers" || t === "premium" || t === "vault") {
+      setTab(t);
+    }
   }, []);
 
   // Data
@@ -140,11 +147,44 @@ export default function MarketplacePage() {
       await loadMarket();
     });
 
+  // Locally add a demo/offline avatar to the collection (labeled, never live).
+  const simulateOwn = useCallback((items: Cosmetic[]) => {
+    setInventory((inv) => {
+      const have = new Set(inv.map((c) => c.id));
+      const add = items.filter((c) => !have.has(c.id));
+      return add.length ? [...add, ...inv] : inv;
+    });
+  }, []);
+
   const buyCosmetic = (c: Cosmetic) =>
     act("shopbuy" + c.id, async () => {
+      if (isDemoCosmeticId(c.id)) {
+        simulateOwn([c]);
+        setMessage(`Acquired "${c.name}" (offline demo — not a live purchase).`);
+        return;
+      }
       await rpc("cosmetic_buy", { cosmetic_id: c.id });
       setMessage(`Purchased "${c.name}".`);
       await loadInventory();
+    });
+
+  // Batch checkout for the Avatars & Tiers cart — each item settles through the
+  // real `cosmetic_buy` RPC (demo items are simulated locally and labeled).
+  const buyCart = (items: Cosmetic[]) =>
+    act("cart", async () => {
+      if (items.length === 0) return;
+      const demo = items.filter((c) => isDemoCosmeticId(c.id));
+      const live = items.filter((c) => !isDemoCosmeticId(c.id));
+      for (const c of live) {
+        await rpc("cosmetic_buy", { cosmetic_id: c.id });
+      }
+      if (demo.length) simulateOwn(demo);
+      if (live.length) await loadInventory();
+      const total = usd(items.reduce((s, c) => s + c.price_cents, 0));
+      setMessage(
+        `Purchase complete — ${items.length} avatar${items.length === 1 ? "" : "s"} for ${total}` +
+          (demo.length ? ` (${demo.length} offline demo).` : "."),
+      );
     });
 
   const equip = (c: Cosmetic) =>
@@ -325,6 +365,26 @@ export default function MarketplacePage() {
             busy={busy}
             onBuy={buyCosmetic}
             onEquip={equip}
+            onWishlist={toggleWishlist}
+          />
+        )}
+
+        {tab === "tiers" && (
+          <AvatarTiers
+            catalog={catalog}
+            ownedIds={ownedIds}
+            busy={busy}
+            onCheckout={buyCart}
+          />
+        )}
+
+        {tab === "premium" && (
+          <PremiumMarket
+            catalog={catalog}
+            ownedIds={ownedIds}
+            wishlistIds={wishlistIds}
+            busy={busy}
+            onBuy={buyCosmetic}
             onWishlist={toggleWishlist}
           />
         )}

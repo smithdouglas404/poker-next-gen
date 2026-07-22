@@ -44,6 +44,8 @@ export interface LeaderEntry {
   username: string;
   score: number;
   subscore?: number;
+  hands?: number; // hands played (leaderboard view); falls back to subscore
+  avatar?: string; // optional avatar id/url (leaderboard view)
 }
 
 /** tournament_status live snapshot. */
@@ -86,6 +88,12 @@ export interface TournamentAnalytics {
   total_fees_display?: string;
   prizes?: Prize[];
   finishers?: { username?: string; finish_place?: number }[];
+  // Financial-overview / summary extras (derived client-side when the snapshot
+  // does not carry them — the payout master surfaces these).
+  rebuys_minor?: number; // re-buys / add-ons contribution to the pool
+  rake_minor?: number; // club rake (same as total fees unless overridden)
+  hands_played?: number; // total hands dealt so far
+  avg_stack?: number; // average stack in chips
 }
 
 /** UI-only enrichment layered on top of a Tournament for the lobby cards. */
@@ -104,7 +112,7 @@ export interface LobbyMeta {
 export type EnrichedTournament = Tournament & { meta?: LobbyMeta };
 
 export type OwnerBucket = "live" | "upcoming" | "completed" | "drafts";
-export type TopTab = "lobby" | "center";
+export type TopTab = "lobby" | "center" | "board";
 
 /** Draft held client-side by the create panel before publish. */
 export interface DraftForm {
@@ -121,4 +129,5 @@ export interface DraftForm {
   guaranteedPrize: number; // dollars
   lateReg: boolean;
   scheduledAt: string; // datetime-local value
+  regCloseAt: string; // datetime-local value (late-reg close)
 }

@@ -20,6 +20,7 @@ import {
   type Withdrawal,
 } from "@/features/wallet/walletRpc";
 import { rgLimitsApi, emptyLimits, type RgLimits } from "@/features/wallet/rgLimitsRpc";
+import { WalletConnect } from "@/features/wallet/WalletConnect";
 
 const GOLD_TEXT =
   "bg-gradient-to-r from-[#ffd54a] via-[#f5c518] to-[#d4a80f] bg-clip-text text-transparent";
@@ -202,6 +203,16 @@ export default function WalletPage() {
               Refresh
             </Button>
           </div>
+        </section>
+
+        {/* Wallet connection interface (MetaMask / Coinbase / WalletConnect / Phantom) */}
+        <section className="mb-6">
+          <WalletConnect
+            balanceCents={balance}
+            buckets={buckets}
+            notify={notify}
+            onDone={loadCore}
+          />
         </section>
 
         {/* Claimable strip */}

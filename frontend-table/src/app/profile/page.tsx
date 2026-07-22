@@ -5,14 +5,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AnalyticsPanel } from "@/features/profile/AnalyticsPanel";
 import { LeaderboardPanel } from "@/features/profile/LeaderboardPanel";
+import { ProfileOverview } from "@/features/profile/ProfileOverview";
+import { SecurityDashboard } from "@/features/profile/SecurityDashboard";
 import { SecurityPanel } from "@/features/profile/SecurityPanel";
 import { money, profileApi, type Profile } from "@/features/profile/profileRpc";
 import { GLASS_PANEL, HEADING_SM, cn } from "@/features/ui/tokens";
 
-type Tab = "analytics" | "leaderboard" | "security";
+type Tab = "overview" | "analytics" | "leaderboard" | "security";
 type Toast = { msg: string; kind: "ok" | "err" };
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: "overview", label: "Overview" },
   { id: "analytics", label: "Analytics" },
   { id: "leaderboard", label: "Leaderboard" },
   { id: "security", label: "Security" },
@@ -27,7 +30,7 @@ function initials(name: string): string {
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [tab, setTab] = useState<Tab>("analytics");
+  const [tab, setTab] = useState<Tab>("overview");
   const [toast, setToast] = useState<Toast | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -52,12 +55,19 @@ export default function ProfilePage() {
 
   const body = useMemo(() => {
     switch (tab) {
+      case "overview":
+        return <ProfileOverview notify={notify} />;
       case "analytics":
         return <AnalyticsPanel notify={notify} />;
       case "leaderboard":
         return <LeaderboardPanel meUserId={profile?.user_id ?? null} notify={notify} />;
       case "security":
-        return <SecurityPanel notify={notify} />;
+        return (
+          <div className="space-y-8">
+            <SecurityDashboard notify={notify} />
+            <SecurityPanel notify={notify} />
+          </div>
+        );
       default:
         return null;
     }

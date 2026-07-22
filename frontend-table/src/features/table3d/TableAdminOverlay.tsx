@@ -14,12 +14,16 @@ import { BTN_GOLD, GLASS_PANEL, HEADING_LG, cn } from "@/features/ui/tokens";
 import {
   DEFAULT_TABLE_SETTINGS,
   useTableAdmin,
+  type HandRow,
   type TableAdmin,
   type TableSettingsValues,
   type WaitingEntry,
 } from "./adminSession";
 import {
   GamePausedOverlay,
+  ApproveNewPlayerModal,
+  ReplayScrubber,
+  GlobalDashboardOverlay,
   PlayerGameReportModal,
   PlayerKickBanModal,
   BreakingNewsModal,
@@ -106,6 +110,85 @@ function NumField({
   );
 }
 
+/** Dollar-denominated input backed by a cents value (Blinds Configuration). */
+function MoneyField({
+  label,
+  value,
+  onChange,
+  compact,
+}: {
+  label: string;
+  value: number;
+  onChange: (cents: number) => void;
+  compact?: boolean;
+}) {
+  return (
+    <label className="flex items-center gap-2">
+      <span className={cn("text-sm text-neutral-300", compact && "text-[13px]")}>{label}</span>
+      <span className="flex items-center rounded-lg border border-white/10 bg-black/50 px-2 focus-within:border-gold/50">
+        <span className="text-xs text-neutral-500">$</span>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={Math.round(value / 100).toLocaleString()}
+          onChange={(e) => onChange(Math.max(0, Math.round(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)) * 100)}
+          className={cn("bg-transparent px-1 py-1.5 text-right text-sm font-semibold text-white outline-none", compact ? "w-24" : "w-28")}
+        />
+      </span>
+    </label>
+  );
+}
+
+/** Labelled range slider (Turn Time Limit). */
+function SliderField({
+  label,
+  value,
+  min,
+  max,
+  step,
+  suffix,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  suffix: string;
+  onChange: (n: number) => void;
+}) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between">
+        <span className="text-sm text-neutral-300">{label}</span>
+        <span className="font-semibold text-gold">
+          {value}
+          {suffix}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="mt-2 w-full accent-[#f5c518]"
+      />
+      <div className="flex justify-between text-[10px] text-neutral-500">
+        <span>
+          {min}
+          {suffix}
+        </span>
+        <span>
+          {max}
+          {suffix}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function ModalShell({
   title,
   onClose,
@@ -159,6 +242,8 @@ function AdminControl({
   onSummary,
   onReport,
   onNews,
+  onApprove,
+  onDashboard,
 }: {
   admin: TableAdmin;
   onSettings: () => void;
@@ -166,8 +251,11 @@ function AdminControl({
   onSummary: () => void;
   onReport: () => void;
   onNews: () => void;
+  onApprove: () => void;
+  onDashboard: () => void;
 }) {
   const [open, setOpen] = useState(true);
+  const pending = admin.waiting.length;
   return (
     <div className="pointer-events-auto absolute right-4 top-4 z-30 flex w-60 flex-col items-end gap-2">
       <button
@@ -182,6 +270,8 @@ function AdminControl({
           <MenuRow label="Pause Game" glyph={admin.paused ? "▶" : "❚❚"} accent={admin.paused ? "#f5c518" : undefined} onClick={() => void admin.pauseResume()} sub={admin.paused ? "Paused" : undefined} />
           <MenuRow label="Table Settings" glyph="⚙" onClick={onSettings} />
           <MenuRow label="Player Management" glyph="👥" onClick={onPlayers} />
+          <MenuRow label="Approve New Players" glyph="✔" onClick={onApprove} sub={pending ? String(pending) : undefined} />
+          <MenuRow label="Global Dashboard" glyph="🏛" onClick={onDashboard} />
           <MenuRow label="Session Report" glyph="📊" onClick={onSummary} />
           <MenuRow label="Player Game Report" glyph="🧾" onClick={onReport} />
           <MenuRow label="Broadcast News" glyph="📣" onClick={onNews} />
@@ -221,7 +311,7 @@ function MenuRow({
 
 /* ------------------------------ Waiting List ------------------------------ */
 
-function WaitingList({ admin }: { admin: TableAdmin }) {
+function WaitingList({ admin, onSelect }: { admin: TableAdmin; onSelect: (e: WaitingEntry) => void }) {
   const [busy, setBusy] = useState<string | null>(null);
   if (!admin.waiting.length) return null;
   const approve = async (e: WaitingEntry) => {
@@ -233,21 +323,22 @@ function WaitingList({ admin }: { admin: TableAdmin }) {
     }
   };
   return (
-    <div className="pointer-events-auto absolute right-4 top-28 z-20 flex w-64 flex-col gap-3">
+    <div className="pointer-events-auto absolute right-4 top-28 z-20 flex max-h-[70vh] w-64 flex-col gap-3 overflow-y-auto">
       <div className={cn(HEADING_LG, "text-center text-gold")}>
         Waiting List
       </div>
       <div className="flex flex-col gap-3">
         {admin.waiting.map((e) => (
           <div key={e.invitationId} className={cn(GLASS_PANEL, "border-gold/15 p-3")}>
-            <div className="flex items-center gap-3">
+            {/* The card body opens the full Approve-New-Player card (master 2). */}
+            <button type="button" onClick={() => onSelect(e)} className="flex w-full items-center gap-3 text-left">
               <Avatar src={e.avatar} ring="#f5c518" />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold text-white">{e.name}</div>
                 <div className="truncate text-[11px] text-neutral-400">[{e.handle}]</div>
                 <div className="text-[13px] font-bold text-gold">{formatCents(e.buyInCents)}</div>
               </div>
-            </div>
+            </button>
             <button
               type="button"
               disabled={busy === e.invitationId}
@@ -291,7 +382,7 @@ function TableSettingsModal({ admin, onClose }: { admin: TableAdmin; onClose: ()
 
   return (
     <ModalShell
-      title="Comprehensive Admin Table Settings"
+      title="Table Settings"
       onClose={onClose}
       footer={
         <div className="flex items-center justify-center gap-3">
@@ -305,6 +396,44 @@ function TableSettingsModal({ admin, onClose }: { admin: TableAdmin; onClose: ()
       }
     >
       <div className="space-y-6 px-6 py-5">
+        {/* Blinds Configuration — the primary panel from the HRC master. */}
+        <section className="space-y-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground">Blinds Configuration</h3>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <MoneyField label="Small Blind" value={s.smallBlindCents} onChange={(v) => set("smallBlindCents", v)} />
+            <MoneyField label="Big Blind" value={s.bigBlindCents} onChange={(v) => set("bigBlindCents", v)} />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <Row label="Ante">
+              <Seg value={s.anteOn} onChange={(v) => set("anteOn", v)} options={[{ v: true, label: "On" }, { v: false, label: "Off" }]} />
+            </Row>
+            {s.anteOn && <MoneyField label="Amount" value={s.anteCents} onChange={(v) => set("anteCents", v)} compact />}
+          </div>
+          <SliderField
+            label="Turn Time Limit"
+            value={s.turnTimeSecs}
+            min={15}
+            max={60}
+            step={5}
+            suffix="s"
+            onChange={(v) => set("turnTimeSecs", v)}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <span className="text-sm text-neutral-300">Buy-in Range</span>
+            <div className="flex items-center gap-3">
+              <MoneyField label="Min" value={s.buyInMinCents} onChange={(v) => set("buyInMinCents", v)} compact />
+              <MoneyField label="Max" value={s.buyInMaxCents} onChange={(v) => set("buyInMaxCents", v)} compact />
+            </div>
+          </div>
+          <Row label="Table Privacy">
+            <Seg
+              value={s.isPrivate}
+              onChange={(v) => set("isPrivate", v)}
+              options={[{ v: false, label: "Public" }, { v: true, label: "Private" }]}
+            />
+          </Row>
+        </section>
+
         <section className="space-y-3">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground">Wallet &amp; Credit Limits</h3>
           <div className="flex items-center justify-between gap-4">
@@ -423,7 +552,15 @@ function PlayerManagementModal({
 
 /* -------------------- Financial Summary / Hand History -------------------- */
 
-function FinancialSummaryModal({ admin, onClose }: { admin: TableAdmin; onClose: () => void }) {
+function FinancialSummaryModal({
+  admin,
+  onClose,
+  onScrub,
+}: {
+  admin: TableAdmin;
+  onClose: () => void;
+  onScrub: (hand: HandRow) => void;
+}) {
   const [replaying, setReplaying] = useState<string | null>(null);
   useEffect(() => {
     void admin.loadSummary();
@@ -434,7 +571,11 @@ function FinancialSummaryModal({ admin, onClose }: { admin: TableAdmin; onClose:
   const replay = async (handId: string) => {
     setReplaying(handId);
     try {
-      await admin.replayHand(handId);
+      const row = await admin.replayHand(handId);
+      if (row) {
+        onScrub(row);
+        onClose();
+      }
     } finally {
       setReplaying(null);
     }
@@ -538,13 +679,29 @@ function FinancialSummaryModal({ admin, onClose }: { admin: TableAdmin; onClose:
 
 /* -------------------------------- root ---------------------------------- */
 
-type ModalKind = "settings" | "players" | "summary" | "report" | "kickban" | "news" | null;
+type ModalKind =
+  | "settings"
+  | "players"
+  | "summary"
+  | "report"
+  | "kickban"
+  | "news"
+  | "approve"
+  | "dashboard"
+  | null;
 
 export function TableAdminOverlay({ demo }: { demo: boolean }) {
   const admin = useTableAdmin(demo);
   const overlays = useTableOverlays(demo, admin);
   const [modal, setModal] = useState<ModalKind>(null);
   const [kickTarget, setKickTarget] = useState<KickTarget | null>(null);
+  const [approveEntry, setApproveEntry] = useState<WaitingEntry | null>(null);
+  const [replayHand, setReplayHand] = useState<HandRow | null>(null);
+
+  const openApprove = (entry: WaitingEntry) => {
+    setApproveEntry(entry);
+    setModal("approve");
+  };
 
   useEffect(() => {
     if (admin.canAdmin) void admin.loadWaiting();
@@ -562,12 +719,14 @@ export function TableAdminOverlay({ demo }: { demo: boolean }) {
     setModal("kickban");
   };
 
-  // Dev-control (demo) → open any of the six overlay states.
+  // Dev-control (demo) → open any of the overlay states.
   const openDemo = (state: OverlayDemoState) => {
     if (state === "paused") overlays.setDemoPaused(true);
     else if (state === "news") overlays.showDemoNews();
     else if (state === "kickban") openKickBan(DEMO_KICK_TARGET);
-    else setModal(state); // "summary" | "settings" | "report"
+    else if (state === "approve") {
+      if (admin.waiting[0]) openApprove(admin.waiting[0]);
+    } else setModal(state); // "summary" | "settings" | "report" | "dashboard"
   };
 
   return (
@@ -600,16 +759,43 @@ export function TableAdminOverlay({ demo }: { demo: boolean }) {
             onSummary={() => setModal("summary")}
             onReport={() => setModal("report")}
             onNews={() => setModal("news")}
+            onApprove={() => (admin.waiting[0] ? openApprove(admin.waiting[0]) : setModal("players"))}
+            onDashboard={() => setModal("dashboard")}
           />
-          <WaitingList admin={admin} />
+          <WaitingList admin={admin} onSelect={openApprove} />
           {demo && <OverlayDevControl onOpen={openDemo} />}
+          {modal === "approve" && approveEntry && (
+            <ApproveNewPlayerModal
+              entry={approveEntry}
+              onApprove={admin.approve}
+              onDecline={admin.decline}
+              onClose={() => {
+                setModal(null);
+                setApproveEntry(null);
+              }}
+            />
+          )}
           {modal === "settings" && <TableSettingsModal admin={admin} onClose={() => setModal(null)} />}
           {modal === "players" && (
             <PlayerManagementModal admin={admin} onClose={() => setModal(null)} onKickBan={openKickBan} />
           )}
-          {modal === "summary" && <FinancialSummaryModal admin={admin} onClose={() => setModal(null)} />}
+          {modal === "summary" && (
+            <FinancialSummaryModal admin={admin} onClose={() => setModal(null)} onScrub={setReplayHand} />
+          )}
+          {modal === "dashboard" && (
+            <GlobalDashboardOverlay demo={demo} onClose={() => setModal(null)} />
+          )}
           {modal === "news" && (
             <BreakingNewsComposeModal overlays={overlays} onClose={() => setModal(null)} />
+          )}
+          {replayHand && (
+            <ReplayScrubber
+              hand={replayHand}
+              onSkipEnd={async () => {
+                await admin.replayHand(replayHand.handId);
+              }}
+              onClose={() => setReplayHand(null)}
+            />
           )}
         </>
       )}

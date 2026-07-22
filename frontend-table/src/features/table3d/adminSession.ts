@@ -24,11 +24,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { useGame } from "@/features/game/GameProvider";
-import { avatarForKey, avatarSrc } from "@/features/table/avatars";
+import { avatarDef, avatarForKey, avatarSrc, type AvatarTier } from "@/features/table/avatars";
 
 /** Resolve any user/character key to a portrait URL for the DOM chrome. */
 function avatarUrl(key: string): string {
   return avatarSrc(avatarForKey(key));
+}
+
+/** Resolve any user/character key to its catalog rarity tier (Approve card). */
+function rarityOf(key: string): AvatarTier {
+  return avatarDef(avatarForKey(key)).tier;
 }
 
 /* ------------------------------- types ------------------------------- */
@@ -44,6 +49,8 @@ export interface WaitingEntry {
   buyInCents: number;
   /** Player's connected-wallet balance, minor units (0 when unknown live). */
   walletCents: number;
+  /** Catalog rarity tier of the requesting player's avatar (Approve card). */
+  rarity: AvatarTier;
 }
 
 export interface FinancialRow {
@@ -88,12 +95,25 @@ export interface TableAdmin {
   setBlinds: (smallCents: number, bigCents: number) => Promise<void>;
   saveSettings: (settings: TableSettingsValues) => Promise<void>;
   approve: (entry: WaitingEntry) => Promise<void>;
+  decline: (entry: WaitingEntry) => Promise<void>;
   loadWaiting: () => Promise<void>;
   loadSummary: () => Promise<void>;
   replayHand: (handId: string) => Promise<HandRow | null>;
 }
 
 export interface TableSettingsValues {
+  // Blinds Configuration (HRC full_body master) — the primary panel.
+  smallBlindCents: number;
+  bigBlindCents: number;
+  anteOn: boolean;
+  anteCents: number;
+  /** Decision clock in seconds (15–60 slider on the master). */
+  turnTimeSecs: number;
+  buyInMinCents: number;
+  buyInMaxCents: number;
+  /** Table Privacy — false = Public, true = Private. */
+  isPrivate: boolean;
+  // Extended host config (carried over the same authoritative channel).
   walletLimitCents: number;
   autoBuyBackPrivate: boolean;
   autoStart: boolean;
@@ -107,6 +127,14 @@ export interface TableSettingsValues {
 }
 
 export const DEFAULT_TABLE_SETTINGS: TableSettingsValues = {
+  smallBlindCents: 500_000,
+  bigBlindCents: 1_000_000,
+  anteOn: true,
+  anteCents: 100_000,
+  turnTimeSecs: 30,
+  buyInMinCents: 10_000_000,
+  buyInMaxCents: 100_000_000,
+  isPrivate: false,
   walletLimitCents: 500_000_000,
   autoBuyBackPrivate: true,
   autoStart: false,
@@ -122,9 +150,9 @@ export const DEFAULT_TABLE_SETTINGS: TableSettingsValues = {
 /* ------------------------------- demo -------------------------------- */
 
 const DEMO_WAITING: WaitingEntry[] = [
-  { invitationId: "demo-w1", clubId: "demo-club", userId: "neon-viper", name: "Neon Viper", handle: "User_A", avatar: avatarUrl("neon-viper"), buyInCents: 50_000_000, walletCents: 250_000_000 },
-  { invitationId: "demo-w2", clubId: "demo-club", userId: "shadow-king", name: "Shadow King", handle: "User_b", avatar: avatarUrl("shadow-king"), buyInCents: 75_000_000, walletCents: 100_000_000 },
-  { invitationId: "demo-w3", clubId: "demo-club", userId: "gold-phantom", name: "Gold Phantom", handle: "User_C", avatar: avatarUrl("gold-phantom"), buyInCents: 40_000_000, walletCents: 325_000_000 },
+  { invitationId: "demo-w1", clubId: "demo-club", userId: "neon-viper", name: "ShadowRunner", handle: "User_A", avatar: avatarUrl("neon-viper"), buyInCents: 50_000_000, walletCents: 250_000_000, rarity: rarityOf("neon-viper") },
+  { invitationId: "demo-w2", clubId: "demo-club", userId: "shadow-king", name: "IronVault", handle: "User_B", avatar: avatarUrl("shadow-king"), buyInCents: 75_000_000, walletCents: 100_000_000, rarity: rarityOf("shadow-king") },
+  { invitationId: "demo-w3", clubId: "demo-club", userId: "steel-ghost", name: "PixelDrifter", handle: "User_C", avatar: avatarUrl("steel-ghost"), buyInCents: 40_000_000, walletCents: 325_000_000, rarity: rarityOf("steel-ghost") },
 ];
 
 const DEMO_SUMMARY: SessionSummary = {
@@ -247,6 +275,7 @@ export function useTableAdmin(demo: boolean): TableAdmin {
           avatar: avatarUrl(uid || "neon-viper"),
           buyInCents: num(r.credit_limit_cents),
           walletCents: num(r.wallet_cents),
+          rarity: rarityOf(uid || r.username || "neon-viper"),
         };
       });
       setWaiting(rows);
@@ -333,11 +362,26 @@ export function useTableAdmin(demo: boolean): TableAdmin {
   const saveSettings = useCallback(
     async (settings: TableSettingsValues) => {
       if (demo) return;
-      // Blinds are a first-class host action; the wider table config rides the
-      // same authoritative OpHostAction channel so the server stays the source
-      // of truth (never client-side optimistic).
+      // Blinds are a first-class, server-honoured host action (handleHostAction
+      // "set_blinds") — route them there so the change actually takes effect
+      // from the next hand rather than being silently ignored.
+      if (settings.smallBlindCents > 0 && settings.bigBlindCents >= settings.smallBlindCents) {
+        await hostAction({
+          action: "set_blinds",
+          small_blind: settings.smallBlindCents,
+          big_blind: settings.bigBlindCents,
+        });
+      }
+      // The wider table config rides the same authoritative OpHostAction channel
+      // so the server stays the single source of truth (never client-optimistic).
       await hostAction({
         action: "table_settings",
+        ante_on: settings.anteOn,
+        ante_cents: settings.anteCents,
+        turn_time_secs: settings.turnTimeSecs,
+        buy_in_min_cents: settings.buyInMinCents,
+        buy_in_max_cents: settings.buyInMaxCents,
+        is_private: settings.isPrivate,
         wallet_limit_cents: settings.walletLimitCents,
         auto_buy_back_private: settings.autoBuyBackPrivate,
         auto_start: settings.autoStart,
@@ -376,6 +420,21 @@ export function useTableAdmin(demo: boolean): TableAdmin {
           /* allocation is best-effort; approval already succeeded */
         }
       }
+      await loadWaiting();
+    },
+    [demo, loadWaiting],
+  );
+
+  const decline = useCallback(
+    async (entry: WaitingEntry) => {
+      if (demo) {
+        setWaiting((prev) => prev.filter((w) => w.invitationId !== entry.invitationId));
+        return;
+      }
+      await callSessionRpc("club_request_review", {
+        invitation_id: entry.invitationId,
+        action: "reject",
+      });
       await loadWaiting();
     },
     [demo, loadWaiting],
@@ -438,6 +497,7 @@ export function useTableAdmin(demo: boolean): TableAdmin {
     setBlinds,
     saveSettings,
     approve,
+    decline,
     loadWaiting,
     loadSummary,
     replayHand,

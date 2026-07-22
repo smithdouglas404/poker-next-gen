@@ -6,11 +6,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { cn } from "@/features/ui/tokens";
 import {
+  blindLevelAdd,
   blindLevels,
   createTournament,
+  finalizeTournament,
   leaderboardTop,
   listTournaments,
   prizePool,
+  prizePoolAdd,
   registerTournament,
   tournamentAnalytics,
   tournamentStatus,
@@ -22,7 +25,9 @@ import {
   DEMO_TOURNAMENTS,
   demoAnalytics,
 } from "@/features/tournaments/demo";
+import { buildBlindLevels, buildPrizeTiers } from "@/features/tournaments/structures";
 import { CreateTournamentPanel } from "@/features/tournaments/CreateTournamentPanel";
+import { Leaderboard } from "@/features/tournaments/Leaderboard";
 import { Lobby } from "@/features/tournaments/Lobby";
 import { OwnerCenter } from "@/features/tournaments/OwnerCenter";
 import type {
@@ -225,12 +230,20 @@ export default function TournamentsPage() {
       setBusy(true);
       try {
         if (demo) {
-          notify(`Demo: "${draft.name}" would publish via tournament_create.`);
+          notify(`Demo: "${draft.name}" would publish via tournament_create + blind_level_add + prize_pool_add.`);
           setShowCreate(false);
           return;
         }
-        await createTournament(draft);
-        notify(`Published "${draft.name}".`);
+        const created = await createTournament(draft);
+        // Persist the derived blind ladder and payout tiers alongside the bracket
+        // (best-effort — the bracket is already live even if a level/tier fails).
+        if (created?.id) {
+          await Promise.allSettled([
+            ...buildBlindLevels(draft).map((lvl) => blindLevelAdd(created.id, lvl)),
+            ...buildPrizeTiers(draft.payoutStructure).map((p) => prizePoolAdd(created.id, p)),
+          ]);
+        }
+        notify(`Published "${draft.name}" with structure & payouts.`);
         setShowCreate(false);
         await load();
       } catch (e) {
@@ -240,6 +253,25 @@ export default function TournamentsPage() {
       }
     },
     [demo, notify, load],
+  );
+
+  const onFinalize = useCallback(
+    async (id: string) => {
+      const t = tournaments.find((x) => x.id === id);
+      if (demo) {
+        setTournaments((list) => list.map((x) => (x.id === id ? { ...x, status: "finished" } : x)));
+        notify(`Demo: "${t?.name ?? "event"}" would settle via tournament_finalize.`);
+        return;
+      }
+      try {
+        await finalizeTournament(id);
+        notify(`Finalized "${t?.name ?? "tournament"}".`);
+        await load();
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Finalize failed", "err");
+      }
+    },
+    [tournaments, demo, notify, load],
   );
 
   const totalPrizeMinor = useMemo(
@@ -257,7 +289,7 @@ export default function TournamentsPage() {
               Neon Vault
             </Link>
             <nav className="flex items-center gap-1">
-              {(["lobby", "center"] as TopTab[]).map((id) => (
+              {(["lobby", "center", "board"] as TopTab[]).map((id) => (
                 <button
                   key={id}
                   type="button"
@@ -267,7 +299,7 @@ export default function TournamentsPage() {
                     tab === id ? "bg-brand text-white" : "text-neutral-400 hover:text-neutral-200",
                   )}
                 >
-                  {id === "lobby" ? "Lobby" : "Tournament Center"}
+                  {id === "lobby" ? "Lobby" : id === "center" ? "Tournament Center" : "Leaderboard"}
                 </button>
               ))}
             </nav>
@@ -319,12 +351,21 @@ export default function TournamentsPage() {
             busy={busy}
             totalPrizeMinor={totalPrizeMinor}
           />
-        ) : (
+        ) : tab === "center" ? (
           <OwnerCenter
             tournaments={tournaments}
             registeredCounts={counts}
             loadAnalytics={loadAnalytics}
             onCreate={() => setShowCreate(true)}
+            onFinalize={onFinalize}
+            demo={demo}
+          />
+        ) : (
+          <Leaderboard
+            tournaments={tournaments}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            registeredCounts={counts}
             demo={demo}
           />
         )}

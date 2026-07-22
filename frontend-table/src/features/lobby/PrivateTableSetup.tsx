@@ -10,13 +10,18 @@ import {
   MIN_SEATS,
 } from "@/features/game/protocol";
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
-import { Field, Input } from "@/features/ui";
+import { Field, Input, Select } from "@/features/ui";
 import { BTN_GOLD, GLASS_PANEL, HEADING_SM, cn } from "@/features/ui/tokens";
 
 import {
+  ACCESS_TYPES,
   BLIND_PRESETS,
+  DECISION_TIME_OPTIONS,
   DURATION_OPTIONS,
+  MIN_PLAYERS_OPTIONS,
   demoRoomCode,
+  generateJoinCode,
+  type AccessType,
   type ClubLite,
 } from "./lobbyData";
 
@@ -45,6 +50,12 @@ const FEATURE_TOGGLES: Array<{ key: FeatureKey; label: string; blurb: string }> 
 
 type FeatureKey = "bombPot" | "straddle" | "runItTwice" | "ante";
 
+/** Parse a dollar text input into integer cents; 0 when blank/invalid. */
+function dollarsToCents(text: string): number {
+  const n = Number(String(text).replace(/[^0-9.]/g, ""));
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : 0;
+}
+
 export function PrivateTableSetup({
   mode,
   sponsorClubs,
@@ -68,8 +79,30 @@ export function PrivateTableSetup({
   const [seats, setSeats] = useState(6);
   const [bots, setBots] = useState(0);
   const [durationMins, setDurationMins] = useState(0);
-  const [inviteOnly, setInviteOnly] = useState(!isPublic);
   const [spectators, setSpectators] = useState(true);
+
+  // ---- Advanced Table Access Configuration (detailed_8 master) ----
+  const [accessType, setAccessType] = useState<AccessType>(isPublic ? "public" : "invite");
+  const [joinCode, setJoinCode] = useState("");
+  const [minPlayers, setMinPlayers] = useState(2);
+  const [decisionSecs, setDecisionSecs] = useState(15);
+  const [autoAwayTimeout, setAutoAwayTimeout] = useState(true);
+  const [autoAwayBelow, setAutoAwayBelow] = useState(false);
+  const [autoAwayBelowN, setAutoAwayBelowN] = useState(1);
+  const [walletLimitDollars, setWalletLimitDollars] = useState("");
+  const [autoBuyBackDollars, setAutoBuyBackDollars] = useState("");
+  const [geoRestricted, setGeoRestricted] = useState(false);
+  const [kycRequired, setKycRequired] = useState(false);
+  const [operatingHours, setOperatingHours] = useState(false);
+
+  // Invite-only access hides the table from the public list; derived from the
+  // Access Type control so the two never disagree.
+  const inviteOnly = accessType !== "public";
+
+  // A host can list a table publicly only when they operate a club (sponsored
+  // public games); otherwise the "Public" access type stays gated, matching the
+  // master's greyed-out control + "Only Club Owners can sponsor Public Games".
+  const canGoPublic = isPublic || (sponsorClubs?.length ?? 0) > 0;
   const [features, setFeatures] = useState<Record<FeatureKey, boolean>>({
     bombPot: false,
     straddle: false,
@@ -126,8 +159,20 @@ export function PrivateTableSetup({
       straddle: features.straddle,
       run_it_twice: features.runItTwice,
       ante: features.ante,
-      public: isPublic,
+      public: accessType === "public",
       sponsor_club_id: isPublic ? sponsorClub : undefined,
+      // ---- Advanced Table Access Configuration (detailed_8) ----
+      access_type: accessType,
+      join_code: accessType === "invite" ? joinCode.trim().toUpperCase() || undefined : undefined,
+      min_players: minPlayers,
+      decision_time_secs: decisionSecs,
+      auto_away_on_timeout: autoAwayTimeout,
+      auto_away_below: autoAwayBelow ? autoAwayBelowN : 0,
+      geo_restricted: geoRestricted,
+      kyc_required: kycRequired,
+      operating_hours: operatingHours,
+      wallet_limit_cents: dollarsToCents(walletLimitDollars),
+      auto_buy_back_cents: dollarsToCents(autoBuyBackDollars),
     };
 
     try {
@@ -163,6 +208,18 @@ export function PrivateTableSetup({
     inviteOnly,
     spectators,
     features,
+    accessType,
+    joinCode,
+    minPlayers,
+    decisionSecs,
+    autoAwayTimeout,
+    autoAwayBelow,
+    autoAwayBelowN,
+    geoRestricted,
+    kycRequired,
+    operatingHours,
+    walletLimitDollars,
+    autoBuyBackDollars,
     connected,
     joinRoom,
   ]);
@@ -367,22 +424,184 @@ export function PrivateTableSetup({
           </div>
         </Section>
 
-        <Section title="Access & Duration">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <ToggleRow
-              label="Invite-Only"
-              blurb="Table is hidden from the public list — join by room code only."
-              on={inviteOnly}
-              onToggle={() => setInviteOnly((v) => !v)}
-            />
+        <Section
+          title="Advanced Table Access"
+          hint="Advanced private table setup — who can sit, how they get in, and per-table safeguards."
+        >
+          {/* Access Type — Members Only / Invite Only / Public */}
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+            Access Type
+          </span>
+          <div className="mt-2 grid gap-2 sm:grid-cols-3">
+            {ACCESS_TYPES.map((a) => {
+              const disabled = a.value === "public" && !isPublic && !canGoPublic;
+              const active = accessType === a.value;
+              return (
+                <button
+                  key={a.value}
+                  type="button"
+                  disabled={disabled}
+                  title={disabled ? "Only Club Owners can sponsor Public Games" : a.blurb}
+                  onClick={() => setAccessType(a.value)}
+                  className={cn(
+                    "rounded-xl border px-3 py-2.5 text-left text-xs font-semibold transition",
+                    "disabled:cursor-not-allowed disabled:opacity-40",
+                    active
+                      ? "border-brand/50 bg-brand/10 text-brand"
+                      : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25",
+                  )}
+                >
+                  {a.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-[10px] text-neutral-500">
+            {ACCESS_TYPES.find((a) => a.value === accessType)?.blurb}
+          </p>
+
+          {/* Table Join Code + Auto-Generate — only for invite access */}
+          {accessType === "invite" && (
+            <div className="mt-4">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+                Table Join Code
+              </span>
+              <div className="mt-2 flex gap-2">
+                <Input
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8))}
+                  placeholder="Leave blank to auto-assign"
+                  className="font-mono uppercase tracking-[0.3em]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setJoinCode(generateJoinCode())}
+                  className="shrink-0 rounded-xl border border-white/15 px-4 text-xs font-bold uppercase tracking-wide text-neutral-300 transition hover:border-white/30 hover:text-white"
+                >
+                  Auto-Generate
+                </button>
+              </div>
+              <p className="mt-1 text-[10px] text-neutral-600">
+                Guests join at <span className="text-neutral-400">/lobby?code={joinCode || "XXXXXX"}</span>. A
+                server code is issued on create if left blank.
+              </p>
+            </div>
+          )}
+
+          {/* Restrictions — geo / KYC / spectators */}
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
             <ToggleRow
               label="Allow Spectators"
               blurb="Let non-seated members rail the action without playing."
               on={spectators}
               onToggle={() => setSpectators((v) => !v)}
             />
+            <ToggleRow
+              label="KYC Required"
+              blurb="Only identity-verified players may take a seat at this table."
+              on={kycRequired}
+              onToggle={() => setKycRequired((v) => !v)}
+            />
+            <ToggleRow
+              label="Geo-Restricted"
+              blurb="Limit seating to players in the club's permitted regions."
+              on={geoRestricted}
+              onToggle={() => setGeoRestricted((v) => !v)}
+            />
+            <ToggleRow
+              label="Game Operating Hours"
+              blurb="Table auto-opens and closes on the club's scheduled window."
+              on={operatingHours}
+              onToggle={() => setOperatingHours((v) => !v)}
+            />
           </div>
-          <div className="mt-4">
+
+          {/* Min Players + Decision Time */}
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <Field label="Min Players to Start">
+              <Select value={minPlayers} onChange={(e) => setMinPlayers(Number(e.target.value))}>
+                {MIN_PLAYERS_OPTIONS.map((n) => (
+                  <option key={n} value={n} className="bg-[#16191d]">
+                    {n} players
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Decision Time">
+              <Select value={decisionSecs} onChange={(e) => setDecisionSecs(Number(e.target.value))}>
+                {DECISION_TIME_OPTIONS.map((d) => (
+                  <option key={d.secs} value={d.secs} className="bg-[#16191d]">
+                    {d.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+
+          {/* Player-management — auto-away */}
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <ToggleRow
+              label="Auto-Away on 2× Timeout"
+              blurb="Sit a player out automatically after two consecutive time-outs."
+              on={autoAwayTimeout}
+              onToggle={() => setAutoAwayTimeout((v) => !v)}
+            />
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+              <ToggleRow
+                label="Auto-Away if Players Below"
+                blurb="Pause seats when the table thins out below the threshold."
+                on={autoAwayBelow}
+                onToggle={() => setAutoAwayBelow((v) => !v)}
+              />
+              {autoAwayBelow && (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-[10px] uppercase tracking-wider text-neutral-500">Threshold</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={seats}
+                    value={autoAwayBelowN}
+                    onChange={(e) => setAutoAwayBelowN(Math.max(1, Math.min(seats, Number(e.target.value))))}
+                    className="w-20 text-center"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Financials — wallet limit + auto buy-back */}
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <Field label="Universal Wallet Limit" hint="Cap the total a player may bring to this table.">
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-neutral-500">$</span>
+                <Input
+                  type="number"
+                  min={0}
+                  value={walletLimitDollars}
+                  onChange={(e) => setWalletLimitDollars(e.target.value)}
+                  placeholder="100,000"
+                  className="pl-7"
+                />
+              </div>
+            </Field>
+            <Field label="Auto Buy-Back" hint="Auto top-up to this stack when a player busts.">
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-neutral-500">$</span>
+                <Input
+                  type="number"
+                  min={0}
+                  value={autoBuyBackDollars}
+                  onChange={(e) => setAutoBuyBackDollars(e.target.value)}
+                  placeholder="5,000"
+                  className="pl-7"
+                />
+              </div>
+            </Field>
+          </div>
+        </Section>
+
+        <Section title="Duration">
+          <div className="mt-0">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
               Auto-close
             </span>
@@ -425,7 +644,11 @@ export function PrivateTableSetup({
             <SummaryRow k="Blinds" v={`${formatCents(blinds.sb)} / ${formatCents(blinds.bb)}`} />
             <SummaryRow k="Buy-in" v={formatCents(Math.round(buyInDollars * 100))} />
             <SummaryRow k="Seats" v={`${seats}${!isPublic && bots ? ` · ${bots} bot${bots > 1 ? "s" : ""}` : ""}`} />
-            <SummaryRow k="Access" v={inviteOnly ? "Invite-only" : "Open"} />
+            <SummaryRow
+              k="Access"
+              v={ACCESS_TYPES.find((a) => a.value === accessType)?.label ?? "Open"}
+            />
+            <SummaryRow k="Decision" v={`${decisionSecs}s`} />
             <SummaryRow
               k="Features"
               v={

@@ -107,10 +107,71 @@ export interface RakeLedger {
 }
 
 export type OwnerSection =
-  | "dashboard"
+  | "overview"
   | "tables"
   | "tournaments"
   | "members"
-  | "financials";
+  | "announcements"
+  | "analytics"
+  | "financials"
+  | "settings";
 
 export type MemberTab = "all" | "pending" | "banned";
+
+/** poker_club_announcement row (store.ClubAnnouncement). */
+export interface ClubAnnouncement {
+  id: string;
+  club_id: string;
+  title: string;
+  body: string;
+  severity: string; // info | warning | critical
+  created_by: string;
+  created_at: string;
+}
+
+/** poker_club_chat row (store.ClubChatMessage). */
+export interface ClubChatMessage {
+  id: string;
+  club_id: string;
+  user_id: string;
+  username: string;
+  text: string;
+  created_at: string;
+}
+
+/** models.CustomRakeConfiguration — house rake profile for a club. */
+export interface RakeConfig {
+  id?: string;
+  club_id: string;
+  name: string;
+  percent_bps: number; // rake as basis points (0–1000 = 0–10%)
+  cap_minor: number; // max rake per pot, cents
+  no_flop_no_drop: boolean;
+  min_pot_minor: number; // cents
+  is_active?: boolean;
+}
+
+/** settings_json blob persisted through club_update. Client-shaped; the backend
+ * stores it opaquely, so every field here is optional and defensively read. */
+export interface ClubSettingsBlob {
+  timezone?: string;
+  languages?: string;
+  brand_color?: string;
+  ui_theme?: "classic" | "cyber";
+  max_buyin_cents?: number;
+  twofa_required?: boolean;
+  admin_role?: string;
+  moderator_role?: string;
+  kyc_required?: boolean;
+  geo_block?: string;
+  club_type?: string;
+}
+
+/** Owner's club with the visibility/approval flags club_update reads/writes. */
+export interface OwnerClubExt extends OwnerClub {
+  tag?: string;
+  is_public?: boolean;
+  require_approval?: boolean;
+  currency?: string;
+  settings_json?: ClubSettingsBlob;
+}

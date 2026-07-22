@@ -8,6 +8,7 @@ import { GameProvider, formatCents, useGame } from "@/features/game/GameProvider
 import { GameModeCards, type ModeCardDef } from "@/features/lobby/GameModeCards";
 import { JoinPrivateGame } from "@/features/lobby/JoinPrivateGame";
 import { PrivateTableSetup } from "@/features/lobby/PrivateTableSetup";
+import { PublicGameBrowser } from "@/features/lobby/PublicGameBrowser";
 import { PublicLobbyList } from "@/features/lobby/PublicLobbyList";
 import {
   DEMO_CLUBS,
@@ -233,7 +234,9 @@ function LobbyContent() {
                 ? "Public Game Setup"
                 : view === "tournament"
                   ? "Tournaments"
-                  : "Game Mode Selection"}
+                  : view === "browse"
+                    ? "Classic Public Game Browser"
+                    : "Game Mode Selection"}
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-neutral-400">
             {view === "select"
@@ -242,7 +245,9 @@ function LobbyContent() {
                 ? "Configure every detail of your table, then deal in your invited guests."
                 : view === "public"
                   ? "Sponsor a club-branded open game for the community."
-                  : "Multi-table events with escalating blinds and real prize pools."}
+                  : view === "browse"
+                    ? "Browse every live public game — filter by stakes and game type, then take a seat."
+                    : "Multi-table events with escalating blinds and real prize pools."}
           </p>
         </div>
 
@@ -335,6 +340,16 @@ function LobbyContent() {
                     placeholder="Search tables…"
                     className="w-44 rounded-xl border border-white/10 bg-black/40 px-4 py-2 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25 focus:ring-2 focus:ring-white/10"
                   />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setView("browse");
+                      if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    className="rounded-xl border border-gold/40 px-4 py-2 text-xs font-bold uppercase tracking-wide text-gold transition hover:bg-gold/5"
+                  >
+                    Classic Browser
+                  </button>
                   <button
                     type="button"
                     disabled={busy || !connected}
@@ -459,6 +474,17 @@ function LobbyContent() {
               ← Back to game modes
             </button>
           </section>
+        )}
+
+        {/* ---- classic public game browser ---- */}
+        {view === "browse" && (
+          <PublicGameBrowser
+            liveTables={openTables}
+            connected={connected}
+            busy={busy}
+            onJoin={(id) => void run(() => joinRoom(id))}
+            onBack={() => setView("select")}
+          />
         )}
 
         {/* ---- footer ---- */}

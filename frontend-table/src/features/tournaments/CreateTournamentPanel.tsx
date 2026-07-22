@@ -25,6 +25,7 @@ const EMPTY_DRAFT: DraftForm = {
   guaranteedPrize: 0,
   lateReg: true,
   scheduledAt: "",
+  regCloseAt: "",
 };
 
 const PAYOUT_LABEL: Record<string, string> = {
@@ -181,6 +182,13 @@ export function CreateTournamentPanel({
                     onChange={(e) => set("numLevels", Number(e.target.value))}
                   />
                 </Field>
+                <Field label="Registration Close Time" hint="Late registration ends" className="sm:col-span-2">
+                  <Input
+                    type="datetime-local"
+                    value={draft.regCloseAt}
+                    onChange={(e) => set("regCloseAt", e.target.value)}
+                  />
+                </Field>
                 <label className="flex items-center justify-between rounded-xl border border-white/10 bg-black/30 px-4 py-3 sm:col-span-2">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
                     Late Registration
@@ -315,8 +323,9 @@ export function CreateTournamentPanel({
               </div>
             </dl>
             <p className="mt-4 text-[11px] text-neutral-500">
-              Publishing calls <span className="text-brand">tournament_create</span> and opens registration
-              immediately.
+              Publishing calls <span className="text-brand">tournament_create</span>, seeds the ladder via{" "}
+              <span className="text-brand">blind_level_add</span> /{" "}
+              <span className="text-brand">prize_pool_add</span>, and opens registration immediately.
             </p>
           </div>
         </div>

@@ -2,7 +2,7 @@
 // clear no-backend fallback (guest/offline) — it is always visibly labeled as
 // demo in the UI and never presented as live server state.
 
-export type LobbyView = "select" | "private" | "public" | "tournament";
+export type LobbyView = "select" | "private" | "public" | "tournament" | "browse";
 
 export interface MeRoles {
   platform_admin?: boolean;
@@ -35,7 +35,102 @@ export interface PublicTableRow {
   capacity: number;
   buy_in_minor: number;
   host: string;
+  small_blind_minor?: number;
+  big_blind_minor?: number;
+  variant?: string;
+  live?: boolean;
   demo?: boolean;
+}
+
+// ---- advanced table-access configuration -----------------------------------
+// Extra fields the "Advanced Table Access Configuration" master (detailed_8)
+// layers onto the create-table flow. All are transmitted with the real
+// `table_create` RPC; unknown fields are ignored server-side today, keeping the
+// wiring honest (exactly the config the host chose is what is sent).
+
+export type AccessType = "members" | "invite" | "public";
+
+export const ACCESS_TYPES: Array<{ value: AccessType; label: string; blurb: string }> = [
+  { value: "members", label: "Members Only", blurb: "Only club members may sit — hidden from the public list." },
+  { value: "invite", label: "Invite Only — Code Required", blurb: "Anyone with the join code can take a seat." },
+  { value: "public", label: "Public", blurb: "Listed in the public lobby for anyone to join." },
+];
+
+export const DECISION_TIME_OPTIONS: Array<{ label: string; secs: number }> = [
+  { label: "10 Seconds", secs: 10 },
+  { label: "15 Seconds", secs: 15 },
+  { label: "20 Seconds", secs: 20 },
+  { label: "30 Seconds", secs: 30 },
+  { label: "45 Seconds", secs: 45 },
+  { label: "60 Seconds", secs: 60 },
+];
+
+export const MIN_PLAYERS_OPTIONS = [2, 3, 4, 5, 6] as const;
+
+// ---- public-game browser filters -------------------------------------------
+
+export type StakeTier = "low" | "medium" | "high";
+
+export const STAKE_TIERS: Array<{ value: StakeTier; label: string }> = [
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+];
+
+export const GAME_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "holdem", label: "Texas Hold'em" },
+  { value: "plo", label: "Pot-Limit Omaha" },
+];
+
+/** Classify a table into a stakes tier by its big blind (minor units / cents). */
+export function classifyStakes(bigBlindMinor: number): StakeTier {
+  if (bigBlindMinor >= 50_000) return "high"; // >= $500 BB
+  if (bigBlindMinor >= 1_000) return "medium"; // >= $10 BB
+  return "low";
+}
+
+/** Parsed shape of a holdem match `label` (see backend-core buildLabel). */
+export interface MatchLabel {
+  room_id?: string;
+  sb?: number;
+  bb?: number;
+  seated?: number;
+  open_seats?: number;
+  variant?: string;
+  host?: string;
+}
+
+export function parseMatchLabel(label?: string): MatchLabel | null {
+  if (!label) return null;
+  try {
+    return JSON.parse(label) as MatchLabel;
+  } catch {
+    return null;
+  }
+}
+
+/** Project live `table_list` items (with JSON labels) into browser/list rows. */
+export function rowsFromLiveTables(
+  tables: Array<{ match_id: string; room_id?: string; label?: string; seated?: number; open_seats?: number }>,
+): PublicTableRow[] {
+  return tables.map((t) => {
+    const label = parseMatchLabel(t.label);
+    const seated = label?.seated ?? t.seated ?? 0;
+    const open = label?.open_seats ?? t.open_seats ?? Math.max(0, 10 - seated);
+    return {
+      match_id: t.match_id,
+      name: label?.room_id || t.room_id || t.label || "Hold'em Table",
+      seated,
+      capacity: seated + open || 10,
+      buy_in_minor: 100_000,
+      small_blind_minor: label?.sb,
+      big_blind_minor: label?.bb,
+      variant: label?.variant,
+      host: label?.host || "Table Host",
+      live: true,
+    };
+  });
 }
 
 // ---- blind presets ---------------------------------------------------------
@@ -60,12 +155,23 @@ export const DURATION_OPTIONS: Array<{ label: string; mins: number }> = [
 // ---- demo fallbacks --------------------------------------------------------
 
 export const DEMO_PUBLIC_TABLES: PublicTableRow[] = [
-  { match_id: "demo-hrce", name: "High Rollers Club Elite", seated: 5, capacity: 10, buy_in_minor: 100000, host: "Club Owner", demo: true },
-  { match_id: "demo-prestige-room", name: "Prestige Poker Room", seated: 5, capacity: 10, buy_in_minor: 100000, host: "Club Owner", demo: true },
-  { match_id: "demo-diamond-1", name: "Diamond Flush", seated: 5, capacity: 10, buy_in_minor: 100000, host: "Club Owner", demo: true },
-  { match_id: "demo-prestige", name: "Prestige Poker", seated: 5, capacity: 10, buy_in_minor: 100000, host: "Club Owner", demo: true },
-  { match_id: "demo-diamond-2", name: "Diamond Flush", seated: 5, capacity: 10, buy_in_minor: 100000, host: "Club Owner", demo: true },
-  { match_id: "demo-vault", name: "Neon Vault VIP", seated: 3, capacity: 9, buy_in_minor: 50000, host: "Club Owner", demo: true },
+  { match_id: "demo-hrce", name: "High Rollers Club Elite", seated: 5, capacity: 10, buy_in_minor: 100000, small_blind_minor: 10000, big_blind_minor: 20000, variant: "holdem", host: "Club Owner", demo: true },
+  { match_id: "demo-prestige-room", name: "Prestige Poker Room", seated: 5, capacity: 10, buy_in_minor: 100000, small_blind_minor: 10000, big_blind_minor: 20000, variant: "holdem", host: "Club Owner", demo: true },
+  { match_id: "demo-diamond-1", name: "Diamond Flush", seated: 5, capacity: 10, buy_in_minor: 100000, small_blind_minor: 10000, big_blind_minor: 20000, variant: "holdem", host: "Club Owner", demo: true },
+  { match_id: "demo-prestige", name: "Prestige Poker", seated: 5, capacity: 10, buy_in_minor: 100000, small_blind_minor: 10000, big_blind_minor: 20000, variant: "holdem", host: "Club Owner", demo: true },
+  { match_id: "demo-diamond-2", name: "Diamond Flush", seated: 5, capacity: 10, buy_in_minor: 100000, small_blind_minor: 10000, big_blind_minor: 20000, variant: "holdem", host: "Club Owner", demo: true },
+  { match_id: "demo-vault", name: "Neon Vault VIP", seated: 3, capacity: 9, buy_in_minor: 50000, small_blind_minor: 5000, big_blind_minor: 10000, variant: "plo", host: "Club Owner", demo: true },
+];
+
+// Classic Public Game Browser (detailed_13) demo grid — spans low/medium/high
+// stakes and both variants so the filters have something to act on offline.
+export const DEMO_BROWSER_TABLES: PublicTableRow[] = [
+  { match_id: "demo-b1", name: "High Stakes Elite", seated: 7, capacity: 10, buy_in_minor: 200000, small_blind_minor: 10000, big_blind_minor: 20000, variant: "holdem", host: "Club Owner", demo: true },
+  { match_id: "demo-b2", name: "Prestige Room", seated: 7, capacity: 10, buy_in_minor: 200000, small_blind_minor: 10000, big_blind_minor: 20000, variant: "holdem", host: "Club Owner", demo: true },
+  { match_id: "demo-b3", name: "Diamond Flush", seated: 4, capacity: 9, buy_in_minor: 100000, small_blind_minor: 500, big_blind_minor: 1000, variant: "holdem", host: "Club Owner", demo: true },
+  { match_id: "demo-b4", name: "Neon Vault VIP", seated: 6, capacity: 8, buy_in_minor: 500000, small_blind_minor: 50000, big_blind_minor: 100000, variant: "plo", host: "Club Owner", demo: true },
+  { match_id: "demo-b5", name: "Grinder's Corner", seated: 3, capacity: 9, buy_in_minor: 20000, small_blind_minor: 100, big_blind_minor: 200, variant: "holdem", host: "Club Owner", demo: true },
+  { match_id: "demo-b6", name: "Omaha Splash", seated: 5, capacity: 6, buy_in_minor: 80000, small_blind_minor: 2500, big_blind_minor: 5000, variant: "plo", host: "Club Owner", demo: true },
 ];
 
 export const DEMO_TOURNAMENTS: TournamentLite[] = [
@@ -84,6 +190,11 @@ export function demoRoomCode(): string {
   let out = "";
   for (let i = 0; i < 6; i += 1) out += alphabet[Math.floor(Math.random() * alphabet.length)];
   return out;
+}
+
+/** Client-side join code the host can auto-generate before creating the table. */
+export function generateJoinCode(): string {
+  return demoRoomCode();
 }
 
 export function normalizeTournaments(raw: unknown): TournamentLite[] {

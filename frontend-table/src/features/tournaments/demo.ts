@@ -175,11 +175,16 @@ export const DEMO_PRIZES: Prize[] = [
 ];
 
 export const DEMO_LEADERBOARD: LeaderEntry[] = [
-  { rank: 1, user_id: "u-ghost", username: "Ghost_Runner", score: 412_500 },
-  { rank: 2, user_id: "u-vixen", username: "CyberVixen", score: 389_000 },
-  { rank: 3, user_id: "u-oracle", username: "TheOracle", score: 215_200 },
-  { rank: 4, user_id: "u-nomad", username: "NeonNomad", score: 188_400 },
-  { rank: 5, user_id: "u-quartz", username: "QuartzKing", score: 141_050 },
+  { rank: 1, user_id: "u-cyber", username: "CyberKing", score: 7_500_000, hands: 120 },
+  { rank: 2, user_id: "u-neon", username: "NeonRider", score: 5_200_000, hands: 115 },
+  { rank: 3, user_id: "u-data", username: "DataPhantom", score: 4_800_000, hands: 118 },
+  { rank: 4, user_id: "u-byte4", username: "ByteMaster", score: 3_900_000, hands: 110 },
+  { rank: 5, user_id: "u-byte5", username: "ByteMaster", score: 3_600_000, hands: 110 },
+  { rank: 6, user_id: "u-ride6", username: "ByterRide", score: 3_400_000, hands: 108 },
+  { rank: 7, user_id: "u-byte7", username: "ByteMaster", score: 3_100_000, hands: 106 },
+  { rank: 8, user_id: "u-byte8", username: "GhostByte", score: 2_850_000, hands: 104 },
+  { rank: 9, user_id: "u-quartz", username: "QuartzKing", score: 2_400_000, hands: 101 },
+  { rank: 10, user_id: "u-oracle", username: "TheOracle", score: 2_150_000, hands: 99 },
 ];
 
 export function demoStatus(id: string): TournamentStatus {
@@ -233,6 +238,10 @@ export function demoAnalytics(id: string): TournamentAnalytics {
     fee_minor: t.fee_minor ?? 0,
     prize_pool_minor: pool,
     total_fees_minor: entrants * (t.fee_minor ?? 0),
+    rebuys_minor: Math.round(pool * 0.12),
+    rake_minor: entrants * (t.fee_minor ?? 0),
+    hands_played: t.status === "registering" ? 0 : 2_450 - left * 8,
+    avg_stack: left > 0 ? Math.round((entrants * t.starting_stack) / left) : t.starting_stack,
     prizes: DEMO_PRIZES,
     finishers: t.status === "finished"
       ? [

@@ -80,3 +80,34 @@ export async function leaderboardTop(metric = "chips", limit = 5): Promise<Leade
   };
   return data.entries ?? [];
 }
+
+/** blind_level_add → persist a single blind level onto a tournament structure. */
+export async function blindLevelAdd(tournamentId: string, level: BlindLevel): Promise<BlindLevel> {
+  return (await callSessionRpc("blind_level_add", {
+    tournament_id: tournamentId,
+    level: level.level,
+    small_blind: level.small_blind,
+    big_blind: level.big_blind,
+    ante: level.ante,
+    duration_secs: level.duration_secs,
+    is_break: level.is_break ?? false,
+  })) as BlindLevel;
+}
+
+/** prize_pool_add → persist a single payout tier onto a tournament. */
+export async function prizePoolAdd(tournamentId: string, prize: Prize): Promise<Prize> {
+  return (await callSessionRpc("prize_pool_add", {
+    tournament_id: tournamentId,
+    rank_from: prize.rank_from,
+    rank_to: prize.rank_to,
+    payout_bps: prize.payout_bps,
+    guaranteed_minor: prize.guaranteed_minor,
+  })) as Prize;
+}
+
+/** tournament_finalize → settle payouts and mark the event finished (admin). */
+export async function finalizeTournament(tournamentId: string): Promise<{ ok?: boolean }> {
+  return (await callSessionRpc("tournament_finalize", {
+    tournament_id: tournamentId,
+  })) as { ok?: boolean };
+}

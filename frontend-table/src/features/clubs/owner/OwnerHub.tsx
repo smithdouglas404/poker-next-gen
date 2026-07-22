@@ -6,15 +6,24 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/features/ui";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
+import { Announcements } from "./Announcements";
 import { Financials, type FinancialsPeriod } from "./Financials";
+import { GlobalSettings } from "./GlobalSettings";
 import { GuestGate } from "./GuestGate";
+import { MemberAnalytics } from "./MemberAnalytics";
 import { MemberManagement } from "./MemberManagement";
+import { Overview } from "./Overview";
 import { OwnerShell } from "./OwnerShell";
 import { QuickStats } from "./QuickStats";
 import { StatCards, type StatCard } from "./StatCards";
 import {
+  DEMO_ANALYTICS,
+  DEMO_ANNOUNCEMENTS,
+  DEMO_CHAT,
   DEMO_CLUB,
+  DEMO_OVERVIEW_SPARKS,
   DEMO_QUICK_STATS,
+  DEMO_RAKE_CONFIG,
   DEMO_RAKE_LEDGER,
   DEMO_REQUESTS,
   DEMO_ROSTER,
@@ -24,10 +33,15 @@ import {
 import { compact, ownerApi, usdCompact } from "./ownerRpc";
 import { EmptyState, SectionTitle } from "./ui";
 import type {
+  ClubAnnouncement,
+  ClubChatMessage,
+  ClubSettingsBlob,
   JoinRequest,
   OwnerClub,
+  OwnerClubExt,
   OwnerSection,
   QuickStats as QuickStatsData,
+  RakeConfig,
   RakeLedger,
   RakeReport,
   RosterRow,
@@ -45,7 +59,7 @@ export function OwnerHub() {
   const [demo, setDemo] = useState(false);
   const [forceBrowse, setForceBrowse] = useState(false);
 
-  const [club, setClub] = useState<OwnerClub | null>(null);
+  const [club, setClub] = useState<OwnerClubExt | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [roster, setRoster] = useState<RosterRow[]>([]);
   const [requests, setRequests] = useState<JoinRequest[]>([]);
@@ -53,8 +67,11 @@ export function OwnerHub() {
   const [ledger, setLedger] = useState<RakeLedger | null>(null);
   const [report, setReport] = useState<RakeReport | null>(null);
   const [period, setPeriod] = useState<FinancialsPeriod>("week");
+  const [announcements, setAnnouncements] = useState<ClubAnnouncement[]>([]);
+  const [chat, setChat] = useState<ClubChatMessage[]>([]);
+  const [rakeConfig, setRakeConfig] = useState<RakeConfig | null>(null);
 
-  const [section, setSection] = useState<OwnerSection>("members");
+  const [section, setSection] = useState<OwnerSection>("overview");
   const [toast, setToast] = useState<Toast | null>(null);
 
   const notify = useCallback((msg: string, kind: "ok" | "err" = "ok") => {
@@ -71,6 +88,9 @@ export function OwnerHub() {
     setQuick(DEMO_QUICK_STATS);
     setLedger(DEMO_RAKE_LEDGER);
     setReport(demoRakeReport("week"));
+    setAnnouncements(DEMO_ANNOUNCEMENTS);
+    setChat(DEMO_CHAT);
+    setRakeConfig(DEMO_RAKE_CONFIG);
     setMode("owner");
   }, []);
 
@@ -160,14 +180,20 @@ export function OwnerHub() {
       setRole(owned.role);
 
       // Load all owner data in parallel; individual failures degrade gracefully.
-      const [quickRes, ledgerRes] = await Promise.allSettled([
+      const [quickRes, ledgerRes, annRes, chatRes, rakeRes] = await Promise.allSettled([
         ownerApi.quickStats(owned.club.id),
         ownerApi.rakeLedger(owned.club.id),
+        ownerApi.announcements(owned.club.id),
+        ownerApi.chatList(owned.club.id),
+        ownerApi.rakeConfigGet(owned.club.id),
       ]);
       if (cancelled) return;
 
       if (quickRes.status === "fulfilled") setQuick(quickRes.value);
       if (ledgerRes.status === "fulfilled") setLedger(ledgerRes.value);
+      if (annRes.status === "fulfilled") setAnnouncements(annRes.value.announcements ?? []);
+      if (chatRes.status === "fulfilled") setChat((chatRes.value.messages ?? []).slice().reverse());
+      if (rakeRes.status === "fulfilled" && rakeRes.value?.club_id) setRakeConfig(rakeRes.value);
 
       await Promise.all([
         reloadRoster(owned.club.id),
@@ -288,6 +314,102 @@ export function OwnerHub() {
     [demo, club, loadReport],
   );
 
+  const onSendChat = useCallback(
+    async (text: string) => {
+      const optimistic: ClubChatMessage = {
+        id: `local-${Date.now()}`,
+        club_id: club?.id ?? DEMO_CLUB.id,
+        user_id: "you",
+        username: role === "admin" ? "Admin" : "Owner",
+        text,
+        created_at: new Date().toISOString(),
+      };
+      if (demo || !club) {
+        setChat((prev) => [...prev, optimistic]);
+        return;
+      }
+      try {
+        await ownerApi.chatSend(club.id, text);
+        const r = await ownerApi.chatList(club.id);
+        setChat((r.messages ?? []).slice().reverse());
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Message failed", "err");
+      }
+    },
+    [demo, club, role, notify],
+  );
+
+  const onBroadcast = useCallback(
+    async (title: string, body: string, severity: string) => {
+      const optimistic: ClubAnnouncement = {
+        id: `local-${Date.now()}`,
+        club_id: club?.id ?? DEMO_CLUB.id,
+        title,
+        body,
+        severity,
+        created_by: role ?? "owner",
+        created_at: new Date().toISOString(),
+      };
+      if (demo || !club) {
+        setAnnouncements((prev) => [optimistic, ...prev]);
+        notify(`Broadcast sent: "${title}". (demo)`);
+        return;
+      }
+      try {
+        await ownerApi.createAnnouncement(club.id, title, body, severity);
+        const r = await ownerApi.announcements(club.id);
+        setAnnouncements(r.announcements ?? []);
+        notify(`Broadcast sent: "${title}".`);
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Broadcast failed", "err");
+      }
+    },
+    [demo, club, role, notify],
+  );
+
+  const onSaveRake = useCallback(
+    async (cfg: RakeConfig) => {
+      if (demo || !club) {
+        setRakeConfig(cfg);
+        return;
+      }
+      try {
+        const saved = await ownerApi.rakeConfigSet({ ...cfg, club_id: club.id });
+        setRakeConfig(saved?.club_id ? saved : cfg);
+        notify("Rake configuration saved.");
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Rake save failed", "err");
+        throw e;
+      }
+    },
+    [demo, club, notify],
+  );
+
+  const onSaveSettings = useCallback(
+    async (
+      patch: { is_public?: boolean; require_approval?: boolean; avatar_ref?: string },
+      settings: ClubSettingsBlob,
+    ) => {
+      if (demo || !club) {
+        setClub((prev) => (prev ? { ...prev, settings_json: settings } : prev));
+        notify("Settings saved. (demo)");
+        return;
+      }
+      try {
+        await ownerApi.updateClub(club.id, {
+          ...patch,
+          settings_json: settings as unknown as Record<string, unknown>,
+        });
+        setClub((prev) => (prev ? { ...prev, ...patch, settings_json: settings } : prev));
+        notify("Global settings saved.");
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Settings save failed", "err");
+        throw e;
+      }
+    },
+    [demo, club, notify],
+  );
+
   // ---- Render ----
 
   if (mode === "loading") {
@@ -322,6 +444,11 @@ export function OwnerHub() {
   const onlineCount = roster.filter((m) => m.status === "active" || m.status === "online").length;
   const memberCount = quick?.member_count ?? roster.length;
   const active7d = quick?.stats?.active_7d ?? onlineCount;
+  const rakeTotalCents = (report?.total_rake ?? 0) || houseBalance;
+  const avgPotCents =
+    quick?.stats && quick.stats.hands > 0 && quick.stats.chips_won > 0
+      ? Math.max(1000, Math.round(quick.stats.chips_won / quick.stats.hands))
+      : DEMO_OVERVIEW_SPARKS.potCents[DEMO_OVERVIEW_SPARKS.potCents.length - 1];
 
   const cards: StatCard[] = [
     { label: "Total Stakes", value: usdCompact(bankroll), sub: "Across all club tables", accent: "gold" },
@@ -367,10 +494,26 @@ export function OwnerHub() {
         </div>
       )}
 
-      {(section === "dashboard" || section === "members") && (
+      {section === "members" && (
         <div className="mb-6">
           <StatCards cards={cards} />
         </div>
+      )}
+
+      {section === "overview" && (
+        <Overview
+          clubName={club?.name ?? "Club"}
+          quick={emptyQuick}
+          roster={roster}
+          bankrollCents={bankroll}
+          rakeTotalCents={rakeTotalCents}
+          avgPotCents={avgPotCents}
+          sparks={DEMO_OVERVIEW_SPARKS}
+          chat={chat}
+          demo={demo}
+          canManage={canManage}
+          onSendChat={onSendChat}
+        />
       )}
 
       {section === "members" && (
@@ -389,23 +532,28 @@ export function OwnerHub() {
         </div>
       )}
 
-      {section === "dashboard" && (
-        <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
-          <div className="space-y-5">
-            <SectionTitle eyebrow="Overview" title="Dashboard" />
-            <MemberManagement
-              roster={roster}
-              requests={requests}
-              demo={demo}
-              canManage={canManage}
-              onPromote={onPromote}
-              onKick={onKick}
-              onAllocate={onAllocate}
-              onReview={onReview}
-            />
-          </div>
-          <QuickStats data={emptyQuick} />
-        </div>
+      {section === "announcements" && (
+        <Announcements
+          announcements={announcements}
+          demo={demo}
+          canManage={canManage}
+          onBroadcast={onBroadcast}
+        />
+      )}
+
+      {section === "analytics" && (
+        <MemberAnalytics roster={roster} analytics={DEMO_ANALYTICS} demo={demo} />
+      )}
+
+      {section === "settings" && (
+        <GlobalSettings
+          club={club}
+          rake={rakeConfig}
+          demo={demo}
+          canManage={canManage}
+          onSaveRake={onSaveRake}
+          onSaveSettings={onSaveSettings}
+        />
       )}
 
       {section === "financials" && (
@@ -420,8 +568,8 @@ export function OwnerHub() {
 
       {section === "tables" && (
         <DerivedSection
-          title="Tables"
-          eyebrow="Live Cash Games"
+          title="Live Tables"
+          eyebrow="Public Table Browser"
           quick={emptyQuick}
           roster={roster}
           ctaHref="/lobby"
@@ -431,7 +579,7 @@ export function OwnerHub() {
 
       {section === "tournaments" && (
         <DerivedSection
-          title="Tournaments"
+          title="Tournament Center"
           eyebrow="Scheduled Series"
           quick={emptyQuick}
           roster={roster}

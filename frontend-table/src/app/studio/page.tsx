@@ -13,6 +13,8 @@ import { GenerationQueue } from "@/features/studio/GenerationQueue";
 import { WardrobePanel } from "@/features/studio/WardrobePanel";
 import { LoadoutPanel } from "@/features/studio/LoadoutPanel";
 import { NanoBananaRender } from "@/features/studio/NanoBananaRender";
+import { NanoBananaCustomizer } from "@/features/studio/NanoBananaCustomizer";
+import { WardrobeHub } from "@/features/studio/WardrobeHub";
 import { DyeShop } from "@/features/studio/DyeShop";
 import { useStudio } from "@/features/studio/useStudio";
 
@@ -26,15 +28,23 @@ export default function StudioPage() {
 
 /**
  * /studio hosts three states, selected by the `screen` query param:
- *   • (default)     — the Character Studio home (compose / gallery / wardrobe)
- *   • ?screen=render — the Nano Banana render-progress monitor (optional &gen=<id>)
- *   • ?screen=dye    — the Avatar Dye Shop
+ *   • (default)        — the Character Studio home (compose / gallery / wardrobe)
+ *   • ?screen=render     — the Nano Banana render-progress monitor (optional &gen=<id>)
+ *   • ?screen=customizer — the refined Nano Banana AI Customizer (prompt → render → apply)
+ *   • ?screen=wardrobe   — the Comprehensive Avatar Wardrobe Hub (equip / presets / owned)
+ *   • ?screen=dye        — the Avatar Dye Shop
  */
 function StudioRouter() {
   const params = useSearchParams();
   const screen = params.get("screen");
   if (screen === "render") {
     return <NanoBananaRender generationId={params.get("gen")} />;
+  }
+  if (screen === "customizer") {
+    return <NanoBananaCustomizer />;
+  }
+  if (screen === "wardrobe") {
+    return <WardrobeHub />;
   }
   if (screen === "dye") {
     return <DyeShop />;
@@ -56,6 +66,18 @@ function StudioHome() {
           </div>
           <div className="flex items-center gap-3">
             <StatusPill online={studio.online} />
+            <Link
+              href="/studio?screen=wardrobe"
+              className="rounded-full border border-white/15 px-3 py-1 text-xs uppercase tracking-wider text-neutral-300 transition-colors hover:border-gold/40 hover:text-gold"
+            >
+              Wardrobe
+            </Link>
+            <Link
+              href="/studio?screen=customizer"
+              className="rounded-full border border-white/15 px-3 py-1 text-xs uppercase tracking-wider text-neutral-300 transition-colors hover:border-gold/40 hover:text-gold"
+            >
+              AI Customizer
+            </Link>
             <Link
               href="/studio?screen=dye"
               className="rounded-full border border-white/15 px-3 py-1 text-xs uppercase tracking-wider text-neutral-300 transition-colors hover:border-gold/40 hover:text-gold"

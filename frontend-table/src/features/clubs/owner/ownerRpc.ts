@@ -6,10 +6,15 @@
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 
 import type {
+  ClubAnnouncement,
+  ClubChatMessage,
+  ClubStats,
   JoinRequest,
   OwnerClub,
   OwnerClubDetail,
+  OwnerClubExt,
   QuickStats,
+  RakeConfig,
   RakeLedger,
   RakeReport,
   RosterRow,
@@ -81,6 +86,49 @@ export const ownerApi = {
       club_id: clubId,
       message,
     }),
+
+  /** Cross-club leaderboard over poker_club_stats (analytics benchmarking). */
+  rankings: (metric = "hands", limit = 20) =>
+    call<{ rankings?: ClubStats[] }>("club_rankings", { metric, limit }),
+
+  // ---- Announcements (Global Announcement Control Center) ----
+  announcements: (clubId: string, limit = 30) =>
+    call<{ announcements?: ClubAnnouncement[] }>("club_announcement_list", {
+      club_id: clubId,
+      limit,
+    }),
+  createAnnouncement: (clubId: string, title: string, body: string, severity: string) =>
+    call<{ ok: boolean; id: string }>("club_announcement_create", {
+      club_id: clubId,
+      title,
+      body,
+      severity,
+    }),
+
+  // ---- Club chat (Overview right-rail live feed) ----
+  chatList: (clubId: string, limit = 40) =>
+    call<{ messages?: ClubChatMessage[] }>("club_chat_list", { club_id: clubId, limit }),
+  chatSend: (clubId: string, text: string) =>
+    call<{ ok: boolean; id: string }>("club_chat_send", { club_id: clubId, text }),
+
+  // ---- Global settings: rake profile + club identity/visibility ----
+  rakeConfigGet: (clubId: string) =>
+    call<RakeConfig>("rake_config_get", { club_id: clubId }),
+  rakeConfigSet: (cfg: RakeConfig) =>
+    call<RakeConfig>("rake_config_set", { ...cfg }),
+  /** Patch identity/branding/visibility. Only provided fields change server-side. */
+  updateClub: (
+    clubId: string,
+    patch: {
+      name?: string;
+      description?: string;
+      tag?: string;
+      is_public?: boolean;
+      require_approval?: boolean;
+      avatar_ref?: string;
+      settings_json?: Record<string, unknown>;
+    },
+  ) => call<{ club: OwnerClubExt }>("club_update", { club_id: clubId, ...patch }),
 };
 
 /** Cents → full dollar label, e.g. 254000000 → "$2,540,000". */

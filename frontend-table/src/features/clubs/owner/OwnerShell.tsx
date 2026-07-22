@@ -10,11 +10,14 @@ import { DemoBadge } from "./ui";
 import type { OwnerSection } from "./types";
 
 const NAV: Array<{ id: OwnerSection; label: string; icon: string }> = [
-  { id: "dashboard", label: "Dashboard", icon: "▦" },
-  { id: "tables", label: "Tables", icon: "▤" },
-  { id: "tournaments", label: "Tournaments", icon: "♛" },
-  { id: "members", label: "Members", icon: "☰" },
-  { id: "financials", label: "Financials", icon: "▧" },
+  { id: "overview", label: "Club Overview", icon: "▦" },
+  { id: "tables", label: "Live Tables", icon: "▤" },
+  { id: "tournaments", label: "Tournament Center", icon: "♛" },
+  { id: "members", label: "Member Registry", icon: "☰" },
+  { id: "announcements", label: "Announcements", icon: "📣" },
+  { id: "analytics", label: "Member Analytics", icon: "📊" },
+  { id: "financials", label: "Revenue Reports", icon: "▧" },
+  { id: "settings", label: "Global Settings", icon: "⚙" },
 ];
 
 export function OwnerShell({
