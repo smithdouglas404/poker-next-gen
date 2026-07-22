@@ -12,6 +12,7 @@ import { formatStack, useStackUnit } from "@/features/table/stackDisplay";
 import { Character3D } from "@/features/table/Character3D";
 import { Character3DGL } from "@/features/table/Character3DGL";
 import { useRenderMode } from "@/features/table/renderMode";
+import { useTableGraphics } from "@/features/table/tableGraphics";
 
 function SeatCard({
   seat,
@@ -117,6 +118,8 @@ export function SeatHud() {
   const buyInLabel = formatCents(buyInCents);
 
   const [mode, setMode] = useRenderMode();
+  const [graphics] = useTableGraphics();
+  const cinematic = graphics === "cinematic";
   const [stackUnit] = useStackUnit();
   const bigBlind = snapshot?.big_blind ?? 0;
   const activeSeat = snapshot?.action_seat;
@@ -175,7 +178,10 @@ export function SeatHud() {
           Mix
         </button>
       </div>
-      {positions.length > 0 &&
+      {/* Cinematic mode: the R3F scene draws seats/avatars/stacks; only the
+          avatar-preset toggle above stays. Classic mode: full seat plaques. */}
+      {!cinematic &&
+        positions.length > 0 &&
         seats.slice(0, seatCount).map((seat) => {
           const pos = positions[seat.index] ?? positions[seat.index % positions.length];
           if (!pos) return null;

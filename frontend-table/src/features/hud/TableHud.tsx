@@ -19,11 +19,27 @@ import { TauntBar } from "@/features/sound/TauntBar";
 import { usePokerKeyboard } from "@/features/hud/usePokerKeyboard";
 import { useGameSounds } from "@/features/sound/useGameSounds";
 import { useGame } from "@/features/game/GameProvider";
+import { useTableGraphics } from "@/features/table/tableGraphics";
 
 export function TableHud({ children }: { children: React.ReactNode }) {
-  const { error, snapshot } = useGame();
+  const { error, snapshot, connected, matchId } = useGame();
+  const [graphics] = useTableGraphics();
   usePokerKeyboard();
   useGameSounds();
+
+  // In cinematic mode the R3F scene owns the seats, community board, and pot,
+  // so the legacy DOM chrome for those (SeatHud seat cards, CommunityCards
+  // placeholders, the center pot label) must not double up over the felt.
+  // We keep only the interactive glass controls the 3D layer does NOT provide,
+  // parked as restrained overlays around the edges.
+  const cinematic = graphics === "cinematic";
+
+  // Panels that render empty-state chrome ("Waiting for table events…", buy-in
+  // slider, hand-audit placeholder) only earn their space once there is a live
+  // table. In cinematic idle/demo they would just clutter the felt edge, so we
+  // gate them on an active game. Classic mode is unchanged.
+  const hasGame = connected || !!matchId || !!snapshot;
+  const showGamePanels = !cinematic || hasGame;
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-neutral-950">
@@ -36,20 +52,28 @@ export function TableHud({ children }: { children: React.ReactNode }) {
           <div className="flex w-full max-w-xs flex-col gap-3">
             <RoomPanel />
             <HostPanel />
-            <BuyInSlider />
+            {showGamePanels && <BuyInSlider />}
             <EquityPanel />
-            <HandVerifyPanel />
-            <TableLog />
+            {showGamePanels && <HandVerifyPanel />}
+            {showGamePanels && <TableLog />}
             <ChatPanel />
             <HandHistoryPanel />
             <TauntBar />
-            <MusicPicker />
-            <TableSettings />
+            {/* Music + display settings are tall always-expanded panels; in a
+                cinematic idle/demo they occlude the left seats, so hold them
+                until a live table is up. Mute stays reachable via the header. */}
+            {showGamePanels && <MusicPicker />}
+            {showGamePanels && <TableSettings />}
           </div>
           <div className="relative flex-1">
+            {/* Seats + board are drawn by the 3D scene in cinematic mode; SeatHud
+                still renders (avatar-preset toggle only) so 2.5D/3D/Mix stays
+                switchable. */}
             <SeatHud />
             <ActionTimer />
-            <CommunityCards board={snapshot?.board ?? []} phase={snapshot?.phase ?? "waiting"} />
+            {!cinematic && (
+              <CommunityCards board={snapshot?.board ?? []} phase={snapshot?.phase ?? "waiting"} />
+            )}
           </div>
         </div>
 
@@ -61,7 +85,9 @@ export function TableHud({ children }: { children: React.ReactNode }) {
           <ActionBar />
         </div>
 
-        {error && (
+        {/* The offline "Failed to fetch" toast is noise on the demo/cinematic
+            showcase (no server by design); keep it only for the classic path. */}
+        {!cinematic && error && (
           <div className="pointer-events-auto absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border border-red-500/40 bg-red-950/60 px-4 py-2 text-xs text-red-200">
             {error}
           </div>

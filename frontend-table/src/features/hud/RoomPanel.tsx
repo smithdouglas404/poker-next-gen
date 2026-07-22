@@ -13,6 +13,7 @@ import {
   MIN_SEATS,
 } from "@/features/game/protocol";
 import { Button, Input, SectionHeader, cn } from "@/features/ui";
+import { getTableGraphics } from "@/features/table/tableGraphics";
 
 const OPEN_STORAGE_KEY = "pkr:roomPanelOpen";
 
@@ -39,7 +40,10 @@ export function RoomPanel() {
   const [joinId, setJoinId] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [busy, setBusy] = useState(false);
-  const [open, setOpen] = useState(true);
+  // Cinematic is the default look and the felt must stay clear, so the Room
+  // Control drawer starts collapsed there (reachable via the ⚙ Room tab). In
+  // classic mode it stays open as before. A stored preference still wins.
+  const [open, setOpen] = useState(() => getTableGraphics() !== "cinematic");
 
   // Create-table parameters (blinds in cents, consistent with the buy-in).
   const [smallBlind, setSmallBlind] = useState(DEFAULT_SMALL_BLIND_CENTS);
