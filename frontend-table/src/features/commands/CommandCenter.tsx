@@ -8,6 +8,19 @@ import type { CommandCategory, CommandDefinition, CommandResult } from "./types"
 import { CATEGORY_META } from "./types";
 import { canAccessCommand, canSeeCommand, useMeRoles, useMeVerification } from "./useMeRoles";
 import { canRunInClub, clubStandingLabel } from "./access";
+import { ResultView } from "./ResultView";
+
+// Relative/local timestamp for the command log (UI review P1-2): "2s ago",
+// "3m ago", else a local time — never a raw ISO string.
+function formatWhen(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return iso;
+  const secs = Math.round((Date.now() - t) / 1000);
+  if (secs < 5) return "just now";
+  if (secs < 60) return `${secs}s ago`;
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+  return new Date(iso).toLocaleTimeString();
+}
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { getRpcSchema } from "./schemas";
 import { SchemaForm } from "./schemaForm/SchemaForm";
@@ -126,9 +139,6 @@ function CommandCard({
       </div>
       <h3 className="mt-4 text-base font-semibold text-white">{command.title}</h3>
       <p className="mt-2 text-sm leading-relaxed text-neutral-300">{command.description}</p>
-      {command.rpc && (
-        <p className="mt-3 font-mono text-[10px] text-green/80">rpc/{command.rpc}</p>
-      )}
       <div className="mt-4 text-xs font-semibold uppercase tracking-wider text-brand">
         {isLink ? "Open →" : "Run Command →"}
       </div>
@@ -377,12 +387,12 @@ function CommandCenterInner() {
                       onClick={() => setBannerExpanded((v) => !v)}
                       className="text-[11px] font-semibold uppercase tracking-wider text-white/70 hover:text-white"
                     >
-                      {bannerExpanded ? "Hide details ▲" : "Show details ▼"}
+                      {bannerExpanded ? "Hide details ▲" : "View details ▼"}
                     </button>
                     {bannerExpanded && (
-                      <pre className="mt-2 max-h-64 overflow-auto rounded-lg bg-black/50 p-3 text-xs text-emerald-100">
-                        {JSON.stringify(latest.data, null, 2)}
-                      </pre>
+                      <div className="mt-2 max-h-72 overflow-auto rounded-lg bg-black/30 p-3">
+                        <ResultView commandId={latest.commandId} data={latest.data} />
+                      </div>
                     )}
                   </div>
                 )}
@@ -407,7 +417,7 @@ function CommandCenterInner() {
             <h1 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">Command Center</h1>
             <p className="mt-3 max-w-2xl text-neutral-400">
               Every platform action — communities, wallets, cash games, tournaments, and the live table.
-              All {stats.live} commands are wired to live Nakama RPCs.
+              All {stats.live} actions run live against the platform.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -421,20 +431,9 @@ function CommandCenterInner() {
                 {clubStandingLabel(roles, activeClubId)}
               </span>
             </div>
-            <Link href="/stack" className={NAV_CHIP}>
-              Live Stack →
-            </Link>
             <Link href="/lobby" className={NAV_CHIP}>
               Table Lobby →
             </Link>
-            <a
-              href={process.env.NEXT_PUBLIC_ODDSLINGERS_URL ?? "http://localhost:8888"}
-              target="_blank"
-              rel="noreferrer"
-              className={NAV_CHIP}
-            >
-              OddSlingers →
-            </a>
             <Link href="/table" className={NAV_CHIP_RED}>
               Open Table →
             </Link>
@@ -531,13 +530,13 @@ function CommandCenterInner() {
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="font-medium text-white">{cmd?.title ?? result.commandId}</p>
-                    <span className="text-[10px] text-neutral-500">{result.at}</span>
+                    <span className="text-[10px] text-neutral-500">{formatWhen(result.at)}</span>
                   </div>
                   <p className="mt-1 text-sm text-neutral-300">{result.message}</p>
                   {result.data !== undefined && (
-                    <pre className="mt-3 overflow-x-auto rounded-lg bg-black/40 p-3 text-xs text-green">
-                      {JSON.stringify(result.data, null, 2)}
-                    </pre>
+                    <div className="mt-3">
+                      <ResultView commandId={result.commandId} data={result.data} />
+                    </div>
                   )}
                 </div>
               );

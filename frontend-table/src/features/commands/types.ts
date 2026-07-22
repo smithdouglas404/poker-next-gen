@@ -69,7 +69,7 @@ export const CATEGORY_META: Record<
   },
   math: {
     label: "Math & GTO",
-    subtitle: "rs_poker equity, Omaha, and GTO advice",
+    subtitle: "Equity, Omaha, and GTO analysis",
     accent: "border-cyan/25 bg-[#1c2128]",
   },
   coaching: {

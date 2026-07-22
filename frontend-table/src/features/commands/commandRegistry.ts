@@ -1,13 +1,13 @@
 import type { CommandDefinition } from "./types";
 
-/** All poker network commands — fully wired to live Nakama RPCs. */
+/** All poker network commands — wired to live backend actions. */
 export const COMMAND_REGISTRY: CommandDefinition[] = [
   // Platform
   {
     id: "healthz",
     capability: "guest",
     title: "Check Backend Health",
-    description: "Ping the Nakama backend-core plugin and verify the server is online.",
+    description: "Verify the game server is online and responding.",
     category: "platform",
     status: "live",
     rpc: "healthz",
@@ -17,7 +17,7 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
     id: "stack_health",
     capability: "guest",
     title: "Live Stack Health",
-    description: "Check Nakama, rs_poker engine-math, and OddSlingers in one request.",
+    description: "Check every core service is healthy in one request.",
     category: "platform",
     status: "live",
     href: "/stack",
@@ -27,7 +27,7 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
     id: "auth_sign_in",
     capability: "guest",
     title: "Sign In / Create Account",
-    description: "Authenticate with Nakama using device credentials (auto on first visit).",
+    description: "Sign in or create your account (automatic on your first visit).",
     category: "platform",
     status: "live",
     rpc: "profile_get",
@@ -79,7 +79,7 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
   {
     id: "club_create",
     title: "Create Community",
-    description: "Spin up a private club persisted in PostgreSQL with you as owner.",
+    description: "Create a private club with you as its owner.",
     category: "community",
     status: "live",
     rpc: "club_create",
@@ -204,8 +204,8 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
   },
   {
     id: "hand_rank",
-    title: "Hand Rank (rs_poker)",
-    description: "Evaluate hero hand category via engine-math sidecar.",
+    title: "Hand Rank",
+    description: "Evaluate a hand's category and strength.",
     category: "game",
     status: "live",
     rpc: "hand_rank",
@@ -215,8 +215,8 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
   },
   {
     id: "equity_estimate",
-    title: "Monte Carlo Equity (rs_poker)",
-    description: "Estimate pot equity for 2+ known hands via rs_poker Monte Carlo.",
+    title: "Equity Calculator",
+    description: "Estimate pot equity between two or more known hands.",
     category: "game",
     status: "live",
     rpc: "equity_estimate",
@@ -351,7 +351,7 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
   {
     id: "gto_advise",
     title: "GTO Action Advice",
-    description: "Equity-based GTO approximation (fold/call/bet) via rs_poker Monte Carlo.",
+    description: "Get a fold / call / bet recommendation from equity analysis.",
     category: "math",
     status: "live",
     rpc: "gto_advise",
@@ -368,7 +368,7 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
   {
     id: "omaha_rank",
     title: "Rank Omaha Hand",
-    description: "Evaluate PLO4–PLO7 via rs_poker Omaha module.",
+    description: "Evaluate Omaha (PLO4–PLO7) hands.",
     category: "math",
     status: "live",
     rpc: "omaha_rank",
@@ -421,7 +421,7 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
   {
     id: "audit_list",
     title: "List Hand Audit Events",
-    description: "Fetch immutable audit trail for a match hand (Postgres, chain-ready).",
+    description: "Fetch the immutable, verifiable audit trail for a hand.",
     category: "audit",
     status: "live",
     rpc: "audit_list",
@@ -443,7 +443,7 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
   {
     id: "table_open",
     title: "Open Table Canvas",
-    description: "Launch the premium Pixi.js WebGPU poker table surface.",
+    description: "Open the cinematic 3D poker table.",
     category: "table",
     status: "live",
     href: "/table",

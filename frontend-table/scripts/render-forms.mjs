@@ -1,6 +1,6 @@
 import { chromium } from "playwright-core";
 const CHROME = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
-const BASE = "http://127.0.0.1:3311";
+const BASE = "http://127.0.0.1:3312";
 const OUT = "/tmp/claude-0/-home-user-poker-next-gen/392cc787-6489-50fa-8651-c53dd904e186/scratchpad/forms";
 import { mkdirSync } from "fs";
 mkdirSync(OUT, { recursive: true });
@@ -135,6 +135,23 @@ await w(400);
 
 // tournament_create — the "unit stew" fix: buy-in/fee money + chips count
 await openCard("Create Tournament", "07-tournament_create.png");
+try { await p.getByRole("button", { name: /^Cancel$/ }).click({ timeout: 1500 }); } catch {}
+await w(400);
+
+// P1-2 proof: run a READ command (Browse Communities -> club_list) and show the
+// result rendered as a TABLE in the command log, not raw JSON.
+try {
+  await p.evaluate(() => window.scrollTo(0, 0));
+  const card = p.locator("button", { hasText: /Browse Communities/i }).first();
+  await card.scrollIntoViewIfNeeded();
+  await card.click({ timeout: 4000 });
+  await w(1500);
+  // scroll to the command log at the bottom
+  await p.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await w(600);
+  await p.screenshot({ path: `${OUT}/08-result_table.png`, fullPage: true });
+  console.log("OK result table (club_list)");
+} catch (e) { console.log("result skip", e.message.split("\n")[0]); }
 
 await b.close();
 console.log("done");
