@@ -63,6 +63,13 @@ export interface CinematicSceneProps {
    * renders the center pot label + hero hole cards.
    */
   children?: ReactNode;
+  /**
+   * Extra DOM overlay layered ON TOP of both the canvas and the intrinsic/
+   * children HUD (never suppresses either). The live table passes its admin /
+   * waiting-list / financial-summary chrome here so the pot + hero HUD survive.
+   * Omitted by the proof, so its render stays byte-identical.
+   */
+  overlay?: ReactNode;
 }
 
 // Ellipse the seats sit on (matches the proof exactly).
@@ -240,16 +247,55 @@ function SeatPortrait2D({ seat, total }: { seat: SceneSeat; total: number }) {
   );
 }
 
+/** A dark gunmetal + neon-piped chair the 3D figure sits in — sells the
+ *  "seated full body" read of the full_body_avatar master (figures at the rail,
+ *  not floating busts). Pure R3F geometry (non-negotiable #1). */
+function SeatChair({ ring }: { ring: string }) {
+  return (
+    <group>
+      {/* seat pad */}
+      <mesh position={[0, 0.34, 0]} castShadow receiveShadow>
+        <boxGeometry args={[0.86, 0.14, 0.82]} />
+        <meshStandardMaterial color="#12161d" metalness={0.7} roughness={0.4} />
+      </mesh>
+      {/* backrest, tilted back slightly, sitting behind the figure (−z local) */}
+      <mesh position={[0, 0.86, -0.42]} rotation={[-0.14, 0, 0]} castShadow>
+        <boxGeometry args={[0.82, 0.96, 0.12]} />
+        <meshStandardMaterial color="#171b22" metalness={0.85} roughness={0.36} />
+      </mesh>
+      {/* neon rim piping along the top of the backrest — state-colored glow */}
+      <mesh position={[0, 1.32, -0.46]} rotation={[-0.14, 0, 0]}>
+        <boxGeometry args={[0.82, 0.05, 0.06]} />
+        <meshBasicMaterial color={ring} toneMapped={false} />
+      </mesh>
+      {/* pedestal base */}
+      <mesh position={[0, 0.14, 0]} castShadow>
+        <cylinderGeometry args={[0.16, 0.26, 0.28, 20]} />
+        <meshStandardMaterial color="#0c0f14" metalness={0.6} roughness={0.5} />
+      </mesh>
+    </group>
+  );
+}
+
 function GlbFigure({ seat, total }: { seat: SceneSeat; total: number }) {
   const p = seatPoint(seat.index, total);
   const gltf = useGLTF(seat.model_url ?? GLB_URL);
   // face the table center
   const yaw = Math.atan2(-p[0], -p[2]);
   const dim = seat.state === "folded";
+  // Push the figure a touch further out onto the rail and render it larger so it
+  // reads as a full seated body (torso + lap at the felt) rather than a bust.
+  const fx = p[0] * 1.14;
+  const fz = p[2] * 1.14;
   return (
     <group>
-      <group position={[p[0] * 1.05, 0.0, p[2] * 1.05]} rotation={[0, yaw, 0]} scale={0.82}>
-        <Clone object={gltf.scene} castShadow />
+      <group position={[fx, 0.0, fz]} rotation={[0, yaw, 0]}>
+        <SeatChair ring={seat.ringColor} />
+        {/* seated figure: larger scale, hips at the seat pad so the lap sits at
+            felt height and the head clears the rail — a fuller HRC-style body. */}
+        <group position={[0, 0.24, 0.06]} scale={1.28}>
+          <Clone object={gltf.scene} castShadow />
+        </group>
       </group>
       <Html position={[p[0], 0.55, p[2]]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none", opacity: dim ? 0.5 : 1 }}>
         <SeatPill seat={seat} />
@@ -360,6 +406,7 @@ export function CinematicScene({
   maxSeats,
   showPot = true,
   children,
+  overlay,
 }: CinematicSceneProps) {
   return (
     <div
@@ -387,6 +434,7 @@ export function CinematicScene({
         </Suspense>
       </Canvas>
       {children ?? <SceneHud potLabel={potLabel} heroHole={heroHole} />}
+      {overlay}
     </div>
   );
 }

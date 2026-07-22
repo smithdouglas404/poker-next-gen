@@ -17,6 +17,7 @@ import { heroSeatIndex } from "@/features/table/syncGameToCanvas";
 import { DEFAULT_MAX_SEATS, MAX_SEATS, MIN_SEATS } from "@/features/game/protocol";
 import type { CardView, SeatView, ShowdownMessage, TableSnapshot } from "@/features/game/protocol";
 import { CinematicScene, type SceneSeat } from "./CinematicScene";
+import { TableAdminOverlay } from "./TableAdminOverlay";
 import { DEMO_HERO_ID, DEMO_HOLE, DEMO_SHOWDOWN, DEMO_SNAPSHOT } from "./demoSnapshot";
 
 function seatState(
@@ -146,6 +147,7 @@ export default function LiveCinematicTable() {
       mode={mode}
       maxSeats={scene.maxSeats}
       showPot={scene.showPot}
+      overlay={<TableAdminOverlay demo={demo} />}
     />
   );
 }

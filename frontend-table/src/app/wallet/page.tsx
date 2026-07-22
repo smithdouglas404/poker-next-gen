@@ -19,6 +19,7 @@ import {
   type VerificationResp,
   type Withdrawal,
 } from "@/features/wallet/walletRpc";
+import { rgLimitsApi, emptyLimits, type RgLimits } from "@/features/wallet/rgLimitsRpc";
 
 const GOLD_TEXT =
   "bg-gradient-to-r from-[#f3e2ad] via-[#d4af37] to-[#9a7b2c] bg-clip-text text-transparent";
@@ -44,6 +45,7 @@ export default function WalletPage() {
   const [rakeback, setRakeback] = useState<RakebackStatus | null>(null);
   const [sub, setSub] = useState<SubscriptionStatusResp | null>(null);
   const [ver, setVer] = useState<VerificationResp | null>(null);
+  const [rgLimits, setRgLimits] = useState<RgLimits | null>(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<number | null>(null);
@@ -65,8 +67,9 @@ export default function WalletPage() {
       walletApi.rakebackStatus(),
       walletApi.subscriptionStatus(),
       walletApi.verification(),
+      rgLimitsApi.get(),
     ]);
-    const [g, b, l, w, bo, rb, s, v] = results;
+    const [g, b, l, w, bo, rb, s, v, rg] = results;
     if (g.status === "fulfilled") setBalance(g.value.balance_cents ?? 0);
     if (b.status === "fulfilled") setBuckets(b.value.buckets ?? []);
     if (l.status === "fulfilled") setLedger(l.value.ledger ?? []);
@@ -75,6 +78,7 @@ export default function WalletPage() {
     if (rb.status === "fulfilled") setRakeback(rb.value);
     if (s.status === "fulfilled") setSub(s.value);
     if (v.status === "fulfilled") setVer(v.value);
+    if (rg.status === "fulfilled") setRgLimits(rg.value.limits ?? emptyLimits());
     if (g.status === "rejected") {
       notify(
         g.reason instanceof Error ? g.reason.message : "Failed to load wallet",
@@ -258,6 +262,11 @@ export default function WalletPage() {
         {/* Buckets + transfer */}
         <section className="mb-6">
           <BucketsPanel buckets={buckets} notify={notify} onDone={loadCore} />
+        </section>
+
+        {/* Responsible-gambling deposit limits */}
+        <section className="mb-6">
+          <DepositLimitsPanel limits={rgLimits} notify={notify} onDone={loadCore} />
         </section>
 
         {/* Ledger */}
@@ -672,6 +681,107 @@ function BucketsPanel({
         </Field>
         <Button onClick={transfer} disabled={busy} className="h-[42px]">
           {busy ? "Moving…" : "Transfer"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+function DepositLimitsPanel({
+  limits,
+  notify,
+  onDone,
+}: {
+  limits: RgLimits | null;
+  notify: (msg: string, kind?: "ok" | "err") => void;
+  onDone: () => Promise<void>;
+}) {
+  const [daily, setDaily] = useState("");
+  const [weekly, setWeekly] = useState("");
+  const [monthly, setMonthly] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  // Hydrate the inputs from the server the first time real limits arrive.
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (!limits || hydratedRef.current) return;
+    hydratedRef.current = true;
+    const toStr = (c: number) => (c > 0 ? String(c / 100) : "");
+    setDaily(toStr(limits.deposit_daily_cents));
+    setWeekly(toStr(limits.deposit_weekly_cents));
+    setMonthly(toStr(limits.deposit_monthly_cents));
+  }, [limits]);
+
+  const save = () =>
+    void (async () => {
+      const d = dollarsToCents(daily) ?? 0;
+      const w = dollarsToCents(weekly) ?? 0;
+      const m = dollarsToCents(monthly) ?? 0;
+      setBusy(true);
+      try {
+        await rgLimitsApi.set({
+          // Preserve loss / session limits managed elsewhere.
+          loss_daily_cents: limits?.loss_daily_cents ?? 0,
+          session_minutes: limits?.session_minutes ?? 0,
+          deposit_daily_cents: d,
+          deposit_weekly_cents: w,
+          deposit_monthly_cents: m,
+        });
+        notify("Deposit limits saved.");
+        setDirty(false);
+        await onDone();
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Could not save limits", "err");
+      } finally {
+        setBusy(false);
+      }
+    })();
+
+  const rows: Array<{ key: string; label: string; value: string; set: (v: string) => void }> = [
+    { key: "d", label: "Daily", value: daily, set: setDaily },
+    { key: "w", label: "Weekly", value: weekly, set: setWeekly },
+    { key: "m", label: "Monthly", value: monthly, set: setMonthly },
+  ];
+
+  return (
+    <div className={cn(GLASS_PANEL, "p-5")}>
+      <div className="mb-4 flex items-center justify-between">
+        <p className={cn(HEADING_SM, "text-cyan/70")}>Deposit Limits</p>
+        <span className="text-[11px] text-neutral-500">Play responsibly · 0 = no limit</span>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        {rows.map((r) => (
+          <Field key={r.key} label={`${r.label} (USD)`}>
+            <Input
+              inputMode="decimal"
+              placeholder="No limit"
+              value={r.value}
+              onChange={(e) => {
+                r.set(e.target.value);
+                setDirty(true);
+              }}
+            />
+          </Field>
+        ))}
+      </div>
+
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <p className="text-[11px] text-neutral-500">
+          Enforced at deposit time by the cashier. Lowering a limit applies
+          immediately; raising it may require a cool-off.
+        </p>
+        <Button
+          onClick={save}
+          disabled={busy || !dirty}
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+        >
+          {busy ? "Saving…" : "Save Limits"}
         </Button>
       </div>
     </div>

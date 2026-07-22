@@ -1,192 +1,135 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
 
-import { callSessionRpc } from "@/lib/nakama/sessionRpc";
-import { Button, Field, Input, Panel, SectionHeader } from "@/features/ui";
-
-interface Cosmetic {
-  id: string;
-  kind: string;
-  name: string;
-  rarity: string;
-  asset_ref: string;
-  preview_ref: string;
-}
+import { SectionHeader } from "@/features/ui";
+import { cn } from "@/features/ui/tokens";
+import { ComposePanel } from "@/features/studio/ComposePanel";
+import { StudioSummary } from "@/features/studio/StudioSummary";
+import { CharacterGallery } from "@/features/studio/CharacterGallery";
+import { GenerationQueue } from "@/features/studio/GenerationQueue";
+import { WardrobePanel } from "@/features/studio/WardrobePanel";
+import { LoadoutPanel } from "@/features/studio/LoadoutPanel";
+import { useStudio } from "@/features/studio/useStudio";
 
 export default function StudioPage() {
-  const [prompt, setPrompt] = useState("");
-  const [inventory, setInventory] = useState<Cosmetic[]>([]);
-  const [equipped, setEquipped] = useState<Record<string, string>>({});
-  const [status, setStatus] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const loadInventory = useCallback(async () => {
-    try {
-      const inv = (await callSessionRpc("inventory_list", {})) as {
-        inventory?: Cosmetic[];
-        equipped?: Record<string, string>;
-      };
-      setInventory(inv.inventory ?? []);
-      setEquipped(inv.equipped ?? {});
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load inventory");
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadInventory();
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, [loadInventory]);
-
-  const generate = useCallback(async () => {
-    setBusy(true);
-    setError(null);
-    setStatus("Starting…");
-    try {
-      const res = (await callSessionRpc("character_generate", { prompt: prompt.trim() })) as {
-        configured?: boolean;
-        generation_id?: string;
-        message?: string;
-      };
-      if (!res.configured) {
-        setStatus(null);
-        setError(res.message ?? "Character generation isn't configured yet.");
-        setBusy(false);
-        return;
-      }
-      const genId = res.generation_id!;
-      setStatus("Generating your character… this can take a minute.");
-      pollRef.current = setInterval(async () => {
-        try {
-          const s = (await callSessionRpc("character_generation_status", {
-            generation_id: genId,
-          })) as { status: string; progress?: number; cosmetic_id?: string };
-          if (s.status === "success") {
-            if (pollRef.current) clearInterval(pollRef.current);
-            setStatus("Done! Your character is in your inventory.");
-            setBusy(false);
-            setPrompt("");
-            await loadInventory();
-          } else if (s.status === "failed") {
-            if (pollRef.current) clearInterval(pollRef.current);
-            setStatus(null);
-            setError("Generation failed — your fee was refunded.");
-            setBusy(false);
-          } else {
-            setStatus(`Generating… ${s.progress ?? 0}%`);
-          }
-        } catch {
-          /* keep polling */
-        }
-      }, 4000);
-    } catch (e) {
-      setStatus(null);
-      setError(e instanceof Error ? e.message : "Generation failed");
-      setBusy(false);
-    }
-  }, [prompt, loadInventory]);
-
-  const equip = useCallback(
-    async (id: string) => {
-      try {
-        await callSessionRpc("cosmetic_equip", { cosmetic_id: id });
-        await loadInventory();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Equip failed");
-      }
-    },
-    [loadInventory],
-  );
+  const studio = useStudio();
+  const busy = studio.jobs.some((j) => j.status === "running");
 
   return (
     <div className="min-h-screen text-white">
-      <header className="border-b border-white/10 px-6 py-8">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+      <header className="border-b border-white/10 px-6 py-6">
+        <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-4">
           <div>
-            <SectionHeader>Character Studio</SectionHeader>
-            <h1 className="font-display mt-1 text-3xl font-bold">Generate your character</h1>
+            <SectionHeader>Avatar Creator</SectionHeader>
+            <h1 className="font-display mt-1 text-3xl font-bold">Character Studio</h1>
           </div>
-          <Link href="/hub" className="text-sm text-cyan hover:underline">
-            ← Command Center
-          </Link>
+          <div className="flex items-center gap-3">
+            <StatusPill online={studio.online} />
+            <Link href="/hub" className="text-sm text-cyan hover:underline">
+              ← Command Center
+            </Link>
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-6xl gap-6 px-6 py-10 lg:grid-cols-[1fr_1.4fr]">
-        {error && (
-          <div className="rounded-xl border border-red-500/30 bg-red-950/20 p-4 text-red-200 lg:col-span-2">
-            {error}
-          </div>
-        )}
-
-        <Panel className="h-fit p-6">
-          <h2 className="font-display text-lg font-bold">Describe it</h2>
-          <p className="mt-1 text-xs text-neutral-400">
-            AI-generate a one-of-a-kind 3D character (powered by Tripo3D). A one-time fee
-            applies; your character lands in your inventory and can be equipped at the table —
-            or listed on the marketplace.
-          </p>
-          <Field label="Prompt" className="mt-4">
-            <Input
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="a neon cyberpunk poker boss in a gold suit"
-            />
-          </Field>
-          <Button disabled={busy || prompt.trim().length < 3} onClick={generate} className="mt-3 w-full">
-            {busy ? "Generating…" : "Generate character"}
-          </Button>
-          {status && <p className="mt-3 text-xs text-amber-200">{status}</p>}
-        </Panel>
-
-        <div>
-          <h2 className="font-display mb-3 text-lg font-bold">Your collection</h2>
-          {inventory.length === 0 ? (
-            <Panel className="p-8 text-center text-sm text-neutral-500">
-              No items yet — generate your first character.
-            </Panel>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {inventory.map((c) => {
-                const isEquipped = equipped[c.kind] === c.id;
-                return (
-                  <Panel key={c.id} className="overflow-hidden">
-                    <div className="aspect-square w-full bg-black/40">
-                      {c.preview_ref ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={c.preview_ref} alt={c.name} className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-4xl">🎭</div>
-                      )}
-                    </div>
-                    <div className="p-3">
-                      <p className="truncate text-sm font-semibold">{c.name}</p>
-                      <p className="text-[10px] uppercase tracking-wider text-amber-300/70">
-                        {c.kind} · {c.rarity}
-                      </p>
-                      <Button
-                        size="sm"
-                        variant={isEquipped ? "outline" : "gold"}
-                        disabled={isEquipped}
-                        onClick={() => void equip(c.id)}
-                        className="mt-2 w-full"
-                      >
-                        {isEquipped ? "Equipped" : "Equip"}
-                      </Button>
-                    </div>
-                  </Panel>
-                );
-              })}
+      {(studio.error || studio.notice) && (
+        <div className="mx-auto max-w-[1500px] px-6 pt-4">
+          {studio.error && (
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-950/20 px-4 py-2.5 text-sm text-red-200">
+              <span>{studio.error}</span>
+              <button
+                type="button"
+                onClick={studio.clearMessages}
+                className="text-xs uppercase tracking-wider text-red-300/70 hover:text-red-200"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+          {studio.notice && !studio.error && (
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-cyan/25 bg-cyan/5 px-4 py-2.5 text-sm text-cyan">
+              <span>{studio.notice}</span>
+              <button
+                type="button"
+                onClick={studio.clearMessages}
+                className="text-xs uppercase tracking-wider text-cyan/60 hover:text-cyan"
+              >
+                Dismiss
+              </button>
             </div>
           )}
         </div>
+      )}
+
+      <main className="mx-auto grid max-w-[1500px] items-start gap-5 px-6 py-6 lg:grid-cols-[300px_minmax(0,1fr)_320px]">
+        {/* Left rail — compose + summary */}
+        <div className="space-y-5">
+          <ComposePanel
+            feeCents={studio.feeCents}
+            online={studio.online}
+            busy={busy}
+            onGenerate={studio.generate}
+          />
+          <StudioSummary inventory={studio.inventory} equipped={studio.equipped} />
+        </div>
+
+        {/* Center — character gallery */}
+        <div className="lg:h-[calc(100vh-160px)]">
+          <CharacterGallery
+            inventory={studio.inventory}
+            equipped={studio.equipped}
+            online={studio.online}
+            onEquip={studio.equip}
+            onDye={studio.dye}
+          />
+        </div>
+
+        {/* Right rail — queue + wardrobe + loadouts */}
+        <div className="space-y-5">
+          <GenerationQueue
+            jobs={studio.jobs}
+            onEquip={studio.equip}
+            onDismiss={studio.dismissJob}
+          />
+          <WardrobePanel
+            inventory={studio.inventory}
+            catalog={studio.catalog}
+            equipped={studio.equipped}
+            online={studio.online}
+            onEquip={studio.equip}
+            onDye={studio.dye}
+          />
+          <LoadoutPanel
+            loadouts={studio.loadouts}
+            equipped={studio.equipped}
+            onSave={studio.saveLoadout}
+            onEquip={studio.equipLoadout}
+          />
+        </div>
       </main>
     </div>
+  );
+}
+
+function StatusPill({ online }: { online: boolean | null }) {
+  if (online === null) {
+    return (
+      <span className="rounded-full border border-white/15 px-3 py-1 text-[11px] uppercase tracking-wider text-neutral-400">
+        Connecting…
+      </span>
+    );
+  }
+  return (
+    <span
+      className={cn(
+        "rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wider",
+        online
+          ? "border-cyan/40 bg-cyan/10 text-cyan"
+          : "border-amber-500/40 bg-amber-500/10 text-amber-300",
+      )}
+    >
+      {online ? "Live" : "Demo · offline"}
+    </span>
   );
 }
