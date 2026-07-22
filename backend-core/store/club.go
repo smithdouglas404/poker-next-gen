@@ -18,14 +18,14 @@ func (s *ClubStore) Create(ctx context.Context, club *models.Club) error {
 	now := time.Now().UTC()
 	club.CreatedAt, club.UpdatedAt = now, now
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO poker_club (id,name,slug,description,currency,is_active,created_at,updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-		club.ID, club.Name, club.Slug, club.Description, club.Currency, club.IsActive, club.CreatedAt, club.UpdatedAt)
+		INSERT INTO poker_club (id,name,slug,description,currency,accepts_global_wallet,is_active,created_at,updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+		club.ID, club.Name, club.Slug, club.Description, club.Currency, club.AcceptsGlobalWallet, club.IsActive, club.CreatedAt, club.UpdatedAt)
 	return err
 }
 
 func (s *ClubStore) List(ctx context.Context) ([]models.Club, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id,name,slug,description,currency,is_active,created_at,updated_at FROM poker_club WHERE is_active ORDER BY created_at DESC LIMIT 100`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,name,slug,description,currency,accepts_global_wallet,is_active,created_at,updated_at FROM poker_club WHERE is_active ORDER BY created_at DESC LIMIT 100`)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +33,7 @@ func (s *ClubStore) List(ctx context.Context) ([]models.Club, error) {
 	var out []models.Club
 	for rows.Next() {
 		var c models.Club
-		if err := rows.Scan(&c.ID, &c.Name, &c.Slug, &c.Description, &c.Currency, &c.IsActive, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Slug, &c.Description, &c.Currency, &c.AcceptsGlobalWallet, &c.IsActive, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, c)
@@ -43,8 +43,8 @@ func (s *ClubStore) List(ctx context.Context) ([]models.Club, error) {
 
 func (s *ClubStore) GetByID(ctx context.Context, id string) (*models.Club, error) {
 	var c models.Club
-	err := s.db.QueryRowContext(ctx, `SELECT id,name,slug,description,currency,is_active,created_at,updated_at FROM poker_club WHERE id=$1`, id).
-		Scan(&c.ID, &c.Name, &c.Slug, &c.Description, &c.Currency, &c.IsActive, &c.CreatedAt, &c.UpdatedAt)
+	err := s.db.QueryRowContext(ctx, `SELECT id,name,slug,description,currency,accepts_global_wallet,is_active,created_at,updated_at FROM poker_club WHERE id=$1`, id).
+		Scan(&c.ID, &c.Name, &c.Slug, &c.Description, &c.Currency, &c.AcceptsGlobalWallet, &c.IsActive, &c.CreatedAt, &c.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

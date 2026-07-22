@@ -45,7 +45,12 @@ type MatchState struct {
 	BigBlind         int64
 	Ante             int64
 	BuyIn            int64
+	MinBuyIn         int64 // table minimum buy-in / rebuy (0 => BuyIn)
+	MaxBuyIn         int64 // table maximum buy-in (0 => 3x BuyIn)
 	Presences        map[string]runtime.Presence
+	// SeatWallet remembers which wallet each seat's buy-in was drawn from
+	// ("global" | "club") so cash-out/refund returns chips to the SAME wallet.
+	SeatWallet       map[int]string
 	BotCount         int
 	Rand             *rand.Rand
 	// Per-session AES-256-GCM keys (userID -> 32 raw bytes) used to encrypt each
@@ -128,6 +133,17 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	}
 	if v, ok := numParam(params, "buy_in"); ok {
 		buyIn = v
+	}
+	minBuyIn := buyIn
+	if v, ok := numParam(params, "min_buy_in"); ok && v > 0 {
+		minBuyIn = v
+	}
+	maxBuyIn := buyIn * 3
+	if v, ok := numParam(params, "max_buy_in"); ok && v > 0 {
+		maxBuyIn = v
+	}
+	if maxBuyIn < minBuyIn {
+		maxBuyIn = minBuyIn
 	}
 	if v, ok := params["room_id"].(string); ok {
 		roomID = v
@@ -216,7 +232,10 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		SmallBlind:   sb,
 		BigBlind:     bb,
 		BuyIn:        buyIn,
+		MinBuyIn:     minBuyIn,
+		MaxBuyIn:     maxBuyIn,
 		Presences:    map[string]runtime.Presence{},
+		SeatWallet:   map[int]string{},
 		Rand:         rand.New(rand.NewSource(time.Now().UnixNano())),
 		SessionKeys:  map[string][]byte{},
 		RITAgree:     map[string]bool{},
@@ -383,10 +402,19 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				sendError(dispatcher, presence, "invalid_payload", err.Error())
 				continue
 			}
-			buyIn := poker.ClampBuyIn(s.BuyIn)
+			buyIn := s.BuyIn
 			if req.BuyIn > 0 {
-				buyIn = poker.ClampBuyIn(req.BuyIn)
+				buyIn = req.BuyIn
 			}
+			// Enforce the table's buy-in band: [MinBuyIn, MaxBuyIn]. A rebuy after
+			// busting must be at least the minimum.
+			if buyIn < s.minBuyIn() {
+				buyIn = s.minBuyIn()
+			}
+			if buyIn > s.maxBuyIn() {
+				buyIn = s.maxBuyIn()
+			}
+			buyIn = poker.ClampBuyIn(buyIn)
 			// Tier gate: enforce the multi-table limit (tables seated at once).
 			seatReg := store.NewActiveSeatStore(db)
 			matchKey := matchIDForAudit(s)
@@ -397,8 +425,9 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 					continue
 				}
 			}
-			if err := reserveBuyIn(ctx, db, s, userID, buyIn); err != nil {
-				sendError(dispatcher, presence, "buy_in_failed", err.Error())
+			wallet := reserveBuyIn(ctx, db, s, userID, buyIn, req.Wallet)
+			if wallet == "" {
+				sendError(dispatcher, presence, "buy_in_failed", "not enough funds in the selected wallet")
 				continue
 			}
 			username := presence.GetUsername()
@@ -406,10 +435,11 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				username = fmt.Sprintf("Player_%s", userID[:4])
 			}
 			if err := s.Table.SitDown(req.Seat, userID, username, buyIn); err != nil {
-				releaseBuyIn(ctx, db, s.ClubID, userID, buyIn)
+				releaseBuyIn(ctx, db, s, req.Seat, userID, buyIn)
 				sendError(dispatcher, presence, "sit_failed", err.Error())
 				continue
 			}
+			s.SeatWallet[req.Seat] = wallet
 			// If a hand is already in progress, the new player sits out until it
 			// finishes (folded = excluded from the current pot/showdown). The next
 			// ResetBetweenHands restores them to Seated so they are dealt in.
@@ -423,7 +453,8 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 		case protocol.OpStandUp:
 			for i, seat := range s.Table.Seats {
 				if seat != nil && seat.UserID == userID {
-					releaseBuyIn(ctx, db, s.ClubID, userID, seat.Stack)
+					releaseBuyIn(ctx, db, s, i, userID, seat.Stack)
+					delete(s.SeatWallet, i)
 					s.Table.StandUp(i)
 					break
 				}
@@ -1078,7 +1109,8 @@ func handleHostAction(ctx context.Context, db *sql.DB, dispatcher runtime.MatchD
 	case "kick":
 		seat := s.Table.Seats[req.Seat]
 		if req.Seat >= 0 && req.Seat < poker.MaxSeats && seat != nil && !seat.IsBot {
-			releaseBuyIn(ctx, db, s.ClubID, seat.UserID, seat.Stack)
+			releaseBuyIn(ctx, db, s, req.Seat, seat.UserID, seat.Stack)
+			delete(s.SeatWallet, req.Seat)
 			_ = store.NewActiveSeatStore(db).Unregister(ctx, seat.UserID, matchIDForAudit(s))
 			name := seat.Username
 			s.Table.StandUp(req.Seat)
@@ -1105,7 +1137,8 @@ func closeTable(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatc
 			continue
 		}
 		if !seat.IsBot {
-			releaseBuyIn(ctx, db, s.ClubID, seat.UserID, seat.Stack)
+			releaseBuyIn(ctx, db, s, i, seat.UserID, seat.Stack)
+			delete(s.SeatWallet, i)
 			_ = seatReg.Unregister(ctx, seat.UserID, matchIDForAudit(s))
 		}
 		s.Table.StandUp(i)
@@ -1249,25 +1282,71 @@ func emitPlayerAction(ctx context.Context, s *MatchState, userID, action string,
 	})
 }
 
-func reserveBuyIn(ctx context.Context, db *sql.DB, s *MatchState, userID string, amount int64) error {
-	amount = poker.ClampBuyIn(amount)
-	if s.TournamentID != "" {
-		return nil
+func (s *MatchState) minBuyIn() int64 {
+	if s.MinBuyIn > 0 {
+		return s.MinBuyIn
 	}
-	if s.ClubID != "" {
-		return store.NewClubStore(db).LockBalance(ctx, s.ClubID, userID, amount)
-	}
-	return store.NewWalletStore(db).Debit(ctx, userID, amount, "table_buyin")
+	return s.BuyIn
 }
 
-func releaseBuyIn(ctx context.Context, db *sql.DB, clubID, userID string, amount int64) {
-	if amount <= 0 {
+func (s *MatchState) maxBuyIn() int64 {
+	if s.MaxBuyIn > 0 {
+		return s.MaxBuyIn
+	}
+	if s.BuyIn > 0 {
+		return s.BuyIn * 3
+	}
+	return s.BuyIn
+}
+
+// clubAcceptsGlobal reports whether a club lets players buy in with the funded
+// global wallet (in addition to the club-issued balance).
+func clubAcceptsGlobal(ctx context.Context, db *sql.DB, clubID string) bool {
+	c, err := store.NewClubStore(db).GetByID(ctx, clubID)
+	return err == nil && c != nil && c.AcceptsGlobalWallet
+}
+
+// reserveBuyIn debits the chosen wallet and returns which wallet was used
+// ("global" | "club" | "tournament"), or "" on failure (insufficient funds).
+// At a club table the club-issued balance is used unless the player picked
+// "global" AND the club accepts it.
+func reserveBuyIn(ctx context.Context, db *sql.DB, s *MatchState, userID string, amount int64, wallet string) string {
+	amount = poker.ClampBuyIn(amount)
+	if s.TournamentID != "" {
+		return "tournament" // director-managed; no wallet debit
+	}
+	if s.ClubID != "" {
+		if wallet == "global" && clubAcceptsGlobal(ctx, db, s.ClubID) {
+			if err := store.NewWalletStore(db).Debit(ctx, userID, amount, "table_buyin"); err != nil {
+				return ""
+			}
+			return "global"
+		}
+		if err := store.NewClubStore(db).LockBalance(ctx, s.ClubID, userID, amount); err != nil {
+			return ""
+		}
+		return "club"
+	}
+	if err := store.NewWalletStore(db).Debit(ctx, userID, amount, "table_buyin"); err != nil {
+		return ""
+	}
+	return "global"
+}
+
+// releaseBuyIn returns chips to the SAME wallet the seat bought in from.
+func releaseBuyIn(ctx context.Context, db *sql.DB, s *MatchState, seat int, userID string, amount int64) {
+	if amount <= 0 || s.TournamentID != "" {
 		return
 	}
-	if clubID != "" {
-		_ = store.NewClubStore(db).UnlockBalance(ctx, clubID, userID, amount)
+	wallet := ""
+	if s.SeatWallet != nil {
+		wallet = s.SeatWallet[seat]
+	}
+	if wallet == "club" && s.ClubID != "" {
+		_ = store.NewClubStore(db).UnlockBalance(ctx, s.ClubID, userID, amount)
 		return
 	}
+	// "global", non-club tables, or unknown -> the global wallet.
 	_ = store.NewWalletStore(db).Credit(ctx, userID, amount, "table_cashout")
 }
 

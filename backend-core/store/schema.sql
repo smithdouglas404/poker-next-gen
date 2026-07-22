@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS poker_club (
     slug TEXT NOT NULL UNIQUE,
     description TEXT NOT NULL DEFAULT '',
     currency TEXT NOT NULL DEFAULT 'USD',
+    accepts_global_wallet BOOLEAN NOT NULL DEFAULT FALSE,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -439,6 +440,7 @@ CREATE TABLE IF NOT EXISTS poker_room_code (
 -- Per-club competitive ELO, used to rank clubs and settle club wars. Default
 -- 1500; recomputed at the end of each completed war.
 ALTER TABLE poker_club ADD COLUMN IF NOT EXISTS elo INT NOT NULL DEFAULT 1500;
+ALTER TABLE poker_club ADD COLUMN IF NOT EXISTS accepts_global_wallet BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Alliances: a federation of clubs. A founding club creates the alliance and
 -- other clubs join. A club belongs to at most one alliance (UNIQUE club_id).

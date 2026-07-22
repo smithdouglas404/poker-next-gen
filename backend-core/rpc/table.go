@@ -34,6 +34,19 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 	if req.BuyIn > 0 {
 		buyIn = req.BuyIn
 	}
+	// Buy-in range. Default the min to the default buy-in and the max to 3× it
+	// when unset, so a table always has a sensible band.
+	minBuyIn := req.MinBuyIn
+	if minBuyIn <= 0 {
+		minBuyIn = buyIn
+	}
+	maxBuyIn := req.MaxBuyIn
+	if maxBuyIn <= 0 {
+		maxBuyIn = buyIn * 3
+	}
+	if maxBuyIn < minBuyIn {
+		maxBuyIn = minBuyIn
+	}
 
 	// Auth mandatory (SEC-1): fail closed. Previously the tier cap was applied
 	// only when a session happened to be present, so an unauthenticated caller
@@ -114,6 +127,8 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		"buy_in":        buyIn,
 		"max_seats":     maxSeats,
 		"min_players":   minPlayers,
+		"min_buy_in":    minBuyIn,
+		"max_buy_in":    maxBuyIn,
 		"num_bots":      numBots,
 		"variant":       variant,
 		"duration_secs": durationSecs,

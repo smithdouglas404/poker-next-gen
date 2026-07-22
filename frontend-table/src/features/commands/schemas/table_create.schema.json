@@ -6,22 +6,22 @@
     "allow_bomb_pot": {
       "title": "Allow Bomb Pot",
       "type": "boolean",
-      "x-order": 11
+      "x-order": 13
     },
     "allow_insurance": {
       "title": "Allow Insurance",
       "type": "boolean",
-      "x-order": 13
+      "x-order": 15
     },
     "allow_run_it_twice": {
       "title": "Allow Run It Twice",
       "type": "boolean",
-      "x-order": 14
+      "x-order": 16
     },
     "allow_straddle": {
       "title": "Allow Straddle",
       "type": "boolean",
-      "x-order": 10
+      "x-order": 12
     },
     "big_blind": {
       "title": "Big Blind",
@@ -35,10 +35,10 @@
       "type": "integer",
       "minimum": 0,
       "x-unit": "money_minor",
-      "x-order": 12
+      "x-order": 14
     },
     "buy_in": {
-      "title": "Buy-in",
+      "title": "Default Buy-in",
       "type": "integer",
       "minimum": 0,
       "x-unit": "money_minor",
@@ -57,7 +57,14 @@
       "minimum": 0,
       "maximum": 720,
       "x-unit": "minutes",
-      "x-order": 9
+      "x-order": 11
+    },
+    "max_buy_in": {
+      "title": "Maximum Buy-in",
+      "type": "integer",
+      "minimum": 0,
+      "x-unit": "money_minor",
+      "x-order": 6
     },
     "max_seats": {
       "title": "Seats at the table",
@@ -65,6 +72,13 @@
       "minimum": 2,
       "maximum": 10,
       "x-unit": "count",
+      "x-order": 7
+    },
+    "min_buy_in": {
+      "title": "Minimum Buy-in",
+      "type": "integer",
+      "minimum": 0,
+      "x-unit": "money_minor",
       "x-order": 5
     },
     "min_players": {
@@ -73,7 +87,7 @@
       "minimum": 2,
       "maximum": 10,
       "x-unit": "count",
-      "x-order": 6
+      "x-order": 8
     },
     "name": {
       "title": "Table Name",
@@ -86,7 +100,7 @@
       "minimum": 0,
       "maximum": 9,
       "x-unit": "count",
-      "x-order": 7
+      "x-order": 9
     },
     "small_blind": {
       "title": "Small Blind",
@@ -102,7 +116,7 @@
         "holdem",
         "plo"
       ],
-      "x-order": 8
+      "x-order": 10
     }
   },
   "examples": [

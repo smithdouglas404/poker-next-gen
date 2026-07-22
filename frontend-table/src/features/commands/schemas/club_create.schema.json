@@ -3,6 +3,12 @@
   "title": "Club",
   "type": "object",
   "properties": {
+    "accepts_global_wallet": {
+      "title": "Accept Global Wallet",
+      "description": "Let players buy in with their funded global wallet, not just club chips.",
+      "type": "boolean",
+      "x-order": 3
+    },
     "currency": {
       "title": "Currency",
       "description": "Defaults to USD.",

@@ -5,6 +5,10 @@ package protocol
 type SitDownRequest struct {
 	Seat   int   `json:"seat"`
 	BuyIn  int64 `json:"buy_in"`
+	// Wallet the buy-in draws from at a club table that accepts both: "global"
+	// (funded global wallet) or "club" (club-issued balance). Empty => club
+	// balance at a club table, global wallet at a non-club table (the old default).
+	Wallet string `json:"wallet,omitempty"`
 }
 
 type ActionRequest struct {
@@ -111,7 +115,9 @@ type TableCreateRequest struct {
 	ClubID     string `json:"club_id,omitempty" ref:"club" label:"Club" help:"Bind to a club: buy-ins draw the club-allocated balance and pots are raked to the club."`
 	SmallBlind int64  `json:"small_blind" validate:"min=0" unit:"money_minor" label:"Small Blind"`
 	BigBlind   int64  `json:"big_blind" validate:"min=0" unit:"money_minor" label:"Big Blind"`
-	BuyIn      int64  `json:"buy_in" validate:"min=0" unit:"money_minor" label:"Buy-in"`
+	BuyIn      int64  `json:"buy_in" validate:"min=0" unit:"money_minor" label:"Default Buy-in"`
+	MinBuyIn   int64  `json:"min_buy_in" validate:"min=0" unit:"money_minor" label:"Minimum Buy-in"`
+	MaxBuyIn   int64  `json:"max_buy_in" validate:"min=0" unit:"money_minor" label:"Maximum Buy-in"`
 	MaxSeats   int    `json:"max_seats" validate:"min=2,max=10" unit:"count" label:"Seats at the table"`
 	MinPlayers int    `json:"min_players" validate:"min=2,max=10" unit:"count" label:"Players needed to start"`
 	NumBots    int    `json:"num_bots" validate:"min=0,max=9" unit:"count" label:"Bots"`

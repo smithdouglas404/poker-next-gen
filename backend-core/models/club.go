@@ -20,6 +20,10 @@ type Club struct {
 	Slug        string    `json:"slug" db:"slug" server:"true" help:"Auto-derived from the name when omitted."`
 	Description string    `json:"description" db:"description" validate:"maxlen=280" label:"Description"`
 	Currency    string    `json:"currency" db:"currency" enum:"USD,EUR,GBP,CAD,AUD" label:"Currency" help:"Defaults to USD."`
+	// AcceptsGlobalWallet: when true, players may buy in with their funded global
+	// wallet at this club's tables (in addition to the club-issued balance). When
+	// false, only the club-issued wallet is accepted.
+	AcceptsGlobalWallet bool `json:"accepts_global_wallet" db:"accepts_global_wallet" label:"Accept Global Wallet" help:"Let players buy in with their funded global wallet, not just club chips."`
 	IsActive    bool      `json:"is_active" db:"is_active" server:"true"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at" server:"true"`
 	UpdatedAt   time.Time `json:"updated_at" db:"updated_at" server:"true"`
