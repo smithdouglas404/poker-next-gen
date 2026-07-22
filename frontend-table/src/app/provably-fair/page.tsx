@@ -8,14 +8,16 @@ import { FairnessDashboard } from "@/features/audit/FairnessDashboard";
 import { SeedReveal } from "@/features/audit/SeedReveal";
 import { HandAudit } from "@/features/audit/HandAudit";
 import { HandHistoryPicker } from "@/features/audit/HandHistoryPicker";
+import { RakeTransparency } from "@/features/provably/RakeTransparency";
 
-type Tab = "dashboard" | "history" | "reveal" | "audit";
+type Tab = "dashboard" | "history" | "reveal" | "audit" | "rake";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "dashboard", label: "Audit Log" },
   { id: "history", label: "Hand History" },
   { id: "reveal", label: "Seed Reveal" },
   { id: "audit", label: "Hand Audit" },
+  { id: "rake", label: "Rake" },
 ];
 
 function isTab(v: string | null): v is Tab {
@@ -107,6 +109,7 @@ export default function ProvablyFairPage() {
         {tab === "history" && <HandHistoryPicker />}
         {tab === "reveal" && <SeedReveal target={target} />}
         {tab === "audit" && <HandAudit target={target} />}
+        {tab === "rake" && <RakeTransparency />}
       </main>
     </div>
   );

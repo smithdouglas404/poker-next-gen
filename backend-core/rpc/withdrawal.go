@@ -21,6 +21,9 @@ func WalletWithdraw(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 	if err != nil {
 		return "", err
 	}
+	if err := requireRealMoney(); err != nil { // SEC-2: fail-closed real-money switch
+		return "", err
+	}
 	// Receiving money requires KYC/AML verification.
 	if err := requireVerified(ctx, db, userID, "kyc_aml", "withdrawing funds"); err != nil {
 		return "", err

@@ -21,6 +21,9 @@ func WalletDepositCrypto(ctx context.Context, logger runtime.Logger, db *sql.DB,
 	if err != nil {
 		return "", err
 	}
+	if err := requireRealMoney(); err != nil { // SEC-2: fail-closed real-money switch
+		return "", err
+	}
 	var req struct {
 		AmountCents int64 `json:"amount_cents"`
 	}
@@ -93,6 +96,13 @@ func checkDepositLimit(ctx context.Context, db *sql.DB, deposits *store.DepositS
 func WalletDepositFiat(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	userID, err := callerID(ctx)
 	if err != nil {
+		return "", err
+	}
+	if err := requireRealMoney(); err != nil { // SEC-2: fail-closed real-money switch
+		return "", err
+	}
+	// Fiat deposits require KYC/AML (tier 3) — verification follows the money.
+	if err := requireVerified(ctx, db, userID, "kyc_aml", "depositing funds"); err != nil {
 		return "", err
 	}
 	var req struct {
