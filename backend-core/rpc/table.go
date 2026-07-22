@@ -82,8 +82,18 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 
 	hostUserID, _ := callerID(ctx) // the creator is the table host
 
+	// Club-bound table: buy-ins draw the player's club-allocated balance (union
+	// model) and pots are raked to the club. Only a club owner/configurer may
+	// stand one up, so a random member can't spin tables on someone's club.
+	if req.ClubID != "" {
+		if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+			return "", err
+		}
+	}
+
 	matchID, err := nk.MatchCreate(ctx, protocol.MatchModule, map[string]interface{}{
 		"room_id":       roomID,
+		"club_id":       req.ClubID,
 		"small_blind":   sb,
 		"big_blind":     bb,
 		"buy_in":        buyIn,

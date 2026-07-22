@@ -108,6 +108,7 @@ type ChatMessage struct {
 
 type TableCreateRequest struct {
 	Name       string `json:"name"`
+	ClubID     string `json:"club_id,omitempty"` // bind to a club: buy-ins draw the club-allocated balance and pots are raked to the club
 	SmallBlind int64  `json:"small_blind"`
 	BigBlind   int64  `json:"big_blind"`
 	BuyIn      int64  `json:"buy_in"`

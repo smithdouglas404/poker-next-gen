@@ -70,6 +70,8 @@ async function main() {
   const RUN = Date.now().toString(36).slice(-5);
   const walletBefore = await rpc(client, owner, "wallet_get", "");
   const clubRes = await rpc(client, owner, "club_create", { name: `High Rollers E2E ${RUN}`, currency: "USD" });
+  // (#6) set a club rake config so pots on club tables are raked.
+  const RAKE_BPS = 500, RAKE_CAP = 300;
   const clubId = clubRes.ok ? (clubRes.data.id || clubRes.data.ID || clubRes.data.club_id) : null;
   step("club_create", clubRes.ok && !!clubId, clubRes.ok ? `clubId=${String(clubId).slice(0, 10)} (fee debited)` : clubRes.error);
   if (!clubId) return finish(report, "club_create failed — cannot continue");
@@ -95,21 +97,25 @@ async function main() {
   const meta = safeParse(acct.user?.metadata || "{}");
   step("profile + 2.5D avatar", meta.avatar === AVATAR_ID || equip.ok, `avatar=${meta.avatar || AVATAR_ID} mode=2.5D${equip.ok ? " (cosmetic_equip ok)" : ""}`);
 
+  // set club rake config (#6 rake path)
+  const rakeCfg = await rpc(client, owner, "rake_config_set", { club_id: clubId, name: "Standard", percent_bps: RAKE_BPS, cap_minor: RAKE_CAP, no_flop_no_drop: true, min_pot_minor: 0, is_active: true });
+  step("rake_config_set (club)", rakeCfg.ok, rakeCfg.ok ? `${(RAKE_BPS / 100).toFixed(1)}% cap ${money(RAKE_CAP)}` : rakeCfg.error);
+
   // ── 5. Owner allocates club balance to player (union model) ──
-  const allocAmt = 50_000; // $500 club bankroll
-  const alloc = await rpc(client, owner, "balance_allocate", { club_id: clubId, user_id: player.user_id, amount: allocAmt, currency: "USD" });
+  const allocAmt = 100_000; // $1000 club bankroll (field is `balance`, not `amount`)
+  const alloc = await rpc(client, owner, "balance_allocate", { club_id: clubId, user_id: player.user_id, balance: allocAmt, currency: "USD" });
   const balGet = await rpc(client, owner, "balance_get", { club_id: clubId, user_id: player.user_id });
-  const allocBal = balGet.data?.balance ?? balGet.data?.amount ?? balGet.data?.Balance;
-  step("balance_allocate (owner→player)", alloc.ok, alloc.ok ? `allocated ${money(allocAmt)}; balance_get=${allocBal != null ? money(allocBal) : "?"}` : alloc.error);
+  const allocBal = balGet.data?.balance ?? balGet.data?.Balance;
+  step("balance_allocate (owner→player)", alloc.ok && allocBal >= allocAmt, alloc.ok ? `allocated ${money(allocAmt)}; balance_get=${allocBal != null ? money(allocBal) : "?"}` : alloc.error);
 
   // player wallet before play
   const pWalletBefore = await rpc(client, player, "wallet_get", "");
   const pBalBefore = pWalletBefore.data?.balance_cents ?? pWalletBefore.data?.balance;
 
   // ── 6. Create a table (7 bots) + seat the player, play 200 hands ──
-  const table = await rpc(client, owner, "table_create", { name: "E2E Table", small_blind: 100, big_blind: 200, buy_in: BUY_IN, max_seats: 8, num_bots: 7, duration_mins: 0 });
+  const table = await rpc(client, owner, "table_create", { name: "E2E Table", club_id: clubId, small_blind: 100, big_blind: 200, buy_in: BUY_IN, max_seats: 8, num_bots: 7, duration_mins: 0 });
   const matchId = table.data?.match_id;
-  step("table_create (8-max, 7 bots)", table.ok && !!matchId, table.ok ? `matchId=${String(matchId).slice(0, 12)}…` : table.error);
+  step("table_create (club-bound, 7 bots)", table.ok && !!matchId, table.ok ? `matchId=${String(matchId).slice(0, 12)}… club=${String(clubId).slice(0,10)}` : table.error);
   if (!matchId) return finish(report, "table_create failed");
 
   const play = await playHands(client, player, matchId);
@@ -126,12 +132,19 @@ async function main() {
   const rake = await rpc(client, owner, "rake_ledger_get", { club_id: clubId, clubId });
   const rakeReport = await rpc(client, owner, "club_rake_report", { club_id: clubId, clubId });
 
+  const balAfter = await rpc(client, owner, "balance_get", { club_id: clubId, user_id: player.user_id });
+  const balAfterVal = balAfter.data?.balance ?? balAfter.data?.Balance;
+  const lockedAfter = balAfter.data?.locked_amount ?? balAfter.data?.LockedAmount ?? 0;
+
   const ledgerRows = Array.isArray(ledger.data) ? ledger.data : (ledger.data?.entries || ledger.data?.ledger || []);
-  step("wallet_get (player)", pWalletAfter.ok, `before=${money(pBalBefore)} after=${money(pBalAfter)} net=${money((pBalAfter ?? 0) - (pBalBefore ?? 0))}`);
-  step("wallet_ledger", ledger.ok, `${ledgerRows.length} entries` + (ledgerRows[0] ? ` · latest: ${ledgerRows[0].reason || ledgerRows[0].Reason || "?"} ${money(ledgerRows[0].delta ?? ledgerRows[0].Delta ?? 0)}` : ""));
+  // Club table: buy-in draws the club-allocated balance (union model), so the
+  // global wallet is unchanged — this is the correct behavior for #6.
+  step("wallet unchanged (club buy-in)", pWalletAfter.ok && pBalAfter === pBalBefore, `wallet ${money(pBalBefore)} (buy-in drew club balance, not wallet)`);
+  step("club balance (union bankroll)", balAfter.ok, `allocated→ balance ${money(balAfterVal ?? 0)} locked ${money(lockedAfter)} (started ${money(allocAmt)})`);
   step("player_stats", stats.ok, summarizeStats(stats.data));
-  step("rake_ledger_get", rake.ok, rake.ok ? `club rake entries=${(Array.isArray(rake.data) ? rake.data.length : (rake.data?.entries?.length ?? 0))}` : rake.error);
-  step("club_rake_report", rakeReport.ok, rakeReport.ok ? JSON.stringify(rakeReport.data).slice(0, 80) : rakeReport.error);
+  const rakeTotal = rakeReport.data?.total_rake ?? 0;
+  const rakeEntries = Array.isArray(rake.data) ? rake.data.length : (rake.data?.entries?.length ?? 0);
+  step("rake accrued to club (#6)", rakeReport.ok && rakeTotal > 0, `total_rake=${money(rakeTotal)} over ${rakeReport.data?.hand_count ?? "?"} raked hands · ledger entries=${rakeEntries}`);
 
   // DB corroboration (authoritative Postgres state)
   const q1 = (t, w) => { try { return sql(`SELECT count(*) FROM ${t}${w ? " WHERE " + w : ""}`).split("\n")[0] || "0"; } catch (e) { return "err"; } };

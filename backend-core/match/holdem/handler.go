@@ -59,6 +59,10 @@ type MatchState struct {
 	HostUserID       string
 	HostPaused       bool
 	HostClosed       bool
+	// Human action clock: when the seat to act is a human, ActionDeadlineTick is
+	// the tick by which they must act before the server auto-checks/folds them.
+	ActionDeadlineTick int64
+	ActionDeadlineSeat int
 	// Per-hand behavioural tracking (userID -> counters), reset each hand start
 	// and drained into poker_hand_stats at settlement. Feeds VPIP/PFR/AF.
 	HandTrack        map[string]*playerHandTrack
@@ -78,8 +82,13 @@ type insurancePolicy struct {
 }
 
 // autoDealDelayTicks is the breather between hands on a self-dealing table
-// (MatchInit sets tick rate = 1/s, so this is seconds).
+// (MatchInit sets tick rate = 10/s, so 4 ticks ≈ 0.4s).
 const autoDealDelayTicks = 4
+
+// actionTimeoutTicks bounds how long a human may take to act before the server
+// acts for them (check if free, else fold). Without it a disconnected or AFK
+// player freezes the whole table indefinitely. At 10 ticks/s this is 30 seconds.
+const actionTimeoutTicks int64 = 300
 
 type Handler struct{}
 
@@ -530,7 +539,73 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 
 	// After human input, let any bot(s) whose turn it is act.
 	driveBots(ctx, db, dispatcher, s)
+	// Then enforce the human action clock so an AFK/disconnected player can't
+	// freeze the table.
+	enforceActionDeadline(ctx, db, dispatcher, s, tick)
 	return s
+}
+
+// enforceActionDeadline auto-acts for a human who has been sitting on their turn
+// past actionTimeoutTicks (check if free, else fold), then progresses the hand
+// exactly as a real action would. Bots act via driveBots and are never subject to
+// this. The deadline is (re)armed the first tick a given human seat is to act.
+func enforceActionDeadline(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, tick int64) {
+	if s.Phase != poker.PhaseBetting {
+		s.ActionDeadlineTick, s.ActionDeadlineSeat = 0, -1
+		return
+	}
+	seatIdx := s.Table.ActionSeat
+	seat := seatIdxSeat(s, seatIdx)
+	if seat == nil || seat.IsBot || seat.Status != poker.SeatSeated {
+		s.ActionDeadlineTick, s.ActionDeadlineSeat = 0, -1
+		return
+	}
+	// Arm the clock the first tick this human seat is on the clock.
+	if s.ActionDeadlineSeat != seatIdx || s.ActionDeadlineTick == 0 {
+		s.ActionDeadlineSeat = seatIdx
+		s.ActionDeadlineTick = tick + actionTimeoutTicks
+		return
+	}
+	if tick < s.ActionDeadlineTick {
+		return
+	}
+	// Time's up — act for them.
+	_, toCall, _, _ := s.Table.ValidActions(seatIdx)
+	action := "fold"
+	if toCall == 0 {
+		action = "check"
+	}
+	if err := s.Table.ApplyAction(seatIdx, action, 0); err != nil {
+		return
+	}
+	s.ActionDeadlineTick, s.ActionDeadlineSeat = 0, -1
+	emitPlayerAction(ctx, s, seat.UserID, action, 0)
+	narrateAction(dispatcher, s, seatIdx, action)
+	broadcastSnapshot(ctx, db, dispatcher, s, nil)
+	if _, uncontested := s.Table.UncontestedWinner(); uncontested {
+		beginShowdownResolution(ctx, s)
+		broadcastSnapshot(ctx, db, dispatcher, s, nil)
+		return
+	}
+	if s.Table.AdvanceAction() {
+		beginShowdownResolution(ctx, s)
+		broadcastSnapshot(ctx, db, dispatcher, s, nil)
+		return
+	}
+	if len(s.Table.Board) > 0 {
+		broadcastBoard(dispatcher, s)
+	}
+	broadcastActionRequired(ctx, db, dispatcher, s)
+	// A bot may now be first to act on the new street.
+	driveBots(ctx, db, dispatcher, s)
+}
+
+// seatIdxSeat safely returns the seat at idx (nil if out of range/empty).
+func seatIdxSeat(s *MatchState, idx int) *poker.Seat {
+	if idx < 0 || idx >= poker.MaxSeats {
+		return nil
+	}
+	return s.Table.Seats[idx]
 }
 
 // driveBots plays out consecutive bot turns during the betting phase. Bot hand
