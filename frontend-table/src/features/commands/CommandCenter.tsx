@@ -10,6 +10,7 @@ import { canAccessCommand, canSeeCommand, useMeRoles, useMeVerification } from "
 import { canRunInClub, clubStandingLabel } from "./access";
 import { ResultView } from "./ResultView";
 import { ClubSetupWizard } from "./ClubSetupWizard";
+import { TournamentBuilderWizard } from "./TournamentBuilderWizard";
 import {
   WORKSPACE_META,
   WORKSPACE_ORDER,
@@ -199,6 +200,7 @@ function CommandCenterInner() {
   const [bannerExpanded, setBannerExpanded] = useState(false);
   const [view, setView] = useState<"workspaces" | "console">("workspaces");
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [tourneyWizardOpen, setTourneyWizardOpen] = useState(false);
 
   // The generated schema for the active command, if it has a form (P0-1).
   const activeSchema: RpcSchema | undefined = activeCommand?.rpc
@@ -540,7 +542,10 @@ function CommandCenterInner() {
                 canRunInClub(c.id, roles, activeClubId),
             );
             const showSetupCta = workspace === "my_club" && clubs.length === 0;
-            if (commands.length === 0 && !showSetupCta) return null;
+            // Show the tournament builder CTA to anyone who can build one.
+            const showTourneyCta =
+              workspace === "run_games" && canRunInClub("tournament_create", roles, activeClubId);
+            if (commands.length === 0 && !showSetupCta && !showTourneyCta) return null;
             return (
               <section key={workspace} className="mb-12">
                 <div className={`mb-5 flex items-center gap-3 rounded-2xl border bg-surface/60 p-5 ${meta.accent}`}>
@@ -561,6 +566,24 @@ function CommandCenterInner() {
                       <p className="text-base font-semibold text-white">Set up your club</p>
                       <p className="mt-1 text-sm text-neutral-300">
                         A guided walkthrough: create → set rake → add a manager → allocate a balance.
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-gradient-to-r from-[#9a7b2c] via-gold to-gold-lite px-5 py-2 text-sm font-bold uppercase tracking-wider text-black">
+                      Start →
+                    </span>
+                  </button>
+                )}
+
+                {showTourneyCta && (
+                  <button
+                    type="button"
+                    onClick={() => setTourneyWizardOpen(true)}
+                    className="mb-4 flex w-full items-center justify-between gap-4 rounded-2xl border border-gold/40 bg-gradient-to-r from-gold/10 to-transparent p-5 text-left transition hover:border-gold/60"
+                  >
+                    <div>
+                      <p className="text-base font-semibold text-white">Build a tournament</p>
+                      <p className="mt-1 text-sm text-neutral-300">
+                        Guided setup: basics → blind structure (templates) → payouts with a live 100% check → start.
                       </p>
                     </div>
                     <span className="shrink-0 rounded-full bg-gradient-to-r from-[#9a7b2c] via-gold to-gold-lite px-5 py-2 text-sm font-bold uppercase tracking-wider text-black">
@@ -788,6 +811,24 @@ function CommandCenterInner() {
           </div>
         );
       })()}
+
+      {tourneyWizardOpen && (
+        <TournamentBuilderWizard
+          onClose={() => setTourneyWizardOpen(false)}
+          onComplete={(tid) => {
+            setTourneyWizardOpen(false);
+            setResults((prev) => [
+              {
+                ok: true,
+                commandId: "tournament_create",
+                message: tid ? "Tournament built and started." : "Tournament wizard closed.",
+                at: new Date().toISOString(),
+              },
+              ...prev.slice(0, 9),
+            ]);
+          }}
+        />
+      )}
 
       {wizardOpen && (
         <ClubSetupWizard
