@@ -116,6 +116,13 @@ view-states, and modals. This is the master list for review.
 
 ---
 
+## Render status
+**62 of 66 captured** and delivered for review (all 33 routes, 8 table overlays,
+lobby states, fairness tabs, studio states, modals, and the owner-gated club-hub
+sections via a real owner session — which showed live data, e.g. a member's $848
+balance from the 200-hand test). Remaining 4 are minor deep-modals: 2FA setup,
+purchase-success, create-tournament panel, and the hand-audit deep-link.
+
 ## Honest notes
 - Every screen above is **BUILT** — the component exists, renders, and is wired
   to its RPC(s). None are known stubs.
