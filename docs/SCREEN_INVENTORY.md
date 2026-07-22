@@ -9,7 +9,8 @@ view-states, and modals. This is the master list for review.
 - `Render` column: ✅ = captured in the review render pass; ⏳ = pending capture.
 
 **Totals:** 33 routes · 8 table overlays · 5 lobby states · 4 fairness tabs ·
-5 club-owner sections · 5 studio states · 6 modals/dialogs = **66 screens.**
+5 club-owner sections · 5 studio states · 6 modals/dialogs · **40 Command Center
+command screens** = **106 screens.**
 
 ---
 
@@ -115,6 +116,36 @@ view-states, and modals. This is the master list for review.
 | 66 | Legal (About / Terms / Privacy) | landing footer | BUILT | ⏳ |
 
 ---
+
+## H. COMMAND CENTER — 40 command detail screens (`/hub`, each card → RUN COMMAND modal)
+
+Each command opens a detail modal with its description, the exact `rpc/…` it calls,
+and a pre-filled JSON payload form. All 40 are LIVE-wired. Captured as `cc-01`…`cc-40`.
+
+| # | Command | RPC | # | Command | RPC |
+|---|---------|-----|---|---------|-----|
+| 67 | Check Backend Health | `healthz` | 87 | Leave Table | (match leave) |
+| 68 | Live Stack Health | multi | 88 | Create Tournament | `tournament_create` |
+| 69 | Sign In / Create Account | auth | 89 | Browse Tournaments | `tournament_list` |
+| 70 | View Player Profile | `profile_get` | 90 | Register for Tournament | `tournament_register` |
+| 71 | View Global Wallet | `wallet_get` | 91 | Add Blind Level | `blind_level_add` |
+| 72 | Loyalty & HRP | `loyalty_get` | 92 | View Blind Structure | `blind_level_list` |
+| 73 | Identity Verification | `kyc_status` | 93 | Add Prize Tier | `prize_pool_add` |
+| 74 | Create Community | `club_create` | 94 | View Prize Pool | `prize_pool_list` |
+| 75 | Browse Communities | `club_list` | 95 | Start Tournament (Live MTT) | `tournament_start` |
+| 76 | Add Club Owner | `club_owner_add` | 96 | View Rake Ledger | `rake_ledger_get` |
+| 77 | Allocate Player Balance | `balance_allocate` | 97 | Set Table Balancing Rule | `balancing_rule_set` |
+| 78 | Get Club Balance | `balance_get` | 98 | GTO Action Advice | `gto_advise` |
+| 79 | Configure Rake Rules | `rake_config_set` | 99 | Rank Omaha Hand | `omaha_rank` |
+| 80 | Get Rake Rules | `rake_config_get` | 100 | Omaha Showdown | `omaha_showdown` |
+| 81 | Create Cash Game | `table_create` | 101 | Smart HUD Coaching Tip | `coaching_tip` |
+| 82 | Join Cash Game | (match join) | 102 | Anti-Bot Pattern Score | `antibot_score` |
+| 83 | List Open Tables | `table_list` | 103 | List Hand Audit Events | `audit_list` |
+| 84 | Find Match (Matchmaker) | `matchmaker_enqueue` | 104 | Verify Hand Integrity | `audit_verify_hand` |
+| 85 | Hand Rank (rs_poker) | `hand_rank` | 105 | Open Table Canvas | (Pixi canvas) |
+| 86 | Monte Carlo Equity (rs_poker) | `equity_estimate` | 106 | Start Hand / Deal Cards | (deal) |
+
+**Grand total: 106 screens** (66 pages/states/modals + 40 command detail screens).
 
 ## Render status
 **62 of 66 captured** and delivered for review (all 33 routes, 8 table overlays,
