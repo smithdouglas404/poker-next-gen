@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PrizeDistributionPool",
+  "type": "object",
+  "properties": {
+    "guaranteed_minor": {
+      "title": "Guaranteed Minimum",
+      "type": "integer",
+      "minimum": 0,
+      "x-unit": "money_minor",
+      "x-order": 4
+    },
+    "payout_bps": {
+      "title": "Payout",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10000,
+      "x-unit": "bps",
+      "x-order": 3
+    },
+    "rank_from": {
+      "title": "Rank From",
+      "type": "integer",
+      "minimum": 1,
+      "x-unit": "count",
+      "x-order": 1
+    },
+    "rank_to": {
+      "title": "Rank To",
+      "type": "integer",
+      "minimum": 1,
+      "x-unit": "count",
+      "x-order": 2
+    },
+    "tournament_id": {
+      "title": "Tournament",
+      "type": "string",
+      "x-ref": "tournament"
+    }
+  },
+  "required": [
+    "payout_bps",
+    "rank_from",
+    "rank_to",
+    "tournament_id"
+  ],
+  "examples": [
+    {
+      "payout_bps": 5000,
+      "rank_from": 1,
+      "rank_to": 1,
+      "tournament_id": ""
+    }
+  ],
+  "additionalProperties": false,
+  "x-rpc": "prize_pool_add"
+}

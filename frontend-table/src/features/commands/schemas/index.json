@@ -1,0 +1,15 @@
+{
+  "generated_by": "backend-core/cmd/schemagen",
+  "rpcs": [
+    "balance_allocate",
+    "balancing_rule_set",
+    "blind_level_add",
+    "club_create",
+    "club_member_role",
+    "club_owner_add",
+    "prize_pool_add",
+    "rake_config_set",
+    "table_create",
+    "tournament_create"
+  ]
+}

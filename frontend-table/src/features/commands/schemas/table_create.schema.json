@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TableCreateRequest",
+  "type": "object",
+  "properties": {
+    "allow_bomb_pot": {
+      "title": "Allow Bomb Pot",
+      "type": "boolean",
+      "x-order": 10
+    },
+    "allow_insurance": {
+      "title": "Allow Insurance",
+      "type": "boolean",
+      "x-order": 12
+    },
+    "allow_run_it_twice": {
+      "title": "Allow Run It Twice",
+      "type": "boolean",
+      "x-order": 13
+    },
+    "allow_straddle": {
+      "title": "Allow Straddle",
+      "type": "boolean",
+      "x-order": 9
+    },
+    "big_blind": {
+      "title": "Big Blind",
+      "type": "integer",
+      "minimum": 0,
+      "x-unit": "money_minor",
+      "x-order": 3
+    },
+    "bomb_pot_ante": {
+      "title": "Bomb Pot Ante",
+      "type": "integer",
+      "minimum": 0,
+      "x-unit": "money_minor",
+      "x-order": 11
+    },
+    "buy_in": {
+      "title": "Buy-in",
+      "type": "integer",
+      "minimum": 0,
+      "x-unit": "money_minor",
+      "x-order": 4
+    },
+    "club_id": {
+      "title": "Club",
+      "description": "Bind to a club: buy-ins draw the club-allocated balance and pots are raked to the club.",
+      "type": "string",
+      "x-ref": "club",
+      "x-order": 1
+    },
+    "duration_mins": {
+      "title": "Auto-close (minutes)",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 720,
+      "x-unit": "minutes",
+      "x-order": 8
+    },
+    "max_seats": {
+      "title": "Max Seats",
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 9,
+      "x-unit": "count",
+      "x-order": 5
+    },
+    "name": {
+      "title": "Table Name",
+      "description": "Optional; a name is generated if omitted.",
+      "type": "string"
+    },
+    "num_bots": {
+      "title": "Bots",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8,
+      "x-unit": "count",
+      "x-order": 6
+    },
+    "small_blind": {
+      "title": "Small Blind",
+      "type": "integer",
+      "minimum": 0,
+      "x-unit": "money_minor",
+      "x-order": 2
+    },
+    "variant": {
+      "title": "Variant",
+      "type": "string",
+      "enum": [
+        "holdem",
+        "plo"
+      ],
+      "x-order": 7
+    }
+  },
+  "examples": [
+    {
+      "big_blind": 200,
+      "buy_in": 100000,
+      "max_seats": 6,
+      "name": "High Rollers",
+      "num_bots": 5,
+      "small_blind": 100,
+      "variant": "holdem"
+    }
+  ],
+  "additionalProperties": false,
+  "x-rpc": "table_create"
+}

@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Owner",
+  "type": "object",
+  "properties": {
+    "can_configure": {
+      "title": "Can Configure",
+      "type": "boolean",
+      "x-order": 4
+    },
+    "club_id": {
+      "title": "Club",
+      "type": "string",
+      "x-ref": "club"
+    },
+    "equity_bps": {
+      "title": "Equity",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10000,
+      "x-unit": "bps",
+      "x-order": 3
+    },
+    "role": {
+      "title": "Role",
+      "type": "string",
+      "enum": [
+        "owner",
+        "manager",
+        "agent"
+      ],
+      "x-order": 2
+    },
+    "user_id": {
+      "title": "User",
+      "type": "string",
+      "x-ref": "user",
+      "x-order": 1
+    }
+  },
+  "required": [
+    "club_id",
+    "user_id"
+  ],
+  "examples": [
+    {
+      "club_id": "",
+      "equity_bps": 2500,
+      "role": "manager",
+      "user_id": ""
+    }
+  ],
+  "additionalProperties": false,
+  "x-rpc": "club_owner_add"
+}

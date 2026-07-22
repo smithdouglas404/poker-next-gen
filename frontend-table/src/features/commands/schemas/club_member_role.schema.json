@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ClubMemberRoleRequest",
+  "type": "object",
+  "properties": {
+    "club_id": {
+      "title": "Club",
+      "type": "string",
+      "x-ref": "club"
+    },
+    "role": {
+      "title": "Role",
+      "type": "string",
+      "enum": [
+        "member",
+        "admin"
+      ],
+      "x-order": 2
+    },
+    "user_id": {
+      "title": "Member",
+      "type": "string",
+      "x-ref": "user",
+      "x-order": 1
+    }
+  },
+  "required": [
+    "club_id",
+    "role",
+    "user_id"
+  ],
+  "examples": [
+    {
+      "club_id": "",
+      "role": "admin",
+      "user_id": ""
+    }
+  ],
+  "additionalProperties": false,
+  "x-rpc": "club_member_role"
+}

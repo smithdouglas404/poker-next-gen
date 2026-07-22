@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TournamentBracket",
+  "type": "object",
+  "properties": {
+    "buy_in_minor": {
+      "title": "Buy-in",
+      "type": "integer",
+      "minimum": 0,
+      "x-unit": "money_minor",
+      "x-order": 3
+    },
+    "club_id": {
+      "title": "Club",
+      "description": "Leave empty for a platform tournament.",
+      "type": "string",
+      "x-ref": "club",
+      "x-order": 1
+    },
+    "fee_minor": {
+      "title": "Entry Fee",
+      "type": "integer",
+      "minimum": 0,
+      "x-unit": "money_minor",
+      "x-order": 4
+    },
+    "max_players": {
+      "title": "Max Players",
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 10000,
+      "x-unit": "count",
+      "x-order": 6
+    },
+    "max_seats_per_table": {
+      "title": "Seats per Table",
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 10,
+      "x-unit": "count",
+      "x-order": 7
+    },
+    "name": {
+      "title": "Tournament Name",
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 80
+    },
+    "scheduled_at": {
+      "title": "Scheduled Start",
+      "description": "Defaults to now.",
+      "type": "string",
+      "format": "date-time",
+      "x-order": 8
+    },
+    "starting_stack": {
+      "title": "Starting Stack",
+      "type": "integer",
+      "minimum": 0,
+      "x-unit": "count",
+      "x-order": 5
+    },
+    "variant": {
+      "title": "Variant",
+      "type": "string",
+      "enum": [
+        "texas-holdem",
+        "omaha"
+      ],
+      "x-order": 2
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "examples": [
+    {
+      "buy_in_minor": 10000,
+      "fee_minor": 1000,
+      "max_players": 180,
+      "max_seats_per_table": 6,
+      "name": "Friday Night 100",
+      "starting_stack": 10000,
+      "variant": "texas-holdem"
+    }
+  ],
+  "additionalProperties": false,
+  "x-rpc": "tournament_create"
+}

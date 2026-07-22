@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BlindTimer",
+  "type": "object",
+  "properties": {
+    "ante": {
+      "title": "Ante",
+      "type": "integer",
+      "minimum": 0,
+      "x-unit": "money_minor",
+      "x-order": 4
+    },
+    "big_blind": {
+      "title": "Big Blind",
+      "type": "integer",
+      "minimum": 0,
+      "x-unit": "money_minor",
+      "x-order": 3
+    },
+    "duration_secs": {
+      "title": "Duration",
+      "type": "integer",
+      "minimum": 0,
+      "x-unit": "seconds",
+      "x-order": 5
+    },
+    "is_break": {
+      "title": "Is Break",
+      "type": "boolean",
+      "x-order": 6
+    },
+    "level": {
+      "title": "Level",
+      "type": "integer",
+      "minimum": 1,
+      "x-unit": "count",
+      "x-order": 1
+    },
+    "small_blind": {
+      "title": "Small Blind",
+      "type": "integer",
+      "minimum": 0,
+      "x-unit": "money_minor",
+      "x-order": 2
+    },
+    "tournament_id": {
+      "title": "Tournament",
+      "type": "string",
+      "x-ref": "tournament"
+    }
+  },
+  "required": [
+    "level",
+    "tournament_id"
+  ],
+  "examples": [
+    {
+      "ante": 0,
+      "big_blind": 100,
+      "duration_secs": 600,
+      "level": 1,
+      "small_blind": 50,
+      "tournament_id": ""
+    }
+  ],
+  "additionalProperties": false,
+  "x-rpc": "blind_level_add"
+}

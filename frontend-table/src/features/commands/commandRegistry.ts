@@ -245,7 +245,7 @@ export const COMMAND_REGISTRY: CommandDefinition[] = [
     href: "/tournaments",
     icon: "🏆",
     example: {
-      name: "Sunday Million",
+      name: "Friday Night 100",
       variant: "texas-holdem",
       buy_in_minor: 10000,
       fee_minor: 1000,

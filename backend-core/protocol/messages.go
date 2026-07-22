@@ -107,21 +107,30 @@ type ChatMessage struct {
 }
 
 type TableCreateRequest struct {
-	Name       string `json:"name"`
-	ClubID     string `json:"club_id,omitempty"` // bind to a club: buy-ins draw the club-allocated balance and pots are raked to the club
-	SmallBlind int64  `json:"small_blind"`
-	BigBlind   int64  `json:"big_blind"`
-	BuyIn      int64  `json:"buy_in"`
-	MaxSeats   int    `json:"max_seats"`
-	NumBots    int    `json:"num_bots"`
-	Variant    string `json:"variant"`       // "holdem" | "plo"; empty => holdem
-	DurationMins int  `json:"duration_mins"` // auto-close after N minutes (0 = no limit)
+	Name       string `json:"name" label:"Table Name" help:"Optional; a name is generated if omitted."`
+	ClubID     string `json:"club_id,omitempty" ref:"club" label:"Club" help:"Bind to a club: buy-ins draw the club-allocated balance and pots are raked to the club."`
+	SmallBlind int64  `json:"small_blind" validate:"min=0" unit:"money_minor" label:"Small Blind"`
+	BigBlind   int64  `json:"big_blind" validate:"min=0" unit:"money_minor" label:"Big Blind"`
+	BuyIn      int64  `json:"buy_in" validate:"min=0" unit:"money_minor" label:"Buy-in"`
+	MaxSeats   int    `json:"max_seats" validate:"min=2,max=9" unit:"count" label:"Max Seats"`
+	NumBots    int    `json:"num_bots" validate:"min=0,max=8" unit:"count" label:"Bots"`
+	Variant    string `json:"variant" enum:"holdem,plo" label:"Variant"`       // "holdem" | "plo"; empty => holdem
+	DurationMins int  `json:"duration_mins" validate:"min=0,max=720" unit:"minutes" label:"Auto-close (minutes)"` // auto-close after N minutes (0 = no limit)
 	// Optional table features (#41); all default-off so a plain table is unchanged.
-	AllowStraddle   bool  `json:"allow_straddle,omitempty"`
-	AllowBombPot    bool  `json:"allow_bomb_pot,omitempty"`
-	BombPotAnte     int64 `json:"bomb_pot_ante,omitempty"` // per-player ante (0 => one BB when triggered)
-	AllowInsurance  bool  `json:"allow_insurance,omitempty"`
-	AllowRunItTwice bool  `json:"allow_run_it_twice,omitempty"`
+	AllowStraddle   bool  `json:"allow_straddle,omitempty" label:"Allow Straddle"`
+	AllowBombPot    bool  `json:"allow_bomb_pot,omitempty" label:"Allow Bomb Pot"`
+	BombPotAnte     int64 `json:"bomb_pot_ante,omitempty" validate:"min=0" unit:"money_minor" label:"Bomb Pot Ante"` // per-player ante (0 => one BB when triggered)
+	AllowInsurance  bool  `json:"allow_insurance,omitempty" label:"Allow Insurance"`
+	AllowRunItTwice bool  `json:"allow_run_it_twice,omitempty" label:"Allow Run It Twice"`
+}
+
+// ClubMemberRoleRequest is the club_member_role RPC payload: promote/demote a
+// member between the member and admin roles. Named (not anonymous) so the schema
+// generator can reflect it as the single source of truth for the form.
+type ClubMemberRoleRequest struct {
+	ClubID string `json:"club_id" validate:"required" ref:"club" label:"Club"`
+	UserID string `json:"user_id" validate:"required" ref:"user" label:"Member"`
+	Role   string `json:"role" validate:"required" enum:"member,admin" label:"Role"`
 }
 
 // PostStraddleRequest arms (or disarms) a voluntary straddle for the next hand.

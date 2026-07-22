@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CustomRakeConfiguration",
+  "type": "object",
+  "properties": {
+    "cap_minor": {
+      "title": "Rake Cap",
+      "type": "integer",
+      "minimum": 0,
+      "x-unit": "money_minor",
+      "x-order": 3
+    },
+    "club_id": {
+      "title": "Club",
+      "type": "string",
+      "x-ref": "club"
+    },
+    "min_pot_minor": {
+      "title": "Minimum Pot",
+      "type": "integer",
+      "minimum": 0,
+      "x-unit": "money_minor",
+      "x-order": 5
+    },
+    "name": {
+      "title": "Config Name",
+      "description": "Defaults to \"Standard\".",
+      "type": "string",
+      "maxLength": 64,
+      "x-order": 1
+    },
+    "no_flop_no_drop": {
+      "title": "No Flop, No Drop",
+      "type": "boolean",
+      "x-order": 4
+    },
+    "percent_bps": {
+      "title": "Rake",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000,
+      "x-unit": "bps",
+      "x-order": 2
+    },
+    "public": {
+      "title": "Publicly Visible",
+      "description": "Opt in to make this rake rule readable by anyone.",
+      "type": "boolean",
+      "x-order": 6
+    }
+  },
+  "required": [
+    "club_id"
+  ],
+  "examples": [
+    {
+      "cap_minor": 300,
+      "club_id": "",
+      "min_pot_minor": 0,
+      "name": "Standard",
+      "percent_bps": 500,
+      "public": false
+    }
+  ],
+  "additionalProperties": false,
+  "x-rpc": "rake_config_set"
+}

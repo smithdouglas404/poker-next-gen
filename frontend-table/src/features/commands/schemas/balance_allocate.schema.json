@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PlayerAllocatedBalance",
+  "type": "object",
+  "properties": {
+    "balance": {
+      "title": "Amount",
+      "type": "integer",
+      "minimum": 1,
+      "x-unit": "money_minor",
+      "x-order": 2
+    },
+    "club_id": {
+      "title": "Club",
+      "type": "string",
+      "x-ref": "club"
+    },
+    "currency": {
+      "title": "Currency",
+      "description": "Defaults to USD.",
+      "type": "string",
+      "enum": [
+        "USD",
+        "EUR",
+        "GBP",
+        "CAD",
+        "AUD"
+      ],
+      "x-order": 3
+    },
+    "user_id": {
+      "title": "Player",
+      "type": "string",
+      "x-ref": "user",
+      "x-order": 1
+    }
+  },
+  "required": [
+    "balance",
+    "club_id",
+    "user_id"
+  ],
+  "examples": [
+    {
+      "balance": 100000,
+      "club_id": "",
+      "currency": "USD",
+      "user_id": ""
+    }
+  ],
+  "additionalProperties": false,
+  "x-rpc": "balance_allocate"
+}

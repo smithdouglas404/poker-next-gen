@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MultiTableBalancingRule",
+  "type": "object",
+  "properties": {
+    "break_table_at_or_below": {
+      "title": "Break Table At or Below",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9,
+      "x-unit": "count",
+      "x-order": 2
+    },
+    "max_seat_difference": {
+      "title": "Max Seat Difference",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9,
+      "x-unit": "count",
+      "x-order": 1
+    },
+    "strategy": {
+      "title": "Strategy",
+      "type": "string",
+      "enum": [
+        "balanced",
+        "random"
+      ],
+      "x-order": 3
+    },
+    "tournament_id": {
+      "title": "Tournament",
+      "type": "string",
+      "x-ref": "tournament"
+    }
+  },
+  "required": [
+    "tournament_id"
+  ],
+  "examples": [
+    {
+      "break_table_at_or_below": 2,
+      "max_seat_difference": 1,
+      "strategy": "balanced",
+      "tournament_id": ""
+    }
+  ],
+  "additionalProperties": false,
+  "x-rpc": "balancing_rule_set"
+}

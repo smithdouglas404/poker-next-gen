@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Club",
+  "type": "object",
+  "properties": {
+    "currency": {
+      "title": "Currency",
+      "description": "Defaults to USD.",
+      "type": "string",
+      "enum": [
+        "USD",
+        "EUR",
+        "GBP",
+        "CAD",
+        "AUD"
+      ],
+      "x-order": 2
+    },
+    "description": {
+      "title": "Description",
+      "type": "string",
+      "maxLength": 280,
+      "x-order": 1
+    },
+    "name": {
+      "title": "Club Name",
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 64
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "examples": [
+    {
+      "currency": "USD",
+      "description": "Invite-only high stakes club",
+      "name": "Midnight Hold'em Society"
+    }
+  ],
+  "additionalProperties": false,
+  "x-rpc": "club_create"
+}

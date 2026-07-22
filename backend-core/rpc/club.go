@@ -12,6 +12,7 @@ import (
 
 	"github.com/smithdouglas404/poker-next-gen/backend-core/billing"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/models"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/protocol"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
 
@@ -212,11 +213,7 @@ func ClubMembers(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 
 // ClubMemberRole lets an owner/configurer set a member's role (member|admin).
 func ClubMemberRole(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
-	var req struct {
-		ClubID string `json:"club_id"`
-		UserID string `json:"user_id"`
-		Role   string `json:"role"`
-	}
+	var req protocol.ClubMemberRoleRequest
 	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" || req.UserID == "" {
 		return "", runtime.NewError("club_id and user_id required", 3)
 	}

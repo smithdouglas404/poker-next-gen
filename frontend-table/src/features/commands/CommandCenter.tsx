@@ -1,13 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { COMMAND_REGISTRY, commandsByCategory, getCommand } from "./commandRegistry";
 import type { CommandCategory, CommandDefinition, CommandResult } from "./types";
 import { CATEGORY_META } from "./types";
 import { canAccessCommand, canSeeCommand, useMeRoles, useMeVerification } from "./useMeRoles";
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
+import { getRpcSchema } from "./schemas";
+import { SchemaForm } from "./schemaForm/SchemaForm";
+import { initialValues, validate } from "./schemaForm/validate";
+import {
+  ActiveClubProvider,
+  ActiveClubSwitcher,
+  useActiveClub,
+} from "./schemaForm/activeClub";
+import {
+  describeSubmission,
+  maxMoneyMinor,
+  needsConfirm,
+  riskOf,
+  TYPED_CONFIRM_THRESHOLD_MINOR,
+} from "./schemaForm/confirm";
+import type { RpcSchema } from "./schemaForm/schemaTypes";
 
 const CATEGORY_ORDER: CommandCategory[] = [
   "platform",
@@ -142,14 +158,65 @@ function CommandCard({
 }
 
 export function CommandCenter() {
+  return (
+    <ActiveClubProvider>
+      <CommandCenterInner />
+    </ActiveClubProvider>
+  );
+}
+
+function CommandCenterInner() {
   const roles = useMeRoles();
   const verification = useMeVerification();
+  const { clubs, activeClubId } = useActiveClub();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [activeCommand, setActiveCommand] = useState<CommandDefinition | null>(null);
   const [formJson, setFormJson] = useState("");
+  const [formValues, setFormValues] = useState<Record<string, unknown>>({});
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [typedConfirm, setTypedConfirm] = useState("");
+  const [memberNames, setMemberNames] = useState<Record<string, string>>({});
   const [results, setResults] = useState<CommandResult[]>([]);
   const [dismissedKey, setDismissedKey] = useState<string | null>(null);
   const [bannerExpanded, setBannerExpanded] = useState(false);
+
+  // The generated schema for the active command, if it has a form (P0-1).
+  const activeSchema: RpcSchema | undefined = activeCommand?.rpc
+    ? getRpcSchema(activeCommand.rpc)
+    : undefined;
+
+  // Resolve club/user ids to names for the confirm sentence (P0-3), so the
+  // operator reads real names, not ids.
+  const clubName = useCallback(
+    (id: string) => clubs.find((c) => c.id === id)?.name,
+    [clubs],
+  );
+  const userName = useCallback((id: string) => memberNames[id], [memberNames]);
+
+  // Load member names for the selected club so the confirm sentence and any
+  // resolved user shows a username.
+  const formClubId = (formValues["club_id"] as string) || activeClubId || "";
+  useEffect(() => {
+    if (!activeSchema || !formClubId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = (await callSessionRpc("club_members", { club_id: formClubId })) as
+          | { members?: Array<{ user_id: string; username: string }> }
+          | null;
+        if (!cancelled && Array.isArray(data?.members)) {
+          const map: Record<string, string> = {};
+          for (const m of data!.members!) map[m.user_id] = m.username;
+          setMemberNames(map);
+        }
+      } catch {
+        /* non-fatal */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSchema, formClubId]);
 
   const latest = results[0];
   const bannerVisible = Boolean(latest) && latest.at !== dismissedKey;
@@ -167,7 +234,19 @@ export function CommandCenter() {
     async (command: CommandDefinition) => {
       if (needsModal(command)) {
         setActiveCommand(command);
-        setFormJson(JSON.stringify(command.example ?? {}, null, 2));
+        setConfirmOpen(false);
+        setTypedConfirm("");
+        const schema = command.rpc ? getRpcSchema(command.rpc) : undefined;
+        if (schema) {
+          // Schema-driven form (P0-1): prefill from the example, inherit the
+          // active club so club_id is never typed (P0-4).
+          setFormValues(
+            initialValues(schema, activeClubId ? { club_id: activeClubId } : {}),
+          );
+        } else {
+          // Legacy fallback: raw JSON for commands without a generated form yet.
+          setFormJson(JSON.stringify(command.example ?? {}, null, 2));
+        }
         return;
       }
 
@@ -180,8 +259,43 @@ export function CommandCenter() {
         setBusyId(null);
       }
     },
-    [needsModal],
+    [needsModal, activeClubId],
   );
+
+  const closeModal = useCallback(() => {
+    setActiveCommand(null);
+    setConfirmOpen(false);
+    setTypedConfirm("");
+    setFormValues({});
+  }, []);
+
+  // Execute the active command with the current form values (after confirm).
+  const executeActive = useCallback(async () => {
+    if (!activeCommand) return;
+    setBusyId(activeCommand.id);
+    try {
+      const result = await runLiveCommand(activeCommand, formValues);
+      setResults((prev) => [result, ...prev.slice(0, 9)]);
+      setBannerExpanded(false);
+      closeModal();
+    } finally {
+      setBusyId(null);
+    }
+  }, [activeCommand, formValues, closeModal]);
+
+  // "Review & Run": validate, then either confirm (money/destructive/write) or
+  // run directly.
+  const proceedFromForm = useCallback(() => {
+    if (!activeCommand?.rpc || !activeSchema) return;
+    const errors = validate(activeSchema, formValues);
+    if (errors.length > 0) return; // form shows the errors inline
+    if (needsConfirm(activeCommand.rpc)) {
+      setTypedConfirm("");
+      setConfirmOpen(true);
+    } else {
+      void executeActive();
+    }
+  }, [activeCommand, activeSchema, formValues, executeActive]);
 
   const submitModal = useCallback(async () => {
     if (!activeCommand) return;
@@ -296,6 +410,7 @@ export function CommandCenter() {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
+            <ActiveClubSwitcher />
             <Link href="/stack" className={NAV_CHIP}>
               Live Stack →
             </Link>
@@ -420,7 +535,7 @@ export function CommandCenter() {
 
       {activeCommand && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-neutral-900 p-6 shadow-2xl">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-neutral-900 p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs uppercase tracking-wider text-gold/80">Run Command</p>
@@ -430,36 +545,126 @@ export function CommandCenter() {
             </div>
             <p className="mt-3 text-sm text-neutral-400">{activeCommand.description}</p>
 
-            <label className="mt-5 block text-xs font-semibold uppercase tracking-wider text-neutral-500">
-              JSON Payload
-            </label>
-            <textarea
-              value={formJson}
-              onChange={(e) => setFormJson(e.target.value)}
-              rows={10}
-              className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 p-3 font-mono text-xs text-green outline-none focus:border-green/50"
-            />
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              <button
-                type="button"
-                disabled={busyId !== null}
-                onClick={submitModal}
-                className="rounded-full bg-[#0a7d43] px-6 py-2.5 text-sm font-semibold uppercase tracking-wider text-white hover:bg-[#1c9f57] disabled:opacity-50"
-              >
-                Run
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveCommand(null)}
-                className="rounded-full border border-white/20 px-6 py-2.5 text-sm font-semibold uppercase tracking-wider text-neutral-300 hover:bg-white/5"
-              >
-                Close
-              </button>
-            </div>
+            {activeSchema ? (
+              <>
+                <div className="mt-5">
+                  <SchemaForm schema={activeSchema} values={formValues} onChange={setFormValues} />
+                </div>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    disabled={busyId !== null || validate(activeSchema, formValues).length > 0}
+                    onClick={proceedFromForm}
+                    className="rounded-full bg-gradient-to-r from-[#9a7b2c] via-gold to-gold-lite px-6 py-2.5 text-sm font-bold uppercase tracking-wider text-black transition hover:shadow-[0_0_22px_rgba(212,175,55,0.35)] disabled:opacity-50"
+                  >
+                    {needsConfirm(activeCommand.rpc ?? "") ? "Review & Run" : "Run"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="rounded-full border border-white/20 px-6 py-2.5 text-sm font-semibold uppercase tracking-wider text-neutral-300 hover:bg-white/5"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <label className="mt-5 block text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                  JSON Payload
+                </label>
+                <textarea
+                  value={formJson}
+                  onChange={(e) => setFormJson(e.target.value)}
+                  rows={10}
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 p-3 font-mono text-xs text-green outline-none focus:border-green/50"
+                />
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    disabled={busyId !== null}
+                    onClick={submitModal}
+                    className="rounded-full bg-[#0a7d43] px-6 py-2.5 text-sm font-semibold uppercase tracking-wider text-white hover:bg-[#1c9f57] disabled:opacity-50"
+                  >
+                    Run
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="rounded-full border border-white/20 px-6 py-2.5 text-sm font-semibold uppercase tracking-wider text-neutral-300 hover:bg-white/5"
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
+
+      {activeCommand && activeSchema && confirmOpen && (() => {
+        const desc = describeSubmission(activeCommand.rpc ?? "", activeSchema, formValues, {
+          clubName,
+          userName,
+        });
+        const risk = riskOf(activeCommand.rpc ?? "");
+        const money = maxMoneyMinor(activeSchema, formValues);
+        const needsTyped = money >= TYPED_CONFIRM_THRESHOLD_MINOR;
+        const confirmWord = risk === "destructive" ? "DELETE" : "CONFIRM";
+        const typedOk = !needsTyped || typedConfirm.trim().toUpperCase() === confirmWord;
+        return (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4">
+            <div className="w-full max-w-md rounded-2xl border-2 border-gold/40 bg-neutral-900 p-6 shadow-2xl">
+              <p className="text-xs uppercase tracking-[0.3em] text-gold/80">
+                {risk === "destructive" ? "Destructive action" : risk === "money" ? "Money movement" : "Confirm"}
+              </p>
+              <h3 className="mt-2 text-lg font-semibold text-white">{desc.title}</h3>
+              <p className="mt-3 text-sm leading-relaxed text-neutral-200">{desc.sentence}</p>
+
+              {desc.lines.length > 0 && (
+                <dl className="mt-4 space-y-1 rounded-xl border border-white/10 bg-black/40 p-3 text-xs">
+                  {desc.lines.map((line) => (
+                    <div key={line} className="text-neutral-300">{line}</div>
+                  ))}
+                </dl>
+              )}
+
+              {needsTyped && (
+                <div className="mt-4">
+                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-brand">
+                    Type {confirmWord} to authorize this {money >= TYPED_CONFIRM_THRESHOLD_MINOR ? "large " : ""}action
+                  </label>
+                  <input
+                    autoFocus
+                    value={typedConfirm}
+                    onChange={(e) => setTypedConfirm(e.target.value)}
+                    placeholder={confirmWord}
+                    className="w-full rounded-xl border border-brand/40 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-brand"
+                  />
+                </div>
+              )}
+
+              <div className="mt-6 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  disabled={busyId !== null || !typedOk}
+                  onClick={executeActive}
+                  className="rounded-full bg-gradient-to-r from-[#9a7b2c] via-gold to-gold-lite px-6 py-2.5 text-sm font-bold uppercase tracking-wider text-black transition hover:shadow-[0_0_22px_rgba(212,175,55,0.35)] disabled:opacity-40"
+                >
+                  Confirm &amp; Run
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmOpen(false)}
+                  className="rounded-full border border-white/20 px-6 py-2.5 text-sm font-semibold uppercase tracking-wider text-neutral-300 hover:bg-white/5"
+                >
+                  Back
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
