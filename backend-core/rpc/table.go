@@ -220,6 +220,37 @@ func TableAddBot(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 	return `{"ok":true}`, nil
 }
 
+// TablesFreezeAll is the platform-admin "emergency freeze all" / resume: it
+// signals every active holdem table to pause (or resume) dealing. Uses a
+// MatchSignal so it works even on tables whose host is not connected — the
+// AdminPaused flag is honored regardless of host presence.
+func TablesFreezeAll(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	if _, err := aiprocRequireAdmin(ctx); err != nil {
+		return "", err
+	}
+	var req struct {
+		Resume bool `json:"resume"`
+	}
+	_ = json.Unmarshal([]byte(payload), &req)
+	action := "pause"
+	if req.Resume {
+		action = "resume"
+	}
+	matches, err := nk.MatchList(ctx, 100, true, "", nil, nil, "+label.module:holdem_cash_6max")
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	signal := `{"type":"` + action + `"}`
+	n := 0
+	for _, m := range matches {
+		if _, err := nk.MatchSignal(ctx, m.MatchId, signal); err == nil {
+			n++
+		}
+	}
+	out, _ := json.Marshal(map[string]interface{}{"ok": true, "action": action, "tables": n})
+	return string(out), nil
+}
+
 func TableList(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	matches, err := nk.MatchList(ctx, 20, true, "", nil, nil, "+label.module:holdem_cash_6max")
 	if err != nil {

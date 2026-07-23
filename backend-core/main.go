@@ -46,6 +46,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"rake_ledger_get":             rpc.RakeLedgerGet,
 		"table_create":                rpc.TableCreate,
 		"table_list":                  rpc.TableList,
+		"tables_freeze_all":           rpc.TablesFreezeAll,
 		"table_add_bot":               rpc.TableAddBot,
 		"tournament_create":           rpc.TournamentCreate,
 		"tournament_list":             rpc.TournamentList,

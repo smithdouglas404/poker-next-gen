@@ -44,6 +44,8 @@ export default function CyberDeckPage() {
   const [balancing, setBalancing] = useState<string | null>(null);
   const [announce, setAnnounce] = useState("");
   const [flash, setFlash] = useState<string | null>(null);
+  const [frozen, setFrozen] = useState(false);
+  const [freezing, setFreezing] = useState(false);
 
   const loadTables = useCallback(async () => {
     try {
@@ -119,6 +121,21 @@ export default function CyberDeckPage() {
       setFlash(e instanceof Error ? e.message : "Balance failed.");
     } finally {
       setBalancing(null);
+    }
+  }
+
+  async function toggleFreeze() {
+    setFreezing(true);
+    setFlash(null);
+    try {
+      const next = !frozen;
+      await callSessionRpc("tables_freeze_all", { resume: !next });
+      setFrozen(next);
+      setFlash(next ? "All tables frozen — dealing paused platform-wide." : "All tables resumed.");
+    } catch (e) {
+      setFlash(e instanceof Error ? e.message : "Freeze failed (admin only).");
+    } finally {
+      setFreezing(false);
     }
   }
 
@@ -262,8 +279,20 @@ export default function CyberDeckPage() {
                   🎙 Announce
                 </button>
               </div>
+              <button
+                type="button"
+                disabled={freezing}
+                onClick={toggleFreeze}
+                className={cn(
+                  "mt-4 w-full rounded-lg border px-3 py-2.5 text-sm font-semibold uppercase tracking-wider transition disabled:opacity-50",
+                  frozen
+                    ? "border-green/40 bg-green/10 text-green hover:bg-green/20"
+                    : "border-red-500/50 bg-red-950/40 text-red-200 hover:bg-red-900/50",
+                )}
+              >
+                {freezing ? "Working…" : frozen ? "▶ Resume all tables" : "⚡ Emergency freeze all"}
+              </button>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <PreviewTile title="Emergency freeze all" caption="Pause every hosted table at once — needs a cross-match admin signal." />
                 <PreviewTile title="Manual pot re-allocation" caption="Award/split a pot after a bad disconnect — dispute tooling, not wired." />
                 <PreviewTile title="+60s shot-clock extension" caption="Grant time to a specific seat mid-hand — not wired." />
                 <PreviewTile title="Inspect hole cards" caption="View live hole cards for dispute review — held for integrity." />

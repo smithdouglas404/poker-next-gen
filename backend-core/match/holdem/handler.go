@@ -73,6 +73,9 @@ type MatchState struct {
 	HostUserID       string
 	HostPaused       bool
 	HostClosed       bool
+	// AdminPaused is a platform-admin freeze (tables_freeze_all). Unlike HostPaused
+	// it is honored regardless of host presence — it's an operator override.
+	AdminPaused      bool
 	// Human action clock: when the seat to act is a human, ActionDeadlineTick is
 	// the tick by which they must act before the server auto-checks/folds them.
 	ActionDeadlineTick int64
@@ -468,7 +471,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			closeTable(ctx, db, dispatcher, s, "scheduled time reached")
 			return nil // ending the match releases the handler
 		}
-		if s.AutoDeal && !s.effPaused() && s.Table.SeatedCount() >= s.minToStart() && len(s.Presences) >= 1 {
+		if s.AutoDeal && !s.effPaused() && !s.AdminPaused && s.Table.SeatedCount() >= s.minToStart() && len(s.Presences) >= 1 {
 			if s.NextDealTick == 0 {
 				s.NextDealTick = tick + autoDealDelayTicks
 			} else if tick >= s.NextDealTick {
@@ -1700,6 +1703,16 @@ func (h *Handler) MatchSignal(ctx context.Context, logger runtime.Logger, db *sq
 		return s, ""
 	}
 	switch sig["type"] {
+	case "pause":
+		// Platform-admin freeze (tables_freeze_all) — no host socket required.
+		s.AdminPaused = true
+		s.NextDealTick = 0
+		narrate(dispatcher, s, "An administrator paused this table.")
+		broadcastSnapshot(ctx, db, dispatcher, s, nil)
+	case "resume":
+		s.AdminPaused = false
+		narrate(dispatcher, s, "An administrator resumed this table.")
+		broadcastSnapshot(ctx, db, dispatcher, s, nil)
 	case "blind_update":
 		if v, ok := sig["small_blind"].(float64); ok {
 			s.SmallBlind = int64(v)
@@ -1852,7 +1865,7 @@ func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) 
 		DeckCommitHash: s.Table.DeckCommitment,
 		Variant:        s.Table.Variant,
 		HostUserID:     s.HostUserID,
-		HostPaused:     s.effPaused(),
+		HostPaused:     s.effPaused() || s.AdminPaused,
 		AllowStraddle:   s.Table.AllowStraddle,
 		AllowBombPot:    s.Table.AllowBombPot,
 		AllowInsurance:  s.Table.AllowInsurance,
