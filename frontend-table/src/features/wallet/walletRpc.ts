@@ -44,6 +44,18 @@ export interface TransferResp {
 }
 
 // Deposit RPCs return either a "not configured" object or a hosted-invoice URL.
+export interface NowPaymentsBalanceEntry {
+  currency: string;
+  amount: number;
+  pending_amount: number;
+}
+
+export interface NowPaymentsBalanceResp {
+  configured: boolean;
+  message?: string;
+  balances: NowPaymentsBalanceEntry[] | null;
+}
+
 export interface DepositResp {
   configured: boolean;
   message?: string;
@@ -130,6 +142,8 @@ export const walletApi = {
   balances: () => call<BalancesResp>("wallet_balances", {}),
   transfer: (from: string, to: string, amountCents: number) =>
     call<TransferResp>("wallet_transfer", { from, to, amount_cents: amountCents }),
+
+  nowpaymentsBalance: () => call<NowPaymentsBalanceResp>("nowpayments_balance", {}),
 
   depositCrypto: (amountCents: number) =>
     call<DepositResp>("wallet_deposit_crypto", { amount_cents: amountCents }),

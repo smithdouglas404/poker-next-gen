@@ -92,6 +92,33 @@ func WalletDepositCrypto(ctx context.Context, logger runtime.Logger, db *sql.DB,
 	return string(out), nil
 }
 
+// NowPaymentsBalance returns the platform's crypto custody balance held at
+// NOWPayments (the house treasury). Admin-gated — this is operator finance data,
+// never surfaced to players.
+func NowPaymentsBalance(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	if _, err := adminCaller(ctx); err != nil {
+		return "", err
+	}
+	if !payments.NowPaymentsConfigured() {
+		out, _ := json.Marshal(map[string]interface{}{
+			"configured": false,
+			"message":    "Crypto gateway not configured (set NOWPAYMENTS_API_KEY).",
+			"balances":   []interface{}{},
+		})
+		return string(out), nil
+	}
+	balances, err := payments.GetNowPaymentsBalance(ctx)
+	if err != nil {
+		logger.Warn("nowpayments balance error: %v", err)
+		return "", runtime.NewError("could not fetch NOWPayments balance", 13)
+	}
+	out, _ := json.Marshal(map[string]interface{}{
+		"configured": true,
+		"balances":   balances,
+	})
+	return string(out), nil
+}
+
 // checkDepositLimit enforces that deposits require a paid plan and that this
 // deposit plus the trailing-24h total stays within the tier's daily limit.
 func checkDepositLimit(ctx context.Context, db *sql.DB, deposits *store.DepositStore, userID string, amountCents int64) error {

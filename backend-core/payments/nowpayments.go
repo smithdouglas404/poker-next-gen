@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -68,6 +69,60 @@ func CreateNowPaymentsInvoice(ctx context.Context, amountCents int64, orderID, d
 		return "", "", err
 	}
 	return out.InvoiceURL, out.ID.String(), nil
+}
+
+// NowPaymentsBalance is one currency's custody balance held at NOWPayments (the
+// house crypto treasury), amount + any still-pending amount.
+type NowPaymentsBalance struct {
+	Currency string  `json:"currency"`
+	Amount   float64 `json:"amount"`
+	Pending  float64 `json:"pending_amount"`
+}
+
+// GetNowPaymentsBalance returns the merchant's crypto custody balances at
+// NOWPayments (only currencies with a non-zero or pending amount). Requires
+// NOWPAYMENTS_API_KEY.
+func GetNowPaymentsBalance(ctx context.Context) ([]NowPaymentsBalance, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, nowPaymentsAPI+"/balance", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("x-api-key", os.Getenv("NOWPAYMENTS_API_KEY"))
+	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("nowpayments balance http %d: %s", resp.StatusCode, string(raw))
+	}
+	// The response is a map of currency -> {amount, pendingAmount}. Some accounts
+	// wrap it under a top-level "balances" object; handle both shapes.
+	payload := raw
+	var wrapper struct {
+		Balances json.RawMessage `json:"balances"`
+	}
+	if json.Unmarshal(raw, &wrapper) == nil && len(wrapper.Balances) > 0 {
+		payload = wrapper.Balances
+	}
+	var m map[string]struct {
+		Amount        json.Number `json:"amount"`
+		PendingAmount json.Number `json:"pendingAmount"`
+	}
+	if err := json.Unmarshal(payload, &m); err != nil {
+		return nil, err
+	}
+	out := []NowPaymentsBalance{}
+	for cur, v := range m {
+		amt, _ := v.Amount.Float64()
+		pend, _ := v.PendingAmount.Float64()
+		if amt == 0 && pend == 0 {
+			continue
+		}
+		out = append(out, NowPaymentsBalance{Currency: strings.ToUpper(cur), Amount: amt, Pending: pend})
+	}
+	return out, nil
 }
 
 // VerifyNowPaymentsIPN checks the x-nowpayments-sig header: HMAC-SHA512 over the

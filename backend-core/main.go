@@ -87,6 +87,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"wallet_deposit_crypto":       rpc.WalletDepositCrypto,
 		"wallet_deposit_fiat":         rpc.WalletDepositFiat,
 		"nowpayments_webhook":         rpc.NowPaymentsWebhook,
+		"nowpayments_balance":         rpc.NowPaymentsBalance,
 		"wallet_withdraw":             rpc.WalletWithdraw,
 		"withdrawal_list":             rpc.WithdrawalList,
 		"withdrawal_approve_admin":    rpc.WithdrawalApproveAdmin,

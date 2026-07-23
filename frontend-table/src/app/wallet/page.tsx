@@ -14,6 +14,7 @@ import {
   walletApi,
   type BucketBalance,
   type LedgerEntry,
+  type NowPaymentsBalanceEntry,
   type RakebackStatus,
   type SubscriptionStatusResp,
   type VerificationResp,
@@ -47,6 +48,7 @@ export default function WalletPage() {
   const [sub, setSub] = useState<SubscriptionStatusResp | null>(null);
   const [ver, setVer] = useState<VerificationResp | null>(null);
   const [rgLimits, setRgLimits] = useState<RgLimits | null>(null);
+  const [treasury, setTreasury] = useState<NowPaymentsBalanceEntry[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<number | null>(null);
@@ -69,8 +71,10 @@ export default function WalletPage() {
       walletApi.subscriptionStatus(),
       walletApi.verification(),
       rgLimitsApi.get(),
+      walletApi.nowpaymentsBalance(), // admin-only; rejects (hidden) for players
     ]);
-    const [g, b, l, w, bo, rb, s, v, rg] = results;
+    const [g, b, l, w, bo, rb, s, v, rg, np] = results;
+    if (np.status === "fulfilled" && np.value.configured) setTreasury(np.value.balances ?? []);
     if (g.status === "fulfilled") setBalance(g.value.balance_cents ?? 0);
     if (b.status === "fulfilled") setBuckets(b.value.buckets ?? []);
     if (l.status === "fulfilled") setLedger(l.value.ledger ?? []);
@@ -246,6 +250,40 @@ export default function WalletPage() {
             onAction={claimRakeback}
           />
         </section>
+
+        {/* Crypto treasury (NOWPayments) — admin-only; hidden for players. */}
+        {treasury && (
+          <section className="mb-6">
+            <div className={cn(GLASS_PANEL, "p-5")}>
+              <div className="flex items-center justify-between">
+                <p className={HEADING_SM}>Crypto Treasury · NOWPayments</p>
+                <span className="rounded-full border border-gold/30 bg-gold/[0.08] px-2 py-0.5 text-[10px] uppercase tracking-wider text-gold">
+                  Operator
+                </span>
+              </div>
+              {treasury.length === 0 ? (
+                <p className="mt-3 text-sm text-neutral-400">
+                  No crypto custody balance yet. Deposits settle here before they credit player wallets.
+                </p>
+              ) : (
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {treasury.map((t) => (
+                    <div key={t.currency} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                      <p className="text-[11px] uppercase tracking-wider text-muted">{t.currency}</p>
+                      <p className="mt-0.5 text-lg font-semibold text-green">{t.amount}</p>
+                      {t.pending_amount > 0 && (
+                        <p className="text-[11px] text-neutral-400">{t.pending_amount} pending</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="mt-3 text-[11px] text-neutral-500">
+                Live balance held at NOWPayments (the house crypto treasury). Read-only.
+              </p>
+            </div>
+          </section>
+        )}
 
         {/* Cashier: deposit + withdraw */}
         <section className="mb-6 grid gap-4 lg:grid-cols-2">
