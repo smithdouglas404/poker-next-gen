@@ -44,6 +44,13 @@ type MatchState struct {
 	SmallBlind       int64
 	BigBlind         int64
 	Ante             int64
+	// Initial* capture the table's configured allocations at creation. Host
+	// overrides (set_blinds, pause) only take effect while the host is present
+	// AT the table; when the host is absent the table reverts to these initial
+	// rules. Never overwritten after MatchInit.
+	InitialSmallBlind int64
+	InitialBigBlind   int64
+	InitialAnte       int64
 	BuyIn            int64
 	MinBuyIn         int64 // table minimum buy-in / rebuy (0 => BuyIn)
 	MaxBuyIn         int64 // table maximum buy-in (0 => 3x BuyIn)
@@ -231,6 +238,10 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		TournamentID: tournamentID,
 		SmallBlind:   sb,
 		BigBlind:     bb,
+		// Snapshot the configured allocations so host overrides can be reverted
+		// when the host leaves the table (see hostPresent / effSmallBlind).
+		InitialSmallBlind: sb,
+		InitialBigBlind:   bb,
 		BuyIn:        buyIn,
 		MinBuyIn:     minBuyIn,
 		MaxBuyIn:     maxBuyIn,
@@ -262,6 +273,48 @@ func (s *MatchState) minToStart() int {
 		return s.MinPlayers
 	}
 	return 2
+}
+
+// hostPresent reports whether the table's host is currently connected to the
+// match. Host-only overrides (set_blinds, pause) are honored only while the
+// host is at the table; when the host leaves, the table reverts to its initial
+// setup rules. A hostless table (tournaments, whose blinds are director-driven)
+// has HostUserID == "" and is never subject to this reversion.
+func (s *MatchState) hostPresent() bool {
+	return s.HostUserID != "" && s.Presences[s.HostUserID] != nil
+}
+
+// hostAbsent is true only when a host is configured but not currently present.
+func (s *MatchState) hostAbsent() bool {
+	return s.HostUserID != "" && !s.hostPresent()
+}
+
+// effSmallBlind / effBigBlind return the blinds actually in force: the host's
+// override while the host is present, otherwise the table's initial blinds.
+// Hostless tables (tournaments) always use the live value (director-controlled).
+func (s *MatchState) effSmallBlind() int64 {
+	if s.hostAbsent() {
+		return s.InitialSmallBlind
+	}
+	return s.SmallBlind
+}
+
+func (s *MatchState) effBigBlind() int64 {
+	if s.hostAbsent() {
+		return s.InitialBigBlind
+	}
+	return s.BigBlind
+}
+
+// effPaused reports whether dealing is paused in force. A host's pause only
+// holds while the host is at the table; once the host leaves the table resumes
+// on its initial rules. The host's intent (s.HostPaused) is retained and
+// re-applies if they return.
+func (s *MatchState) effPaused() bool {
+	if s.hostAbsent() {
+		return false
+	}
+	return s.HostPaused
 }
 
 func (h *Handler) MatchJoinAttempt(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, presence runtime.Presence, metadata map[string]string) (interface{}, bool, string) {
@@ -359,7 +412,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			closeTable(ctx, db, dispatcher, s, "scheduled time reached")
 			return nil // ending the match releases the handler
 		}
-		if s.AutoDeal && !s.HostPaused && s.Table.SeatedCount() >= s.minToStart() && len(s.Presences) >= 1 {
+		if s.AutoDeal && !s.effPaused() && s.Table.SeatedCount() >= s.minToStart() && len(s.Presences) >= 1 {
 			if s.NextDealTick == 0 {
 				s.NextDealTick = tick + autoDealDelayTicks
 			} else if tick >= s.NextDealTick {
@@ -534,13 +587,13 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 
 		case protocol.OpStartHand:
 			if s.Table.SeatedCount() >= s.minToStart() && s.Phase == poker.PhaseWaiting && s.Table.Street == poker.StreetWaiting {
-				if err := s.Table.StartHand(s.SmallBlind, s.BigBlind); err != nil {
+				if err := s.Table.StartHand(s.effSmallBlind(), s.effBigBlind()); err != nil {
 					sendError(dispatcher, presence, "engine_unavailable", err.Error())
 					continue
 				}
 				s.Phase = poker.PhaseBetting
 				emitHandStarted(ctx, s)
-				narrate(dispatcher, s, fmt.Sprintf("Hand #%d dealt — blinds $%d/$%d", s.Table.HandNo, s.SmallBlind/100, s.BigBlind/100))
+				narrate(dispatcher, s, fmt.Sprintf("Hand #%d dealt — blinds $%d/$%d", s.Table.HandNo, s.effSmallBlind()/100, s.effBigBlind()/100))
 				broadcastHandStart(ctx, db, dispatcher, s)
 				dealAndBeginBetting(ctx, db, dispatcher, s)
 			}
@@ -1040,12 +1093,12 @@ func autoStartHand(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDisp
 	if s.Table.SeatedCount() < 2 || s.Phase != poker.PhaseWaiting || s.Table.Street != poker.StreetWaiting {
 		return
 	}
-	if err := s.Table.StartHand(s.SmallBlind, s.BigBlind); err != nil {
+	if err := s.Table.StartHand(s.effSmallBlind(), s.effBigBlind()); err != nil {
 		return // engine-math unavailable; retry next tick
 	}
 	s.Phase = poker.PhaseBetting
 	emitHandStarted(ctx, s)
-	narrate(dispatcher, s, fmt.Sprintf("Hand #%d dealt — blinds $%d/$%d", s.Table.HandNo, s.SmallBlind/100, s.BigBlind/100))
+	narrate(dispatcher, s, fmt.Sprintf("Hand #%d dealt — blinds $%d/$%d", s.Table.HandNo, s.effSmallBlind()/100, s.effBigBlind()/100))
 	broadcastHandStart(ctx, db, dispatcher, s)
 	dealAndBeginBetting(ctx, db, dispatcher, s)
 }
@@ -1170,8 +1223,8 @@ func emitHandStarted(ctx context.Context, s *MatchState) {
 	}
 	payload := map[string]any{
 		"hand_no":           s.Table.HandNo,
-		"small_blind":       s.SmallBlind,
-		"big_blind":         s.BigBlind,
+		"small_blind":       s.effSmallBlind(),
+		"big_blind":         s.effBigBlind(),
 		"seated":            s.Table.SeatedCount(),
 		"board":             boardCodes,
 		"deck_commit_hash":  s.Table.DeckCommitment,
@@ -1673,15 +1726,15 @@ func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) 
 		CurrentBet:     s.Table.CurrentBet,
 		ActionSeat:     s.Table.ActionSeat,
 		ButtonSeat:     s.Table.ButtonSeat,
-		SmallBlind:     s.SmallBlind,
-		BigBlind:       s.BigBlind,
+		SmallBlind:     s.effSmallBlind(),
+		BigBlind:       s.effBigBlind(),
 		MaxSeats:       s.Table.Cap(),
 		HeroWallet:     heroWallet,
 		HandNo:         s.Table.HandNo,
 		DeckCommitHash: s.Table.DeckCommitment,
 		Variant:        s.Table.Variant,
 		HostUserID:     s.HostUserID,
-		HostPaused:     s.HostPaused,
+		HostPaused:     s.effPaused(),
 		AllowStraddle:   s.Table.AllowStraddle,
 		AllowBombPot:    s.Table.AllowBombPot,
 		AllowInsurance:  s.Table.AllowInsurance,
