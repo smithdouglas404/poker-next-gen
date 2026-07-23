@@ -92,7 +92,7 @@ function cardProof(index: number, label: string, card: string, batch: boolean): 
     index,
     label,
     card,
-    entropySource: "Quantum-RNG_09",
+    entropySource: "SHA256-CTR/rs_poker",
     sha256: hexChunk(index * 131 + 7, batch ? 96 : 64),
     serverSeed: "k87v_21m_9q01",
     clientSeed: "vault_user_772",

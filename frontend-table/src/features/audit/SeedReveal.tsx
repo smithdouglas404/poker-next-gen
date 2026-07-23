@@ -6,7 +6,7 @@ import { BTN_RED, GLASS_PANEL, HEADING_SM, cn } from "@/features/ui/tokens";
 import { downloadFile, proofBundle } from "@/features/provably/verifier";
 import { PlayingCard } from "./Card";
 import { auditVerifyHand } from "./auditRpc";
-import { combineSeeds, describeHoleCards, verifyLocally } from "./auditCompute";
+import { describeHoleCards, verifyLocally } from "./auditCompute";
 import { DEMO_HAND_NO, DEMO_MATCH_ID, DEMO_SEED, DEMO_SESSION_ID, demoHandAudit } from "./auditDemo";
 import type { RevealResult } from "./auditTypes";
 
@@ -15,8 +15,13 @@ interface Props {
   target?: { matchId: string; handNo: number } | null;
 }
 
+// Provably-fair reveal. NOTHING on this path is user-editable: the deck is a pure
+// function of the server seed, which is committed (SHA-256 hash) BEFORE the deal
+// and revealed AFTER. The browser recomputes the deck from the revealed seed and
+// checks it against the pre-committed hash. There is no client-typed seed — a
+// seed entered after the hand could not influence a shuffle that already
+// happened, so offering that field would be provably-fair theater.
 export function SeedReveal({ target }: Props) {
-  const [playerSeed, setPlayerSeed] = useState("NeonPhantom_99");
   const [result, setResult] = useState<RevealResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,9 +78,9 @@ export function SeedReveal({ target }: Props) {
         commit = demoHandAudit().commit;
       }
 
-      // Independent, in-browser reproduction — the trust-nothing step.
+      // Independent, in-browser reproduction — the trust-nothing step. The deck
+      // is derived solely from the revealed server seed.
       const local = await verifyLocally(revealedSeed, commit);
-      const combined = await combineSeeds(revealedSeed, playerSeed);
       const holeCards = [local.deck[0], local.deck[1]];
       const desc = describeHoleCards(holeCards);
       const latency = Math.max(1, Math.round(performance.now() - started));
@@ -87,8 +92,8 @@ export function SeedReveal({ target }: Props) {
         sessionId,
         serverSeedHash: commit,
         revealedSeed,
-        playerSeed,
-        combinedSeed: combined,
+        playerSeed: "",
+        combinedSeed: "",
         chainValid: demo ? true : chainValid,
         deckValid: demo ? local.commitMatches : deckValid,
         commitMatches: local.commitMatches,
@@ -105,7 +110,7 @@ export function SeedReveal({ target }: Props) {
     } finally {
       setBusy(false);
     }
-  }, [lockedHash, matchId, handNo, playerSeed, sessionId]);
+  }, [lockedHash, matchId, handNo, sessionId]);
 
   const downloadJson = useCallback(() => {
     if (!result) return;
@@ -123,8 +128,6 @@ export function SeedReveal({ target }: Props) {
       {
         ...JSON.parse(base),
         session_id: result.sessionId,
-        player_seed: result.playerSeed,
-        combined_seed: result.combinedSeed,
         resulting_hole_cards: result.resultingCards,
         source: result.demo ? "demo" : "live",
       },
@@ -151,42 +154,41 @@ export function SeedReveal({ target }: Props) {
           </div>
         </div>
 
+        {/* What does this prove? */}
+        <div className="mt-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-xs leading-relaxed text-neutral-400">
+          <span className="font-semibold text-neutral-200">What does this prove?</span> Before the hand was dealt, the
+          server published a SHA-256 hash of its secret shuffle seed (below). After the hand, it revealed the seed. Your
+          browser recomputes the deck from that seed and checks it hashes to the pre-committed value — so the cards could
+          not have been changed after betting began. Nothing here is editable: the deck is a pure function of the
+          committed server seed.
+        </div>
+
         {/* Locked server seed hash */}
-        <div className="mt-8 rounded-2xl border-l-2 border-brand/50 bg-white/[0.02] p-5">
+        <div className="mt-6 rounded-2xl border-l-2 border-brand/50 bg-white/[0.02] p-5">
           <div className="flex items-center justify-between">
-            <span className={cn(HEADING_SM, "text-foreground")}>Server Seed Hash (Locked)</span>
+            <span className={cn(HEADING_SM, "text-foreground")}>Server Seed Hash (committed pre-deal)</span>
             <span className="text-neutral-500">🔒</span>
           </div>
           <div className="mt-3 break-all rounded-lg bg-black/60 p-4 font-mono text-xs leading-relaxed text-neutral-300">
             {lockedHash.replace(/^0x/, "")}
           </div>
           <p className="mt-3 text-xs italic text-neutral-500">
-            Pre-committed during initial deal. Reveal required for audit.
+            Published during the initial deal. The reveal below discloses the seed behind this hash.
           </p>
         </div>
 
-        {/* Player seed input + reveal */}
+        {/* Reveal (no editable input — verify is read-only) */}
         <div className="mt-6">
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-            Player Seed Input
-          </label>
-          <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
-            <input
-              value={playerSeed}
-              onChange={(e) => setPlayerSeed(e.target.value)}
-              className="rounded-xl border border-white/10 bg-black/40 px-4 py-3.5 text-sm text-white outline-none focus:border-white/25"
-            />
-            <button
-              onClick={reveal}
-              disabled={busy}
-              className={cn(
-                BTN_RED,
-                "inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold uppercase tracking-wider disabled:opacity-50",
-              )}
-            >
-              {busy ? "Verifying…" : "Reveal & Verify"} <span>🛡</span>
-            </button>
-          </div>
+          <button
+            onClick={reveal}
+            disabled={busy}
+            className={cn(
+              BTN_RED,
+              "inline-flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold uppercase tracking-wider disabled:opacity-50",
+            )}
+          >
+            {busy ? "Verifying…" : "Reveal seed & verify deck"} <span>🛡</span>
+          </button>
         </div>
 
         {error && (
@@ -202,9 +204,7 @@ export function SeedReveal({ target }: Props) {
               <div
                 className={cn(
                   "flex h-11 w-11 items-center justify-center rounded-xl text-lg",
-                  result.commitMatches
-                    ? "bg-green/15 text-green"
-                    : "bg-brand/15 text-brand",
+                  result.commitMatches ? "bg-green/15 text-green" : "bg-brand/15 text-brand",
                 )}
               >
                 {result.commitMatches ? "✔" : "✕"}
@@ -215,7 +215,7 @@ export function SeedReveal({ target }: Props) {
                 </h2>
                 <p className="text-sm text-neutral-400">
                   {result.commitMatches
-                    ? "Cryptographic proof generated and reproduced in your browser."
+                    ? "Reproduced in your browser: revealed seed hashes to the pre-committed value."
                     : "Reproduced commitment did not match the locked hash."}
                 </p>
               </div>
@@ -228,13 +228,14 @@ export function SeedReveal({ target }: Props) {
 
             <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className={cn(GLASS_PANEL, "p-5")}>
-                <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-500">Calculated Combined Seed</div>
+                <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-500">Revealed Server Seed</div>
                 <div className="mt-3 break-all rounded-lg bg-black/50 p-3 font-mono text-xs text-green">
-                  {result.combinedSeed.slice(0, 10)}...{result.combinedSeed.slice(-16)}
+                  {result.revealedSeed.replace(/^0x/, "").slice(0, 12)}…{result.revealedSeed.replace(/^0x/, "").slice(-16)}
                 </div>
+                <p className="mt-2 text-[10px] text-neutral-500">Recompute method: {result.verifyMethod}</p>
               </div>
               <div className={cn(GLASS_PANEL, "p-5")}>
-                <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-500">Resulting Hand Data</div>
+                <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-500">Recomputed Hole Cards</div>
                 <div className="mt-3 flex items-center gap-3">
                   <PlayingCard card={result.resultingCards[0]} size="sm" />
                   <PlayingCard card={result.resultingCards[1]} size="sm" />

@@ -140,8 +140,10 @@ export function FairnessDashboard({ onReveal }: { onReveal: (matchId: string, ha
             Fairness Audit Dashboard
           </h1>
           <p className="mt-2 flex items-center gap-2 text-sm text-neutral-400">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-green" />
-            Live cryptographic verification active for Table #{data.entropy.tableId}
+            <span className={cn("h-2 w-2 rounded-full", data.demo ? "bg-gold" : "animate-pulse bg-green")} />
+            {data.demo
+              ? "Sample verification data — connect a table to verify live hands"
+              : `Live cryptographic verification active for Table #${data.entropy.tableId}`}
             {data.demo && (
               <span className="ml-1 rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gold">
                 Demo · offline
@@ -167,7 +169,7 @@ export function FairnessDashboard({ onReveal }: { onReveal: (matchId: string, ha
 
       {/* Entropy stream + system health */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_minmax(0,380px)]">
-        <EntropyStream data={data} />
+        <EntropyStream />
         <SystemHealthPanel data={data} onRefresh={refresh} refreshing={refreshing} refreshedAt={refreshedAt} />
       </div>
 
@@ -282,8 +284,7 @@ export function FairnessDashboard({ onReveal }: { onReveal: (matchId: string, ha
   );
 }
 
-function EntropyStream({ data }: { data: DashboardData }) {
-  const { entropy } = data;
+function EntropyStream() {
   return (
     <section className={cn(GLASS_PANEL, "p-6")}>
       <div className="mb-6 flex items-center justify-between">
@@ -296,8 +297,8 @@ function EntropyStream({ data }: { data: DashboardData }) {
       <div className="flex items-center justify-between py-6">
         <EntropyNode
           icon="⧉"
-          title="Chainlink VRF"
-          sub={entropy.vrfSample}
+          title="OS CSPRNG"
+          sub="crypto/rand · 256-bit seed"
         />
         <div className="mx-2 h-px flex-1 bg-gradient-to-r from-white/5 via-white/20 to-white/5" />
         <div className="flex flex-col items-center">
@@ -305,23 +306,27 @@ function EntropyStream({ data }: { data: DashboardData }) {
             <span className="font-display text-2xl font-bold text-brand">✦</span>
           </div>
           <div className="mt-3 text-center">
-            <div className="font-display text-xs font-bold uppercase tracking-wider text-white">Master Seed</div>
-            <div className="mt-0.5 font-mono text-[10px] text-green">{entropy.masterSeedState}</div>
+            <div className="font-display text-xs font-bold uppercase tracking-wider text-white">SHA-256 Commit</div>
+            <div className="mt-0.5 font-mono text-[10px] text-green">published pre-deal</div>
           </div>
         </div>
         <div className="mx-2 h-px flex-1 bg-gradient-to-r from-white/5 via-white/20 to-white/5" />
         <EntropyNode
           icon="☌"
-          title="User Entropy"
-          sub={`MOUSE_CLICKS: ${entropy.mouseClicks}`}
+          title="Shuffle"
+          sub="SHA-256-CTR → Fisher-Yates"
         />
       </div>
 
       <div className="mt-6 grid grid-cols-3 gap-4 border-t border-white/[0.06] pt-6 text-center">
-        <Stat value={`${entropy.poolBits}-bit`} label="Pool Density" tone="plain" />
-        <Stat value={`${entropy.randomnessScore}%`} label="Randomness Score" tone="green" />
-        <Stat value={entropy.hardwareStatus} label="Hardware Status" tone="green" />
+        <Stat value="256-bit" label="Seed entropy" tone="plain" />
+        <Stat value="SHA-256" label="Commitment" tone="green" />
+        <Stat value="rs_poker" label="Shuffle engine" tone="green" />
       </div>
+      <p className="mt-4 text-center text-[11px] text-neutral-500">
+        Every deck is a deterministic function of an OS-random 256-bit seed, committed (SHA-256) before the deal and
+        revealed after. No external oracle, no &quot;quantum&quot; source — just a seed you can recompute yourself.
+      </p>
     </section>
   );
 }
