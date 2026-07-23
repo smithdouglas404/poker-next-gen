@@ -43,6 +43,11 @@ export interface SceneSeat {
   use3d?: boolean;
   /** AI seat — badged "BOT" for every player. */
   isBot?: boolean;
+  /** This seat holds the dealer button — render the "D" marker. */
+  isButton?: boolean;
+  /** Chips committed on the current street, pre-formatted (e.g. "$400"); shown as
+   *  a bet chip in front of the seat. Absent when the seat has no live bet. */
+  betLabel?: string;
 }
 
 export interface CinematicSceneProps {
@@ -201,7 +206,21 @@ function SeatPill({ seat }: { seat: SceneSeat }) {
         </div>
         <div className="text-[11px] font-bold leading-tight" style={{ color: "#f3c14b" }}>{seat.stack}</div>
       </div>
+      {seat.betLabel && (
+        <div className="rounded-full border border-gold/40 bg-black/70 px-2 py-0.5 text-[10px] font-bold text-gold shadow-[0_0_10px_rgba(212,175,55,0.35)]">
+          {seat.betLabel}
+        </div>
+      )}
       {seat.action && <ActionChip action={seat.action} />}
+      {seat.isButton && (
+        <div
+          className="flex h-5 w-5 items-center justify-center rounded-full border border-black/40 text-[10px] font-black text-[#231b00]"
+          style={{ background: "linear-gradient(180deg,#ffffff,#d8d8d8)" }}
+          title="Dealer button"
+        >
+          D
+        </div>
+      )}
     </div>
   );
 }
@@ -344,11 +363,7 @@ function Scene({ seats, board, mode, maxSeats, showPot }: {
       <Board board={board} />
       {showPot && <Pot />}
 
-      {/* dealer button */}
-      <mesh position={[1.1, 0.09, 2.0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.17, 0.17, 0.04, 32]} />
-        <meshStandardMaterial color="#f5f5f5" metalness={0.2} roughness={0.5} />
-      </mesh>
+      {/* Dealer button is rendered per-seat (SeatPill) from snapshot.button_seat. */}
 
       {seats.map((s) => {
         const is3d = mode === "3d" || (mode === "mix" && s.use3d);

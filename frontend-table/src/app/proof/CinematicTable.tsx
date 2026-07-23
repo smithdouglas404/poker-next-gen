@@ -78,10 +78,10 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
         <div className="mt-2 rounded-md px-2 py-1 text-[11px] text-white/40" style={{ background: "rgba(255,255,255,0.04)" }}>Type a message…</div>
       </div>
 
-      {/* bottom-left tournament stats */}
+      {/* bottom-left table stats (cash game — not "tournament") */}
       <div className={`absolute bottom-6 left-5 ${GLASS_PANEL} px-4 py-3`} style={{ width: 200 }}>
-        <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-[0.2em] text-white/50">Tournament Stats</div>
-        {[["Live Stack", "$52,500"], ["Pot", POT_LABEL], ["Players Left", "6 / 9"], ["Blinds", "$5 / $10"]].map(([k, v]) => (
+        <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-[0.2em] text-white/50">Table Stats</div>
+        {[["Your Stack", "$24,500"], ["Pot", POT_LABEL], ["Players", "6 / 9"], ["Blinds", "$50 / $100"]].map(([k, v]) => (
           <div key={k} className="flex justify-between py-[3px] text-[11px]">
             <span className="text-white/55">{k}</span>
             <span className="font-semibold text-white/90">{v}</span>
@@ -134,8 +134,8 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
         <div className={`${GLASS_PANEL} px-3 py-2.5`} style={{ boxShadow: "0 10px 40px rgba(0,0,0,0.55)" }}>
           <div className="flex items-center gap-2">
             <button className="rounded-lg px-5 py-2.5 text-sm font-bold text-white" style={{ background: "linear-gradient(180deg,#b33,#7a1f1f)", border: "1px solid #d9534f" }}>FOLD</button>
-            <button className="rounded-lg px-5 py-2.5 text-sm font-bold" style={{ background: "linear-gradient(180deg,#0e4a5c,#0a3340)", border: "1px solid #22d3ee", color: "#bff0ff" }}>CHECK / CALL <span className="opacity-80">$1,500</span></button>
-            <button className="rounded-lg px-6 py-2.5 text-sm font-bold text-black" style={{ background: "linear-gradient(180deg,#f3e2ad,#d4af37 55%,#9a7b2c)", border: "1px solid #f3e2ad" }}>RAISE <span>$1,200</span></button>
+            <button className="rounded-lg px-5 py-2.5 text-sm font-bold" style={{ background: "linear-gradient(180deg,#0e4a5c,#0a3340)", border: "1px solid #22d3ee", color: "#bff0ff" }}>CALL <span className="opacity-80">$4,000</span></button>
+            <button className="rounded-lg px-6 py-2.5 text-sm font-bold text-black" style={{ background: "linear-gradient(180deg,#f3e2ad,#d4af37 55%,#9a7b2c)", border: "1px solid #f3e2ad" }}>RAISE TO <span>$12,000</span></button>
             <button className="rounded-lg px-5 py-2.5 text-sm font-bold" style={{ background: "rgba(60,10,14,0.6)", border: "1px solid #ff3b46", color: "#ff9aa0" }}>ALL-IN</button>
           </div>
 
@@ -147,7 +147,7 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
               ))}
             </div>
             <input type="range" min={0} max={100} defaultValue={44} className="h-1.5 flex-1 accent-amber-400" readOnly />
-            <div className="rounded-md px-3 py-1 text-sm font-bold" style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(212,175,55,0.5)", color: "#ffe6a3", minWidth: 84, textAlign: "center" }}>$1,200</div>
+            <div className="rounded-md px-3 py-1 text-sm font-bold" style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(212,175,55,0.5)", color: "#ffe6a3", minWidth: 84, textAlign: "center" }}>$12,000</div>
           </div>
         </div>
       </div>

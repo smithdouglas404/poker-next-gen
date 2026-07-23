@@ -126,6 +126,8 @@ export default function LiveCinematicTable() {
           model_url: s.model_url,
           use3d: mode === "3d" || (mode === "mix" && !!s.model_url),
           isBot: !!s.is_bot,
+          isButton: s.index === snapshot.button_seat,
+          betLabel: (s.bet ?? 0) > 0 ? formatCents(s.bet ?? 0) : undefined,
         } satisfies SceneSeat;
       });
 
