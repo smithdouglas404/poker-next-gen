@@ -41,6 +41,8 @@ export interface SceneSeat {
   model_url?: string;
   /** In "mix" mode, render this seat as a 3D GLB. */
   use3d?: boolean;
+  /** AI seat — badged "BOT" for every player. */
+  isBot?: boolean;
 }
 
 export interface CinematicSceneProps {
@@ -189,7 +191,14 @@ function SeatPill({ seat }: { seat: SceneSeat }) {
         className="rounded-md px-2 py-0.5 text-center"
         style={{ background: "rgba(8,10,14,0.82)", border: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(6px)" }}
       >
-        <div className="text-[11px] font-semibold leading-tight text-white">{seat.name}</div>
+        <div className="flex items-center justify-center gap-1 leading-tight">
+          <span className="text-[11px] font-semibold text-white">{seat.name}</span>
+          {seat.isBot && (
+            <span className="rounded-sm bg-purple-500/30 px-1 text-[8px] font-bold uppercase tracking-wider text-purple-200">
+              Bot
+            </span>
+          )}
+        </div>
         <div className="text-[11px] font-bold leading-tight" style={{ color: "#f3c14b" }}>{seat.stack}</div>
       </div>
       {seat.action && <ActionChip action={seat.action} />}

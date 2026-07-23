@@ -31,21 +31,25 @@ export function GamePausedOverlay({
             Game Paused by Admin
           </h1>
           <div className="mx-auto mt-4 h-px w-40 bg-gradient-to-r from-transparent via-gold/50 to-transparent" />
-          <p className="mt-4 text-sm text-neutral-300">Waiting for admin to resume…</p>
+          <p className="mt-4 text-sm text-neutral-300">
+            {canResume ? "You paused this table. Resume when ready." : "Waiting for the host to resume…"}
+          </p>
         </div>
 
         <div className="flex w-full flex-col items-center gap-3">
-          <button
-            type="button"
-            onClick={onResume}
-            disabled={!canResume}
-            className={cn(
-              BTN_GOLD,
-              "w-full max-w-sm rounded-xl px-8 py-3 text-base uppercase tracking-wider disabled:cursor-not-allowed disabled:opacity-40",
-            )}
-          >
-            Resume Game
-          </button>
+          {/* Resume is host-only — non-hosts never see a control they can't use. */}
+          {canResume && (
+            <button
+              type="button"
+              onClick={onResume}
+              className={cn(
+                BTN_GOLD,
+                "w-full max-w-sm rounded-xl px-8 py-3 text-base uppercase tracking-wider",
+              )}
+            >
+              Resume Game
+            </button>
+          )}
           <button
             type="button"
             onClick={onQuit}
@@ -57,10 +61,6 @@ export function GamePausedOverlay({
             Quit Table
           </button>
         </div>
-
-        {!canResume && (
-          <p className="text-[11px] text-neutral-500">Only the table host can resume play.</p>
-        )}
       </div>
     </div>
   );

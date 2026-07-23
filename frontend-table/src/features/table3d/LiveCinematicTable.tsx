@@ -125,6 +125,7 @@ export default function LiveCinematicTable() {
           avatar: avatarDef(s.user_id || `seat-${s.index}`).id,
           model_url: s.model_url,
           use3d: mode === "3d" || (mode === "mix" && !!s.model_url),
+          isBot: !!s.is_bot,
         } satisfies SceneSeat;
       });
 

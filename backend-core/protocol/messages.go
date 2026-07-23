@@ -29,7 +29,11 @@ type SeatView struct {
 	Status   string `json:"status"` // empty | seated | folded | all_in
 	LastAction string `json:"last_action,omitempty"`
 	IsHero   bool   `json:"is_hero,omitempty"`
+	IsBot    bool   `json:"is_bot,omitempty"` // AI seat — always disclosed to every player
 	ModelURL string `json:"model_url,omitempty"` // equipped 3D character GLB
+	// Bet is the player's contribution on the current street (chips in front of
+	// the seat), 0 when they haven't acted this street.
+	Bet      int64  `json:"bet,omitempty"`
 }
 
 type PotView struct {

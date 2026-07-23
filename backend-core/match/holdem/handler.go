@@ -1824,7 +1824,9 @@ func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) 
 				Status:     string(seat.Status),
 				LastAction: seat.LastAction,
 				IsHero:     seat.UserID == heroID,
+				IsBot:      seat.IsBot,
 				ModelURL:   equippedModelURL(ctx, db, seat.UserID, seat.IsBot),
+				Bet:        seat.Bet,
 			}
 		}
 	}

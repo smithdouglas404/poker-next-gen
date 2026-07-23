@@ -10,15 +10,8 @@
 import { useState } from "react";
 
 import { formatCents } from "@/features/game/GameProvider";
-import { BTN_GOLD, GLASS_PANEL, HEADING_LG, RARITY, cn } from "@/features/ui/tokens";
+import { BTN_GOLD, GLASS_PANEL, HEADING_LG, cn } from "@/features/ui/tokens";
 import type { WaitingEntry } from "../adminSession";
-
-const RARITY_LABEL: Record<WaitingEntry["rarity"], string> = {
-  common: "Common",
-  rare: "Rare",
-  epic: "Epic",
-  legendary: "Legendary",
-};
 
 export function ApproveNewPlayerModal({
   entry,
@@ -32,7 +25,6 @@ export function ApproveNewPlayerModal({
   onClose: () => void;
 }) {
   const [busy, setBusy] = useState<"approve" | "decline" | null>(null);
-  const rarity = RARITY[entry.rarity];
 
   const run = async (kind: "approve" | "decline") => {
     setBusy(kind);
@@ -74,22 +66,15 @@ export function ApproveNewPlayerModal({
               <dd className="truncate font-semibold text-white">{entry.name}</dd>
             </div>
             <div className="flex items-baseline gap-2">
-              <dt className="text-neutral-400">Bankroll:</dt>
+              <dt className="text-neutral-400">Requested buy-in:</dt>
               <dd className="font-bold text-green">{formatCents(entry.buyInCents)}</dd>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <dt className="text-neutral-400">Rarity:</dt>
-              <dd className={cn("font-bold", rarity.text)}>{RARITY_LABEL[entry.rarity]}</dd>
             </div>
           </dl>
         </div>
 
-        {entry.walletCents > 0 && (
-          <p className="mt-4 text-center text-[12px] text-neutral-500">
-            Connected wallet balance{" "}
-            <span className="font-semibold text-green">{formatCents(entry.walletCents)}</span>
-          </p>
-        )}
+        {/* The applicant's connected wallet balance is deliberately NOT shown to
+            the host — surfacing a prospect's full roll invites predatory game
+            selection. Only the requested buy-in is relevant to seating. */}
 
         <button
           type="button"

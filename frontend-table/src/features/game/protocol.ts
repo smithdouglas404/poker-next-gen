@@ -42,8 +42,12 @@ export interface SeatView {
   status: string;
   last_action?: string;
   is_hero?: boolean;
+  /** AI seat — always disclosed to every player. */
+  is_bot?: boolean;
   /** Equipped 3D model GLB URL (from cosmetics), when the player has one. */
   model_url?: string;
+  /** Chips committed on the current street (in front of the seat). */
+  bet?: number;
 }
 
 export interface TableSnapshot {

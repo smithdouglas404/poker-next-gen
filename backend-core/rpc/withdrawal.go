@@ -8,7 +8,6 @@ import (
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
-	"github.com/smithdouglas404/poker-next-gen/backend-core/billing"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/payments"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
@@ -51,19 +50,11 @@ func WalletWithdraw(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 		currency = strings.ToLower(req.Currency)
 	}
 
-	tier := store.SubscriptionTier(ctx, db, userID)
-	def := billing.GetTierDef(tier)
-	if def.WithdrawLimitWeeklyCents <= 0 {
-		return "", runtime.NewError("withdrawals require a paid membership", 7)
-	}
+	// A player's own money is never gated behind a paid plan — withdrawals are
+	// limited only by KYC/AML verification (checked above) and AML review on
+	// approval. Subscription tier governs stakes / rakeback / multi-tabling, not
+	// access to your own balance.
 	wd := store.NewWithdrawalStore(db)
-	priorWeek, err := wd.SumRecentCents(ctx, userID, 168)
-	if err != nil {
-		return "", runtime.NewError(err.Error(), 13)
-	}
-	if priorWeek+req.AmountCents > def.WithdrawLimitWeeklyCents {
-		return "", runtime.NewError("amount exceeds your plan's weekly withdrawal limit", 7)
-	}
 
 	id, err := wd.CreateRequest(ctx, userID, req.AmountCents, currency, req.Destination, gateway)
 	if err != nil {
