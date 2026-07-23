@@ -77,6 +77,12 @@ type MatchState struct {
 	// AdminPaused is a platform-admin freeze (tables_freeze_all). Unlike HostPaused
 	// it is honored regardless of host presence — it's an operator override.
 	AdminPaused      bool
+	// DealerDown tracks the engine-math (rs_poker) sidecar being unreachable so the
+	// table pauses dealing gracefully and tells players ONCE, rather than silently
+	// failing to deal. Cleared (with a "restored" notice) on the next successful
+	// StartHand. There is no local shuffle fallback (Golden rule 4) — the table
+	// simply waits for the authoritative dealer service to return.
+	DealerDown       bool
 	// Human action clock: when the seat to act is a human, ActionDeadlineTick is
 	// the tick by which they must act before the server auto-checks/folds them.
 	ActionDeadlineTick int64
@@ -1200,7 +1206,19 @@ func autoStartHand(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDisp
 		return
 	}
 	if err := s.Table.StartHand(s.effSmallBlind(), s.effBigBlind()); err != nil {
-		return // engine-math unavailable; retry next tick
+		// engine-math (dealer service) unreachable — no chips were committed
+		// (blinds post only after a successful shuffle). Pause dealing gracefully
+		// and tell players once; the loop keeps retrying and auto-resumes when the
+		// service returns. No local shuffle fallback (Golden rule 4).
+		if !s.DealerDown {
+			s.DealerDown = true
+			narrate(dispatcher, s, "Dealing paused — the dealer service is briefly unavailable. Hands resume automatically; no chips are at risk.")
+		}
+		return
+	}
+	if s.DealerDown {
+		s.DealerDown = false
+		narrate(dispatcher, s, "Dealer service restored — dealing resumed.")
 	}
 	s.Phase = poker.PhaseBetting
 	emitHandStarted(ctx, s)

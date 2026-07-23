@@ -258,11 +258,14 @@ func (t *Table) FirstEmptySeat() int {
 }
 
 func (t *Table) StartHand(sb, bb int64) error {
-	t.HandNo++
+	// Shuffle FIRST: if engine-math is unreachable, bail before mutating any hand
+	// state (HandNo, board, pot) or posting blinds, so a dealer outage leaves the
+	// table cleanly between hands rather than half-started.
 	deck, commitment, seed, deckOrder, err := NewDeck()
 	if err != nil {
 		return err
 	}
+	t.HandNo++
 	t.Deck = deck
 	t.DeckOrder = deckOrder
 	t.DeckCommitment = commitment
