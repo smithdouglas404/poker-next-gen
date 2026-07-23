@@ -16,8 +16,7 @@ const NAV: Array<{ href: string; label: string }> = [
   { href: "/clubs", label: "Owner Hub" },
   { href: "/clubs/revenue", label: "Revenue Reports" },
   { href: "/clubs/sponsorship", label: "Sponsorship Payouts" },
-  { href: "/clubs/invite", label: "Member Invites" },
-  { href: "/clubs/invite/system", label: "Invitation System" },
+  { href: "/clubs/invite", label: "Invitations" },
 ];
 
 export function OwnerPageShell({

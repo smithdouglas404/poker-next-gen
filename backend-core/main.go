@@ -178,6 +178,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"club_member_stats":        rpc.ClubMemberStats,
 		"club_quick_stats":         rpc.ClubQuickStats,
 		"club_invite":              rpc.ClubInvite,
+		"club_invite_revoke":       rpc.ClubInviteRevoke,
 		"club_join_request":        rpc.ClubJoinRequest,
 		"club_requests_list":       rpc.ClubRequestsList,
 		"club_request_review":      rpc.ClubRequestReview,

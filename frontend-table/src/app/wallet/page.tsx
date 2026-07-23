@@ -22,6 +22,7 @@ import {
 } from "@/features/wallet/walletRpc";
 import { rgLimitsApi, emptyLimits, type RgLimits } from "@/features/wallet/rgLimitsRpc";
 import { WalletConnect } from "@/features/wallet/WalletConnect";
+import { MoneyModeTag } from "@/features/money/MoneyModeTag";
 
 const GOLD_TEXT =
   "bg-gradient-to-r from-[#ffd54a] via-[#f5c518] to-[#d4a80f] bg-clip-text text-transparent";
@@ -175,7 +176,10 @@ export default function WalletPage() {
         >
           <div className="relative flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className={cn(HEADING_SM, "text-muted")}>Total Balance</p>
+              <div className="flex items-center gap-2">
+                <p className={cn(HEADING_SM, "text-muted")}>Total Balance</p>
+                <MoneyModeTag mode="cash" showCash />
+              </div>
               <p className={cn("font-display mt-2 text-5xl font-bold tabular-nums tracking-tight sm:text-6xl", GOLD_TEXT)}>
                 {loading ? (
                   <span className="text-neutral-600">— — —</span>

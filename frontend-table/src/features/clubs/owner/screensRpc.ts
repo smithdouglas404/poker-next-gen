@@ -86,6 +86,9 @@ export const screensApi = {
       credit_limit_cents: opts.creditLimitCents ?? 0,
       message: opts.message ?? "",
     }),
+  /** Revoke (cancel) a pending club-issued invitation. Configurer-gated. */
+  revokeInvite: (invitationId: string) =>
+    call<{ ok: boolean }>("club_invite_revoke", { invitation_id: invitationId }),
   /** Allocate initial club credit to a member's balance. */
   allocateBalance: (clubId: string, userId: string, amountCents: number) =>
     call<unknown>("balance_allocate", {

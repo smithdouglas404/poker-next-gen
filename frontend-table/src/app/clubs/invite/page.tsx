@@ -1,7 +1,7 @@
 "use client";
 
-import { MemberInviteFlow } from "@/features/clubs/owner/MemberInviteFlow";
+import { ClubInvitations } from "@/features/clubs/owner/ClubInvitations";
 
 export default function InvitePage() {
-  return <MemberInviteFlow />;
+  return <ClubInvitations />;
 }

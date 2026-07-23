@@ -312,6 +312,41 @@ func ClubInvite(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 	return `{"ok":true,"invitation_id":"` + id + `"}`, nil
 }
 
+// ClubInviteRevoke cancels a pending club-issued invitation. Configurer-gated —
+// only an operator who can configure the club may pull back an invite it sent.
+// Requests (user→club) are resolved via ClubRequestReview, not here.
+func ClubInviteRevoke(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	var req struct {
+		InvitationID string `json:"invitation_id"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.InvitationID == "" {
+		return "", runtime.NewError("invitation_id required", 3)
+	}
+	es := store.NewClubExtStore(db)
+	inv, err := es.GetInvitation(ctx, req.InvitationID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	if inv == nil {
+		return "", runtime.NewError("invitation not found", 5)
+	}
+	if inv.Type != "invite" {
+		return "", runtime.NewError("not an invitation", 3)
+	}
+	caller, err := requireClubConfigurer(ctx, db, inv.ClubID)
+	if err != nil {
+		return "", err
+	}
+	if inv.Status != "pending" {
+		return "", runtime.NewError("invitation already resolved", 9)
+	}
+	if err := es.SetInvitationStatus(ctx, inv.ID, "revoked", caller); err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	_ = es.LogActivity(ctx, inv.ClubID, caller, "invite_revoke", "revoked invite to "+inv.UserID)
+	return `{"ok":true}`, nil
+}
+
 // ClubJoinRequest creates a join-request (user → club) from the caller.
 func ClubJoinRequest(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	userID, err := callerID(ctx)

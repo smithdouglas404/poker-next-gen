@@ -1,7 +1,7 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { InvitationSystem } from "@/features/clubs/owner/InvitationSystem";
-
+// The former standalone "Invitation System" screen was merged into the single
+// Club Invitations surface (P0-8). Keep the old route working as a redirect.
 export default function InvitationSystemPage() {
-  return <InvitationSystem />;
+  redirect("/clubs/invite");
 }
