@@ -16,6 +16,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -113,15 +114,22 @@ func GetNowPaymentsBalance(ctx context.Context) ([]NowPaymentsBalance, error) {
 	if err := json.Unmarshal(payload, &m); err != nil {
 		return nil, err
 	}
+	// Return every currency the account holds, including zero balances — an
+	// operator wants to see the treasury even when it is empty (e.g. a fresh
+	// account before any deposits). Sorted highest-amount first for a stable,
+	// useful order.
 	out := []NowPaymentsBalance{}
 	for cur, v := range m {
 		amt, _ := v.Amount.Float64()
 		pend, _ := v.PendingAmount.Float64()
-		if amt == 0 && pend == 0 {
-			continue
-		}
 		out = append(out, NowPaymentsBalance{Currency: strings.ToUpper(cur), Amount: amt, Pending: pend})
 	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Amount != out[j].Amount {
+			return out[i].Amount > out[j].Amount
+		}
+		return out[i].Currency < out[j].Currency
+	})
 	return out, nil
 }
 

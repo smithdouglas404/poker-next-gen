@@ -263,20 +263,25 @@ export default function WalletPage() {
               </div>
               {treasury.length === 0 ? (
                 <p className="mt-3 text-sm text-neutral-400">
-                  No crypto custody balance yet. Deposits settle here before they credit player wallets.
+                  Gateway connected — no currencies enabled on the NOWPayments account yet.
                 </p>
               ) : (
-                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {treasury.map((t) => (
-                    <div key={t.currency} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                      <p className="text-[11px] uppercase tracking-wider text-muted">{t.currency}</p>
-                      <p className="mt-0.5 text-lg font-semibold text-green">{t.amount}</p>
-                      {t.pending_amount > 0 && (
-                        <p className="text-[11px] text-neutral-400">{t.pending_amount} pending</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {treasury.slice(0, 12).map((t) => (
+                      <div key={t.currency} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                        <p className="text-[11px] uppercase tracking-wider text-muted">{t.currency}</p>
+                        <p className="mt-0.5 text-lg font-semibold text-green">{t.amount}</p>
+                        {t.pending_amount > 0 && (
+                          <p className="text-[11px] text-neutral-400">{t.pending_amount} pending</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {treasury.length > 12 && (
+                    <p className="mt-2 text-[11px] text-neutral-500">+{treasury.length - 12} more currencies</p>
+                  )}
+                </>
               )}
               <p className="mt-3 text-[11px] text-neutral-500">
                 Live balance held at NOWPayments (the house crypto treasury). Read-only.
