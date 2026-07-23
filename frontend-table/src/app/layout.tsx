@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Manrope } from "next/font/google";
 import "./globals.css";
-import { SiteNav } from "@/features/nav/SiteNav";
+import { SiteFooter } from "@/features/nav/SiteFooter";
+import { AgeGate } from "@/features/nav/AgeGate";
 
 // Neon Vault type system (matches HighRollersClub): Space Grotesk for display,
 // Manrope for body.
@@ -28,7 +29,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${displayFont.variable} ${bodyFont.variable} antialiased`}>{children}</body>
+      <body className={`${displayFont.variable} ${bodyFont.variable} antialiased`}>
+        {children}
+        <SiteFooter />
+        <AgeGate />
+      </body>
     </html>
   );
 }

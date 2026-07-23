@@ -40,6 +40,9 @@ export const COMMAND_ACCESS: Record<string, AccessLevel> = {
   // Anti-bot scoring is operator-only — never advertise the mechanics to players
   // who could probe their own detectability (P1-9).
   antibot_score: "platform_admin",
+  // Ops / infra surfaces are admin-only — the Live Stack health page leaks
+  // service topology and localhost URLs; hide it from non-admins (P0-9).
+  stack_health: "platform_admin",
 
   // Tournaments — structure edits are configurer/creator (server: requireTournamentOwner).
   tournament_create: "configurer",
