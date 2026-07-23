@@ -114,6 +114,20 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 
 	hostUserID, _ := callerID(ctx) // the creator is the table host
 
+	// Shot clock: clamp per-table action / time-bank seconds to [0, 120]. 0 keeps
+	// the server defaults.
+	clampSecs := func(v int) int {
+		if v < 0 {
+			return 0
+		}
+		if v > 120 {
+			return 120
+		}
+		return v
+	}
+	actionSecs := clampSecs(req.ActionSecs)
+	timeBankSecs := clampSecs(req.TimeBankSecs)
+
 	// Club-bound table: buy-ins draw the player's club-allocated balance (union
 	// model) and pots are raked to the club. Only a club owner/configurer may
 	// stand one up, so a random member can't spin tables on someone's club.
@@ -136,6 +150,8 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		"num_bots":      numBots,
 		"variant":       variant,
 		"duration_secs": durationSecs,
+		"action_secs":   actionSecs,
+		"time_bank_secs": timeBankSecs,
 		"host_user_id":  hostUserID,
 		// Optional table features (#41); default-off so a plain table is unchanged.
 		"allow_straddle":     req.AllowStraddle,

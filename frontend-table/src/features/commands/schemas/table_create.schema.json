@@ -3,25 +3,33 @@
   "title": "TableCreateRequest",
   "type": "object",
   "properties": {
+    "action_secs": {
+      "title": "Shot clock (seconds)",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 120,
+      "x-unit": "seconds",
+      "x-order": 12
+    },
     "allow_bomb_pot": {
       "title": "Allow Bomb Pot",
       "type": "boolean",
-      "x-order": 13
+      "x-order": 15
     },
     "allow_insurance": {
       "title": "Allow Insurance",
       "type": "boolean",
-      "x-order": 15
+      "x-order": 17
     },
     "allow_run_it_twice": {
       "title": "Allow Run It Twice",
       "type": "boolean",
-      "x-order": 16
+      "x-order": 18
     },
     "allow_straddle": {
       "title": "Allow Straddle",
       "type": "boolean",
-      "x-order": 12
+      "x-order": 14
     },
     "big_blind": {
       "title": "Big Blind",
@@ -35,7 +43,7 @@
       "type": "integer",
       "minimum": 0,
       "x-unit": "money_minor",
-      "x-order": 14
+      "x-order": 16
     },
     "buy_in": {
       "title": "Default Buy-in",
@@ -108,6 +116,14 @@
       "minimum": 0,
       "x-unit": "money_minor",
       "x-order": 2
+    },
+    "time_bank_secs": {
+      "title": "Time bank (seconds)",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 120,
+      "x-unit": "seconds",
+      "x-order": 13
     },
     "variant": {
       "title": "Variant",

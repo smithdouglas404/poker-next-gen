@@ -133,6 +133,10 @@ type TableCreateRequest struct {
 	NumBots    int    `json:"num_bots" validate:"min=0,max=9" unit:"count" label:"Bots"`
 	Variant    string `json:"variant" enum:"holdem,plo" label:"Variant"`       // "holdem" | "plo"; empty => holdem
 	DurationMins int  `json:"duration_mins" validate:"min=0,max=720" unit:"minutes" label:"Auto-close (minutes)"` // auto-close after N minutes (0 = no limit)
+	// Shot clock: per-table action seconds + per-player time bank. 0 => server
+	// defaults (30s clock, 30s bank).
+	ActionSecs   int `json:"action_secs,omitempty" validate:"min=0,max=120" unit:"seconds" label:"Shot clock (seconds)"`
+	TimeBankSecs int `json:"time_bank_secs,omitempty" validate:"min=0,max=120" unit:"seconds" label:"Time bank (seconds)"`
 	// Optional table features (#41); all default-off so a plain table is unchanged.
 	AllowStraddle   bool  `json:"allow_straddle,omitempty" label:"Allow Straddle"`
 	AllowBombPot    bool  `json:"allow_bomb_pot,omitempty" label:"Allow Bomb Pot"`

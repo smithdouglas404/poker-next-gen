@@ -81,6 +81,9 @@ export function PlayerHeader() {
             <Link href="/hub" className={menuLink} onClick={() => setOpen(false)}>
               🎛 Command Center
             </Link>
+            <Link href="/command-core" className={menuLink} onClick={() => setOpen(false)}>
+              🛰 Command Core (new session)
+            </Link>
             <Link href="/lobby" className={menuLink} onClick={() => setOpen(false)}>
               🎲 Lobby
             </Link>

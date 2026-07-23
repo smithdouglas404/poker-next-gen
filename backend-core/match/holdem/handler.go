@@ -81,6 +81,10 @@ type MatchState struct {
 	// only after the base ActionSecs lapses, before the server auto-folds. Granted
 	// once when a player first sits; not auto-refilled.
 	TimeBank         map[string]int64
+	// Per-table shot-clock config (0 => server defaults): ActionSecsCfg is the base
+	// clock in seconds; TimeBankGrant is the one-time bank granted on sit.
+	ActionSecsCfg    int
+	TimeBankGrant    int64
 	// Per-hand behavioural tracking (userID -> counters), reset each hand start
 	// and drained into poker_hand_stats at settlement. Feeds VPIP/PFR/AF.
 	HandTrack        map[string]*playerHandTrack
@@ -202,6 +206,14 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	if v, ok := numParam(params, "duration_secs"); ok && v > 0 {
 		durationSecs = int(v)
 	}
+	actionSecsCfg := 0
+	if v, ok := numParam(params, "action_secs"); ok && v > 0 {
+		actionSecsCfg = int(v)
+	}
+	timeBankCfg := int64(0)
+	if v, ok := numParam(params, "time_bank_secs"); ok && v > 0 {
+		timeBankCfg = v
+	}
 	hostUserID := ""
 	if v, ok := params["host_user_id"].(string); ok {
 		hostUserID = v
@@ -269,6 +281,8 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		InsOffered:   map[string]insurancePolicy{},
 		AntibotLog:   map[string][]antibot.ActionRecord{},
 		TimeBank:     map[string]int64{},
+		ActionSecsCfg: actionSecsCfg,
+		TimeBankGrant: timeBankCfg,
 		DurationSecs: durationSecs,
 		MinPlayers:   minPlayers,
 		// Cash tables deal themselves (no operator babysitting); tournament tables
@@ -332,6 +346,31 @@ func (s *MatchState) effPaused() bool {
 		return false
 	}
 	return s.HostPaused
+}
+
+// actionTicks is the base action-clock length in ticks: the per-table config
+// (ActionSecsCfg seconds × 10 ticks/s) when set, else the server default.
+func (s *MatchState) actionTicks() int64 {
+	if s.ActionSecsCfg > 0 {
+		return int64(s.ActionSecsCfg) * 10
+	}
+	return actionTimeoutTicks
+}
+
+// actionSecsEff is the base action clock in seconds sent to the client.
+func (s *MatchState) actionSecsEff() int {
+	if s.ActionSecsCfg > 0 {
+		return s.ActionSecsCfg
+	}
+	return actionSecs
+}
+
+// timeBankGrant is the one-time time-bank granted on sit (per-table when set).
+func (s *MatchState) timeBankGrant() int64 {
+	if s.TimeBankGrant > 0 {
+		return s.TimeBankGrant
+	}
+	return timeBankSecs
 }
 
 func (h *Handler) MatchJoinAttempt(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, presence runtime.Presence, metadata map[string]string) (interface{}, bool, string) {
@@ -522,7 +561,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				s.TimeBank = map[string]int64{}
 			}
 			if _, ok := s.TimeBank[userID]; !ok {
-				s.TimeBank[userID] = timeBankSecs // one-time grant per player
+				s.TimeBank[userID] = s.timeBankGrant() // one-time grant per player
 			}
 			// If a hand is already in progress, the new player sits out until it
 			// finishes (folded = excluded from the current pot/showdown). The next
@@ -699,7 +738,7 @@ func enforceActionDeadline(ctx context.Context, db *sql.DB, dispatcher runtime.M
 	// Arm the clock the first tick this human seat is on the clock.
 	if s.ActionDeadlineSeat != seatIdx || s.ActionDeadlineTick == 0 {
 		s.ActionDeadlineSeat = seatIdx
-		s.ActionDeadlineTick = tick + actionTimeoutTicks
+		s.ActionDeadlineTick = tick + s.actionTicks()
 		return
 	}
 	if tick < s.ActionDeadlineTick {
@@ -1886,7 +1925,7 @@ func broadcastActionRequired(ctx context.Context, db *sql.DB, dispatcher runtime
 		MinRaise:     minRaise,
 		MaxRaise:     maxRaise,
 		Pot:          s.Table.Pot,
-		ActionSecs:   actionSecs,
+		ActionSecs:   s.actionSecsEff(),
 		TimeBankSecs: int(s.TimeBank[seatData.UserID]),
 	}
 	data, _ := json.Marshal(msg)
