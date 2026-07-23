@@ -35,19 +35,36 @@ Three first-class services live in their own top-level directories:
 
 This section is the contract for **all** UI. It is not aspirational styling advice — it is the definition of "done" for anything a player sees. The reference implementation is the cinematic proof under `frontend-table/src/app/proof/` (`CinematicTable.tsx`, `textures.ts`, `proofData.ts`, `ClubDashboard.tsx`, reachable at `/proof` and `/proof?screen=club`). When in doubt, open the proof and match it. Deviating from these values is a defect, not a preference.
 
-### Palette — graphite / red / gold (dark-only)
+### Palette — GGPoker (dark slate / red / green / gold)
 
-The theme is **GGPoker red**: obsidian graphite base, GGPoker red primary, gold premium accent. It is **dark-only by design** — do not add a light mode. Canonical tokens live in `frontend-table/src/app/globals.css` (`:root` + `@theme inline`) and must be referenced through the Tailwind theme (`bg-background`, `text-foreground`, `text-brand`, `text-gold`, `font-display`, `font-body`) rather than re-hardcoded:
+The theme is **GGPoker**, applied globally to **every** screen via the shared tokens
+(this is the winning bake-off look, locked in commit `9fb6f04` "apply GGPoker global
+theme across all screens" + the follow-up sweeps). It is **dark-only by design** — do
+not add a light mode. These are the ACTUAL, canonical values in
+`frontend-table/src/app/globals.css` (`:root` + `@theme inline`) — this table mirrors
+the code, not an aspiration. Reference them through the Tailwind theme
+(`bg-background`, `bg-surface`, `text-foreground`, `text-brand`, `text-green`,
+`text-gold`, `font-display`, `font-body`) — never re-hardcode the hexes.
 
 | Token | Value | Role |
 |---|---|---|
-| `--background` | `#0b0b0e` | obsidian app base |
-| `--foreground` | `#ededf2` | primary text |
-| `--brand` | `#e01e2b` | GGPoker red primary |
+| `--background` | `#191d25` | dark slate app base (lifted well off near-black) |
+| `--surface` | `#262d38` | card / panel base — a clear step above `--background` |
+| `--surface-2` | `#313a46` | elevated: modals, hovered cards, popovers |
+| `--foreground` | `#f6f7f8` | primary text |
+| `--muted` | `#c2c8d0` | secondary text (WCAG AA >7:1 on the slate base) |
+| `--brand` | `#e01e2b` | GGPoker red — primary brand + destructive/all-in actions |
 | `--brand-bright` | `#ff2d3f` | bright red — neon/bloom, `toneMapped={false}` glows |
-| `--gold` | `#d4af37` | premium accent |
-| `--gold-lite` | `#f3e2ad` | gold highlight / gradient top |
+| `--green` | `#22c55e` | money / success / call action |
+| `--green-deep` | `#0a7d43` | deep green — money gradients, positive fills |
+| `--gold` | `#f5c518` | premium / rewards / VIP accent |
+| `--gold-lite` | `#ffd54a` | gold highlight / gradient top |
 | `--cyan` | `#4a9eb0` | **demoted** — muted teal, verification/provably-fair accent ONLY (not a brand color) |
+
+GGPoker semantics in one line: **red = brand + danger, green = money, gold =
+rewards/premium, slate = chrome.** Cards are clean elevated `bg-surface` panels
+(not glassmorphism). Every one of the 60+ screens inherits this by using the tokens
+above — a screen that hardcodes off-palette hexes instead is a defect.
 
 The `body` background is fixed (`background-attachment: fixed`) and layers two faint radials over the base: red `rgba(224,30,43,0.06)` from top-center and gold `rgba(212,175,55,0.05)` from top-right. Reproduce, do not "improve."
 
