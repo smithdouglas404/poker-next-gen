@@ -94,6 +94,26 @@ export default function MembershipPage() {
     [interval, notify],
   );
 
+  const cancelSub = useCallback(async () => {
+    if (typeof window !== "undefined" && !window.confirm("Cancel your membership? You keep your benefits until the end of the current billing period, then downgrade to Free.")) {
+      return;
+    }
+    setBusy("cancel");
+    try {
+      const res = await membershipApi.cancel();
+      if (res.canceled_at_period_end) {
+        notify(res.message ?? "Your membership will cancel at the end of the period.", "ok");
+        await load();
+      } else {
+        notify(res.message ?? "Billing is not configured yet.", "err");
+      }
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "Could not cancel", "err");
+    } finally {
+      setBusy(null);
+    }
+  }, [load, notify]);
+
   const startVerification = useCallback(
     async (kind: "biometric" | "kyc_aml") => {
       setBusy(`kyc:${kind}`);
@@ -203,6 +223,16 @@ export default function MembershipPage() {
                   </span>
                 )}
               </p>
+              {currentTier !== "free" && status?.billing_configured && (
+                <button
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() => void cancelSub()}
+                  className="mt-3 text-xs font-semibold uppercase tracking-wider text-neutral-500 underline-offset-2 transition hover:text-[#ff9ba1] hover:underline disabled:opacity-40"
+                >
+                  {busy === "cancel" ? "Cancelling…" : "Cancel membership"}
+                </button>
+              )}
             </div>
 
             {nextTier && (

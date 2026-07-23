@@ -77,6 +77,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"subscription_tiers":          rpc.SubscriptionTiers,
 		"subscription_status":         rpc.SubscriptionStatus,
 		"subscription_checkout":       rpc.SubscriptionCheckout,
+		"subscription_cancel":         rpc.SubscriptionCancel,
 		"subscription_grant_admin":    rpc.SubscriptionGrantAdmin,
 		"stripe_webhook":              rpc.StripeWebhook,
 		"kyc_status":                  rpc.KycStatus,

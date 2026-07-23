@@ -128,6 +128,47 @@ func SubscriptionCheckout(ctx context.Context, logger runtime.Logger, db *sql.DB
 	return string(out), nil
 }
 
+// SubscriptionCancel schedules the caller's Stripe subscription to cancel at the
+// end of the current billing period. They keep their tier + benefits until it
+// expires, then the customer.subscription.deleted webhook downgrades them to
+// free. This is the in-app "Cancel anytime" path (no external Stripe portal
+// needed for a basic cancel).
+func SubscriptionCancel(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	userID, ok := ctx.Value(runtime.RUNTIME_CTX_USER_ID).(string)
+	if !ok || userID == "" {
+		return "", runtime.NewError("unauthorized", 16)
+	}
+	sub, err := store.NewSubscriptionStore(db).Get(ctx, userID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	if !billing.IsPaidTier(sub.Tier) || sub.StripeSubscriptionID == "" {
+		return "", runtime.NewError("no active paid subscription to cancel", 9)
+	}
+	if !stripeConfigured() {
+		out, _ := json.Marshal(map[string]interface{}{"configured": false, "message": "Billing is not configured yet."})
+		return string(out), nil
+	}
+	form := url.Values{}
+	form.Set("cancel_at_period_end", "true")
+	body, status, err := stripePost(ctx, "https://api.stripe.com/v1/subscriptions/"+sub.StripeSubscriptionID, form)
+	if err != nil {
+		logger.Error("stripe cancel error: %v", err)
+		return "", runtime.NewError("billing error", 13)
+	}
+	if status < 200 || status >= 300 {
+		logger.Error("stripe cancel http %d: %s", status, string(body))
+		return "", runtime.NewError("billing error", 13)
+	}
+	out, _ := json.Marshal(map[string]interface{}{
+		"configured":             true,
+		"canceled_at_period_end": true,
+		"tier":                   sub.Tier,
+		"message":                "Your membership stays active until the end of the current billing period, then downgrades to Free. You can resubscribe anytime.",
+	})
+	return string(out), nil
+}
+
 // createStripeDepositSession creates a one-time (mode=payment) Checkout session
 // to top up the wallet. The wallet is credited by the webhook on completion.
 func createStripeDepositSession(ctx context.Context, userID, depositID string, amountCents int64) (string, error) {

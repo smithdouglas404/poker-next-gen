@@ -27,6 +27,12 @@ export const membershipApi = {
   /** Start a recurring Stripe Checkout session for a paid tier. */
   checkout: (tier: string, interval: BillingInterval) =>
     call<CheckoutResponse>("subscription_checkout", { tier, interval }),
+  /** Cancel the caller's subscription at the end of the current period. */
+  cancel: () =>
+    call<{ configured: boolean; canceled_at_period_end?: boolean; tier?: string; message?: string }>(
+      "subscription_cancel",
+      {},
+    ),
   /** Caller's identity-verification state (none | pending | verified | rejected). */
   kycStatus: () => call<KycStatusResponse>("kyc_status", {}),
   /** Per-kind verification statuses + unlocked capabilities. */

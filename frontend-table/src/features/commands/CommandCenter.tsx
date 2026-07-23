@@ -60,7 +60,7 @@ const CATEGORY_ORDER: CommandCategory[] = [
   "table",
 ];
 
-const NO_PAYLOAD_COMMANDS = new Set(["healthz", "club_list", "table_list", "tournament_list", "wallet_get", "profile_get"]);
+const NO_PAYLOAD_COMMANDS = new Set(["healthz", "club_list", "table_list", "tournament_list", "wallet_get", "auth_profile", "auth_sign_in"]);
 
 // GGPoker nav chips — clean neutral surface with tone accents for primary/premium.
 const NAV_CHIP =

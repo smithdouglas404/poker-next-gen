@@ -25,6 +25,11 @@ async function rpc<T>(id: string, payload: Record<string, unknown> = {}): Promis
   return (await callSessionRpc(id, payload)) as T;
 }
 
+// On-chain NFT minting is dormant unless the Polygon relay is configured
+// (backend POLYGON_ANCHOR_URL). Gate the mint UI on a matching public flag so it
+// stays hidden — no dead "Coming soon" control — until minting is actually live.
+const NFT_ENABLED = process.env.NEXT_PUBLIC_NFT_ENABLED === "true";
+
 const TABS: { id: Tab; label: string; blurb: string }[] = [
   { id: "market", label: "Marketplace", blurb: "Player-to-player trading floor" },
   { id: "shop", label: "Shop", blurb: "Official cosmetics catalog" },
@@ -877,30 +882,34 @@ function VaultTab({
               </Button>
             </div>
 
-            {/* NFT mint */}
-            <div className="space-y-2 rounded-xl border border-white/10 bg-black/30 p-4">
-              <h4 className="font-display text-xs font-bold uppercase tracking-[0.2em] text-gold/80">
-                Mint as NFT
-              </h4>
-              <NftBlock status={nft[selected.id]} />
-              <button
-                type="button"
-                disabled={busy !== null || nft[selected.id]?.configured === false}
-                onClick={() => onMint(selected)}
-                className={cn(
-                  BTN_GOLD,
-                  "w-full rounded-xl px-4 py-2 text-sm uppercase tracking-wide disabled:opacity-40",
-                )}
-              >
-                {nft[selected.id]?.configured === false
-                  ? "Coming soon"
-                  : nft[selected.id]?.status === "minted"
-                    ? "Minted ✓"
-                    : busy === "mint" + selected.id
-                      ? "Minting…"
-                      : "Mint to chain"}
-              </button>
-            </div>
+            {/* NFT mint — only shown when on-chain minting is actually configured
+                (NEXT_PUBLIC_NFT_ENABLED), so Beta users never hit a dead
+                "Coming soon" control. */}
+            {NFT_ENABLED && (
+              <div className="space-y-2 rounded-xl border border-white/10 bg-black/30 p-4">
+                <h4 className="font-display text-xs font-bold uppercase tracking-[0.2em] text-gold/80">
+                  Mint as NFT
+                </h4>
+                <NftBlock status={nft[selected.id]} />
+                <button
+                  type="button"
+                  disabled={busy !== null || nft[selected.id]?.configured === false}
+                  onClick={() => onMint(selected)}
+                  className={cn(
+                    BTN_GOLD,
+                    "w-full rounded-xl px-4 py-2 text-sm uppercase tracking-wide disabled:opacity-40",
+                  )}
+                >
+                  {nft[selected.id]?.configured === false
+                    ? "Coming soon"
+                    : nft[selected.id]?.status === "minted"
+                      ? "Minted ✓"
+                      : busy === "mint" + selected.id
+                        ? "Minting…"
+                        : "Mint to chain"}
+                </button>
+              </div>
+            )}
           </Panel>
         ) : (
           <Panel className="flex h-64 items-center justify-center p-10 text-center text-sm text-neutral-500">
