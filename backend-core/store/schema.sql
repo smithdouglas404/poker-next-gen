@@ -867,6 +867,16 @@ CREATE TABLE IF NOT EXISTS poker_ip_rule (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Manual jurisdiction (country) allow/deny overrides, layered over the
+-- IP->country provider lookup for geofencing.
+CREATE TABLE IF NOT EXISTS poker_geo_rule (
+    country TEXT PRIMARY KEY,
+    rule TEXT NOT NULL DEFAULT 'deny',
+    reason TEXT NOT NULL DEFAULT '',
+    created_by TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS poker_hitl_queue (
     id TEXT PRIMARY KEY,
     kind TEXT NOT NULL DEFAULT '',

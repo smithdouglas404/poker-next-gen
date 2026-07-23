@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"net"
+	"strings"
 	"time"
 )
 
@@ -377,6 +379,47 @@ func (s *AdminStore) AddIPRule(ctx context.Context, cidr, rule, reason, adminUse
 func (s *AdminStore) DeleteIPRule(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM poker_ip_rule WHERE id=$1`, id)
 	return err
+}
+
+// CheckIP decides whether an IP is permitted by the manual allow/deny rules.
+// Rules were stored but never enforced; this is the decision function. A deny
+// match blocks; if any allow rules exist they form an allow-list (an IP not
+// covered by an allow rule is blocked). No rules → allowed. An unparseable IP
+// is allowed (fail-open) so local/dev traffic is never bricked.
+func (s *AdminStore) CheckIP(ctx context.Context, ip string) (allowed bool, reason string) {
+	parsed := net.ParseIP(strings.TrimSpace(ip))
+	if parsed == nil {
+		return true, ""
+	}
+	rules, err := s.ListIPRules(ctx)
+	if err != nil {
+		return true, "" // fail-open on store error; never lock everyone out
+	}
+	hasAllow := false
+	inAllow := false
+	for _, r := range rules {
+		_, cidr, perr := net.ParseCIDR(strings.TrimSpace(r.CIDR))
+		if perr != nil {
+			continue
+		}
+		if !cidr.Contains(parsed) {
+			if r.Rule == "allow" {
+				hasAllow = true
+			}
+			continue
+		}
+		if r.Rule == "deny" {
+			return false, "your network is blocked by an administrator"
+		}
+		if r.Rule == "allow" {
+			hasAllow = true
+			inAllow = true
+		}
+	}
+	if hasAllow && !inAllow {
+		return false, "your network is not on the allow-list"
+	}
+	return true, ""
 }
 
 // --- HITL (human-in-the-loop) review queue ---

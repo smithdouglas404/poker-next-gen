@@ -95,6 +95,14 @@ export interface IPRule {
   created_at: string;
 }
 
+export interface GeoRule {
+  country: string;
+  rule: "allow" | "deny";
+  reason: string;
+  created_by: string;
+  created_at: string;
+}
+
 export interface Announcement {
   id: string;
   title: string;

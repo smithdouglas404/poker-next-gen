@@ -15,6 +15,7 @@ import type {
   GlobalStats,
   HitlItem,
   IPRule,
+  GeoRule,
   KycPendingRow,
   PlatformSetting,
   PresenceOnline,
@@ -106,6 +107,10 @@ export const adminApi = {
   ipRuleAdd: (cidr: string, rule: "allow" | "deny", reason: string) =>
     call<{ id: string }>("ip_rule_add", { cidr, rule, reason }),
   ipRuleDelete: (id: string) => call<{ ok: boolean }>("ip_rule_delete", { id }),
+  geoRuleList: () => call<{ rules: GeoRule[] }>("geo_rule_list", {}),
+  geoRuleSet: (country: string, rule: "allow" | "deny", reason: string) =>
+    call<{ ok: boolean }>("geo_rule_set", { country, rule, reason }),
+  geoRuleDelete: (country: string) => call<{ ok: boolean }>("geo_rule_delete", { country }),
 
   // Announcements
   announcementList: (all = true) =>

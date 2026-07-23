@@ -41,6 +41,9 @@ func WalletDepositCrypto(ctx context.Context, logger runtime.Logger, db *sql.DB,
 	if err := blockedByRG(ctx, db, userID); err != nil { // responsible-gambling gate
 		return "", err
 	}
+	if err := guardJurisdiction(ctx, db); err != nil { // geo/IP jurisdiction gate
+		return "", err
+	}
 	var req struct {
 		AmountCents int64 `json:"amount_cents"`
 	}
@@ -119,6 +122,9 @@ func WalletDepositFiat(ctx context.Context, logger runtime.Logger, db *sql.DB, n
 		return "", err
 	}
 	if err := blockedByRG(ctx, db, userID); err != nil { // responsible-gambling gate
+		return "", err
+	}
+	if err := guardJurisdiction(ctx, db); err != nil { // geo/IP jurisdiction gate
 		return "", err
 	}
 	// Fiat deposits require KYC/AML (tier 3) — verification follows the money.

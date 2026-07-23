@@ -7,16 +7,17 @@ import { cn } from "@/features/ui/tokens";
 
 import { adminApi, relTime } from "../adminRpc";
 import { Badge, Card, Empty, GoldHeading, Mono, Row, Table, Td, Th, statusTone } from "../primitives";
-import type { AntibotScore, CollusionFlag, HitlItem, IPRule } from "../types";
+import type { AntibotScore, CollusionFlag, GeoRule, HitlItem, IPRule } from "../types";
 import type { Notify } from "./shared";
 
-type Tab = "antibot" | "collusion" | "hitl" | "ip";
+type Tab = "antibot" | "collusion" | "hitl" | "ip" | "geo";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "antibot", label: "Bot Detection" },
   { id: "collusion", label: "Collusion" },
   { id: "hitl", label: "HITL Queue" },
   { id: "ip", label: "IP Rules" },
+  { id: "geo", label: "Jurisdictions" },
 ];
 
 export function AntiCheat({ notify }: { notify: Notify }) {
@@ -53,6 +54,7 @@ export function AntiCheat({ notify }: { notify: Notify }) {
       {tab === "collusion" && <Collusion notify={notify} />}
       {tab === "hitl" && <Hitl notify={notify} />}
       {tab === "ip" && <IPRules notify={notify} />}
+      {tab === "geo" && <Jurisdictions notify={notify} />}
     </div>
   );
 }
@@ -462,6 +464,137 @@ function IPRules({ notify }: { notify: Notify }) {
                 <Td className="text-neutral-500">{relTime(r.created_at)}</Td>
                 <Td className="text-right">
                   <Button size="sm" variant="danger" onClick={() => remove(r.id)} disabled={busy === r.id}>
+                    Delete
+                  </Button>
+                </Td>
+              </Row>
+            ))}
+          </Table>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// Jurisdictions — per-country allow/deny overrides layered over the IP→country
+// geofence. A deny blocks the country; adding any allow rule turns it into an
+// allow-list. Enforced server-side at table creation and deposits.
+function Jurisdictions({ notify }: { notify: Notify }) {
+  const [rows, setRows] = useState<GeoRule[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [country, setCountry] = useState("");
+  const [rule, setRule] = useState<"allow" | "deny">("deny");
+  const [reason, setReason] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await adminApi.geoRuleList();
+      setRows(res.rules ?? []);
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Failed to load jurisdictions", "err");
+    } finally {
+      setLoading(false);
+    }
+  }, [notify]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const add = () =>
+    void (async () => {
+      const code = country.trim().toUpperCase();
+      if (code.length !== 2) {
+        notify("Use a 2-letter country code (e.g. US, GB)", "err");
+        return;
+      }
+      setBusy("add");
+      try {
+        await adminApi.geoRuleSet(code, rule, reason.trim());
+        notify("Jurisdiction rule saved");
+        setCountry("");
+        setReason("");
+        await load();
+      } catch (err) {
+        notify(err instanceof Error ? err.message : "Save failed", "err");
+      } finally {
+        setBusy(null);
+      }
+    })();
+
+  const remove = (code: string) =>
+    void (async () => {
+      setBusy(code);
+      try {
+        await adminApi.geoRuleDelete(code);
+        notify("Rule removed");
+        await load();
+      } catch (err) {
+        notify(err instanceof Error ? err.message : "Delete failed", "err");
+      } finally {
+        setBusy(null);
+      }
+    })();
+
+  return (
+    <div className="space-y-6">
+      <Card eyebrow="Geofencing" title="Add country rule">
+        <p className="mb-3 text-xs text-neutral-500">
+          Player country is resolved from IP; these rules override it. Deny blocks a country; adding any allow rule makes
+          the list an allow-list (everything else is blocked). Enforced at table creation and deposits.
+        </p>
+        <div className="grid gap-3 lg:grid-cols-[0.8fr_0.7fr_1.4fr_auto] lg:items-end">
+          <Field label="Country (ISO-2)">
+            <Input
+              value={country}
+              onChange={(e) => setCountry(e.target.value.toUpperCase().slice(0, 2))}
+              placeholder="US"
+            />
+          </Field>
+          <Field label="Rule">
+            <Select value={rule} onChange={(e) => setRule(e.target.value as "allow" | "deny")}>
+              <option value="deny">Deny</option>
+              <option value="allow">Allow</option>
+            </Select>
+          </Field>
+          <Field label="Reason">
+            <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="optional" />
+          </Field>
+          <Button onClick={add} disabled={busy === "add" || country.trim().length !== 2}>
+            Save
+          </Button>
+        </div>
+      </Card>
+
+      <Card eyebrow="Active" title={`Jurisdictions · ${rows.length}`}>
+        {rows.length === 0 ? (
+          <Empty>{loading ? "Loading…" : "No jurisdiction rules — all regions allowed."}</Empty>
+        ) : (
+          <Table
+            head={
+              <>
+                <Th>Country</Th>
+                <Th>Rule</Th>
+                <Th>Reason</Th>
+                <Th>Added</Th>
+                <Th className="text-right">Remove</Th>
+              </>
+            }
+          >
+            {rows.map((r) => (
+              <Row key={r.country}>
+                <Td>
+                  <Mono>{r.country}</Mono>
+                </Td>
+                <Td>
+                  <Badge tone={r.rule === "allow" ? "green" : "red"}>{r.rule}</Badge>
+                </Td>
+                <Td className="text-neutral-400">{r.reason || "—"}</Td>
+                <Td className="text-neutral-500">{relTime(r.created_at)}</Td>
+                <Td className="text-right">
+                  <Button size="sm" variant="danger" onClick={() => remove(r.country)} disabled={busy === r.country}>
                     Delete
                   </Button>
                 </Td>

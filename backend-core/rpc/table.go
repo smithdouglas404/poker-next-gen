@@ -55,6 +55,10 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 	if uerr != nil {
 		return "", uerr
 	}
+	// Jurisdiction gate: block table creation from a restricted region / network.
+	if err := guardJurisdiction(ctx, db); err != nil {
+		return "", err
+	}
 	// Tier gate: cap the big blind to what the caller's plan allows. Free plays
 	// the default $1/$2; higher stakes require an upgrade (platinum = unlimited).
 	tier := store.SubscriptionTier(ctx, db, userID)

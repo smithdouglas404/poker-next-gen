@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 
 import { GameProvider, useGame } from "@/features/game/GameProvider";
+import { JurisdictionGate } from "@/features/game/JurisdictionGate";
 import { TableHud } from "@/features/hud/TableHud";
 import { useTableGraphics } from "@/features/table/tableGraphics";
 import { cn, GLASS_PANEL } from "@/features/ui/tokens";
@@ -217,6 +218,7 @@ function TableSurface() {
 export default function TablePage() {
   return (
     <GameProvider>
+      <JurisdictionGate />
       <TableHud>
         <TableSurface />
       </TableHud>
