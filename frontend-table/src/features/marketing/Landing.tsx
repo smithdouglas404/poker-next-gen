@@ -8,14 +8,14 @@ const PILLARS = [
     body: "Every deck is committed before the deal, your cards are encrypted and never shared, and the record is anchored on-chain. Verify every hand.",
     href: "/provably-fair",
     cta: "See how",
-    accent: "#34d399",
+    accent: "#22c55e",
   },
   {
     title: "Own Your Club",
     body: "Run your own room. Set your rake (0–10%), invite your community, manage members, and earn. Club owners are entrepreneurs here.",
     href: "/clubs",
     cta: "Start a club",
-    accent: "#22d3ee",
+    accent: "#e01e2b",
   },
   {
     title: "Crypto & Card",
@@ -42,7 +42,7 @@ export function Landing() {
       <section className="relative px-6 pt-24 pb-20 text-center">
         <div className="pointer-events-none absolute inset-0 -z-10">
           <div className="absolute left-1/2 top-0 h-[420px] w-[820px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse,rgba(212,175,55,0.14),transparent_65%)]" />
-          <div className="absolute left-1/2 top-40 h-[360px] w-[720px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse,rgba(129,236,255,0.10),transparent_65%)]" />
+          <div className="absolute left-1/2 top-40 h-[360px] w-[720px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse,rgba(224,30,43,0.10),transparent_65%)]" />
         </div>
         <p className="font-display text-xs font-bold uppercase tracking-[0.35em] text-amber-300/80">
           High Rollers Club

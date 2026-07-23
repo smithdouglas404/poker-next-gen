@@ -24,21 +24,21 @@ export default function ClubDashboard() {
       className="relative flex h-screen w-screen items-center justify-center overflow-hidden"
       style={{
         background:
-          "radial-gradient(900px 600px at 15% 10%, rgba(56,230,255,0.12), transparent 55%)," +
-          "radial-gradient(900px 600px at 85% 90%, rgba(20,50,80,0.5), transparent 60%)," +
+          "radial-gradient(900px 600px at 15% 10%, rgba(224,30,43,0.12), transparent 55%)," +
+          "radial-gradient(900px 600px at 85% 90%, rgba(60,14,20,0.5), transparent 60%)," +
           "linear-gradient(120deg,#05080e,#0a1420 55%,#05080e)",
       }}
     >
       {/* faux server-room depth lines */}
-      <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: "repeating-linear-gradient(90deg, transparent 0 78px, rgba(56,230,255,0.05) 78px 80px)" }} />
+      <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: "repeating-linear-gradient(90deg, transparent 0 78px, rgba(224,30,43,0.05) 78px 80px)" }} />
 
       <div
         className="relative flex w-[1180px] max-w-[94vw] overflow-hidden rounded-3xl"
         style={{
-          border: "1px solid rgba(127,233,255,0.28)",
-          background: "linear-gradient(160deg, rgba(14,22,34,0.72), rgba(8,14,22,0.66))",
+          border: "1px solid rgba(224,30,43,0.28)",
+          background: "linear-gradient(160deg, rgba(22,20,26,0.72), rgba(14,12,16,0.66))",
           backdropFilter: "blur(24px)",
-          boxShadow: "0 40px 120px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06), 0 0 60px rgba(56,230,255,0.10)",
+          boxShadow: "0 40px 120px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06), 0 0 60px rgba(224,30,43,0.10)",
         }}
       >
         {/* sidebar */}
@@ -57,7 +57,7 @@ export default function ClubDashboard() {
                 className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm"
                 style={
                   n.active
-                    ? { background: "rgba(56,230,255,0.14)", border: "1px solid rgba(127,233,255,0.4)", color: "#bff0ff" }
+                    ? { background: "rgba(224,30,43,0.14)", border: "1px solid rgba(224,30,43,0.4)", color: "#ffd9dc" }
                     : { color: "rgba(255,255,255,0.6)" }
                 }
               >
@@ -86,9 +86,9 @@ export default function ClubDashboard() {
                   <div key={m.name} className="grid grid-cols-[1fr_90px_90px] items-center rounded-xl px-3 py-3" style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.07)" }}>
                     <div className="flex items-center gap-3">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={avatarSrc(m.avatar)} alt="" width={48} height={48} className="rounded-lg" style={{ border: "2px solid rgba(127,233,255,0.5)", objectFit: "cover" }} />
+                      <img src={avatarSrc(m.avatar)} alt="" width={48} height={48} className="rounded-lg" style={{ border: "2px solid rgba(224,30,43,0.5)", objectFit: "cover" }} />
                       <div>
-                        <div className="text-[11px] uppercase tracking-wide" style={{ color: m.role === "Owner" ? "#f3c14b" : m.role === "Manager" ? "#7fe9ff" : "rgba(255,255,255,0.5)" }}>{m.role}</div>
+                        <div className="text-[11px] uppercase tracking-wide" style={{ color: m.role === "Owner" ? "#f3c14b" : m.role === "Manager" ? "#ff2d3f" : "rgba(255,255,255,0.5)" }}>{m.role}</div>
                         <div className="text-sm font-semibold text-white">{m.name}</div>
                       </div>
                     </div>
@@ -113,7 +113,7 @@ export default function ClubDashboard() {
                       <div className="mb-1 text-xl">{ic as string}</div>
                       <div className="mb-2 text-[11px] text-white/70">{t}</div>
                       <div className="h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
-                        <div className="h-1.5 rounded-full" style={{ width: `${(pct as number) * 100}%`, background: "#7fe9ff", boxShadow: "0 0 8px #7fe9ff" }} />
+                        <div className="h-1.5 rounded-full" style={{ width: `${(pct as number) * 100}%`, background: "#ff2d3f", boxShadow: "0 0 8px #ff2d3f" }} />
                       </div>
                     </div>
                   ))}
@@ -133,11 +133,11 @@ export default function ClubDashboard() {
               </div>
 
               {/* pending join */}
-              <div className="rounded-2xl p-4" style={{ background: "rgba(56,230,255,0.06)", border: "1px solid rgba(127,233,255,0.3)" }}>
-                <div className="mb-3 text-[11px] uppercase tracking-[0.2em]" style={{ color: "#9be9ff" }}>Pending Join Requests</div>
+              <div className="rounded-2xl p-4" style={{ background: "rgba(224,30,43,0.06)", border: "1px solid rgba(224,30,43,0.3)" }}>
+                <div className="mb-3 text-[11px] uppercase tracking-[0.2em]" style={{ color: "#ff9aa0" }}>Pending Join Requests</div>
                 <div className="flex items-center gap-3">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={avatarSrc("void-witch")} alt="" width={44} height={44} className="rounded-lg" style={{ border: "2px solid #b44dff", objectFit: "cover" }} />
+                  <img src={avatarSrc("void-witch")} alt="" width={44} height={44} className="rounded-lg" style={{ border: "2px solid #e01e2b", objectFit: "cover" }} />
                   <div className="flex-1">
                     <div className="text-sm font-semibold text-white">PlayerX_Toddler</div>
                     <div className="text-[11px] text-white/50">Requests to join</div>

@@ -67,7 +67,7 @@ function FeaturedCard({ game }: { game: FeaturedGame }) {
 
 const ACTIVITY_DOT: Record<ActivityItem["kind"], string> = {
   win: "#22c55e",
-  member: "#81ecff",
+  member: "#e01e2b",
   tournament: "#f5c518",
   info: "#9aa0a6",
 };
@@ -103,7 +103,7 @@ export function GlobalDashboardOverlay({ demo, onClose }: { demo: boolean; onClo
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(1200px 600px at 50% -10%, rgba(245,197,24,0.06), transparent 60%), radial-gradient(800px 400px at 100% 0%, rgba(129,236,255,0.05), transparent 60%)",
+            "radial-gradient(1200px 600px at 50% -10%, rgba(245,197,24,0.06), transparent 60%), radial-gradient(800px 400px at 100% 0%, rgba(224,30,43,0.05), transparent 60%)",
         }}
       />
 

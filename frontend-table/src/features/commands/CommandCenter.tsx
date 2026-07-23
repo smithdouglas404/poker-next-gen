@@ -485,7 +485,7 @@ function CommandCenterInner() {
             </Link>
             <Link
               href="/provably-fair"
-              className="rounded-xl border border-cyan-400/40 bg-cyan-400/10 px-5 py-3 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-400/15"
+              className="rounded-xl border border-cyan/40 bg-cyan/10 px-5 py-3 text-sm font-semibold text-cyan transition hover:bg-cyan/15"
             >
               Provably Fair →
             </Link>

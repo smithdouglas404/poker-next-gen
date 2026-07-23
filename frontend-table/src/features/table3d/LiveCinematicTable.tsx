@@ -45,7 +45,7 @@ function ringForState(state: SceneSeat["state"]): string {
     case "winner":
       return "#f3e2ad";
     default:
-      return "#22d3ee";
+      return "#5b6472";
   }
 }
 

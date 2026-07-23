@@ -20,14 +20,14 @@ export interface ProofSeat {
 // use3d marks the seats that own a 3D avatar (mixed table: Tripo 3D + HRC portraits).
 export const PROOF_SEATS: ProofSeat[] = [
   { index: 0, name: "You",          stack: "$24,500", avatar: "cyber-samurai", ring: "#f3c14b", state: "active",  action: { label: "RAISE", amount: "$12,000", tone: "raise" }, hole: ["Ah", "Ad"], use3d: true },
-  { index: 1, name: "Neon Viper",   stack: "$18,200", avatar: "neon-viper",    ring: "#22d3ee", state: "idle",    action: { label: "CALL",  amount: "$4,000", tone: "call" } },
-  { index: 2, name: "Ice Queen",    stack: "$9,900",  avatar: "ice-queen",     ring: "#22d3ee", state: "folded",  action: { label: "FOLD",  tone: "fold" } },
-  { index: 3, name: "Shadow King",  stack: "$31,300", avatar: "shadow-king",   ring: "#22d3ee", state: "idle",    action: { label: "BET",   amount: "$4,000", tone: "raise" }, use3d: true },
+  { index: 1, name: "Neon Viper",   stack: "$18,200", avatar: "neon-viper",    ring: "#5b6472", state: "idle",    action: { label: "CALL",  amount: "$4,000", tone: "call" } },
+  { index: 2, name: "Ice Queen",    stack: "$9,900",  avatar: "ice-queen",     ring: "#5b6472", state: "folded",  action: { label: "FOLD",  tone: "fold" } },
+  { index: 3, name: "Shadow King",  stack: "$31,300", avatar: "shadow-king",   ring: "#5b6472", state: "idle",    action: { label: "BET",   amount: "$4,000", tone: "raise" }, use3d: true },
   { index: 4, name: "Void Witch",   stack: "$6,400",  avatar: "void-witch",    ring: "#ef4444", state: "allin",   action: { label: "ALL-IN", amount: "$6,400", tone: "allin" } },
-  { index: 5, name: "Gold Phantom", stack: "$22,100", avatar: "gold-phantom",  ring: "#22d3ee", state: "folded",  action: { label: "FOLD",  tone: "fold" } },
-  { index: 6, name: "Red Wolf",     stack: "$14,700", avatar: "red-wolf",      ring: "#22d3ee", state: "idle" },
-  { index: 7, name: "Chrome Siren", stack: "$16,800", avatar: "chrome-siren",  ring: "#22d3ee", state: "idle",    action: { label: "CALL",  amount: "$4,000", tone: "call" }, use3d: true },
-  { index: 8, name: "Tech Monk",    stack: "$12,300", avatar: "tech-monk",     ring: "#22d3ee", state: "idle" },
+  { index: 5, name: "Gold Phantom", stack: "$22,100", avatar: "gold-phantom",  ring: "#5b6472", state: "folded",  action: { label: "FOLD",  tone: "fold" } },
+  { index: 6, name: "Red Wolf",     stack: "$14,700", avatar: "red-wolf",      ring: "#5b6472", state: "idle" },
+  { index: 7, name: "Chrome Siren", stack: "$16,800", avatar: "chrome-siren",  ring: "#5b6472", state: "idle",    action: { label: "CALL",  amount: "$4,000", tone: "call" }, use3d: true },
+  { index: 8, name: "Tech Monk",    stack: "$12,300", avatar: "tech-monk",     ring: "#5b6472", state: "idle" },
 ];
 
 // Community board (four-color deck: s=black, h=red, d=blue, c=green).

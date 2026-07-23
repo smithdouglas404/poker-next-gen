@@ -195,7 +195,7 @@ function GraphicsToggle() {
           onClick={() => setGraphics(o.id)}
           className={cn(
             "rounded-full px-3 py-1 transition-colors",
-            graphics === o.id ? "bg-amber-500 text-black" : "text-neutral-300 hover:text-white",
+            graphics === o.id ? "bg-gold text-black" : "text-neutral-300 hover:text-white",
           )}
         >
           {o.label}

@@ -69,12 +69,12 @@ export function cardBackTexture(): THREE.CanvasTexture {
   const ctx = c.getContext("2d")!;
   rounded(ctx, 6, 6, W - 12, H - 12, 34);
   const g = ctx.createLinearGradient(0, 0, W, H);
-  g.addColorStop(0, "#0b2740"); g.addColorStop(1, "#123a63");
+  g.addColorStop(0, "#3a0d12"); g.addColorStop(1, "#5c1420");
   ctx.fillStyle = g; ctx.fill();
   ctx.strokeStyle = "#d4af37"; ctx.lineWidth = 8;
   rounded(ctx, 26, 26, W - 52, H - 52, 22); ctx.stroke();
   // diamond lattice
-  ctx.strokeStyle = "rgba(129,236,255,0.25)"; ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(224,30,43,0.25)"; ctx.lineWidth = 2;
   for (let i = -H; i < W; i += 26) {
     ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i + H, H); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(i + H, 0); ctx.lineTo(i, H); ctx.stroke();

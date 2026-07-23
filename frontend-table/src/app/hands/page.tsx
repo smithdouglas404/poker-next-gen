@@ -148,7 +148,7 @@ export default function HandsPage() {
                     </td>
                     <td className="px-3 py-3">
                       {h.anchored ? (
-                        <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-cyan-300">
+                        <span className="rounded-full bg-cyan/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-cyan">
                           On-chain
                         </span>
                       ) : (
@@ -226,7 +226,7 @@ export default function HandsPage() {
                 <div className="flex gap-4 text-xs text-neutral-400">
                   <span>Pot {formatMoney(selected.pot)}</span>
                   <span>Rake {formatMoney(selected.rake)}</span>
-                  {selected.anchored && <span className="text-cyan-300">Anchored on-chain</span>}
+                  {selected.anchored && <span className="text-cyan">Anchored on-chain</span>}
                 </div>
               </div>
             ) : null}

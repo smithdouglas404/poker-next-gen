@@ -46,10 +46,10 @@ export function PreviewTile({ title, caption }: { title: string; caption: string
   return (
     <div
       aria-disabled
-      className="pointer-events-none select-none rounded-xl border border-dashed border-purple-400/30 bg-purple-500/[0.04] p-4 opacity-70"
+      className="pointer-events-none select-none rounded-xl border border-dashed border-white/15 bg-white/[0.03] p-4 opacity-70"
     >
       <div className="flex items-center gap-2">
-        <span className="rounded-full border border-purple-400/40 bg-purple-500/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-purple-300">
+        <span className="rounded-full border border-white/20 bg-white/[0.06] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white/55">
           Preview
         </span>
         <p className="text-sm font-semibold text-neutral-200">{title}</p>

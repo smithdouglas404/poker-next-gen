@@ -44,7 +44,7 @@ function HeroCard({ code }: { code: string }) {
   const glyph = suit === "h" ? "♥" : suit === "s" ? "♠" : suit === "d" ? "♦" : "♣";
   const color = suit === "h" ? "#e5484d" : suit === "s" ? "#101317" : suit === "d" ? "#2f6bff" : "#1fa85a";
   return (
-    <div className="relative flex h-[86px] w-[62px] flex-col justify-between rounded-lg bg-white p-1.5 shadow-lg" style={{ boxShadow: "0 6px 20px rgba(0,0,0,0.5), 0 0 18px rgba(127,233,255,0.25)" }}>
+    <div className="relative flex h-[86px] w-[62px] flex-col justify-between rounded-lg bg-white p-1.5 shadow-lg" style={{ boxShadow: "0 6px 20px rgba(0,0,0,0.5), 0 0 18px rgba(224,30,43,0.25)" }}>
       <span className="text-lg font-bold leading-none" style={{ color }}>{rank}{glyph}</span>
       <span className="self-end text-2xl leading-none" style={{ color }}>{glyph}</span>
       <span className="sr-only">{red}</span>
@@ -58,7 +58,7 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
     <div className="pointer-events-none absolute inset-0 select-none">
       {/* top-left table info */}
       <div className={`absolute left-5 top-5 ${GLASS_PANEL} px-4 py-3`} style={{ minWidth: 190 }}>
-        <div className="text-[11px] uppercase tracking-[0.25em]" style={{ color: "#7fe9ff" }}>High Rollers Main</div>
+        <div className="text-[11px] uppercase tracking-[0.25em]" style={{ color: "#ff2d3f" }}>High Rollers Main</div>
         <div className="mt-0.5 text-sm font-semibold text-white">$5 / $10 · No-Limit Hold&apos;em</div>
         <div className="mt-1 flex items-center gap-2 text-[11px] text-white/60">
           <span>Round: <span className="text-white/90">River</span></span>
@@ -71,9 +71,9 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
       <div className={`absolute right-5 top-5 ${GLASS_PANEL} px-3.5 py-3`} style={{ width: 210 }}>
         <div className="mb-1.5 text-[11px] uppercase tracking-[0.2em] text-white/50">Table Chat</div>
         <div className="space-y-1 text-[11px] leading-snug">
-          <div><span style={{ color: "#7fe9ff" }}>NeonViper:</span> <span className="text-white/70">nice pot building</span></div>
+          <div><span style={{ color: "#ff2d3f" }}>NeonViper:</span> <span className="text-white/70">nice pot building</span></div>
           <div><span style={{ color: "#e9c46a" }}>IceQueen:</span> <span className="text-white/70">gg well played 🎲</span></div>
-          <div><span style={{ color: "#b44dff" }}>ShadowKing:</span> <span className="text-white/70">all day 🔥</span></div>
+          <div><span style={{ color: "#e01e2b" }}>ShadowKing:</span> <span className="text-white/70">all day 🔥</span></div>
         </div>
         <div className="mt-2 rounded-md px-2 py-1 text-[11px] text-white/40" style={{ background: "rgba(255,255,255,0.04)" }}>Type a message…</div>
       </div>
@@ -92,7 +92,7 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
       {/* bottom-right player analytics */}
       <div className={`absolute bottom-5 right-5 ${GLASS_PANEL} px-4 py-3`} style={{ width: 200 }}>
         <div className="mb-2 flex items-center gap-1.5 text-[11px] uppercase tracking-[0.2em] text-white/50">Player Analytics</div>
-        {[["Neon Viper", 68, "#22d3ee"], ["Shadow King", 41, "#e9c46a"], ["Void Witch", 92, "#ff3b46"]].map(([n, pct, c]) => (
+        {[["Neon Viper", 68, "#e01e2b"], ["Shadow King", 41, "#e9c46a"], ["Void Witch", 92, "#ff3b46"]].map(([n, pct, c]) => (
           <div key={n as string} className="mb-2">
             <div className="mb-0.5 flex justify-between text-[11px]"><span className="text-white/70">{n}</span><span className="text-white/50">{pct}% VPIP</span></div>
             <div className="h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
@@ -122,7 +122,7 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
               className="rounded-full px-3 py-1 text-[11px] font-semibold"
               style={
                 on
-                  ? { background: "rgba(56,230,255,0.16)", border: "1px solid #22d3ee", color: "#bff0ff" }
+                  ? { background: "rgba(224,30,43,0.16)", border: "1px solid #e01e2b", color: "#ffd9dc" }
                   : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.6)" }
               }
             >
@@ -134,7 +134,7 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
         <div className={`${GLASS_PANEL} px-3 py-2.5`} style={{ boxShadow: "0 10px 40px rgba(0,0,0,0.55)" }}>
           <div className="flex items-center gap-2">
             <button className="rounded-lg px-5 py-2.5 text-sm font-bold text-white" style={{ background: "linear-gradient(180deg,#b33,#7a1f1f)", border: "1px solid #d9534f" }}>FOLD</button>
-            <button className="rounded-lg px-5 py-2.5 text-sm font-bold" style={{ background: "linear-gradient(180deg,#0e4a5c,#0a3340)", border: "1px solid #22d3ee", color: "#bff0ff" }}>CALL <span className="opacity-80">$4,000</span></button>
+            <button className="rounded-lg px-5 py-2.5 text-sm font-bold" style={{ background: "linear-gradient(180deg,#0e5c33,#0a3320)", border: "1px solid #22c55e", color: "#8ef0b0" }}>CALL <span className="opacity-80">$4,000</span></button>
             <button className="rounded-lg px-6 py-2.5 text-sm font-bold text-black" style={{ background: "linear-gradient(180deg,#f3e2ad,#d4af37 55%,#9a7b2c)", border: "1px solid #f3e2ad" }}>RAISE TO <span>$12,000</span></button>
             <button className="rounded-lg px-5 py-2.5 text-sm font-bold" style={{ background: "rgba(60,10,14,0.6)", border: "1px solid #ff3b46", color: "#ff9aa0" }}>ALL-IN</button>
           </div>
@@ -153,7 +153,7 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
       </div>
 
       {/* mode badge */}
-      <div className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em]" style={{ background: "rgba(8,10,14,0.7)", border: "1px solid rgba(127,233,255,0.4)", color: "#7fe9ff" }}>
+      <div className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em]" style={{ background: "rgba(8,10,14,0.7)", border: "1px solid rgba(224,30,43,0.4)", color: "#ff2d3f" }}>
         {badge}
       </div>
     </div>

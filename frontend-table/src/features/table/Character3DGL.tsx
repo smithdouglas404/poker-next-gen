@@ -108,7 +108,7 @@ export function Character3DGL({
       >
         <ambientLight intensity={0.9} />
         <directionalLight position={[2, 4, 3]} intensity={1.4} />
-        <directionalLight position={[-3, 2, -2]} intensity={0.5} color={hero ? "#fbbf24" : "#81ecff"} />
+        <directionalLight position={[-3, 2, -2]} intensity={0.5} color={hero ? "#fbbf24" : "#ff2d3f"} />
         <Suspense fallback={null}>
           <Model url={url} active={active} winner={winner} folded={folded} />
         </Suspense>

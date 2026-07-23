@@ -111,10 +111,10 @@ function TableBody() {
         <meshStandardMaterial color="#f1cf6b" emissive="#8a6a1e" emissiveIntensity={0.5} metalness={1} roughness={0.28} side={THREE.DoubleSide} />
       </mesh>
 
-      {/* cyan neon rim at felt edge */}
+      {/* red neon rim at felt edge (GGPoker brand glow) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]} scale={[5.55, 3.72, 1]}>
         <ringGeometry args={[0.985, 1.0, 160]} />
-        <meshBasicMaterial color="#7fe9ff" side={THREE.DoubleSide} toneMapped={false} />
+        <meshBasicMaterial color="#ff2d3f" side={THREE.DoubleSide} toneMapped={false} />
       </mesh>
 
       {/* gunmetal outer rail */}
@@ -199,7 +199,7 @@ function SeatPill({ seat }: { seat: SceneSeat }) {
         <div className="flex items-center justify-center gap-1 leading-tight">
           <span className="text-[11px] font-semibold text-white">{seat.name}</span>
           {seat.isBot && (
-            <span className="rounded-sm bg-purple-500/30 px-1 text-[8px] font-bold uppercase tracking-wider text-purple-200">
+            <span className="rounded-sm bg-white/15 px-1 text-[8px] font-bold uppercase tracking-wider text-white/80">
               Bot
             </span>
           )}
@@ -228,7 +228,7 @@ function SeatPill({ seat }: { seat: SceneSeat }) {
 function ActionChip({ action }: { action: NonNullable<SceneSeat["action"]> }) {
   const tone = {
     fold: { bg: "rgba(60,20,24,0.9)", bd: "#c9302c", fg: "#ff9aa0" },
-    call: { bg: "rgba(6,32,42,0.9)", bd: "#22d3ee", fg: "#9be9ff" },
+    call: { bg: "rgba(8,40,22,0.9)", bd: "#22c55e", fg: "#8ef0b0" },
     raise: { bg: "rgba(44,34,8,0.92)", bd: "#e9c46a", fg: "#ffe6a3" },
     allin: { bg: "rgba(60,10,14,0.95)", bd: "#ff3b46", fg: "#ff7a82" },
   }[action.tone];
@@ -242,7 +242,7 @@ function ActionChip({ action }: { action: NonNullable<SceneSeat["action"]> }) {
 function SeatPortrait2D({ seat, total }: { seat: SceneSeat; total: number }) {
   const p = seatPoint(seat.index, total);
   const ringColor = seat.ringColor;
-  const glow = seat.state === "active" ? "rgba(243,193,75,0.75)" : seat.state === "allin" ? "rgba(255,59,70,0.7)" : "rgba(124,233,255,0.55)";
+  const glow = seat.state === "active" ? "rgba(243,193,75,0.75)" : seat.state === "allin" ? "rgba(255,59,70,0.7)" : "rgba(91,100,114,0.5)";
   const src = seat.avatar ? avatarSrc(seat.avatar) : avatarSrc("neon-viper");
   return (
     <Html position={[p[0], 0.35, p[2]]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
@@ -349,13 +349,13 @@ function Scene({ seats, board, mode, maxSeats, showPot }: {
       <ambientLight intensity={0.35} color="#6a86b8" />
       <hemisphereLight intensity={0.45} color="#2a4d78" groundColor="#08170f" />
       <spotLight position={[0, 9.5, 2.5]} angle={0.62} penumbra={0.9} intensity={2.6} color="#fff4d8" castShadow shadow-mapSize={[1024, 1024]} />
-      <pointLight position={[-7.5, 3.2, -3]} intensity={2.2} decay={0} color="#38e6ff" />
+      <pointLight position={[-7.5, 3.2, -3]} intensity={2.2} decay={0} color="#ff2d3f" />
       <pointLight position={[7.5, 3.2, -2]} intensity={2.0} decay={0} color="#ffcf6a" />
-      <pointLight position={[0, 2.4, -7.5]} intensity={1.3} decay={0} color="#b44dff" />
+      <pointLight position={[0, 2.4, -7.5]} intensity={1.3} decay={0} color="#c8102e" />
 
       <Environment resolution={128}>
         <Lightformer intensity={1.4} form="rect" position={[0, 6, 1]} scale={[9, 4, 1]} color="#ffffff" />
-        <Lightformer intensity={2.2} form="rect" position={[-6, 2, -3]} scale={[3, 6, 1]} color="#38e6ff" />
+        <Lightformer intensity={2.2} form="rect" position={[-6, 2, -3]} scale={[3, 6, 1]} color="#ff2d3f" />
         <Lightformer intensity={2.0} form="rect" position={[6, 2, -3]} scale={[3, 6, 1]} color="#ffcf6a" />
       </Environment>
 
@@ -394,7 +394,7 @@ function HeroCard({ code }: { code: string }) {
   const glyph = suit === "h" ? "♥" : suit === "s" ? "♠" : suit === "d" ? "♦" : "♣";
   const color = suit === "h" ? "#e5484d" : suit === "s" ? "#101317" : suit === "d" ? "#2f6bff" : "#1fa85a";
   return (
-    <div className="relative flex h-[86px] w-[62px] flex-col justify-between rounded-lg bg-white p-1.5 shadow-lg" style={{ boxShadow: "0 6px 20px rgba(0,0,0,0.5), 0 0 18px rgba(127,233,255,0.25)" }}>
+    <div className="relative flex h-[86px] w-[62px] flex-col justify-between rounded-lg bg-white p-1.5 shadow-lg" style={{ boxShadow: "0 6px 20px rgba(0,0,0,0.5), 0 0 18px rgba(224,30,43,0.25)" }}>
       <span className="text-lg font-bold leading-none" style={{ color }}>{rank}{glyph}</span>
       <span className="self-end text-2xl leading-none" style={{ color }}>{glyph}</span>
     </div>
@@ -437,8 +437,8 @@ export function CinematicScene({
       className="relative h-screen w-screen overflow-hidden"
       style={{
         background:
-          "radial-gradient(1200px 700px at 20% 0%, rgba(56,230,255,0.10), transparent 60%)," +
-          "radial-gradient(1000px 600px at 85% 20%, rgba(180,77,255,0.10), transparent 60%)," +
+          "radial-gradient(1200px 700px at 20% 0%, rgba(255,45,63,0.10), transparent 60%)," +
+          "radial-gradient(1000px 600px at 85% 20%, rgba(200,16,46,0.10), transparent 60%)," +
           "radial-gradient(900px 500px at 50% 100%, rgba(233,196,106,0.08), transparent 60%)," +
           "linear-gradient(180deg,#04060a,#070b12 60%,#04060a)",
       }}

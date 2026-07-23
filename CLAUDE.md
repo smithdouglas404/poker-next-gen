@@ -35,28 +35,31 @@ Three first-class services live in their own top-level directories:
 
 This section is the contract for **all** UI. It is not aspirational styling advice — it is the definition of "done" for anything a player sees. The reference implementation is the cinematic proof under `frontend-table/src/app/proof/` (`CinematicTable.tsx`, `textures.ts`, `proofData.ts`, `ClubDashboard.tsx`, reachable at `/proof` and `/proof?screen=club`). When in doubt, open the proof and match it. Deviating from these values is a defect, not a preference.
 
-### Palette — graphite / cyan / gold (dark-only)
+### Palette — graphite / red / gold (dark-only)
 
-The theme is "Neon Vault": obsidian graphite base, cyan primary, gold premium accent. It is **dark-only by design** — do not add a light mode. Canonical tokens live in `frontend-table/src/app/globals.css` (`:root` + `@theme inline`) and must be referenced through the Tailwind theme (`bg-background`, `text-foreground`, `text-cyan`, `text-gold`, `font-display`, `font-body`) rather than re-hardcoded:
+The theme is **GGPoker red**: obsidian graphite base, GGPoker red primary, gold premium accent. It is **dark-only by design** — do not add a light mode. Canonical tokens live in `frontend-table/src/app/globals.css` (`:root` + `@theme inline`) and must be referenced through the Tailwind theme (`bg-background`, `text-foreground`, `text-brand`, `text-gold`, `font-display`, `font-body`) rather than re-hardcoded:
 
 | Token | Value | Role |
 |---|---|---|
 | `--background` | `#0b0b0e` | obsidian app base |
 | `--foreground` | `#ededf2` | primary text |
+| `--brand` | `#e01e2b` | GGPoker red primary |
+| `--brand-bright` | `#ff2d3f` | bright red — neon/bloom, `toneMapped={false}` glows |
 | `--gold` | `#d4af37` | premium accent |
 | `--gold-lite` | `#f3e2ad` | gold highlight / gradient top |
-| `--cyan` | `#81ecff` | primary / neon |
+| `--cyan` | `#4a9eb0` | **demoted** — muted teal, verification/provably-fair accent ONLY (not a brand color) |
 
-The `body` background is fixed (`background-attachment: fixed`) and layers two faint radials over the base: cyan `rgba(129,236,255,0.06)` from top-center and gold `rgba(212,175,55,0.05)` from top-right. Reproduce, do not "improve."
+The `body` background is fixed (`background-attachment: fixed`) and layers two faint radials over the base: red `rgba(224,30,43,0.06)` from top-center and gold `rgba(212,175,55,0.05)` from top-right. Reproduce, do not "improve."
 
 **Scene / 3D palette** (from `proof/CinematicTable.tsx` + `proof/textures.ts`) — these are the exact material colors and are part of the look:
 - Scene background & fog: `#05070c` (fog range `[12, 26]`); page gradient base `linear-gradient(180deg,#04060a,#070b12 60%,#04060a)`.
 - Felt: radial `#1c7d4e` center → `#0f5f39` → `#053821` edge, plus weave noise (±14) and a `rgba(212,175,55,0.85)` gold inner ring and faint `♦` club mark.
 - Gold ring (flat): `#f1cf6b`, emissive `#8a6a1e` @ `0.5`, `metalness 1`, `roughness 0.28`.
-- Cyan neon rim: `#7fe9ff`, `meshBasicMaterial`, `toneMapped={false}` (glow must not be tone-mapped down).
+- Red neon rim: `#ff2d3f`, `meshBasicMaterial`, `toneMapped={false}` (glow must not be tone-mapped down). This is the table's signature GGPoker-red brand glow.
 - Gunmetal outer rail: `#171b22`, `metalness 0.95`, `roughness 0.32`; gold pinstripe `#e9c46a` emissive `#6b501a`.
-- Four-color deck (both canvas cards and DOM hero cards): spades `#101317`, hearts `#e5484d`, diamonds `#2f6bff` (blue), clubs `#1fa85a` (green).
-- Action / state tones: active/turn gold `#f3c14b`, call/cyan `#22d3ee`, raise/gold `#e9c46a`, all-in red `#ff3b46` (`#ef4444` for the seat ring), fold/muted `#3a4250`, purple accent `#b44dff`.
+- Four-color deck (both canvas cards and DOM hero cards): spades `#101317`, hearts `#e5484d`, diamonds `#2f6bff` (blue), clubs `#1fa85a` (green). (The blue diamond is a functional suit color, NOT a brand accent — it stays.)
+- Rim lighting: warm white key + **red** accent light (`#ff2d3f`) + **gold** accent light (`#ffcf6a`) + a deep-red back light (`#c8102e`); Environment Lightformers white key + red left rim + gold right rim. Two-tone red/gold — never cyan/purple.
+- Action / state tones: active/turn gold `#f3c14b`, **call green `#22c55e`** (kept distinct from all-in red), raise/gold `#e9c46a`, all-in red `#ff3b46` (`#ef4444` for the seat ring), fold/muted `#3a4250`, **idle seat ring neutral steel `#5b6472`** (red is reserved for all-in/danger — idle seats never glow red).
 
 ### Typography — Space Grotesk + Manrope
 
@@ -73,12 +76,12 @@ The live table is a **React Three Fiber** scene (`@react-three/fiber` v9, `@reac
 - **Felt** — radial-lit green canvas texture (`feltTexture()`), `roughness 0.92`, `metalness 0.02`, on a 128-segment circle scaled `[5.35, 3.55]`.
 - **Gunmetal rail** — `torusGeometry`, `#171b22`, high metalness, with a thin emissive **gold pinstripe** torus above it.
 - **Gold ring** — flat emissive `ringGeometry` (`#f1cf6b`) inset in the felt.
-- **Neon seat rings** — each seat portrait wears a colored ring whose color encodes state (active `#f3c14b`, all-in `#ff3b46`, folded `#3a4250`, else the character's `ring`) with a matching `box-shadow` glow; the felt edge carries the cyan `#7fe9ff` neon rim.
+- **Neon seat rings** — each seat portrait wears a colored ring whose color encodes state (active `#f3c14b`, all-in `#ff3b46`, folded `#3a4250`, idle neutral steel `#5b6472`, else the character's `ring`) with a matching `box-shadow` glow; the felt edge carries the red `#ff2d3f` neon rim.
 - **Beveled 4-color cards** — board cards are real `boxGeometry` `[0.66, 0.03, 0.92]` slabs with a per-face material array (white edges, textured top via `cardFaceTexture`, faint `emissiveMap` @ `0.14`). Faces use the four-color deck. Not sprites.
 - **Instanced chip stacks** — `ChipStack` renders `cylinderGeometry` chips stacked at `y = i*0.032`; the pot is five colored stacks (`#c9302c`, `#1f2937`, `#2f6bff`, `#e9c46a`, `#1fa85a`). Keep chips as real stacked geometry.
 - **Restrained bloom** — `EffectComposer` with `Bloom intensity={0.55} luminanceThreshold={0.55} luminanceSmoothing={0.2} mipmapBlur` and `Vignette offset={0.28} darkness={0.82}`. Bloom is subtle and threshold-gated — only true neon/emissive surfaces bloom. Do **not** crank intensity or drop the threshold.
 - **Fixed hero camera** — `camera={{ position: [0, 6.9, 7.9], fov: 42 }}`, `ACESFilmicToneMapping`, `toneMappingExposure 1.15`, `dpr={[1,2]}`, `shadows`. The camera is a fixed cinematic hero angle — no free-orbit `OrbitControls` at the live table.
-- **Lighting** — warm key `spotLight` (`#fff4d8`, casts shadow) + cyan/gold/purple accent `pointLight`s + an `Environment` of three `Lightformer` rects (white key, cyan `#38e6ff` left, gold `#ffcf6a` right) + `ContactShadows` (`opacity 0.5`). This tri-color rim lighting is part of the identity.
+- **Lighting** — warm key `spotLight` (`#fff4d8`, casts shadow) + red/gold accent `pointLight`s (red `#ff2d3f`, gold `#ffcf6a`, deep-red back `#c8102e`) + an `Environment` of three `Lightformer` rects (white key, red `#ff2d3f` left, gold `#ffcf6a` right) + `ContactShadows` (`opacity 0.5`). This red/gold rim lighting is part of the identity.
 
 Seats sit on an ellipse (`SX=4.95`, `SZ=3.2`); seat 0 is the hero at bottom-center.
 
@@ -96,7 +99,7 @@ Note: `renderMode.ts` currently persists `"2d" | "3d"`; `"mix"` is the third sel
 
 Every floating text surface is a glass panel built from the shared tokens in `frontend-table/src/features/ui/tokens.ts` — compose with `cn()`, do not re-invent:
 - `GLASS_PANEL` = `rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl`.
-- `GLASS_PANEL_HOVER` adds `hover:border-white/20 hover:shadow-[0_0_24px_rgba(129,236,255,0.08)]` (cyan glow on hover).
+- `GLASS_PANEL_HOVER` adds `hover:border-white/20 hover:shadow-[0_0_24px_rgba(129,236,255,0.08)]` (subtle glow on hover).
 - `BTN_GOLD` = gradient `from-[#9a7b2c] via-[#d4af37] to-[#f3e2ad]`, black bold text, `hover:shadow-[0_0_22px_rgba(212,175,55,0.35)]`.
 - `RARITY` map (common/rare/epic/legendary → text/border/glow) is the single source for tier styling.
 
@@ -117,7 +120,7 @@ Timeline/UI animation uses **GSAP** as the standard motion layer (chip flights, 
 ### Non-negotiables
 
 1. **No HTML/CSS faking the cinematic.** The table's 3D look must come from real R3F geometry, materials, lighting, and post-processing — not gradient `div`s or box-shadows pretending to be a 3D table. The proof is the bar.
-2. **Glow = hierarchy.** Bloom/glow encodes importance and state (active seat, all-in, premium/gold, cyan primary). It is threshold-gated and restrained (`Bloom` threshold `0.55`, intensity `0.55`). Never use glow as ambient decoration — if everything glows, nothing does.
+2. **Glow = hierarchy.** Bloom/glow encodes importance and state (active seat, all-in, premium/gold, red primary). It is threshold-gated and restrained (`Bloom` threshold `0.55`, intensity `0.55`). Never use glow as ambient decoration — if everything glows, nothing does.
 3. **State never drifts.** The rendered UI is a pure projection of authoritative server state. No optimistic values that can disagree with the backend, no client-side "guesses" at stacks/pot/turn. Consistent with Golden rule 4 (no math fallbacks): the display reflects server truth or it shows nothing.
 4. **Every rendered control binds to a real RPC — no dead buttons.** If a control is on screen (fold/check/call/raise/all-in, presets, host controls, membership, deposits), it is wired to a registered `backend-core` RPC and reflects real capability/permission gating. Ship no placeholder or decorative buttons. The proof uses static demo data precisely because it is a showcase — production surfaces must be live.
 
