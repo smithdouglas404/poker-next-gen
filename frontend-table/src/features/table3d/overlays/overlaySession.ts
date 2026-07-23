@@ -160,6 +160,14 @@ export function useTableOverlays(demo: boolean, admin: TableAdmin): TableOverlay
   const showPaused = demo ? demoPaused : !!snapshot?.host_paused;
   const canResume = admin.canAdmin;
 
+  // Breaking-news modals block the whole screen, so they must never pop mid-hand
+  // and interrupt a live decision (P0-6). Hold any active announcement until the
+  // current hand finishes; it surfaces at the next between-hands moment. Demo has
+  // no live hand, so it shows immediately there.
+  const phase = (snapshot?.phase ?? "").toLowerCase();
+  const inLiveHand = phase === "preflop" || phase === "flop" || phase === "turn" || phase === "river";
+  const visibleNews = demo || !inLiveHand ? activeNews : null;
+
   const resume = useCallback(async () => {
     if (demo) {
       setDemoPaused(false);
@@ -310,7 +318,7 @@ export function useTableOverlays(demo: boolean, admin: TableAdmin): TableOverlay
     report,
     reportLoading,
     loadReport,
-    activeNews,
+    activeNews: visibleNews,
     dismissNews,
     loadNews,
     broadcastNews,

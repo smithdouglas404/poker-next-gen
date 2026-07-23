@@ -24,6 +24,9 @@ export function SiteFooter() {
           <Link href="/kyc" className="hover:text-neutral-300">
             Responsible Gambling
           </Link>
+          <Link href="/integrity" className="hover:text-neutral-300">
+            Game Integrity
+          </Link>
           <button type="button" onClick={() => setLegal("terms")} className="hover:text-neutral-300">
             Terms
           </button>

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/heroiclabs/nakama-common/runtime"
@@ -14,6 +15,17 @@ import (
 	"github.com/smithdouglas404/poker-next-gen/backend-core/antibot"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/poker/enginemath"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
+)
+
+// Announcement broadcast rate limit. Breaking-news modals interrupt every open
+// client, so a spamming (or compromised) admin account must not be able to
+// hammer them out. One broadcast per admin per cooldown window; the modal is
+// also gated to between-hands on the client (BreakingNewsModal).
+const announceCooldown = 20 * time.Second
+
+var (
+	announceMu   sync.Mutex
+	announceLast = map[string]time.Time{}
 )
 
 // aiprocRequireAdmin returns the caller id only if they are a platform admin
@@ -186,6 +198,15 @@ func AnnouncementCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 	if req.Title == "" {
 		return "", runtime.NewError("title required", 3)
 	}
+	// Rate-limit broadcasts per admin.
+	announceMu.Lock()
+	if last, ok := announceLast[adminID]; ok && time.Since(last) < announceCooldown {
+		wait := announceCooldown - time.Since(last)
+		announceMu.Unlock()
+		return "", runtime.NewError(fmt.Sprintf("slow down: another announcement can be sent in %ds", int(wait.Seconds())+1), 8)
+	}
+	announceLast[adminID] = time.Now()
+	announceMu.Unlock()
 	ann := &store.AiprocAnnouncement{
 		Title:     req.Title,
 		Body:      req.Body,

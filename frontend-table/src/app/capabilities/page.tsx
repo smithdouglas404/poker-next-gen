@@ -26,7 +26,7 @@ const GROUPS: Group[] = [
       { title: "Authoritative match runtime", detail: "Every deal, bet, and showdown is resolved on the server (Nakama match handler) — clients can't forge state." },
       { title: "rs_poker hand evaluation", detail: "Rust-powered hand ranking, correct multi-way side-pots, and showdown resolution. No shortcuts." },
       { title: "Provably-fair shuffle", detail: "SHA-256 deck commitment revealed each hand + an append-only audit trail you can verify." },
-      { title: "GTO / CFR solver", detail: "A counterfactual-regret solver (rs_poker arena) powers in-app coaching and equity/ICM tools." },
+      { title: "GTO / CFR solver", detail: "A counterfactual-regret solver (rs_poker arena) powers study-and-review coaching and equity/ICM tools — never fed a live opponent's cards. See Game Integrity." },
     ],
   },
   {
