@@ -59,6 +59,10 @@ export interface TableSnapshot {
   small_blind: number;
   big_blind: number;
   max_seats?: number;
+  min_buy_in?: number;
+  max_buy_in?: number;
+  accepts_global_wallet?: boolean;
+  hero_club_balance?: number;
   hand_no: number;
   hero_wallet_cents?: number;
   deck_commit_hash?: string;

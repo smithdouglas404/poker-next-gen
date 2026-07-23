@@ -1649,9 +1649,23 @@ func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) 
 		board = append(board, protocol.CardView{Code: c.Code(), FaceUp: true})
 	}
 	heroWallet, _ := store.NewWalletStore(db).Get(ctx, heroID)
+	// Buy-in options for the client dialog: the table band, whether the club
+	// accepts the global wallet, and the hero's available club balance.
+	var heroClubBalance int64
+	acceptsGlobal := true // non-club tables always use the global wallet
+	if s.ClubID != "" {
+		acceptsGlobal = clubAcceptsGlobal(ctx, db, s.ClubID)
+		if bal, err := store.NewClubStore(db).GetBalance(ctx, s.ClubID, heroID); err == nil && bal != nil {
+			heroClubBalance = bal.Balance - bal.LockedAmount
+		}
+	}
 	return protocol.TableSnapshot{
 		MatchID:        s.MatchID,
 		RoomID:         s.RoomID,
+		MinBuyIn:            s.minBuyIn(),
+		MaxBuyIn:            s.maxBuyIn(),
+		AcceptsGlobalWallet: acceptsGlobal,
+		HeroClubBalance:     heroClubBalance,
 		Phase:          poker.HandPhaseForTable(s.Table, s.Phase),
 		Seats:          seats,
 		Board:          board,

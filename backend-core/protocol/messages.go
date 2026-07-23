@@ -50,6 +50,11 @@ type TableSnapshot struct {
 	BigBlind     int64      `json:"big_blind"`
 	MaxSeats     int        `json:"max_seats"`
 	HeroWallet   int64      `json:"hero_wallet_cents"`
+	// Buy-in band + wallet options so the client can render a real buy-in dialog.
+	MinBuyIn            int64 `json:"min_buy_in"`
+	MaxBuyIn            int64 `json:"max_buy_in"`
+	AcceptsGlobalWallet bool  `json:"accepts_global_wallet"`
+	HeroClubBalance     int64 `json:"hero_club_balance,omitempty"` // available club-issued balance (club tables)
 	HandNo         int         `json:"hand_no"`
 	DeckCommitHash string      `json:"deck_commit_hash,omitempty"`
 	Variant        string      `json:"variant,omitempty"` // "holdem" | "plo"

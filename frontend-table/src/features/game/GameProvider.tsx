@@ -78,7 +78,7 @@ interface GameContextValue extends GameState {
   joinRoom: (matchId: string) => Promise<void>;
   joinByCode: (code: string) => Promise<void>;
   roomCode: string | null;
-  sitDown: (seat: number, buyIn?: number) => Promise<void>;
+  sitDown: (seat: number, buyIn?: number, wallet?: "global" | "club") => Promise<void>;
   standUp: () => Promise<void>;
   startHand: () => Promise<void>;
   sendAction: (type: string, amount: number) => Promise<void>;
@@ -361,17 +361,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
   );
 
   const sitDown = useCallback(
-    async (seat: number, buyIn?: number) => {
-      const amount = Math.min(
-        MAX_BUY_IN_CENTS,
-        Math.max(MIN_BUY_IN_CENTS, buyIn ?? buyInCents),
-        profile.walletCents,
+    async (seat: number, buyIn?: number, wallet?: "global" | "club") => {
+      // The table enforces [min,max] and the chosen wallet's balance server-side;
+      // send the requested amount + wallet and let the server be the authority.
+      const amount = Math.max(MIN_BUY_IN_CENTS, buyIn ?? buyInCents);
+      await sendMatch(OpSitDown, { seat, buy_in: amount, wallet: wallet ?? "" });
+      pushLog(
+        `Sitting seat ${seat + 1} with ${formatCents(amount)}${wallet === "global" ? " (global wallet)" : wallet === "club" ? " (club wallet)" : ""}`,
+        "action",
       );
-      await sendMatch(OpSitDown, { seat, buy_in: amount });
-      pushLog(`Sitting seat ${seat + 1} with ${formatCents(amount)}`, "action");
       await refreshWallet();
     },
-    [sendMatch, buyInCents, profile.walletCents, pushLog, refreshWallet],
+    [sendMatch, buyInCents, pushLog, refreshWallet],
   );
 
   const standUp = useCallback(async () => {

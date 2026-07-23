@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { formatCents, useGame } from "@/features/game/GameProvider";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
+import { BuyInDialog } from "@/features/hud/BuyInDialog";
 
 // Empty-table path to the money action (UI review P0-7). The felt looked great
 // but had nothing to do on it — no seats, no "take a seat", no way in. This
@@ -12,10 +13,11 @@ import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 // house nudging players to over-deposit).
 
 export function TableEmptyState() {
-  const { snapshot, matchId, createRoom, joinByCode, sitDown, profile, buyInCents } = useGame();
+  const { snapshot, matchId, createRoom, joinByCode, profile, buyInCents } = useGame();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [buyInSeat, setBuyInSeat] = useState<number | null>(null);
 
   const seated = (snapshot?.seats ?? []).filter(
     (s) => (s.status ?? "") !== "" && (s.status ?? "") !== "empty",
@@ -54,16 +56,11 @@ export function TableEmptyState() {
     }
   }
 
-  async function takeSeat() {
-    setBusy(true);
+  // Seating goes through the buy-in dialog so the player picks wallet + amount
+  // (P0-7 / WALLET-2) — never a silent sit at some default stack.
+  function takeSeat() {
     setErr(null);
-    try {
-      await sitDown(firstOpenSeat());
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Could not take a seat.");
-    } finally {
-      setBusy(false);
-    }
+    setBuyInSeat(firstOpenSeat());
   }
 
   async function join() {
@@ -128,6 +125,10 @@ export function TableEmptyState() {
 
         {err && <p className="mt-3 text-sm text-red-400">{err}</p>}
       </div>
+
+      {buyInSeat !== null && (
+        <BuyInDialog seat={buyInSeat} onClose={() => setBuyInSeat(null)} />
+      )}
     </div>
   );
 }
