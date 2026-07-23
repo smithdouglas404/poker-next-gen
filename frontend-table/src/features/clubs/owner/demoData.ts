@@ -105,7 +105,7 @@ export function totalBankrollCents(roster: RosterRow[], houseBalance: number): n
 
 export const DEMO_ANNOUNCEMENTS: ClubAnnouncement[] = [
   { id: "clann-1", club_id: DEMO_CLUB.id, title: "Special Tournament Starts in 1 Hour", body: "ATTENTION ALL PLAYERS: The Gold Cup qualifier begins at the top of the hour. Double XP event is now LIVE!", severity: "critical", created_by: "owner", created_at: minsAgo(52) },
-  { id: "clann-2", club_id: DEMO_CLUB.id, title: "New High-Stakes Table Opened", body: "The $500/$1k Neon Vault table is now seating. First 6 players get a rakeback boost.", severity: "info", created_by: "owner", created_at: minsAgo(340) },
+  { id: "clann-2", club_id: DEMO_CLUB.id, title: "New High-Stakes Table Opened", body: "The $500/$1k Diamond Vault table is now seating. First 6 players get a rakeback boost.", severity: "info", created_by: "owner", created_at: minsAgo(340) },
   { id: "clann-3", club_id: DEMO_CLUB.id, title: "Scheduled Maintenance Sunday 04:00 UTC", body: "Brief downtime for the vault ledger migration. All balances are safe.", severity: "warning", created_by: "owner", created_at: daysAgo(2) },
 ];
 

@@ -72,7 +72,7 @@ export default function ClubDashboard() {
         <div className="flex-1 p-7">
           <div className="mb-5 flex items-end justify-between">
             <h1 className="text-3xl font-bold tracking-wide text-white">Members</h1>
-            <div className="text-[11px] uppercase tracking-[0.25em] text-white/40">The Aces Syndicate · 128 members</div>
+            <div className="text-[11px] uppercase tracking-[0.25em] text-white/40">High Rollers Club · 128 members</div>
           </div>
 
           <div className="grid grid-cols-[1fr_320px] gap-6">
@@ -129,7 +129,7 @@ export default function ClubDashboard() {
                   <span>Club &amp; Alliance News</span>
                   <span className="rounded-full px-1.5 text-[10px]" style={{ background: "#c9302c", color: "white" }}>3</span>
                 </div>
-                <p className="text-[12px] leading-relaxed text-white/65">The Aces Syndicate has formed an alliance with Neon Kings. Cross-club tournament seats now open — check the lobby before Sunday.</p>
+                <p className="text-[12px] leading-relaxed text-white/65">High Rollers Club has formed an alliance with Diamond Kings. Cross-club tournament seats now open — check the lobby before Sunday.</p>
               </div>
 
               {/* pending join */}

@@ -37,7 +37,7 @@ function fromIndex(h: HandIndexRow): Row {
 // Offline / guest fallback so the picker is never an empty shell. Every row is
 // deep-linkable into the audit detail route (which itself demos when unauthed).
 function demoRows(): Row[] {
-  const labels = ["Neon Vault 200/400", "High Rollers 5/10", "Cyan Cup #14", "Vault Sit & Go"];
+  const labels = ["Diamond Vault 200/400", "High Rollers 5/10", "Diamond Cup #14", "Vault Sit & Go"];
   return Array.from({ length: 6 }, (_, i) => {
     const handNo = 9982 - i;
     return {

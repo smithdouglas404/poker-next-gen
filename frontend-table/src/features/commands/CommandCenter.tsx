@@ -441,7 +441,7 @@ function CommandCenterInner() {
       <header className="border-b border-white/[0.06] bg-surface px-6 py-10">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-gold/80">Poker Next-Gen</p>
+            <p className="text-xs uppercase tracking-[0.4em] text-gold/80">High Rollers Club</p>
             <h1 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">Command Center</h1>
             <p className="mt-3 max-w-2xl text-neutral-400">
               Every platform action — communities, wallets, cash games, tournaments, and the live table.

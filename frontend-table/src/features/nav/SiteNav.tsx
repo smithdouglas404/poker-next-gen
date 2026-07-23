@@ -48,7 +48,7 @@ export function SiteNav() {
             HR
           </span>
           <span className="hidden font-display text-sm font-bold uppercase tracking-wider text-foreground sm:inline">
-            High Rollers
+            High Rollers Club
           </span>
         </Link>
 

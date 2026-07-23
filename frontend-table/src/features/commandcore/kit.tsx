@@ -4,8 +4,9 @@ import type { ReactNode } from "react";
 
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
-// Shared neon-glassmorphism building blocks for the NEXUS OS surfaces (Command
-// Core pre-game + Live Cyber-Deck in-game). Dark, high-contrast, cyan/gold.
+// Shared neon-glassmorphism building blocks for the High Rollers Club operator
+// surfaces (Command Core pre-game + Cyber-Deck in-game). Dark, high-contrast,
+// GGPoker red/gold.
 
 export function NeonSection({
   index,
@@ -25,7 +26,7 @@ export function NeonSection({
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {index && (
-            <span className="rounded-md border border-cyan/30 bg-cyan/[0.08] px-1.5 py-0.5 text-[10px] font-bold text-cyan">
+            <span className="rounded-md border border-brand/30 bg-brand/[0.08] px-1.5 py-0.5 text-[10px] font-bold text-brand">
               {index}
             </span>
           )}
@@ -80,7 +81,7 @@ export function NeonToggle({
       onClick={onToggle}
       className={cn(
         "flex w-full items-center justify-between gap-3 rounded-xl border p-3 text-left transition disabled:opacity-50",
-        on ? "border-cyan/40 bg-cyan/[0.06]" : "border-white/10 bg-white/[0.02] hover:border-white/20",
+        on ? "border-brand/40 bg-brand/[0.06]" : "border-white/10 bg-white/[0.02] hover:border-white/20",
       )}
     >
       <span>
@@ -90,7 +91,7 @@ export function NeonToggle({
       <span
         className={cn(
           "relative h-5 w-9 shrink-0 rounded-full transition",
-          on ? "bg-cyan/70" : "bg-white/15",
+          on ? "bg-brand/70" : "bg-white/15",
         )}
       >
         <span
@@ -126,7 +127,7 @@ export function NeonSlider({
     <div>
       <div className="mb-1 flex items-center justify-between">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">{label}</span>
-        <span className="text-sm font-bold text-cyan">{format ? format(value) : value}</span>
+        <span className="text-sm font-bold text-brand">{format ? format(value) : value}</span>
       </div>
       <input
         type="range"
@@ -135,7 +136,7 @@ export function NeonSlider({
         step={step ?? 1}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-cyan"
+        className="w-full accent-[#e01e2b]"
       />
     </div>
   );

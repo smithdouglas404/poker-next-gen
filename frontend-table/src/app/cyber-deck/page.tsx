@@ -10,7 +10,7 @@ import { walletApi, type NowPaymentsBalanceEntry } from "@/features/wallet/walle
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
-// NEXUS OS :: Live Cyber-Deck. An in-game operator overview: every live table at
+// High Rollers Club :: Cyber-Deck. An in-game operator overview: every live table at
 // a glance, running tournaments with one-click balance/merge, an announce-all
 // broadcast, and the treasury readout. Per-table live controls (pause / force
 // fold / move seat) run over that table's match socket, so each card links into
@@ -158,25 +158,25 @@ export default function CyberDeckPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(1200px_600px_at_50%_-10%,rgba(129,236,255,0.06),transparent),radial-gradient(900px_500px_at_90%_0%,rgba(212,175,55,0.05),transparent)] bg-background text-foreground">
+    <div className="min-h-screen bg-[radial-gradient(1200px_600px_at_50%_-10%,rgba(224,30,43,0.06),transparent),radial-gradient(900px_500px_at_90%_0%,rgba(212,175,55,0.05),transparent)] bg-background text-foreground">
       <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
         {/* Header */}
-        <div className={cn(GLASS_PANEL, "mb-6 flex flex-wrap items-center justify-between gap-3 border-cyan/20 p-4")}>
+        <div className={cn(GLASS_PANEL, "mb-6 flex flex-wrap items-center justify-between gap-3 border-brand/20 p-4")}>
           <div>
-            <p className="font-display text-[11px] font-bold uppercase tracking-[0.35em] text-cyan">NEXUS OS · Live Cyber-Deck</p>
+            <p className="font-display text-[11px] font-bold uppercase tracking-[0.35em] text-brand">High Rollers Club · Cyber-Deck</p>
             <h1 className="mt-0.5 font-display text-xl font-bold uppercase tracking-wider text-white">Operator Console</h1>
           </div>
           <div className="flex items-center gap-2">
             <Chip label={`${tables.length} live tables`} />
             <Chip label={`${tours.length} running events`} />
-            <Link href="/command-core" className="text-xs text-cyan hover:underline">
+            <Link href="/command-core" className="text-xs text-brand hover:underline">
               + New session
             </Link>
           </div>
         </div>
 
         {flash && (
-          <div className={cn(GLASS_PANEL, "mb-4 border-cyan/20 px-4 py-2 text-sm text-neutral-200")}>{flash}</div>
+          <div className={cn(GLASS_PANEL, "mb-4 border-brand/20 px-4 py-2 text-sm text-neutral-200")}>{flash}</div>
         )}
 
         <div className="space-y-6">
@@ -190,7 +190,7 @@ export default function CyberDeckPage() {
                   <div key={t.match_id} className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
                     <div className="flex items-center justify-between">
                       <p className="font-mono text-sm text-gold">{t.room_id ?? t.match_id.slice(0, 8)}</p>
-                      <span className="rounded-full border border-cyan/30 bg-cyan/[0.06] px-2 py-0.5 text-[10px] uppercase tracking-wider text-cyan">
+                      <span className="rounded-full border border-brand/30 bg-brand/[0.06] px-2 py-0.5 text-[10px] uppercase tracking-wider text-brand">
                         {t.status ?? "live"}
                       </span>
                     </div>
@@ -199,7 +199,7 @@ export default function CyberDeckPage() {
                       <span className="text-right">Seated {t.seated ?? 0}</span>
                       <span>Open seats {t.open_seats ?? 0}</span>
                       <span className="text-right">
-                        <Link href="/table" className="text-cyan hover:underline">Manage →</Link>
+                        <Link href="/table" className="text-brand hover:underline">Manage →</Link>
                       </span>
                     </div>
                   </div>
@@ -229,7 +229,7 @@ export default function CyberDeckPage() {
                       type="button"
                       disabled={balancing === t.id}
                       onClick={() => balance(t.id)}
-                      className="rounded-lg border border-cyan/40 bg-cyan/[0.08] px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-cyan hover:bg-cyan/[0.16] disabled:opacity-50"
+                      className="rounded-lg border border-brand/40 bg-brand/[0.08] px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-brand hover:bg-brand/[0.16] disabled:opacity-50"
                     >
                       {balancing === t.id ? "Balancing…" : "⚖ Balance / Merge"}
                     </button>
@@ -268,7 +268,7 @@ export default function CyberDeckPage() {
                   value={announce}
                   onChange={(e) => setAnnounce(e.target.value)}
                   placeholder="Message broadcast to every table…"
-                  className="flex-1 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-cyan/50"
+                  className="flex-1 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-brand/50"
                 />
                 <button
                   type="button"

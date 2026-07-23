@@ -10,7 +10,7 @@ import { walletApi, type NowPaymentsBalanceEntry } from "@/features/wallet/walle
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { BTN_GOLD, GLASS_PANEL, cn } from "@/features/ui/tokens";
 
-// NEXUS OS :: Session Architect ("The Command Core"). A pre-game cockpit that
+// High Rollers Club :: Command Core (Session Architect). A pre-game cockpit that
 // composes the wired session-setup capabilities — variant, buy-in band, shot
 // clock + time bank, blind-curve simulator, IP/device jurisdiction guard, live
 // treasury readout — and drives a real table_create (cash) or the tournament
@@ -111,15 +111,15 @@ export default function CommandCorePage() {
   }
 
   const numCls =
-    "w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-cyan/50";
+    "w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-brand/50";
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(1200px_600px_at_50%_-10%,rgba(129,236,255,0.06),transparent),radial-gradient(900px_500px_at_90%_0%,rgba(212,175,55,0.05),transparent)] bg-background text-foreground">
+    <div className="min-h-screen bg-[radial-gradient(1200px_600px_at_50%_-10%,rgba(224,30,43,0.06),transparent),radial-gradient(900px_500px_at_90%_0%,rgba(212,175,55,0.05),transparent)] bg-background text-foreground">
       <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
         {/* Header */}
-        <div className={cn(GLASS_PANEL, "mb-6 flex flex-wrap items-center justify-between gap-3 border-cyan/20 p-4")}>
+        <div className={cn(GLASS_PANEL, "mb-6 flex flex-wrap items-center justify-between gap-3 border-brand/20 p-4")}>
           <div>
-            <p className="font-display text-[11px] font-bold uppercase tracking-[0.35em] text-cyan">NEXUS OS · v4.2</p>
+            <p className="font-display text-[11px] font-bold uppercase tracking-[0.35em] text-brand">High Rollers Club · Command Core</p>
             <h1 className="mt-0.5 font-display text-xl font-bold uppercase tracking-wider text-white">Session Architect</h1>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1.5">
@@ -145,7 +145,7 @@ export default function CommandCorePage() {
                 <p className="mt-2 text-[11px] text-neutral-500">
                   USD is the settlement ledger; crypto funds via NOWPayments deposit/withdraw rails.
                 </p>
-                <Link href="/hub" className="mt-3 inline-block text-xs text-cyan hover:underline">
+                <Link href="/hub" className="mt-3 inline-block text-xs text-brand hover:underline">
                   Configure rake per club →
                 </Link>
               </div>
@@ -263,7 +263,7 @@ export default function CommandCorePage() {
           )}
 
           {/* Footer */}
-          <div className={cn(GLASS_PANEL, "flex flex-wrap items-center justify-between gap-3 border-cyan/20 p-4")}>
+          <div className={cn(GLASS_PANEL, "flex flex-wrap items-center justify-between gap-3 border-brand/20 p-4")}>
             <div className="flex items-center gap-3">
               <button
                 type="button"

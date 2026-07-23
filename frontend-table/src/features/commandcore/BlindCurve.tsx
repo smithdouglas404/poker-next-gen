@@ -59,7 +59,7 @@ export function BlindCurve({ blinds }: { blinds: BlindLevel[] }) {
         </div>
         <div>
           <p className="text-[10px] uppercase tracking-wider text-muted">Top blind</p>
-          <p className="text-2xl font-bold text-cyan">{maxBB.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-brand">{maxBB.toLocaleString()}</p>
         </div>
       </div>
 
@@ -68,12 +68,12 @@ export function BlindCurve({ blinds }: { blinds: BlindLevel[] }) {
         <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-28 w-full">
           <defs>
             <linearGradient id="ccBlindFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#81ecff" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="#81ecff" stopOpacity="0" />
+              <stop offset="0%" stopColor="#ff2d3f" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#ff2d3f" stopOpacity="0" />
             </linearGradient>
           </defs>
           <polygon points={area} fill="url(#ccBlindFill)" />
-          <polyline points={line} fill="none" stroke="#81ecff" strokeWidth={2} strokeLinejoin="round" />
+          <polyline points={line} fill="none" stroke="#ff2d3f" strokeWidth={2} strokeLinejoin="round" />
         </svg>
       </div>
     </div>

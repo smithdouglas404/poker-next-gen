@@ -647,7 +647,7 @@ function DerivedSection({
           {(tournaments
             ? [
                 { name: "Gold Cup Championship", note: "Prize pool $1M · Sundays 20:00" },
-                { name: "Neon Vault Turbo", note: "$50k GTD · Daily 21:00" },
+                { name: "Diamond Vault Turbo", note: "$50k GTD · Daily 21:00" },
               ]
             : [
                 { name: "High Stakes — Table 1", note: "$500 / $1k · 6-max" },

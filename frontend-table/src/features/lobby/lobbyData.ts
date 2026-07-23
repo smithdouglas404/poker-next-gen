@@ -160,7 +160,7 @@ export const DEMO_PUBLIC_TABLES: PublicTableRow[] = [
   { match_id: "demo-diamond-1", name: "Diamond Flush", seated: 5, capacity: 10, buy_in_minor: 100000, small_blind_minor: 10000, big_blind_minor: 20000, variant: "holdem", host: "Club Owner", demo: true },
   { match_id: "demo-prestige", name: "Prestige Poker", seated: 5, capacity: 10, buy_in_minor: 100000, small_blind_minor: 10000, big_blind_minor: 20000, variant: "holdem", host: "Club Owner", demo: true },
   { match_id: "demo-diamond-2", name: "Diamond Flush", seated: 5, capacity: 10, buy_in_minor: 100000, small_blind_minor: 10000, big_blind_minor: 20000, variant: "holdem", host: "Club Owner", demo: true },
-  { match_id: "demo-vault", name: "Neon Vault VIP", seated: 3, capacity: 9, buy_in_minor: 50000, small_blind_minor: 5000, big_blind_minor: 10000, variant: "plo", host: "Club Owner", demo: true },
+  { match_id: "demo-vault", name: "Diamond Vault VIP", seated: 3, capacity: 9, buy_in_minor: 50000, small_blind_minor: 5000, big_blind_minor: 10000, variant: "plo", host: "Club Owner", demo: true },
 ];
 
 // Classic Public Game Browser (detailed_13) demo grid — spans low/medium/high
@@ -169,7 +169,7 @@ export const DEMO_BROWSER_TABLES: PublicTableRow[] = [
   { match_id: "demo-b1", name: "High Stakes Elite", seated: 7, capacity: 10, buy_in_minor: 200000, small_blind_minor: 10000, big_blind_minor: 20000, variant: "holdem", host: "Club Owner", demo: true },
   { match_id: "demo-b2", name: "Prestige Room", seated: 7, capacity: 10, buy_in_minor: 200000, small_blind_minor: 10000, big_blind_minor: 20000, variant: "holdem", host: "Club Owner", demo: true },
   { match_id: "demo-b3", name: "Diamond Flush", seated: 4, capacity: 9, buy_in_minor: 100000, small_blind_minor: 500, big_blind_minor: 1000, variant: "holdem", host: "Club Owner", demo: true },
-  { match_id: "demo-b4", name: "Neon Vault VIP", seated: 6, capacity: 8, buy_in_minor: 500000, small_blind_minor: 50000, big_blind_minor: 100000, variant: "plo", host: "Club Owner", demo: true },
+  { match_id: "demo-b4", name: "Diamond Vault VIP", seated: 6, capacity: 8, buy_in_minor: 500000, small_blind_minor: 50000, big_blind_minor: 100000, variant: "plo", host: "Club Owner", demo: true },
   { match_id: "demo-b5", name: "Grinder's Corner", seated: 3, capacity: 9, buy_in_minor: 20000, small_blind_minor: 100, big_blind_minor: 200, variant: "holdem", host: "Club Owner", demo: true },
   { match_id: "demo-b6", name: "Omaha Splash", seated: 5, capacity: 6, buy_in_minor: 80000, small_blind_minor: 2500, big_blind_minor: 5000, variant: "plo", host: "Club Owner", demo: true },
 ];

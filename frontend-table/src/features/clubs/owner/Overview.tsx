@@ -316,7 +316,7 @@ function FeaturedTables({ roster, demo }: { roster: RosterRow[]; demo: boolean }
 function UpcomingTournaments() {
   const rows = [
     { name: "Gold Cup Championship", note: "Prize pool $1M · Sundays 20:00", buyin: "$1,000", state: "Registering" },
-    { name: "Neon Vault Turbo", note: "$50k GTD · Daily 21:00", buyin: "$120", state: "Late Reg" },
+    { name: "Diamond Vault Turbo", note: "$50k GTD · Daily 21:00", buyin: "$120", state: "Late Reg" },
     { name: "Nightly PLO Bounty", note: "$25k GTD · Daily 22:30", buyin: "$60", state: "Scheduled" },
   ];
   return (
