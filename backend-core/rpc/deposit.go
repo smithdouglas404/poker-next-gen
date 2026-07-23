@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
+	"strings"
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
@@ -12,6 +14,18 @@ import (
 	"github.com/smithdouglas404/poker-next-gen/backend-core/payments"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
+
+// blockedByRG rejects a money action when the caller is in an active
+// self-exclusion or cool-off window (responsible-gambling controls). These
+// windows were settable but never enforced; this is the enforcement side.
+func blockedByRG(ctx context.Context, db *sql.DB, userID string) error {
+	if blocked, kind, until, _ := store.NewResponsibleStore(db).IsRestricted(ctx, userID); blocked {
+		return runtime.NewError(
+			fmt.Sprintf("you are in a %s period until %s", strings.ReplaceAll(kind, "_", "-"), until.Format("Jan 2, 2006")),
+			7)
+	}
+	return nil
+}
 
 // WalletDepositCrypto starts a crypto deposit: it records a pending deposit and
 // creates a hosted NOWPayments invoice. The wallet is credited later, only when
@@ -22,6 +36,9 @@ func WalletDepositCrypto(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		return "", err
 	}
 	if err := requireRealMoney(); err != nil { // SEC-2: fail-closed real-money switch
+		return "", err
+	}
+	if err := blockedByRG(ctx, db, userID); err != nil { // responsible-gambling gate
 		return "", err
 	}
 	var req struct {
@@ -99,6 +116,9 @@ func WalletDepositFiat(ctx context.Context, logger runtime.Logger, db *sql.DB, n
 		return "", err
 	}
 	if err := requireRealMoney(); err != nil { // SEC-2: fail-closed real-money switch
+		return "", err
+	}
+	if err := blockedByRG(ctx, db, userID); err != nil { // responsible-gambling gate
 		return "", err
 	}
 	// Fiat deposits require KYC/AML (tier 3) — verification follows the money.

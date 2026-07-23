@@ -87,6 +87,10 @@ export interface ActionRequiredMessage {
   max_raise: number;
   pot: number;
   deadline_tick: number;
+  /** Server-authoritative shot clock: base seconds to act. */
+  action_secs?: number;
+  /** Remaining time-bank seconds, burned after action_secs lapses. */
+  time_bank_secs?: number;
 }
 
 export interface ShowdownMessage {

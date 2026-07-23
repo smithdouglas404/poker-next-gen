@@ -92,6 +92,11 @@ type ActionRequiredMessage struct {
 	MaxRaise     int64    `json:"max_raise"`
 	Pot          int64    `json:"pot"`
 	DeadlineTick int64    `json:"deadline_tick"`
+	// Server-authoritative shot clock: ActionSecs is the base time to act; when
+	// it lapses the server burns TimeBankSecs (the player's remaining time bank)
+	// before auto-folding. The client renders these instead of a hardcoded clock.
+	ActionSecs   int      `json:"action_secs"`
+	TimeBankSecs int      `json:"time_bank_secs"`
 }
 
 type ErrorMessage struct {

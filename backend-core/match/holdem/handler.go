@@ -15,6 +15,7 @@ import (
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
+	"github.com/smithdouglas404/poker-next-gen/backend-core/antibot"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/audit"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/billing"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/bot"
@@ -76,9 +77,17 @@ type MatchState struct {
 	// the tick by which they must act before the server auto-checks/folds them.
 	ActionDeadlineTick int64
 	ActionDeadlineSeat int
+	// TimeBank is each human's remaining banked seconds (userID -> secs), burned
+	// only after the base ActionSecs lapses, before the server auto-folds. Granted
+	// once when a player first sits; not auto-refilled.
+	TimeBank         map[string]int64
 	// Per-hand behavioural tracking (userID -> counters), reset each hand start
 	// and drained into poker_hand_stats at settlement. Feeds VPIP/PFR/AF.
 	HandTrack        map[string]*playerHandTrack
+	// AntibotLog is a rolling window of each human's recent actions, scored at
+	// settlement so bot-likelihood accrues from LIVE play (previously the scorer
+	// only ran when an admin hand-posted action batches). Capped per user.
+	AntibotLog       map[string][]antibot.ActionRecord
 	// Optional table features (#41), all per-hand and reset at hand start:
 	RITAgree         map[string]bool             // userID -> agreed to run it twice
 	Insurance        map[string]insurancePolicy  // userID -> accepted all-in insurance
@@ -102,6 +111,12 @@ const autoDealDelayTicks = 4
 // acts for them (check if free, else fold). Without it a disconnected or AFK
 // player freezes the whole table indefinitely. At 10 ticks/s this is 30 seconds.
 const actionTimeoutTicks int64 = 300
+
+// timeBankSecs is the per-player time bank granted once on sit (seconds), burned
+// after the base action clock lapses before the server auto-folds. At 10 ticks/s
+// the base clock (actionTimeoutTicks) is 30s, so actionSecs is derived from it.
+const timeBankSecs int64 = 30
+const actionSecs int = int(actionTimeoutTicks / 10)
 
 type Handler struct{}
 
@@ -252,6 +267,8 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		RITAgree:     map[string]bool{},
 		Insurance:    map[string]insurancePolicy{},
 		InsOffered:   map[string]insurancePolicy{},
+		AntibotLog:   map[string][]antibot.ActionRecord{},
+		TimeBank:     map[string]int64{},
 		DurationSecs: durationSecs,
 		MinPlayers:   minPlayers,
 		// Cash tables deal themselves (no operator babysitting); tournament tables
@@ -468,6 +485,14 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				buyIn = s.maxBuyIn()
 			}
 			buyIn = poker.ClampBuyIn(buyIn)
+			// Responsible-gambling gate: a player who has self-excluded or is in a
+			// cool-off window cannot take a seat until it lifts. (Set via
+			// rg_self_exclude / rg_cool_off — previously stored but never enforced.)
+			if blocked, kind, until, _ := store.NewResponsibleStore(db).IsRestricted(ctx, userID); blocked {
+				sendError(dispatcher, presence, "rg_"+kind,
+					fmt.Sprintf("you are in a %s period until %s", strings.ReplaceAll(kind, "_", "-"), until.Format("Jan 2, 2006")))
+				continue
+			}
 			// Tier gate: enforce the multi-table limit (tables seated at once).
 			seatReg := store.NewActiveSeatStore(db)
 			matchKey := matchIDForAudit(s)
@@ -493,6 +518,12 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				continue
 			}
 			s.SeatWallet[req.Seat] = wallet
+			if s.TimeBank == nil {
+				s.TimeBank = map[string]int64{}
+			}
+			if _, ok := s.TimeBank[userID]; !ok {
+				s.TimeBank[userID] = timeBankSecs // one-time grant per player
+			}
 			// If a hand is already in progress, the new player sits out until it
 			// finishes (folded = excluded from the current pot/showdown). The next
 			// ResetBetweenHands restores them to Seated so they are dealt in.
@@ -672,6 +703,13 @@ func enforceActionDeadline(ctx context.Context, db *sql.DB, dispatcher runtime.M
 		return
 	}
 	if tick < s.ActionDeadlineTick {
+		return
+	}
+	// Base clock lapsed — burn one second of the player's time bank (if any)
+	// before folding for them, extending the deadline a second at a time.
+	if s.TimeBank[seat.UserID] > 0 {
+		s.TimeBank[seat.UserID]--
+		s.ActionDeadlineTick = tick + 10 // one more second on the bank (10 ticks/s)
 		return
 	}
 	// Time's up — act for them.
@@ -1309,6 +1347,7 @@ func emitHandSettled(ctx context.Context, s *MatchState, res poker.ShowdownResul
 
 func emitPlayerAction(ctx context.Context, s *MatchState, userID, action string, amount int64) {
 	trackAction(s, userID, action)
+	recordAntibotAction(s, userID, action, amount)
 	if s.Audit == nil {
 		return
 	}
@@ -1807,6 +1846,8 @@ func broadcastActionRequired(ctx context.Context, db *sql.DB, dispatcher runtime
 		MinRaise:     minRaise,
 		MaxRaise:     maxRaise,
 		Pot:          s.Table.Pot,
+		ActionSecs:   actionSecs,
+		TimeBankSecs: int(s.TimeBank[seatData.UserID]),
 	}
 	data, _ := json.Marshal(msg)
 	p, ok := s.Presences[seatData.UserID]

@@ -3,12 +3,42 @@ package holdem
 import (
 	"context"
 	"database/sql"
+	"strings"
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
+	"github.com/smithdouglas404/poker-next-gen/backend-core/antibot"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/poker"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
+
+// antibotWindow bounds the rolling per-user action buffer scored at settlement.
+const antibotWindow = 40
+
+// recordAntibotAction appends a human's action to the rolling anti-bot window
+// (bots excluded). The window is scored at hand settlement so bot-likelihood
+// accrues from live play rather than only when an admin posts action batches.
+func recordAntibotAction(s *MatchState, userID, action string, amount int64) {
+	if s.AntibotLog == nil || userID == "" || strings.HasPrefix(userID, "bot_") {
+		return
+	}
+	pot := s.Table.Pot
+	if pot <= 0 {
+		pot = 1
+	}
+	rec := antibot.ActionRecord{
+		UserID:   userID,
+		Action:   action,
+		Amount:   amount,
+		PotRatio: float64(amount) / float64(pot),
+		Street:   string(s.Table.Street),
+	}
+	log := append(s.AntibotLog[userID], rec)
+	if len(log) > antibotWindow {
+		log = log[len(log)-antibotWindow:]
+	}
+	s.AntibotLog[userID] = log
+}
 
 // playerHandTrack accumulates one player's actions within a single hand so the
 // settlement path can derive VPIP / PFR / aggression without re-reading history.
@@ -133,6 +163,16 @@ func attributeHand(ctx context.Context, logger runtime.Logger, db *sql.DB, s *Ma
 			Calls:             tr.Calls,
 		}); err != nil {
 			logger.Warn("attributeHand stat (%s %s#%d): %v", seat.UserID, matchID, handNo, err)
+		}
+
+		// Live anti-bot scoring: evaluate this player's rolling action window and
+		// persist the bot-likelihood score (best-effort). This is what makes the
+		// existing detector run on real tables instead of admin-posted batches.
+		if recs := s.AntibotLog[seat.UserID]; len(recs) >= 8 {
+			resp := antibot.AnalyzeBettingPatterns(antibot.ScoreRequest{UserID: seat.UserID, Actions: recs})
+			if err := store.NewAiprocStore(db).UpsertAntibotScore(ctx, seat.UserID, resp.Score, resp.Risk, resp.Flags, resp.SampleSize); err != nil {
+				logger.Warn("attributeHand antibot (%s): %v", seat.UserID, err)
+			}
 		}
 
 		// Mission progress (best-effort): played / vpip / won / showdown-won.

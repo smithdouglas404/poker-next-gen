@@ -72,6 +72,26 @@ func (s *ResponsibleStore) SetLimits(ctx context.Context, l *RgLimit) error {
 	return err
 }
 
+// IsRestricted reports whether the player is currently blocked from play by
+// their own responsible-gambling controls — an active self-exclusion or
+// cool-off window. Returns the block kind ("self_excluded" | "cool_off") and
+// the time it lifts. This is the enforcement counterpart to SetSelfExcluded /
+// SetCoolOff, which until now were write-only.
+func (s *ResponsibleStore) IsRestricted(ctx context.Context, userID string) (blocked bool, kind string, until time.Time, err error) {
+	l, err := s.GetLimits(ctx, userID)
+	if err != nil {
+		return false, "", time.Time{}, err
+	}
+	now := time.Now()
+	if l.SelfExcludedUntil != nil && l.SelfExcludedUntil.After(now) {
+		return true, "self_excluded", *l.SelfExcludedUntil, nil
+	}
+	if l.CoolOffUntil != nil && l.CoolOffUntil.After(now) {
+		return true, "cool_off", *l.CoolOffUntil, nil
+	}
+	return false, "", time.Time{}, nil
+}
+
 // SetCoolOff arms a temporary cool-off window (a lighter, self-lifting break).
 func (s *ResponsibleStore) SetCoolOff(ctx context.Context, userID string, until time.Time) error {
 	_, err := s.db.ExecContext(ctx, `
