@@ -181,6 +181,7 @@ export function TournamentBuilderWizard({
                 </tbody>
               </table>
             </div>
+            <BlindStructureSummary blinds={blinds} />
             <p className="mt-2 text-xs text-muted">{blinds.length} levels · edit any cell or pick a template.</p>
           </div>
         )}
@@ -246,6 +247,46 @@ export function TournamentBuilderWizard({
           {step > 0 && step < 4 && <button type="button" onClick={() => setStep((s) => s - 1)} className={ghost}>Back</button>}
           <button type="button" onClick={onClose} className="ml-auto text-[11px] font-semibold uppercase tracking-wider text-neutral-500 hover:text-white">Close</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Blind-structure summary: total estimated duration + a compact blind-curve
+// sparkline (big blind over levels), derived from the level data the operator is
+// already editing. Read-only; no new inputs.
+function BlindStructureSummary({ blinds }: { blinds: BlindLevel[] }) {
+  if (blinds.length === 0) return null;
+  const totalSecs = blinds.reduce((a, b) => a + (b.duration_secs || 0), 0);
+  const hours = Math.floor(totalSecs / 3600);
+  const mins = Math.round((totalSecs % 3600) / 60);
+  const durLabel = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+
+  const W = 260;
+  const H = 48;
+  const maxBB = Math.max(1, ...blinds.map((b) => b.big_blind));
+  const pts = blinds
+    .map((b, i) => {
+      const x = blinds.length === 1 ? 0 : (i / (blinds.length - 1)) * W;
+      const y = H - (b.big_blind / maxBB) * (H - 4) - 2;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3">
+      <div>
+        <p className="text-[10px] uppercase tracking-wider text-muted">Est. duration</p>
+        <p className="text-lg font-semibold text-gold">{durLabel}</p>
+        <p className="text-[10px] text-muted">
+          {blinds.length} levels · top blind {blinds[blinds.length - 1].big_blind.toLocaleString()}
+        </p>
+      </div>
+      <div className="flex flex-col items-end">
+        <p className="mb-1 text-[10px] uppercase tracking-wider text-muted">Blind curve</p>
+        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="overflow-visible">
+          <polyline points={pts} fill="none" stroke="#81ecff" strokeWidth={1.5} strokeLinejoin="round" />
+        </svg>
       </div>
     </div>
   );
