@@ -125,10 +125,11 @@ func (s *MarketplaceStore) Buy(ctx context.Context, listingID, buyerID string, f
 	fee := price * int64(feeBps) / 10000
 	sellerNet := price - fee
 
-	// Debit buyer with a balance guard.
+	// Ensure a wallet row exists (starting at ZERO — buyers are never auto-funded;
+	// they must have real balance to purchase). Debit is balance-guarded below.
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO poker_global_wallet (user_id, balance, currency, updated_at)
-		VALUES ($1, 100000, 'USD', NOW()) ON CONFLICT (user_id) DO NOTHING`, buyerID); err != nil {
+		VALUES ($1, 0, 'USD', NOW()) ON CONFLICT (user_id) DO NOTHING`, buyerID); err != nil {
 		return 0, err
 	}
 	var buyerAfter int64

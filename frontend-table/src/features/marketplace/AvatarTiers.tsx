@@ -4,19 +4,11 @@ import { useMemo, useState } from "react";
 
 import { BTN_GOLD, GLASS_PANEL, GLASS_PANEL_HOVER, HEADING_LG, cn } from "@/features/ui/tokens";
 import { CosmeticThumb } from "./CosmeticThumb";
-import { rarityStyle } from "./rarity";
-import {
-  DEMO_BASIC_AVATARS,
-  DEMO_PREMIUM_AVATARS,
-  fmtEth,
-  fmtGold,
-  goldOf,
-  isAvatarKind,
-} from "./avatars";
+import { rarityStyle, usd } from "./rarity";
+import { DEMO_BASIC_AVATARS, DEMO_PREMIUM_AVATARS, isAvatarKind } from "./avatars";
 import type { Cosmetic } from "./types";
 
 type Tier = "premium" | "basic";
-type Pay = "gold" | "eth";
 
 /**
  * detailed_14 — Avatar Marketplace and Tiers.
@@ -34,11 +26,10 @@ export function AvatarTiers({
   catalog: Cosmetic[];
   ownedIds: Set<string>;
   busy: string | null;
-  onCheckout: (items: Cosmetic[], pay: Pay) => void | Promise<void>;
+  onCheckout: (items: Cosmetic[]) => void | Promise<void>;
 }) {
   const [tier, setTier] = useState<Tier>("premium");
   const [cart, setCart] = useState<Cosmetic[]>([]);
-  const [pay, setPay] = useState<Pay>("gold");
 
   const liveAvatars = useMemo(() => catalog.filter((c) => isAvatarKind(c.kind)), [catalog]);
 
@@ -60,7 +51,7 @@ export function AvatarTiers({
 
   const checkout = async () => {
     if (cart.length === 0) return;
-    await onCheckout(cart, pay);
+    await onCheckout(cart);
     setCart([]);
   };
 
@@ -111,8 +102,7 @@ export function AvatarTiers({
                 <CosmeticThumb preview={c.preview_ref} kind={c.kind} rarity={c.rarity} />
                 <div className="space-y-1 p-3.5">
                   <p className="truncate text-sm font-bold text-white">{c.name}</p>
-                  <p className="font-display text-sm font-bold text-gold">{fmtGold(c.price_cents)}</p>
-                  <p className="text-[11px] text-neutral-400">{fmtEth(c.price_cents)}</p>
+                  <p className="font-display text-sm font-bold text-gold">{usd(c.price_cents)}</p>
                   <div className="pt-1.5">
                     {owned ? (
                       <span className="inline-flex w-full items-center justify-center rounded-lg border border-[#22c55e]/30 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-green">
@@ -156,7 +146,7 @@ export function AvatarTiers({
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-semibold text-white">{c.name}</p>
-                    <p className="text-[10px] text-gold">{fmtGold(c.price_cents)}</p>
+                    <p className="text-[10px] text-gold">{usd(c.price_cents)}</p>
                   </div>
                   <button
                     type="button"
@@ -173,36 +163,9 @@ export function AvatarTiers({
 
           <div className="flex items-center justify-between border-t border-white/[0.06] pt-3">
             <span className="text-[11px] uppercase tracking-wider text-neutral-400">Total Cost</span>
-            <span className="font-display text-sm font-bold text-gold">
-              {goldOf(totalCents).toLocaleString()} Gold
-            </span>
+            <span className="font-display text-sm font-bold text-gold">{usd(totalCents)}</span>
           </div>
-
-          <div className="space-y-2">
-            {(["gold", "eth"] as Pay[]).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setPay(m)}
-                className={cn(
-                  "flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-sm transition",
-                  pay === m
-                    ? "border-gold/40 bg-gold/10 text-white"
-                    : "border-white/[0.08] text-neutral-300 hover:border-white/20",
-                )}
-              >
-                <span
-                  className={cn(
-                    "grid h-4 w-4 place-items-center rounded-full border",
-                    pay === m ? "border-gold" : "border-white/30",
-                  )}
-                >
-                  {pay === m && <span className="h-2 w-2 rounded-full bg-gold" />}
-                </span>
-                <span>{m === "gold" ? "🪙 Pay with Gold" : "◆ Pay with ETH"}</span>
-              </button>
-            ))}
-          </div>
+          <p className="text-[11px] text-neutral-500">Charged to your wallet balance.</p>
 
           <button
             type="button"

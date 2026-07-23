@@ -1,11 +1,9 @@
 // Types for the marketplace checkout + purchase-success flow.
 // A cart line references a REAL cosmetic (cosmetic_buy) or a REAL listing
 // (marketplace_buy) so "Complete Purchase" settles through a registered RPC.
-// Gold / ETH are the displayed store currencies (faithful to the HRC mock).
+// Prices are the real USD `price_cents` the wallet is charged — no fake currency.
 
 import type { Cosmetic, Listing } from "@/features/marketplace/types";
-
-export type PayMethod = "gold" | "eth";
 
 export interface CartItem {
   /** Stable cart-line key. */
@@ -20,10 +18,8 @@ export interface CartItem {
   kind?: string;
   rarity: string;
   preview?: string;
-  /** Displayed gold price for one unit. */
-  gold: number;
-  /** Displayed ETH price for one unit. */
-  eth: number;
+  /** Real USD price for one unit, in cents — the exact amount charged. */
+  priceCents: number;
   /** Quantity (shown as "X1", "X2" like the mock). */
   qty: number;
 }

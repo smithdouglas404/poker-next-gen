@@ -14,19 +14,17 @@ import {
   cartFromCatalog,
   cartTotals,
   DEMO_CART,
-  formatEth,
-  formatGold,
+  formatPrice,
 } from "@/features/marketplace/checkout/cart";
 import { PurchaseSuccessModal } from "@/features/marketplace/checkout/PurchaseSuccessModal";
-import type { CartItem, PayMethod, PurchaseLineResult } from "@/features/marketplace/checkout/types";
+import type { CartItem, PurchaseLineResult } from "@/features/marketplace/checkout/types";
 
 async function rpc<T>(id: string, payload: Record<string, unknown> = {}): Promise<T> {
   return (await callSessionRpc(id, payload)) as T;
 }
 
-// ETH is a display settlement rail in the HRC store; on-chain settlement is not
-// wired, so ETH orders still fulfil through the same registered buy RPC that
-// grants the cosmetic. Gold is the default.
+// Purchases settle in the platform wallet (USD). The displayed price is the exact
+// amount charged (the cosmetic's real price_cents) — no separate Gold/ETH rail.
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -34,7 +32,6 @@ export default function CheckoutPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [demoMode, setDemoMode] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [pay, setPay] = useState<PayMethod>("gold");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<PurchaseLineResult[] | null>(null);
@@ -116,7 +113,7 @@ export default function CheckoutPage() {
   }, [cart, demoMode]);
 
   const settled = results?.filter((r) => r.ok).map((r) => r.item) ?? cart;
-  const settledTotal = useMemo(() => cartTotals(settled).gold, [settled]);
+  const settledTotal = useMemo(() => cartTotals(settled).cents, [settled]);
 
   return (
     <div className="min-h-screen bg-background font-body text-foreground">
@@ -191,9 +188,8 @@ export default function CheckoutPage() {
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="font-display text-sm font-bold text-gold">
-                        {formatGold(item.gold * item.qty)}
+                        {formatPrice(item.priceCents * item.qty)}
                       </p>
-                      <p className="text-[11px] text-neutral-500">{formatEth(item.eth * item.qty)}</p>
                     </div>
                     <button
                       type="button"
@@ -232,7 +228,7 @@ export default function CheckoutPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-semibold">{item.name}</p>
-                    <p className="text-[11px] text-gold">{formatGold(item.gold)}</p>
+                    <p className="text-[11px] text-gold">{formatPrice(item.priceCents)}</p>
                   </div>
                 </div>
               ))}
@@ -245,35 +241,13 @@ export default function CheckoutPage() {
               <div className="flex items-baseline justify-between">
                 <span className="text-sm text-neutral-400">Total Cost</span>
                 <span className="font-display text-xl font-bold text-gold">
-                  {formatGold(totals.gold)}
+                  {formatPrice(totals.cents)}
                 </span>
               </div>
-              <div className="flex items-baseline justify-between">
-                <span className="text-[11px] text-neutral-500">or pay in ETH</span>
-                <span className="text-sm font-semibold text-neutral-300">
-                  {formatEth(totals.eth)}
-                </span>
-              </div>
+              <p className="text-[11px] text-neutral-500">
+                Charged to your wallet balance. Add funds in the Cashier if your balance is low.
+              </p>
             </div>
-
-            {/* Pay method */}
-            <fieldset className="space-y-2">
-              <legend className="sr-only">Payment method</legend>
-              <PayOption
-                label="Pay with Gold"
-                icon="🪙"
-                value={formatGold(totals.gold)}
-                selected={pay === "gold"}
-                onSelect={() => setPay("gold")}
-              />
-              <PayOption
-                label="Pay with ETH"
-                icon="⬨"
-                value={formatEth(totals.eth)}
-                selected={pay === "eth"}
-                onSelect={() => setPay("eth")}
-              />
-            </fieldset>
 
             {error && (
               <div className="rounded-lg border border-[#e01e2b]/30 bg-[#e01e2b]/10 p-3 text-xs text-[#ff9ba1]">
@@ -305,52 +279,11 @@ export default function CheckoutPage() {
       {success && (
         <PurchaseSuccessModal
           items={settled}
-          totalGold={settledTotal}
+          totalCents={settledTotal}
           onWardrobe={() => router.push("/marketplace?tab=vault")}
           onBackToMarket={() => router.push("/marketplace")}
         />
       )}
     </div>
-  );
-}
-
-function PayOption({
-  label,
-  icon,
-  value,
-  selected,
-  onSelect,
-}: {
-  label: string;
-  icon: string;
-  value: string;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      onClick={onSelect}
-      className={cn(
-        "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition",
-        selected
-          ? "border-gold/50 bg-[#f5c518]/10 shadow-[0_0_18px_-6px_rgba(245,197,24,0.4)]"
-          : "border-white/10 bg-black/30 hover:border-white/20",
-      )}
-    >
-      <span
-        className={cn(
-          "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2",
-          selected ? "border-gold" : "border-white/25",
-        )}
-      >
-        {selected && <span className="h-2 w-2 rounded-full bg-gold" />}
-      </span>
-      <span className="text-lg leading-none">{icon}</span>
-      <span className="flex-1 text-sm font-semibold">{label}</span>
-      <span className="text-xs text-neutral-400">{value}</span>
-    </button>
   );
 }

@@ -4,10 +4,22 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/smithdouglas404/poker-next-gen/backend-core/models"
 )
+
+// NewWalletBalance is the starting balance for a freshly-created wallet. In
+// real-money mode a new wallet starts at ZERO — funds only ever enter via a
+// verified deposit. In play-money mode new users get a starter stipend so they
+// can try the tables without depositing.
+func NewWalletBalance() int64 {
+	if os.Getenv("REAL_MONEY_ENABLED") == "true" {
+		return 0
+	}
+	return 100000 // play-money starter stipend ($1,000)
+}
 
 type WalletStore struct{ db *sql.DB }
 
@@ -16,7 +28,7 @@ func NewWalletStore(db *sql.DB) *WalletStore { return &WalletStore{db: db} }
 func (s *WalletStore) Ensure(ctx context.Context, userID string) (int64, error) {
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO poker_global_wallet (user_id, balance, currency, updated_at)
-		VALUES ($1, 100000, 'USD', NOW()) ON CONFLICT (user_id) DO NOTHING`, userID)
+		VALUES ($1, $2, 'USD', NOW()) ON CONFLICT (user_id) DO NOTHING`, userID, NewWalletBalance())
 	if err != nil {
 		return 0, err
 	}

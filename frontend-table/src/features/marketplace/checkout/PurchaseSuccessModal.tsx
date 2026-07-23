@@ -4,7 +4,7 @@ import { useMemo } from "react";
 
 import { BTN_GOLD, cn } from "@/features/ui/tokens";
 import { CosmeticThumb } from "@/features/marketplace/CosmeticThumb";
-import { formatGold } from "./cart";
+import { formatPrice } from "./cart";
 import type { CartItem } from "./types";
 
 // Celebration modal shown after a settled purchase — "PURCHASE SUCCESSFUL!"
@@ -21,12 +21,12 @@ function usePrefersReducedMotion(): boolean {
 
 export function PurchaseSuccessModal({
   items,
-  totalGold,
+  totalCents,
   onWardrobe,
   onBackToMarket,
 }: {
   items: CartItem[];
-  totalGold: number;
+  totalCents: number;
   onWardrobe: () => void;
   onBackToMarket: () => void;
 }) {
@@ -144,7 +144,7 @@ export function PurchaseSuccessModal({
                 : `${items.length} items added to your collection`}
             </p>
             <p className="font-display text-lg font-bold text-gold">
-              {formatGold(totalGold)}
+              {formatPrice(totalCents)}
             </p>
           </div>
 

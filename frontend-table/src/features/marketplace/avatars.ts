@@ -15,24 +15,6 @@ export function isAvatarKind(kind: string | undefined): boolean {
   return AVATAR_KINDS.has((kind ?? "").toLowerCase());
 }
 
-/** Gold display amount — 1 USD cent == 1 Gold (so $500.00 → 50,000 Gold). */
-export function goldOf(cents: number): number {
-  return Math.max(0, Math.round(cents));
-}
-
-/** Thematic ETH equivalent, derived from Gold (never a real on-chain quote). */
-export function ethOf(cents: number): number {
-  return goldOf(cents) / 100_000;
-}
-
-export function fmtGold(cents: number): string {
-  return `${goldOf(cents).toLocaleString()} Gold`;
-}
-
-export function fmtEth(cents: number): string {
-  const eth = ethOf(cents);
-  return `${eth.toLocaleString(undefined, { minimumFractionDigits: eth < 1 ? 1 : 2, maximumFractionDigits: 3 })} ETH`;
-}
 
 /** True for locally-simulated demo items (never live inventory). */
 export function isDemoCosmeticId(id: string): boolean {

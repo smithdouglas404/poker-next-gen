@@ -4,8 +4,8 @@ import { useMemo } from "react";
 
 import { BTN_GOLD, GLASS_PANEL, GLASS_PANEL_HOVER, cn } from "@/features/ui/tokens";
 import { CosmeticThumb } from "./CosmeticThumb";
-import { rarityStyle } from "./rarity";
-import { DEMO_EXCLUSIVE_AVATARS, avatarBlurb, fmtEth, fmtGold, isAvatarKind } from "./avatars";
+import { rarityStyle, usd } from "./rarity";
+import { DEMO_EXCLUSIVE_AVATARS, avatarBlurb, isAvatarKind } from "./avatars";
 import type { Cosmetic } from "./types";
 
 /**
@@ -48,7 +48,7 @@ export function PremiumMarket({
           Premium Exclusive
         </h2>
         <p className="mt-1 text-xs uppercase tracking-[0.3em] text-neutral-400">
-          Mythic & 1/1 Drops · Priced in Gold and ETH
+          Mythic & 1/1 Drops
         </p>
       </div>
 
@@ -86,12 +86,7 @@ export function PremiumMarket({
               <div className="space-y-1.5 p-4">
                 <p className={cn("truncate font-display text-base font-bold", style.text)}>{c.name}</p>
                 <p className="text-xs text-neutral-400">{avatarBlurb(c)}</p>
-                <p className="pt-1 font-display text-sm font-bold text-gold">
-                  🪙 {fmtGold(c.price_cents)}{" "}
-                  <span className="font-body text-[11px] font-normal text-neutral-400">
-                    / {fmtEth(c.price_cents)}
-                  </span>
-                </p>
+                <p className="pt-1 font-display text-sm font-bold text-gold">{usd(c.price_cents)}</p>
                 {owned ? (
                   <span className="mt-1 inline-flex w-full items-center justify-center rounded-lg border border-[#22c55e]/30 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-green">
                     Owned
