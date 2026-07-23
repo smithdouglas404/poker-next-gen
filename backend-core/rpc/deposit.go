@@ -44,6 +44,10 @@ func WalletDepositCrypto(ctx context.Context, logger runtime.Logger, db *sql.DB,
 	if err := guardJurisdiction(ctx, db); err != nil { // geo/IP jurisdiction gate
 		return "", err
 	}
+	// Crypto deposits get the same KYC/AML floor as fiat — no crypto exemption.
+	if err := requireVerified(ctx, db, userID, "kyc_aml", "depositing funds"); err != nil {
+		return "", err
+	}
 	var req struct {
 		AmountCents int64 `json:"amount_cents"`
 	}

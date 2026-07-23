@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"os"
 	"strings"
 	"time"
 
@@ -127,6 +128,12 @@ const actionSecs int = int(actionTimeoutTicks / 10)
 
 type Handler struct{}
 
+// realMoneyEnabled mirrors the rpc-layer kill switch: when off (default), no
+// table plays for real value, so bots are permitted and KYC-at-sit is moot. When
+// on, bots are barred from tables and seating requires KYC/AML (the platform
+// floor — a club can only ADD verification, never opt out of this).
+func realMoneyEnabled() bool { return os.Getenv("REAL_MONEY_ENABLED") == "true" }
+
 // numParam reads a numeric match param regardless of concrete type. Params set
 // via nk.MatchCreate from Go arrive as native int/int64; the same params set from
 // a JSON path arrive as float64. Asserting only float64 silently dropped every
@@ -194,6 +201,11 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	}
 	if numBots > maxSeats-1 {
 		numBots = maxSeats - 1
+	}
+	// No bots on real-money tables — undisclosed AI against real stakes is a
+	// reputational (and in places legal) non-starter. Bots stay play-only.
+	if realMoneyEnabled() {
+		numBots = 0
 	}
 	// Minimum players required before hands auto-start. Operator-configurable
 	// (default 2 — heads-up); clamped to [2, maxSeats] so a table can never be
@@ -534,6 +546,16 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				sendError(dispatcher, presence, "rg_"+kind,
 					fmt.Sprintf("you are in a %s period until %s", strings.ReplaceAll(kind, "_", "-"), until.Format("Jan 2, 2006")))
 				continue
+			}
+			// KYC platform floor: when real money is live, taking a seat (committing a
+			// buy-in) requires KYC/AML. This is enforced server-side regardless of any
+			// club setting — a club can only ADD verification, never opt out of this.
+			if realMoneyEnabled() {
+				st, _ := store.NewVerificationStore(db).Statuses(ctx, userID)
+				if st["kyc_aml"] != "verified" {
+					sendError(dispatcher, presence, "kyc_required", "identity verification (KYC/AML) is required to sit at a real-money table")
+					continue
+				}
 			}
 			// Tier gate: enforce the multi-table limit (tables seated at once).
 			seatReg := store.NewActiveSeatStore(db)
@@ -1757,6 +1779,9 @@ func (h *Handler) MatchSignal(ctx context.Context, logger runtime.Logger, db *sq
 		}
 		broadcastSnapshot(ctx, db, dispatcher, s, nil)
 	case "add_bot":
+		if realMoneyEnabled() {
+			break // no bots on real-money tables
+		}
 		seatIdx := s.Table.FirstEmptySeat()
 		if seatIdx >= 0 {
 			s.BotCount++

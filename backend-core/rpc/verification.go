@@ -45,7 +45,8 @@ func kindLabel(kind string) string {
 // MeVerification returns the caller's per-kind verification statuses and the
 // capabilities they unlock. Drives the guest → registered → paying → money model:
 // guests can only host a game; email unlocks clubs; biometric unlocks paying +
-// marketplace; KYC/AML unlocks fiat deposit + withdrawal (crypto is exempt).
+// marketplace; KYC/AML unlocks deposits (fiat AND crypto) + withdrawal. No
+// crypto exemption — real-money crypto gets the same AML posture as fiat.
 func MeVerification(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	userID, err := callerID(ctx)
 	if err != nil {
@@ -79,8 +80,9 @@ func MeVerification(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 			"clubs":        email,     // registration
 			"pay":          biometric, // paying for services
 			"marketplace":  biometric, // marketplace buy/sell
-			"deposit_fiat": kycAML,    // buying with fiat (crypto is exempt)
-			"withdraw":     kycAML,    // receiving money
+			"deposit_fiat":   kycAML, // buying with fiat
+			"deposit_crypto": kycAML, // buying with crypto — same KYC/AML floor
+			"withdraw":       kycAML, // receiving money
 		},
 	})
 	return string(out), nil
