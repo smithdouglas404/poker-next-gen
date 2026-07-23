@@ -128,18 +128,20 @@ export const DEMO_RAKE_CONFIG: RakeConfig = {
   is_active: true,
 };
 
-/** 12-month analytics series for the Member Analytics dashboard. */
+/** 12-month analytics series for the Member Analytics dashboard. Kept internally
+ *  consistent with the club: active members stay under member_count (500) and the
+ *  new/returning split sums to the latest active count (472). */
 export const DEMO_ANALYTICS = {
   months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-  activeMembers: [22, 58, 96, 150, 176, 190, 214, 240, 262, 288, 312, 342],
+  activeMembers: [180, 236, 288, 322, 350, 372, 395, 414, 432, 448, 460, 472],
   tableVolumeCents: [14_000_00, 11_500_00, 15_800_00, 21_000_00, 17_400_00, 22_400_00, 15_000_00, 12_600_00, 16_800_00, 19_200_00, 20_400_00, 24_800_00],
-  newPlayers: 33,
-  returningPlayers: 57,
+  newPlayers: 128,
+  returningPlayers: 344,
 };
 
 /** Overview sparkline series (one per stat card). */
 export const DEMO_OVERVIEW_SPARKS = {
-  members: [980, 1010, 1044, 1090, 1120, 1165, 1205, 1245],
+  members: [384, 402, 421, 440, 456, 472, 486, 500],
   tables: [11, 12, 10, 14, 15, 13, 17, 18],
   volumeCents: [8_400_000_00, 9_100_000_00, 10_800_000_00, 12_200_000_00, 13_900_000_00, 12_600_000_00, 14_800_000_00, 15_450_000_00],
   potCents: [9_800_00, 10_400_00, 11_100_00, 10_600_00, 12_000_00, 11_500_00, 12_200_00, 12_500_00],
