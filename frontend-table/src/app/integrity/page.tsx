@@ -48,7 +48,7 @@ const GROUPS: Group[] = [
   {
     heading: "Equal information at the table",
     blurb: "Every player sees the same tools. No one can buy an information edge over the table.",
-    accent: "#22d3ee",
+    accent: "#22c55e",
     items: [
       {
         title: "Your own hand only",
@@ -65,7 +65,7 @@ const GROUPS: Group[] = [
   {
     heading: "Study tools, not live assistance",
     blurb: "Solver and coaching are for learning and post-game review — not real-time bots in your ear.",
-    accent: "#b44dff",
+    accent: "#f3e2ad",
     items: [
       {
         title: "GTO / solver is a study tool",
