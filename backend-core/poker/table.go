@@ -226,6 +226,27 @@ func (t *Table) SitDownBot(seat int, userID, username string, buyIn int64) error
 	return nil
 }
 
+// MoveSeat relocates an occupant to an empty seat, preserving their exact Seat
+// (stack, status) — no buy-in clamp, since these chips are already in play.
+// Intended for use only between hands; moving mid-hand would corrupt button and
+// action indices.
+func (t *Table) MoveSeat(from, to int) error {
+	if from < 0 || from >= t.cap() || to < 0 || to >= t.cap() {
+		return fmt.Errorf("invalid seat")
+	}
+	if t.Seats[from] == nil {
+		return fmt.Errorf("no player to move")
+	}
+	if t.Seats[to] != nil {
+		return fmt.Errorf("seat taken")
+	}
+	s := t.Seats[from]
+	s.Index = to
+	t.Seats[to] = s
+	t.Seats[from] = nil
+	return nil
+}
+
 // FirstEmptySeat returns the lowest empty seat index, or -1 if the table is full.
 func (t *Table) FirstEmptySeat() int {
 	for i := 0; i < MaxSeats; i++ {

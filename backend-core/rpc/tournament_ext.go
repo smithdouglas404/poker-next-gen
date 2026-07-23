@@ -36,6 +36,33 @@ func tournextPrizePool(entrants int, buyInMinor int64) int64 {
 	return int64(entrants) * buyInMinor
 }
 
+// TournamentBalance signals the tournament director to rebalance/merge tables
+// now. The director already has the rebalance+merge logic (director.rebalance)
+// but nothing triggered it; this connects the operator's "Balance / Merge"
+// action to it. Authorized as a tournament mutation (configurer/owner).
+func TournamentBalance(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	var req struct {
+		TournamentID string `json:"tournament_id"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.TournamentID == "" {
+		return "", runtime.NewError("tournament_id required", 3)
+	}
+	if _, err := requireTournamentOwner(ctx, db, req.TournamentID); err != nil {
+		return "", err
+	}
+	info, err := store.NewTournamentExtStore(db).GetInfo(ctx, req.TournamentID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	if info == nil || info.DirectorMatchID == "" {
+		return "", runtime.NewError("tournament is not running", 9)
+	}
+	if _, err := nk.MatchSignal(ctx, info.DirectorMatchID, `{"type":"balance"}`); err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	return `{"ok":true}`, nil
+}
+
 // TournamentStatus returns a live snapshot of a tournament: registered count,
 // players left, derived prize pool, current level, per-table counts, chip
 // standings, and recent eliminations. Read-only and best-effort — fields the

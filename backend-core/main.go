@@ -253,6 +253,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"site_settings_get":            rpc.SiteSettingsGet,
 		// Tournaments expansion
 		"tournament_status":    rpc.TournamentStatus,
+		"tournament_balance":   rpc.TournamentBalance,
 		"tournament_analytics": rpc.TournamentAnalytics,
 		"tournament_finalize":  rpc.TournamentFinalize,
 		"tournament_config":    rpc.TournamentConfig,

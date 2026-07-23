@@ -1166,6 +1166,7 @@ func handleHostAction(ctx context.Context, db *sql.DB, dispatcher runtime.MatchD
 	var req struct {
 		Action     string `json:"action"`
 		Seat       int    `json:"seat"`
+		ToSeat     int    `json:"to_seat"`
 		SmallBlind int64  `json:"small_blind"`
 		BigBlind   int64  `json:"big_blind"`
 		Ante       int64  `json:"ante"`
@@ -1212,6 +1213,45 @@ func handleHostAction(ctx context.Context, db *sql.DB, dispatcher runtime.MatchD
 			s.SmallBlind = req.SmallBlind
 			s.BigBlind = req.BigBlind
 			narrate(dispatcher, s, fmt.Sprintf("Host set blinds to $%d/$%d (from the next hand).", req.SmallBlind/100, req.BigBlind/100))
+		}
+	case "force_fold":
+		// Fold the seat currently on the clock (dispute / stalling / disconnect).
+		// Only the acting seat can be folded without corrupting hand state.
+		if s.Phase == poker.PhaseBetting && s.Table.ActionSeat == req.Seat {
+			seat := seatIdxSeat(s, req.Seat)
+			if seat != nil && !seat.IsBot {
+				if err := s.Table.ApplyAction(req.Seat, "fold", 0); err == nil {
+					s.ActionDeadlineTick, s.ActionDeadlineSeat = 0, -1
+					emitPlayerAction(ctx, s, seat.UserID, "fold", 0)
+					narrate(dispatcher, s, fmt.Sprintf("Host folded %s's hand.", seat.Username))
+					broadcastSnapshot(ctx, db, dispatcher, s, nil)
+					if _, uncontested := s.Table.UncontestedWinner(); uncontested {
+						beginShowdownResolution(ctx, s)
+					} else if s.Table.AdvanceAction() {
+						beginShowdownResolution(ctx, s)
+					} else {
+						broadcastActionRequired(ctx, db, dispatcher, s)
+					}
+					broadcastSnapshot(ctx, db, dispatcher, s, nil)
+				}
+			}
+		}
+	case "move_seat":
+		// Relocate a player to an empty seat, between hands only, preserving their
+		// exact stack (chip-conserving MoveSeat, not a re-buy).
+		if s.Phase == poker.PhaseWaiting {
+			from := seatIdxSeat(s, req.Seat)
+			if from != nil && !from.IsBot && req.ToSeat >= 0 && req.ToSeat < poker.MaxSeats && s.Table.Seats[req.ToSeat] == nil {
+				name := from.Username
+				wallet := s.SeatWallet[req.Seat]
+				if err := s.Table.MoveSeat(req.Seat, req.ToSeat); err == nil {
+					delete(s.SeatWallet, req.Seat)
+					if wallet != "" {
+						s.SeatWallet[req.ToSeat] = wallet
+					}
+					narrate(dispatcher, s, fmt.Sprintf("Host moved %s to seat %d.", name, req.ToSeat+1))
+				}
+			}
 		}
 	}
 	dispatcher.MatchLabelUpdate(buildLabel(s))

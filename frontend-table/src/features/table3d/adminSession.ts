@@ -92,6 +92,8 @@ export interface TableAdmin {
   seated: Array<{ seat: number; name: string; stackCents: number; userId: string; avatar: string }>;
   pauseResume: () => Promise<void>;
   kick: (seat: number) => Promise<void>;
+  forceFold: (seat: number) => Promise<void>;
+  moveSeat: (seat: number, toSeat: number) => Promise<void>;
   setBlinds: (smallCents: number, bigCents: number) => Promise<void>;
   saveSettings: (settings: TableSettingsValues) => Promise<void>;
   approve: (entry: WaitingEntry) => Promise<void>;
@@ -359,6 +361,22 @@ export function useTableAdmin(demo: boolean): TableAdmin {
     [demo, hostAction],
   );
 
+  const forceFold = useCallback(
+    async (seat: number) => {
+      if (demo) return;
+      await hostAction({ action: "force_fold", seat });
+    },
+    [demo, hostAction],
+  );
+
+  const moveSeat = useCallback(
+    async (seat: number, toSeat: number) => {
+      if (demo) return;
+      await hostAction({ action: "move_seat", seat, to_seat: toSeat });
+    },
+    [demo, hostAction],
+  );
+
   const saveSettings = useCallback(
     async (settings: TableSettingsValues) => {
       if (demo) return;
@@ -494,6 +512,8 @@ export function useTableAdmin(demo: boolean): TableAdmin {
     seated,
     pauseResume,
     kick,
+    forceFold,
+    moveSeat,
     setBlinds,
     saveSettings,
     approve,

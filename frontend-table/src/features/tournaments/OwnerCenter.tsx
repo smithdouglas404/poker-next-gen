@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/features/ui";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
+import { tournamentBalance } from "./api";
 import { KpiTile, Tag } from "./atoms";
 import { bps, dollars } from "./format";
 import type { EnrichedTournament, OwnerBucket, Prize, TournamentAnalytics } from "./types";
@@ -261,6 +262,8 @@ export function OwnerCenter({
   const [analytics, setAnalytics] = useState<TournamentAnalytics | null>(null);
   const [loading, setLoading] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
+  const [balancing, setBalancing] = useState(false);
+  const [balanceMsg, setBalanceMsg] = useState<string | null>(null);
 
   const reg = useCallback((id: string) => registeredCounts[id] ?? 0, [registeredCounts]);
 
@@ -559,9 +562,36 @@ export function OwnerCenter({
 
                         {/* Actions */}
                         <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                          <Button
+                            variant="outline"
+                            size="lg"
+                            disabled={balancing || demo || selected.status !== "running"}
+                            title={
+                              selected.status === "running"
+                                ? "Rebalance and merge tables now"
+                                : "Available while the tournament is running"
+                            }
+                            onClick={async () => {
+                              setBalancing(true);
+                              setBalanceMsg(null);
+                              try {
+                                await tournamentBalance(selected.id);
+                                setBalanceMsg("Balancing requested — the director is rebalancing tables.");
+                              } catch (e) {
+                                setBalanceMsg(e instanceof Error ? e.message : "Balance failed.");
+                              } finally {
+                                setBalancing(false);
+                              }
+                            }}
+                          >
+                            {balancing ? "Balancing…" : "⚖ Balance / Merge Tables"}
+                          </Button>
                           <Button variant="outline" size="lg" onClick={() => exportReport(analytics, selected)}>
                             Export Report
                           </Button>
+                          {balanceMsg && (
+                            <p className="text-xs text-neutral-400 sm:col-span-2">{balanceMsg}</p>
+                          )}
                           <Button
                             variant="primary"
                             size="lg"

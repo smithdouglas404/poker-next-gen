@@ -50,6 +50,13 @@ export async function tournamentStatus(tournamentId: string): Promise<Tournament
   })) as TournamentStatus;
 }
 
+/** tournament_balance → signal the director to rebalance/merge tables now. */
+export async function tournamentBalance(tournamentId: string): Promise<{ ok: boolean }> {
+  return (await callSessionRpc("tournament_balance", {
+    tournament_id: tournamentId,
+  })) as { ok: boolean };
+}
+
 /** tournament_analytics → financials + progress for the owner center. */
 export async function tournamentAnalytics(tournamentId: string): Promise<TournamentAnalytics> {
   return (await callSessionRpc("tournament_analytics", {

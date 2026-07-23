@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from "react";
 
-import { formatCents } from "@/features/game/GameProvider";
+import { formatCents, useGame } from "@/features/game/GameProvider";
 import { BTN_GOLD, GLASS_PANEL, HEADING_LG, cn } from "@/features/ui/tokens";
 import {
   DEFAULT_TABLE_SETTINGS,
@@ -504,6 +504,20 @@ function PlayerManagementModal({
   onClose: () => void;
   onKickBan: (target: KickTarget) => void;
 }) {
+  const { snapshot } = useGame();
+  const maxSeats = snapshot?.max_seats ?? 6;
+  const occupied = new Set(
+    (snapshot?.seats ?? [])
+      .filter((s) => (s.status ?? "") !== "" && (s.status ?? "") !== "empty")
+      .map((s) => s.index),
+  );
+  const nextOpenSeat = (): number => {
+    for (let i = 0; i < maxSeats; i++) if (!occupied.has(i)) return i;
+    return -1;
+  };
+  const canDeal = (snapshot?.phase ?? "") === "waiting";
+  const isActing = (seat: number) => snapshot?.action_seat === seat && !canDeal;
+
   return (
     <ModalShell title="Player Management" onClose={onClose}>
       <div className="space-y-2 px-6 py-5">
@@ -511,7 +525,7 @@ function PlayerManagementModal({
           <p className="py-6 text-center text-sm text-neutral-500">No other players seated.</p>
         ) : (
           admin.seated.map((p) => (
-            <div key={p.seat} className={cn(GLASS_PANEL, "flex items-center gap-3 border-white/10 p-3")}>
+            <div key={p.seat} className={cn(GLASS_PANEL, "flex flex-wrap items-center gap-2 border-white/10 p-3")}>
               <Avatar src={p.avatar} size={40} />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold text-white">{p.name}</div>
@@ -519,6 +533,27 @@ function PlayerManagementModal({
                   Seat {p.seat + 1} · <span className="text-gold">{formatCents(p.stackCents)}</span>
                 </div>
               </div>
+              <button
+                type="button"
+                disabled={!isActing(p.seat)}
+                title={isActing(p.seat) ? "Fold this player's hand (they are on the clock)" : "Only the acting player can be folded"}
+                onClick={() => void admin.forceFold(p.seat)}
+                className="rounded-lg border border-amber-500/40 bg-amber-950/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-amber-200 hover:bg-amber-900/40 disabled:opacity-40"
+              >
+                Fold hand
+              </button>
+              <button
+                type="button"
+                disabled={!canDeal || nextOpenSeat() < 0}
+                title={canDeal ? "Move to the next open seat" : "Move between hands only"}
+                onClick={() => {
+                  const to = nextOpenSeat();
+                  if (to >= 0) void admin.moveSeat(p.seat, to);
+                }}
+                className="rounded-lg border border-cyan-500/40 bg-cyan-950/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-cyan-200 hover:bg-cyan-900/40 disabled:opacity-40"
+              >
+                Move
+              </button>
               <button
                 type="button"
                 onClick={() => void admin.kick(p.seat)}
