@@ -161,13 +161,15 @@ const DEMO_SUMMARY: SessionSummary = {
   totalChipsCents: 500_000_000,
   totalRakeCents: 17_000_000,
   live: false,
+  // Player nets sum to −totalRakeCents (money conserved: winners split the pot
+  // minus the house rake). One stable handle per player.
   players: [
-    { userId: "cyber-samurai", name: "Cyber Samurai", handle: "User_A", avatar: avatarUrl("cyber-samurai"), netCents: -100_000_000 },
-    { userId: "neon-viper", name: "Neon Viper", handle: "User_b", avatar: avatarUrl("neon-viper"), netCents: -70_000_000 },
-    { userId: "shadow-king", name: "Shadow King", handle: "User_C", avatar: avatarUrl("shadow-king"), netCents: -15_000_000 },
-    { userId: "ice-queen", name: "Ice Queen", handle: "User_C", avatar: avatarUrl("ice-queen"), netCents: -15_000_000 },
-    { userId: "void-witch", name: "Mystic FS", handle: "User_C", avatar: avatarUrl("void-witch"), netCents: -1_100_000 },
-    { userId: "gold-phantom", name: "Gold Phantom", handle: "User_A", avatar: avatarUrl("gold-phantom"), netCents: 201_100_000 },
+    { userId: "cyber-samurai", name: "Cyber Samurai", handle: "cyber_s", avatar: avatarUrl("cyber-samurai"), netCents: -100_000_000 },
+    { userId: "neon-viper", name: "Neon Viper", handle: "neon_v", avatar: avatarUrl("neon-viper"), netCents: -70_000_000 },
+    { userId: "shadow-king", name: "Shadow King", handle: "shadow_k", avatar: avatarUrl("shadow-king"), netCents: -15_000_000 },
+    { userId: "ice-queen", name: "Ice Queen", handle: "ice_q", avatar: avatarUrl("ice-queen"), netCents: -15_000_000 },
+    { userId: "void-witch", name: "Mystic FS", handle: "mystic_fs", avatar: avatarUrl("void-witch"), netCents: -1_100_000 },
+    { userId: "gold-phantom", name: "Gold Phantom", handle: "gold_p", avatar: avatarUrl("gold-phantom"), netCents: 184_100_000 },
   ],
   hands: [
     { handId: "34261706343384", handNo: 12847, potCents: 7_000_000, winnerName: "Cyber Samurai", winnerAvatar: avatarUrl("cyber-samurai"), winningHand: "Full House, Aces over Kings" },

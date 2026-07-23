@@ -1130,6 +1130,11 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		}
 
 		winners, _ := poker.ApplyResolutions(s.Table, res.Resolutions)
+		// Rake comes OUT of the pot: credit the club, then deduct that same amount
+		// from the winners' stacks so total chips are conserved (Σ player nets ==
+		// −rake) rather than the club's rake being minted on top of a full payout.
+		rakeAmount := creditRake(ctx, db, s, potBefore)
+		poker.DeductRakeFromWinners(s.Table, res.Resolutions, rakeAmount)
 		if err := emitHandSettled(ctx, s, res, potBefore, plan); err != nil {
 			logger.Error("audit hand_settled: %v", err)
 		}
@@ -1137,7 +1142,6 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 			logger.Error("broadcast showdown: %v", err)
 		}
 		recordWinnings(ctx, nk, s, res)
-		creditRake(ctx, db, s, potBefore)
 		accrueLoyalty(ctx, db, nk, s, res) // HRP + achievements (before seats reset)
 		// Run-it-twice: persist the dealt boards (audit/replay). All-in insurance:
 		// pay out policies whose holder lost. Both run before ResetBetweenHands
@@ -1149,7 +1153,7 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		settleInsurance(ctx, db, s, res)
 		// Per-hand analytics + mission progress (best-effort; must not break the
 		// match loop). Uses seat state before ResetBetweenHands clears it.
-		attributeHand(ctx, logger, db, s, res, plan, potBefore)
+		attributeHand(ctx, logger, db, s, res, plan, potBefore, rakeAmount)
 		// TODO(league-accrual): fan out league-standing accrual (store.LeagueStore.
 		// AccrueStanding) and club-war per-hand settlement (store.ClubWarStore.AddHand,
 		// keyed off a war_id match param) from here. Deferred out of the match hot path
@@ -1524,29 +1528,33 @@ func releaseBuyIn(ctx context.Context, db *sql.DB, s *MatchState, seat int, user
 	_ = store.NewWalletStore(db).Credit(ctx, userID, amount, "table_cashout")
 }
 
-func creditRake(ctx context.Context, db *sql.DB, s *MatchState, pot int64) {
+// creditRake credits the club's rake ledger and accrues rakeback, returning the
+// rake amount so the caller can deduct it from the pot the winners received
+// (rake must come OUT of the pot — winners get pot − rake — or chips are minted).
+func creditRake(ctx context.Context, db *sql.DB, s *MatchState, pot int64) int64 {
 	if s.ClubID == "" || pot <= 0 {
-		return
+		return 0
 	}
 	rake, err := store.NewClubStore(db).GetRake(ctx, s.ClubID)
 	if err != nil || rake == nil {
-		return
+		return 0
 	}
 	if rake.NoFlopNoDrop && len(s.Table.Board) == 0 {
-		return
+		return 0
 	}
 	if pot < rake.MinPotMinor {
-		return
+		return 0
 	}
 	rakeAmount := pot * int64(rake.PercentBps) / 10000
 	if rake.CapMinor > 0 && rakeAmount > rake.CapMinor {
 		rakeAmount = rake.CapMinor
 	}
 	if rakeAmount <= 0 {
-		return
+		return 0
 	}
 	_ = store.NewRakeStore(db).Credit(ctx, s.ClubID, rakeAmount, s.MatchID, s.Table.HandNo)
 	accrueRakeback(ctx, db, s, rakeAmount)
+	return rakeAmount
 }
 
 // accrueRakeback distributes rakeback to the human contributors of the raked

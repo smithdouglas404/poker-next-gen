@@ -83,7 +83,7 @@ func trackAction(s *MatchState, userID, action string) {
 // showdown/settlement. Strictly best-effort: every failure is logged and
 // swallowed so a live hand is never disrupted. Reads seat state BEFORE
 // ResetBetweenHands clears it.
-func attributeHand(ctx context.Context, logger runtime.Logger, db *sql.DB, s *MatchState, res poker.ShowdownResult, plan poker.ShowdownPlan, potBefore int64) {
+func attributeHand(ctx context.Context, logger runtime.Logger, db *sql.DB, s *MatchState, res poker.ShowdownResult, plan poker.ShowdownPlan, potBefore int64, rakeAmount int64) {
 	ss := store.NewStatsStore(db)
 	ms := store.NewMissionStore(db)
 	matchID := matchIDForAudit(s)
@@ -94,6 +94,7 @@ func attributeHand(ctx context.Context, logger runtime.Logger, db *sql.DB, s *Ma
 	// Winnings + winner set per seat, derived from the resolved side pots.
 	winBySeat := map[int]int64{}
 	winnerSeatSet := map[int]bool{}
+	var grossWon int64
 	for _, r := range res.Resolutions {
 		if len(r.Winners) == 0 || r.Amount <= 0 {
 			continue
@@ -102,6 +103,15 @@ func attributeHand(ctx context.Context, logger runtime.Logger, db *sql.DB, s *Ma
 		for _, seat := range r.Winners {
 			winBySeat[seat] += share
 			winnerSeatSet[seat] = true
+			grossWon += share
+		}
+	}
+	// Rake comes out of the pot: subtract each winner's proportional rake share
+	// from their recorded winnings so persisted per-hand nets reconcile
+	// (Σ nets == −rake), matching the chips actually deducted at settlement.
+	if rakeAmount > 0 && grossWon > 0 {
+		for seat, won := range winBySeat {
+			winBySeat[seat] = won - rakeAmount*won/grossWon
 		}
 	}
 

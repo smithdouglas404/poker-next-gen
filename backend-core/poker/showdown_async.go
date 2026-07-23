@@ -3,6 +3,7 @@ package poker
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/smithdouglas404/poker-next-gen/backend-core/poker/enginemath"
 )
@@ -234,6 +235,67 @@ func handCategoryFromPlan(seat int, plan ShowdownPlan) (string, error) {
 }
 
 // ApplyResolutions pays winners and clears the pot. Call from MatchLoop only.
+// DeductRakeFromWinners removes `rake` chips from the seats that just won the
+// pot, in proportion to each seat's gross winnings, so the house rake is taken
+// OUT of the pot (winners net pot − rake) instead of being minted. Any rounding
+// remainder is taken from the largest winner. Never drives a stack below zero.
+func DeductRakeFromWinners(t *Table, resolutions []PotResolution, rake int64) {
+	if rake <= 0 {
+		return
+	}
+	won := map[int]int64{}
+	var total int64
+	for _, r := range resolutions {
+		if len(r.Winners) == 0 || r.Amount <= 0 {
+			continue
+		}
+		share := r.Amount / int64(len(r.Winners))
+		for _, seat := range r.Winners {
+			won[seat] += share
+			total += share
+		}
+	}
+	if total <= 0 {
+		return
+	}
+	seats := make([]int, 0, len(won))
+	for seat := range won {
+		seats = append(seats, seat)
+	}
+	sort.Ints(seats)
+	var deducted int64
+	for _, seat := range seats {
+		if seat < 0 || seat >= len(t.Seats) || t.Seats[seat] == nil {
+			continue
+		}
+		d := rake * won[seat] / total
+		if d > t.Seats[seat].Stack {
+			d = t.Seats[seat].Stack
+		}
+		t.Seats[seat].Stack -= d
+		deducted += d
+	}
+	// Rounding remainder → the largest winner with chips left.
+	for rem := rake - deducted; rem > 0; {
+		best := -1
+		for _, seat := range seats {
+			if seat >= 0 && seat < len(t.Seats) && t.Seats[seat] != nil && t.Seats[seat].Stack > 0 &&
+				(best < 0 || won[seat] > won[best]) {
+				best = seat
+			}
+		}
+		if best < 0 {
+			break
+		}
+		take := rem
+		if take > t.Seats[best].Stack {
+			take = t.Seats[best].Stack
+		}
+		t.Seats[best].Stack -= take
+		break
+	}
+}
+
 func ApplyResolutions(t *Table, resolutions []PotResolution) ([][]int, int64) {
 	groups := make([][]int, 0, len(resolutions))
 	var total int64
