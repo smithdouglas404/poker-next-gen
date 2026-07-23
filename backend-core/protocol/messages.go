@@ -147,6 +147,10 @@ type TableCreateRequest struct {
 	BombPotAnte     int64 `json:"bomb_pot_ante,omitempty" validate:"min=0" unit:"money_minor" label:"Bomb Pot Ante"` // per-player ante (0 => one BB when triggered)
 	AllowInsurance  bool  `json:"allow_insurance,omitempty" label:"Allow Insurance"`
 	AllowRunItTwice bool  `json:"allow_run_it_twice,omitempty" label:"Allow Run It Twice"`
+	// Competition tags: bind the table to a club-war / league so settled hands
+	// accrue to those standings (empty => not participating).
+	WarID    string `json:"war_id,omitempty" label:"Club War"`
+	LeagueID string `json:"league_id,omitempty" label:"League"`
 }
 
 // ClubMemberRoleRequest is the club_member_role RPC payload: promote/demote a

@@ -43,6 +43,10 @@ type MatchState struct {
 	RoomID           string
 	ClubID           string
 	TournamentID     string
+	// WarID / LeagueID tag a table as part of a club-war or league so per-hand
+	// results accrue to those standings at settlement (empty => not participating).
+	WarID            string
+	LeagueID         string
 	SmallBlind       int64
 	BigBlind         int64
 	Ante             int64
@@ -197,6 +201,14 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	if v, ok := params["tournament_id"].(string); ok {
 		tournamentID = v
 	}
+	warID := ""
+	if v, ok := params["war_id"].(string); ok {
+		warID = v
+	}
+	leagueID := ""
+	if v, ok := params["league_id"].(string); ok {
+		leagueID = v
+	}
 	maxSeats := 6
 	if v, ok := numParam(params, "max_seats"); ok && v >= 2 {
 		maxSeats = int(v)
@@ -284,6 +296,8 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		RoomID:       roomID,
 		ClubID:       clubID,
 		TournamentID: tournamentID,
+		WarID:        warID,
+		LeagueID:     leagueID,
 		SmallBlind:   sb,
 		BigBlind:     bb,
 		// Snapshot the configured allocations so host overrides can be reverted
@@ -1182,13 +1196,7 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		// Per-hand analytics + mission progress (best-effort; must not break the
 		// match loop). Uses seat state before ResetBetweenHands clears it.
 		attributeHand(ctx, logger, db, s, res, plan, potBefore, rakeAmount)
-		// TODO(league-accrual): fan out league-standing accrual (store.LeagueStore.
-		// AccrueStanding) and club-war per-hand settlement (store.ClubWarStore.AddHand,
-		// keyed off a war_id match param) from here. Deferred out of the match hot path
-		// to avoid destabilizing the handler: standings and war scores are currently
-		// driven by the admin RPCs (league_standings_set, clubwar_result). Wiring this
-		// safely requires a war_id/league_id match label + per-seat club resolution and
-		// a single batched write, tracked as the unified attributeHand() hook in the plan.
+		accrueCompetition(ctx, logger, db, s, potBefore)
 		s.Table.ResetBetweenHands()
 		reportTournamentBusts(ctx, db, nk, s)
 		standUpBusted(s) // cash tables: clear felted players so the table stays playable
@@ -1196,6 +1204,35 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		return true
 	default:
 		return false
+	}
+}
+
+// accrueCompetition fans a settled hand into club-war / league standings when the
+// table is tagged for one (war_id / league_id match params). The club-war delta is
+// the pot contested this hand — a volume-based contribution metric, so a club whose
+// war tables run bigger/more action advances its war score. League accrual is one
+// activity point per settled hand. Per-seat club resolution is intentionally
+// avoided: a war/league table belongs to s.ClubID, so the whole table's activity
+// accrues to that club. Best-effort — a standings write must never break the loop.
+func accrueCompetition(ctx context.Context, logger runtime.Logger, db *sql.DB, s *MatchState, potBefore int64) {
+	if s.ClubID == "" || potBefore <= 0 {
+		return
+	}
+	if s.WarID != "" {
+		if err := store.NewClubWarStore(db).AddHand(ctx, &store.ClubWarHand{
+			WarID:   s.WarID,
+			MatchID: matchIDForAudit(s),
+			HandNo:  s.Table.HandNo,
+			ClubID:  s.ClubID,
+			Delta:   potBefore,
+		}); err != nil {
+			logger.Warn("club-war accrual: %v", err)
+		}
+	}
+	if s.LeagueID != "" {
+		if err := store.NewLeagueStore(db).AccrueStanding(ctx, s.LeagueID, s.ClubID, 1, 0, 0); err != nil {
+			logger.Warn("league accrual: %v", err)
+		}
 	}
 }
 

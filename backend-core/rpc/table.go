@@ -140,6 +140,8 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 	matchID, err := nk.MatchCreate(ctx, protocol.MatchModule, map[string]interface{}{
 		"room_id":       roomID,
 		"club_id":       req.ClubID,
+		"war_id":        req.WarID,
+		"league_id":     req.LeagueID,
 		"small_blind":   sb,
 		"big_blind":     bb,
 		"buy_in":        buyIn,
