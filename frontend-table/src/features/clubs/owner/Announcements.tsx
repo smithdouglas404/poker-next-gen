@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
@@ -40,6 +40,23 @@ export function Announcements({
 }) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const bodyRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Wrap the current selection (or caret) in markdown markers — real formatting,
+  // not a decorative toolbar.
+  const wrapSelection = (before: string, after: string) => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const start = el.selectionStart ?? body.length;
+    const end = el.selectionEnd ?? body.length;
+    const sel = body.slice(start, end) || "text";
+    const next = body.slice(0, start) + before + sel + after + body.slice(end);
+    setBody(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(start + before.length, start + before.length + sel.length);
+    });
+  };
   const [audience, setAudience] = useState<Audience>("all");
   const [delivery, setDelivery] = useState<DeliveryStyle>("modal");
   const [busy, setBusy] = useState(false);
@@ -83,18 +100,26 @@ export function Announcements({
               className="mt-3 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-gold/40"
             />
 
-            {/* Faux rich-text toolbar (formatting hints, message stays plain text) */}
-            <div className="mt-3 flex items-center gap-1 rounded-t-lg border border-b-0 border-white/10 bg-white/[0.03] px-2 py-1.5 text-white/50">
-              {["B", "I", "U", "🔗", "🎨"].map((t) => (
-                <span
-                  key={t}
-                  className="flex h-7 min-w-7 items-center justify-center rounded px-1.5 text-sm font-bold hover:bg-white/10"
+            {/* Markdown toolbar — wraps the current selection (real formatting). */}
+            <div className="mt-3 flex items-center gap-1 rounded-t-lg border border-b-0 border-white/10 bg-white/[0.03] px-2 py-1.5 text-white/60">
+              {([
+                { t: "B", before: "**", after: "**" },
+                { t: "I", before: "*", after: "*" },
+                { t: "U", before: "__", after: "__" },
+                { t: "🔗", before: "[", after: "](https://)" },
+              ] as const).map((b) => (
+                <button
+                  key={b.t}
+                  type="button"
+                  onClick={() => wrapSelection(b.before, b.after)}
+                  className="flex h-7 min-w-7 items-center justify-center rounded px-1.5 text-sm font-bold transition hover:bg-white/10 hover:text-white"
                 >
-                  {t}
-                </span>
+                  {b.t}
+                </button>
               ))}
             </div>
             <textarea
+              ref={bodyRef}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder="Enter your club-wide announcement here…"

@@ -34,7 +34,7 @@ Verified against the live local stack (Postgres :5433 + engine-math :8080 + Naka
 | Screen | Control | State | Evidence / RPC |
 |---|---|---|---|
 | Member Management | Edit / Kick / Promote / Approve | **WIRED** | `balance_allocate`, `club_kick`, `club_member_role`, `club_request_review` (OwnerHub.tsx) |
-| Member Management | Quick Stats (Most Active Table / Top Tournament) | **DEMO** | hardcoded `QuickStats.tsx:14-17` |
+| Member Management | Quick Stats (Most Active Table / Top Tournament) | **FIXED** | derived live from `table_list` (busiest) + `tournament_list` (top buy-in) |
 | Invite Flow | Send / Resend / Revoke | **WIRED** | `club_invite`, `club_invite_revoke` (ClubInvitations.tsx) |
 | Invite Flow | Welcome-card "unique code" | **DEMO** | client hash `inviteCode()`; expiry client-computed |
 | Revenue Reports | rake series / ledger / house balance | **WIRED** | `club_rake_report`, `rake_ledger_get`, `admin_financials` |
@@ -48,7 +48,7 @@ Verified against the live local stack (Postgres :5433 + engine-math :8080 + Naka
 | Global Settings | Admin/Mod role selects, 2FA toggle | **DEMO** | stored as strings/flags in settings_json; grant no real role |
 | Announcements | Broadcast Now (post + list) | **WIRED** | `club_announcement_create/list`, `announcement_create/list` |
 | Announcements | Target Audience / Delivery Style | **DEMO** | only appends text tag / severity; no real channel param |
-| Announcements | Rich-text toolbar (B/I/U/link/color) | **DEAD** | decorative spans (Announcements.tsx:88-95) |
+| Announcements | Rich-text toolbar (B/I/U/link) | **FIXED** | real markdown wrap of the selection (wrapSelection) |
 | Sponsorship Payouts | List / Record | **WIRED** | `sponsorship_payout_list/create` |
 | Public Table Browser (Classic) | grid / Join | **WIRED** | `table_list` → `joinRoom` |
 | Public Table Browser (Classic) | **Seats filter** | **FIXED** | "Open Seats" toggle added (6c23b5d) |
@@ -87,7 +87,7 @@ Verified against the live local stack (Postgres :5433 + engine-math :8080 + Naka
 | Avatar Marketplace | Purchase / Complete Purchase | **WIRED** | cart → `cosmetic_buy` |
 | Avatar Marketplace | Pay with Gold / Pay with ETH | **DEMO** | USD settle only; Gold/ETH display-only |
 | Premium Market | Acquire / Wishlist | **WIRED** | `cosmetic_buy`, `cosmetic_wishlist_add` |
-| Premium Market | 360° rotate badge | **DEAD** | decorative span (PremiumMarket.tsx:67) |
+| Premium Market | 360° rotate badge | **REMOVED** | no multi-angle asset exists; dead badge removed (honest) |
 | Purchase Success modal | View Wardrobe / Back | **WIRED** | nav (by design) |
 | Wardrobe Hub | Equip / Dismantle(list) / Save Preset | **WIRED** | `cosmetic_equip`, `marketplace_list`, `loadout_save/equip`, `inventory_list` |
 | Dye Shop | Apply Dye | **WIRED** | `cosmetic_dye_set` |

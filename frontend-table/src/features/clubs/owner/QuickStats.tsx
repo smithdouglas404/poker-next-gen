@@ -1,20 +1,60 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
+import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
 import { compact, relTime, usdCompact } from "./ownerRpc";
 import type { QuickStats as QuickStatsData } from "./types";
 
+interface HighlightRow {
+  icon: string;
+  label: string;
+  value: string;
+  note: string;
+}
+
 /** Right-rail "Quick Stats" panel from the owner master: most-active table, top
- * tournament, and the club rollup metrics — all sourced from club_quick_stats. */
+ * tournament, and the club rollup metrics. Metrics come from club_quick_stats;
+ * the two highlight rows are derived live from table_list / tournament_list. */
 export function QuickStats({ data }: { data: QuickStatsData }) {
   const s = data.stats;
   const winPct = s ? (s.win_rate_bps / 100).toFixed(1) : "—";
 
-  const rows = [
-    { icon: "▤", label: "Most Active Table", value: "High Stakes — Table 1", note: "$500 / $1k blinds" },
-    { icon: "♛", label: "Top Tournament", value: "Gold Cup Championship", note: "Prize pool $1M" },
-  ];
+  const [rows, setRows] = useState<HighlightRow[]>([
+    { icon: "▤", label: "Most Active Table", value: "No live tables", note: "—" },
+    { icon: "♛", label: "Top Tournament", value: "None scheduled", note: "—" },
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const next: HighlightRow[] = [
+        { icon: "▤", label: "Most Active Table", value: "No live tables", note: "—" },
+        { icon: "♛", label: "Top Tournament", value: "None scheduled", note: "—" },
+      ];
+      try {
+        const t = (await callSessionRpc("table_list", {})) as { matches?: Array<{ label?: string }> };
+        let best: { room: string; sb: number; bb: number; seated: number } | null = null;
+        for (const m of t.matches ?? []) {
+          let l: { room_id?: string; sb?: number; bb?: number; seated?: number } = {};
+          try { l = JSON.parse(m.label ?? "{}"); } catch { /* skip */ }
+          if (!best || (l.seated ?? 0) > best.seated) best = { room: l.room_id || "Table", sb: l.sb ?? 0, bb: l.bb ?? 0, seated: l.seated ?? 0 };
+        }
+        if (best && best.seated >= 0 && (t.matches?.length ?? 0) > 0) {
+          next[0] = { icon: "▤", label: "Most Active Table", value: best.room, note: `$${best.sb / 100} / $${best.bb / 100} · ${best.seated} seated` };
+        }
+      } catch { /* offline */ }
+      try {
+        const tr = (await callSessionRpc("tournament_list", {})) as { tournaments?: Array<{ name: string; buy_in_minor?: number; status: string }> };
+        const top = (tr.tournaments ?? []).filter((x) => x.status !== "finished").sort((a, b) => (b.buy_in_minor ?? 0) - (a.buy_in_minor ?? 0))[0];
+        if (top) next[1] = { icon: "♛", label: "Top Tournament", value: top.name, note: usdCompact(top.buy_in_minor ?? 0) + " buy-in" };
+      } catch { /* offline */ }
+      if (!cancelled) setRows(next);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const metrics = [
     { label: "Hands played", value: compact(s?.hands ?? 0) },
