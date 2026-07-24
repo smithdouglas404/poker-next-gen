@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { Button } from "@/features/ui";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
@@ -626,6 +627,50 @@ function DerivedSection({
 }) {
   const s = quick.stats;
   const seated = roster.filter((m) => m.locked_amount > 0).length;
+
+  // Real featured tables / series from table_list / tournament_list (demo fallback).
+  const [featured, setFeatured] = useState<{ name: string; note: string }[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        if (tournaments) {
+          const d = (await callSessionRpc("tournament_list", {})) as {
+            tournaments?: Array<{ name: string; status: string; buy_in_minor?: number; variant?: string }>;
+          };
+          const rows = (d.tournaments ?? [])
+            .filter((t) => t.status !== "finished")
+            .slice(0, 4)
+            .map((t) => ({
+              name: t.name,
+              note: `${usdCompact(t.buy_in_minor ?? 0)} · ${t.variant === "omaha" ? "PLO" : "Hold'em"} · ${t.status}`,
+            }));
+          if (!cancelled && rows.length) setFeatured(rows);
+        } else {
+          const d = (await callSessionRpc("table_list", {})) as {
+            matches?: Array<{ label?: string }>;
+          };
+          const rows = (d.matches ?? []).slice(0, 5).map((m) => {
+            let l: { room_id?: string; sb?: number; bb?: number; seated?: number } = {};
+            try {
+              l = JSON.parse(m.label ?? "{}");
+            } catch {
+              /* label not json */
+            }
+            const blinds = l.sb && l.bb ? `$${l.sb / 100} / $${l.bb / 100}` : "";
+            return { name: l.room_id || "Table", note: `${blinds}${blinds ? " · " : ""}${l.seated ?? 0} seated` };
+          });
+          if (!cancelled && rows.length) setFeatured(rows);
+        }
+      } catch {
+        /* guest / offline → keep demo rows */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tournaments]);
+
   const cards: StatCard[] = tournaments
     ? [
         { label: "Tournament Wins", value: `${s?.tourney_wins ?? 0}`, sub: "All-time", accent: "gold" },
@@ -657,15 +702,16 @@ function DerivedSection({
           {tournaments ? "Featured Series" : "Featured Tables"}
         </p>
         <div className="mt-4 space-y-3">
-          {(tournaments
-            ? [
-                { name: "Gold Cup Championship", note: "Prize pool $1M · Sundays 20:00" },
-                { name: "Diamond Vault Turbo", note: "$50k GTD · Daily 21:00" },
-              ]
-            : [
-                { name: "High Stakes — Table 1", note: "$500 / $1k · 6-max" },
-                { name: "Nightly PLO — Table 3", note: "$25 / $50 · Pot-Limit Omaha" },
-              ]
+          {(featured ??
+            (tournaments
+              ? [
+                  { name: "Gold Cup Championship", note: "Prize pool $1M · Sundays 20:00" },
+                  { name: "Diamond Vault Turbo", note: "$50k GTD · Daily 21:00" },
+                ]
+              : [
+                  { name: "High Stakes — Table 1", note: "$500 / $1k · 6-max" },
+                  { name: "Nightly PLO — Table 3", note: "$25 / $50 · Pot-Limit Omaha" },
+                ])
           ).map((t) => (
             <div
               key={t.name}
