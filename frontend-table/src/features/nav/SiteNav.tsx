@@ -94,7 +94,7 @@ export function SiteNav() {
           </div>
           
           {/* Clerk Auth Controls */}
-          <SignedOut>
+          <Show when="signed-out">
             <SignInButton mode="modal">
               <button className={cn(BTN_GOLD, "rounded-lg px-4 py-2 text-xs uppercase tracking-wide cursor-pointer")}>
                 Sign in
@@ -105,11 +105,11 @@ export function SiteNav() {
                 Sign up
               </button>
             </SignUpButton>
-          </SignedOut>
+          </Show>
           
-          <SignedIn>
+          <Show when="signed-in">
             <UserButton />
-          </SignedIn>
+          </Show>
         </div>
 
         {/* mobile toggle */}
@@ -161,7 +161,7 @@ export function SiteNav() {
           
           {/* Mobile Clerk Auth Controls */}
           <div className="mt-3 flex gap-2">
-            <SignedOut>
+            <Show when="signed-out">
               <SignInButton mode="modal">
                 <button className={cn(BTN_GOLD, "flex-1 rounded-lg py-2.5 text-xs uppercase tracking-wide cursor-pointer")}>
                   Sign in
@@ -172,12 +172,12 @@ export function SiteNav() {
                   Sign up
                 </button>
               </SignUpButton>
-            </SignedOut>
-            <SignedIn>
+            </Show>
+            <Show when="signed-in">
               <div className="flex-1">
                 <UserButton />
               </div>
-            </SignedIn>
+            </Show>
           </div>
         </div>
       )}
