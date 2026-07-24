@@ -33,7 +33,7 @@ function statusTone(status: string): "green" | "red" | "gold" | "purple" {
 }
 
 interface AlertItem {
-  tone: "red" | "gold" | "cyan" | "green";
+  tone: "red" | "gold" | "steel" | "green";
   title: string;
   body: string;
 }
@@ -57,7 +57,7 @@ function buildAlerts(
     // Late-reg closing soon on a running event.
     if (t.status === "running" && t.meta?.lateReg) {
       alerts.push({
-        tone: "cyan",
+        tone: "steel",
         title: `${t.name} — late registration open`,
         body: `${registered} players remaining. Late reg closes at the next break.`,
       });

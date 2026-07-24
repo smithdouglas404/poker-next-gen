@@ -100,7 +100,7 @@ Verified against the live local stack (Postgres :5433 + engine-math :8080 + Naka
 | Public Lobby | list / Join | **WIRED** | `table_list` |
 | Tournament Center | stat cards / Start / Finalize | **WIRED** | `tournament_list/analytics/start/finalize` |
 | Tournament Center | **Global Club Chat** | **FIXED** | `club_chat_send/list` (7c3ed4e) |
-| Tournament Center | Alerts feed | **DEMO** | client-derived (`buildAlerts`); no feed RPC |
+| Tournament Center | Alerts feed | **FIXED** | real derivation (`buildAlerts`) — overlay-risk / late-reg alerts computed from live `tournament_list` + registration counts (a pure projection of server state, like Quick Stats); off-palette cyan tone removed |
 | Tournament Setup | Publish (create + blinds + prizes) | **WIRED** | `tournament_create`, `blind_level_add`, `prize_pool_add` (+ #82 editors) |
 | Prize/Analytics | overview / payout / Finalize | **WIRED** | `tournament_analytics`, `tournament_finalize` |
 | Prize/Analytics | Export Report | **DEMO** | client-side JSON download; no server artifact |
