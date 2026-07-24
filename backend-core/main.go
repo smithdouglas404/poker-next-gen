@@ -144,6 +144,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"clubwar_result":    rpc.ClubwarResult,
 		// Stats / leaderboards
 		"player_stats":       rpc.PlayerStats,
+		"player_rank":        rpc.PlayerRank,
 		"leak_report":        rpc.LeakReport,
 		"hand_history":       rpc.HandHistory,
 		"stats_head_to_head": rpc.StatsHeadToHead,
@@ -173,6 +174,8 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"account_recovery_request_email": rpc.AccountRecoveryRequestEmail,
 		"account_recovery_verify_email":  rpc.AccountRecoveryVerifyEmail,
 		"account_recovery_backup_code":   rpc.AccountRecoveryBackupCode,
+		"account_recovery_wallet_challenge": rpc.AccountRecoveryWalletChallenge,
+		"account_recovery_wallet_verify":    rpc.AccountRecoveryWalletVerify,
 		"api_key_create":                 rpc.ApiKeyCreate,
 		"api_key_list":                   rpc.ApiKeyList,
 		"api_key_revoke":                 rpc.ApiKeyRevoke,

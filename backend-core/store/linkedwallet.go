@@ -96,6 +96,37 @@ func (s *LinkedWalletStore) List(ctx context.Context, userID string) ([]LinkedWa
 	return out, rows.Err()
 }
 
+// FindByAddress resolves the single account that has verified this wallet
+// address, for wallet-based account recovery. Returns ("", "", nil) when the
+// address is linked to zero accounts OR to more than one — ambiguous ownership
+// must never resolve to a recoverable account (an attacker could otherwise link
+// a victim's public address to their own account to create ambiguity). Matches
+// case-insensitively so EVM checksum/lowercase variants both resolve.
+func (s *LinkedWalletStore) FindByAddress(ctx context.Context, address string) (userID, chain string, err error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT user_id, chain FROM poker_linked_wallet
+		WHERE verified = TRUE AND LOWER(address) = LOWER($1)`, address)
+	if err != nil {
+		return "", "", err
+	}
+	defer rows.Close()
+	var uid, ch string
+	n := 0
+	for rows.Next() {
+		if err := rows.Scan(&uid, &ch); err != nil {
+			return "", "", err
+		}
+		n++
+	}
+	if err := rows.Err(); err != nil {
+		return "", "", err
+	}
+	if n != 1 {
+		return "", "", nil
+	}
+	return uid, ch, nil
+}
+
 // Unlink removes a linked wallet the user owns.
 func (s *LinkedWalletStore) Unlink(ctx context.Context, userID, address string) error {
 	_, err := s.db.ExecContext(ctx,

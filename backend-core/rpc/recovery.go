@@ -141,3 +141,129 @@ func AccountRecoveryBackupCode(ctx context.Context, logger runtime.Logger, db *s
 
 	return `{"ok":true}`, nil
 }
+
+// recoveryWalletMessage is the exact string a recovering player signs with their
+// linked wallet. Distinct from the link-flow message so a link signature can
+// never be replayed to recover an account.
+func recoveryWalletMessage(nonce string) string {
+	return "High Rollers Club: recover account\nnonce: " + nonce
+}
+
+// AccountRecoveryWalletChallenge issues a signing nonce for wallet-based
+// recovery. PUBLIC (a locked-out player has no session). Given a wallet address,
+// it resolves the single account that verified it and mints a single-use nonce
+// bound to that account. The response is uniform whether or not the address is
+// linked (a random, unstored nonce is returned for unknown addresses) so an
+// attacker cannot enumerate which addresses map to accounts.
+func AccountRecoveryWalletChallenge(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	var req struct {
+		Address string `json:"address"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil {
+		return "", runtime.NewError("invalid payload", 3)
+	}
+	address := strings.TrimSpace(req.Address)
+	if address == "" {
+		return "", runtime.NewError("address required", 3)
+	}
+
+	ls := store.NewLinkedWalletStore(db)
+	userID, _, err := ls.FindByAddress(ctx, address)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+
+	var nonce string
+	if userID != "" {
+		nonce, err = ls.IssueNonce(ctx, userID)
+		if err != nil {
+			return "", runtime.NewError(err.Error(), 13)
+		}
+	} else {
+		// Unknown/ambiguous address → a decoy nonce that will never consume.
+		var b [16]byte
+		_, _ = rand.Read(b[:])
+		nonce = hex.EncodeToString(b[:])
+	}
+	out, _ := json.Marshal(map[string]interface{}{
+		"ok":      true,
+		"nonce":   nonce,
+		"message": recoveryWalletMessage(nonce),
+	})
+	return string(out), nil
+}
+
+// AccountRecoveryWalletVerify completes wallet-based recovery. PUBLIC. It
+// cryptographically verifies the signature over recoveryWalletMessage(nonce),
+// confirms the recovered address is a verified linked wallet, resolves the owning
+// account, consumes the nonce, and resets that account's email password. Because
+// only a wallet the account itself already linked (via the #91 signature-proven
+// flow) can satisfy this, possession of a random public address is not enough.
+func AccountRecoveryWalletVerify(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	var req struct {
+		Address     string `json:"address"`
+		Chain       string `json:"chain"`
+		Nonce       string `json:"nonce"`
+		Signature   string `json:"signature"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil {
+		return "", runtime.NewError("invalid payload", 3)
+	}
+	req.Address = strings.TrimSpace(req.Address)
+	if req.Address == "" || req.Nonce == "" || req.Signature == "" {
+		return "", runtime.NewError("address, nonce and signature required", 3)
+	}
+	if len(req.NewPassword) < 8 {
+		return "", runtime.NewError("new password must be at least 8 characters", 3)
+	}
+
+	// 1) Verify the signature and recover the address that actually signed.
+	msg := recoveryWalletMessage(req.Nonce)
+	var verifiedAddr string
+	var err error
+	switch strings.ToLower(req.Chain) {
+	case "solana":
+		verifiedAddr, err = verifySolana(req.Address, msg, req.Signature)
+	default:
+		verifiedAddr, err = recoverEVM(msg, req.Signature)
+	}
+	if err != nil || !strings.EqualFold(verifiedAddr, req.Address) {
+		return "", runtime.NewError("invalid signature or address", 7)
+	}
+
+	// 2) The recovered address must be a verified linked wallet of exactly one
+	//    account — that account is the recovery target.
+	ls := store.NewLinkedWalletStore(db)
+	userID, _, err := ls.FindByAddress(ctx, verifiedAddr)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	if userID == "" {
+		return "", runtime.NewError("wallet is not linked to a recoverable account", 7)
+	}
+
+	// 3) Consume the single-use nonce bound to that account (proves this exact
+	//    challenge was issued for this account and has not expired/been reused).
+	ok, err := ls.ConsumeNonce(ctx, userID, req.Nonce, walletNonceTTL)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	if !ok {
+		return "", runtime.NewError("challenge expired or unknown — request a new one", 7)
+	}
+
+	// 4) Reset the account's email password (parity with email/backup recovery).
+	acct, err := nk.AccountGetId(ctx, userID)
+	if err != nil {
+		return "", runtime.NewError("could not load account", 13)
+	}
+	email := strings.TrimSpace(acct.GetEmail())
+	if email == "" {
+		return "", runtime.NewError("account has no email identity to reset — contact support", 9)
+	}
+	if err := nk.LinkEmail(ctx, userID, email, req.NewPassword); err != nil {
+		return "", runtime.NewError("could not reset password", 13)
+	}
+	return `{"ok":true}`, nil
+}
