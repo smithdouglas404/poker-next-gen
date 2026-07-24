@@ -1408,6 +1408,16 @@ func handleHostAction(ctx context.Context, db *sql.DB, dispatcher runtime.MatchD
 		SmallBlind int64  `json:"small_blind"`
 		BigBlind   int64  `json:"big_blind"`
 		Ante       int64  `json:"ante"`
+		// Comprehensive live table settings (Admin overlay "table_settings").
+		AnteOn           bool  `json:"ante_on"`
+		AnteCents        int64 `json:"ante_cents"`
+		TurnTimeSecs     int   `json:"turn_time_secs"`
+		DecisionSecs     int   `json:"decision_secs"`
+		TimeBankSecs     int64 `json:"time_bank_secs"`
+		BuyInMinCents    int64 `json:"buy_in_min_cents"`
+		BuyInMaxCents    int64 `json:"buy_in_max_cents"`
+		WalletLimitCents int64 `json:"wallet_limit_cents"`
+		SpectatorMode    bool  `json:"spectator_mode"`
 	}
 	if err := json.Unmarshal(data, &req); err != nil {
 		return
@@ -1452,6 +1462,48 @@ func handleHostAction(ctx context.Context, db *sql.DB, dispatcher runtime.MatchD
 			s.BigBlind = req.BigBlind
 			narrate(dispatcher, s, fmt.Sprintf("Host set blinds to $%d/$%d (from the next hand).", req.SmallBlind/100, req.BigBlind/100))
 		}
+	case "table_settings":
+		// Apply the Admin overlay's Comprehensive Table Settings live. Previously
+		// this action was unhandled, so every field below silently no-op'd (a
+		// "face without flow"). Blinds still arrive via set_blinds; here we apply
+		// the rest to fields with a server-side home. Behavioural-only toggles
+		// (deal-to-away, reveal-all, showdown pacing) are not yet consumed and are
+		// intentionally omitted rather than faked.
+		clampHost := func(v int) int {
+			if v < 0 {
+				return 0
+			}
+			if v > 120 {
+				return 120
+			}
+			return v
+		}
+		if req.AnteOn {
+			s.Ante = req.AnteCents
+		} else {
+			s.Ante = 0
+		}
+		if req.DecisionSecs > 0 {
+			s.ActionSecsCfg = clampHost(req.DecisionSecs)
+		} else if req.TurnTimeSecs > 0 {
+			s.ActionSecsCfg = clampHost(req.TurnTimeSecs)
+		}
+		if req.TimeBankSecs > 0 {
+			s.TimeBankGrant = req.TimeBankSecs
+		}
+		if req.BuyInMinCents > 0 {
+			s.MinBuyIn = req.BuyInMinCents
+		}
+		if req.BuyInMaxCents > 0 && req.BuyInMaxCents >= s.MinBuyIn {
+			s.MaxBuyIn = req.BuyInMaxCents
+		}
+		if req.WalletLimitCents >= 0 {
+			s.WalletLimitCents = req.WalletLimitCents
+		}
+		s.AllowSpectators = req.SpectatorMode
+		narrate(dispatcher, s, "Host updated the table settings.")
+		dispatcher.MatchLabelUpdate(buildLabel(s))
+		broadcastSnapshot(ctx, db, dispatcher, s, nil)
 	case "force_fold":
 		// Fold the seat currently on the clock (dispute / stalling / disconnect).
 		// Only the acting seat can be folded without corrupting hand state.
