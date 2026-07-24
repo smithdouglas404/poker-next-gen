@@ -45,6 +45,11 @@ export function GlobalSettings({
   const [maxBuyin, setMaxBuyin] = useState(
     s0.max_buyin_cents ? String(s0.max_buyin_cents / 100) : "",
   );
+  // Full rake config (CustomRakeConfiguration) — previously only percent was editable.
+  const [rakeCap, setRakeCap] = useState(rake?.cap_minor ? String(rake.cap_minor / 100) : "");
+  const [minPot, setMinPot] = useState(rake?.min_pot_minor ? String(rake.min_pot_minor / 100) : "");
+  const [noFlopNoDrop, setNoFlopNoDrop] = useState(rake?.no_flop_no_drop ?? true);
+  const [rakePublic, setRakePublic] = useState(rake?.public ?? false);
 
   const [twofa, setTwofa] = useState(s0.twofa_required ?? true);
   const [adminRole, setAdminRole] = useState(s0.admin_role ?? "Super Admin");
@@ -91,9 +96,10 @@ export function GlobalSettings({
         club_id: club?.id ?? "",
         name: rake?.name ?? "Standard",
         percent_bps: Math.round(Math.max(0, Math.min(10, Number(rakePct) || 0)) * 100),
-        cap_minor: rake?.cap_minor ?? 0,
-        no_flop_no_drop: rake?.no_flop_no_drop ?? true,
-        min_pot_minor: rake?.min_pot_minor ?? 0,
+        cap_minor: Math.max(0, Math.round(Number(rakeCap) || 0) * 100),
+        no_flop_no_drop: noFlopNoDrop,
+        min_pot_minor: Math.max(0, Math.round(Number(minPot) || 0) * 100),
+        public: rakePublic,
       });
       await onSaveSettings({}, mergedSettings());
     });
@@ -182,6 +188,50 @@ export function GlobalSettings({
               />
             </div>
           </Labeled>
+          <Labeled label="Rake Cap (max per pot)">
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gold">$</span>
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                value={rakeCap}
+                onChange={(e) => setRakeCap(e.target.value)}
+                disabled={disabled}
+                placeholder="No cap"
+                className="w-full rounded-lg border border-white/12 bg-black/40 py-2 pl-7 pr-3 text-sm text-white outline-none focus:border-gold/40 disabled:opacity-50"
+              />
+            </div>
+          </Labeled>
+          <Labeled label="Minimum Pot (no rake below)">
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gold">$</span>
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                value={minPot}
+                onChange={(e) => setMinPot(e.target.value)}
+                disabled={disabled}
+                placeholder="0.00"
+                className="w-full rounded-lg border border-white/12 bg-black/40 py-2 pl-7 pr-3 text-sm text-white outline-none focus:border-gold/40 disabled:opacity-50"
+              />
+            </div>
+          </Labeled>
+          <ToggleRow
+            label="No Flop, No Drop"
+            hint="Skip the rake on hands that end before the flop."
+            on={noFlopNoDrop}
+            onToggle={() => setNoFlopNoDrop((v) => !v)}
+            disabled={disabled}
+          />
+          <ToggleRow
+            label="Publicly Visible"
+            hint="Let anyone read this rake rule (transparency signal)."
+            on={rakePublic}
+            onToggle={() => setRakePublic((v) => !v)}
+            disabled={disabled}
+          />
           <GoldButton busy={busy === "fin"} disabled={disabled} onClick={saveFinancials}>
             Save Financials
           </GoldButton>

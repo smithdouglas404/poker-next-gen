@@ -148,6 +148,7 @@ export interface RakeConfig {
   cap_minor: number; // max rake per pot, cents
   no_flop_no_drop: boolean;
   min_pot_minor: number; // cents
+  public?: boolean; // opt-in public rake transparency (backend json key is `public`)
   is_active?: boolean;
 }
 
