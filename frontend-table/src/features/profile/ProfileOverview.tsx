@@ -159,6 +159,24 @@ export function ProfileOverview({ notify }: { notify: (msg: string, kind?: "ok" 
     } catch {
       /* private mode — non-fatal */
     }
+    // Persist server-side so the choice follows the player across devices.
+    void callSessionRpc("profile_meta_set", { avatar: id }).catch(() => {});
+  }, []);
+
+  // Seed the avatar from the server (falls back to the local cache set above).
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = (await callSessionRpc("profile_meta_get", {})) as { meta?: { avatar?: string } };
+        if (!cancelled && data.meta?.avatar) setAvatar(data.meta.avatar);
+      } catch {
+        /* guest / offline → keep local */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const tier = useMemo(() => vipTier(ver), [ver]);

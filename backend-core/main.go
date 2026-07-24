@@ -60,6 +60,8 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"wallet_get":                  rpc.WalletGet,
 		"wallet_ledger":               rpc.WalletLedger,
 		"profile_get":                 rpc.ProfileGet,
+		"profile_meta_get":            rpc.ProfileMetaGet,
+		"profile_meta_set":            rpc.ProfileMetaSet,
 		"me_roles":                    rpc.MeRoles,
 		"loyalty_get":                 rpc.LoyaltyGet,
 		"matchmaker_enqueue":          rpc.MatchmakerEnqueue,

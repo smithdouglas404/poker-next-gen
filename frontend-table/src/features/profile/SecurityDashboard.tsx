@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { BTN_GOLD, GLASS_PANEL, HEADING_SM, cn } from "@/features/ui/tokens";
 
 import {
@@ -71,8 +72,8 @@ export function SecurityDashboard({ notify }: { notify: (msg: string, kind?: "ok
   const [wallet, setWallet] = useState<WalletBalance | null>(null);
   const [keys, setKeys] = useState<ApiKey[] | null>(null);
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
+  const [linked, setLinked] = useState<LinkedWalletInfo[]>(DEMO_LINKED_WALLETS);
   const sessions: ActiveSession[] = DEMO_SESSIONS;
-  const linked: LinkedWalletInfo[] = DEMO_LINKED_WALLETS;
 
   useEffect(() => {
     setPrefs(readPrefs());
@@ -86,6 +87,46 @@ export function SecurityDashboard({ notify }: { notify: (msg: string, kind?: "ok
     })();
   }, []);
 
+  // Real linked wallets (signature-verified) + server-persisted prefs.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [wl, meta] = await Promise.allSettled([
+          callSessionRpc("wallet_linked_list", {}),
+          callSessionRpc("profile_meta_get", {}),
+        ]);
+        if (cancelled) return;
+        if (wl.status === "fulfilled") {
+          const rows = ((wl.value as { wallets?: Array<{ provider: string; chain: string; address: string }> }).wallets ?? []).map(
+            (w) => ({
+              id: w.address,
+              name: w.provider ? w.provider[0].toUpperCase() + w.provider.slice(1) : "Wallet",
+              balance: w.chain === "solana" ? "SOL" : "ETH",
+              short: w.address.length > 12 ? `${w.address.slice(0, 6)}…${w.address.slice(-4)}` : w.address,
+              emoji: w.provider === "phantom" ? "👻" : w.provider === "coinbase" ? "🔵" : "🦊",
+            }),
+          );
+          if (rows.length > 0) setLinked(rows);
+        }
+        if (meta.status === "fulfilled") {
+          const m = (meta.value as { meta?: { email_notifications?: boolean; privacy_mode?: boolean } }).meta;
+          if (m && (m.email_notifications !== undefined || m.privacy_mode !== undefined)) {
+            setPrefs({
+              emailNotifications: m.email_notifications ?? DEFAULT_PREFS.emailNotifications,
+              privacyMode: m.privacy_mode ?? DEFAULT_PREFS.privacyMode,
+            });
+          }
+        }
+      } catch {
+        /* guest / offline → keep demo/local */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const togglePref = useCallback(
     (key: keyof Prefs) => {
       setPrefs((prev) => {
@@ -95,6 +136,11 @@ export function SecurityDashboard({ notify }: { notify: (msg: string, kind?: "ok
         } catch {
           /* private mode */
         }
+        // Persist server-side so prefs follow the player across devices.
+        void callSessionRpc("profile_meta_set", {
+          email_notifications: next.emailNotifications,
+          privacy_mode: next.privacyMode,
+        }).catch(() => {});
         notify(`${key === "emailNotifications" ? "Email notifications" : "Privacy mode"} ${next[key] ? "on" : "off"}.`);
         return next;
       });

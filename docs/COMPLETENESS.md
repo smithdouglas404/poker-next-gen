@@ -64,14 +64,15 @@ Verified against the live local stack (Postgres :5433 + engine-math :8080 + Naka
 |---|---|---|---|
 | Signup | Create Account | **WIRED** | Nakama `authenticate()` (login/page.tsx) |
 | Signup | Google OAuth | **DEAD** | sets an error string (login/page.tsx:55) — needs real OAuth |
-| Signup / Profile | Initial Avatar selection | **DEMO** | localStorage only; no `avatar_set` RPC |
+| Signup / Profile | Initial Avatar selection | **FIXED** | `profile_meta_set/get` (Nakama account metadata) — persists across devices; verified round-trip (14a4f6d+) |
 | Player Profile Dashboard | stats (hands / WL / VIP) | **WIRED** | `player_stats`, `me_verification` |
 | Player Profile Dashboard | Recent Transactions | **FIXED** | `wallet_ledger` (7c3ed4e) |
 | Player Profile Dashboard | Biggest Pot / Tournament Points / Member Since | **DEMO** | static (not fed by player_stats) |
 | Player Profile Dashboard (admin) | Edit Limit / Grant Bonus / Flag for Review | **DEAD** | do not exist (only Ban / adjust-wallet do) |
 | Security Dashboard | Password / 2FA / API keys / Chips | **WIRED** | `auth_change_password`, `auth_2fa_*`, `api_key_*`, `wallet_get` |
 | Security Dashboard | Linked Social (Google/FB) | **DEAD** | static badges |
-| Security Dashboard | Email Notifications / Privacy Mode | **DEMO** | localStorage only; no prefs RPC |
+| Security Dashboard | Email Notifications / Privacy Mode | **FIXED** | `profile_meta_set/get` — server-persisted; verified round-trip |
+| Security Dashboard | Linked crypto wallets list | **FIXED** | `wallet_linked_list` (real signature-verified links; demo only offline) |
 | Security Dashboard | Active Sessions Revoke | **DEAD** | `<Link>`, no revoke RPC |
 | 2FA Setup modal | QR / code / backup / Activate | **WIRED** | `auth_2fa_setup/verify` |
 | Account Recovery | email / backup-code recovery | **WIRED** | `account_recovery_*` |
