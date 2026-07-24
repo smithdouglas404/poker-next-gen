@@ -111,6 +111,7 @@ export type OwnerSection =
   | "tables"
   | "tournaments"
   | "members"
+  | "operators"
   | "announcements"
   | "analytics"
   | "financials"

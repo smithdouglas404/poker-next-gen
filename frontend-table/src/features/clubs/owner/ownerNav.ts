@@ -11,6 +11,7 @@ export const OWNER_SECTION_NAV: (ConsoleNavStateItem & { id: OwnerSection })[] =
   { id: "tables", label: "Live Tables", icon: "▤" },
   { id: "tournaments", label: "Tournament Center", icon: "♛" },
   { id: "members", label: "Member Registry", icon: "☰" },
+  { id: "operators", label: "Operators & Equity", icon: "♦" },
   { id: "announcements", label: "Announcements", icon: "📣" },
   { id: "analytics", label: "Member Analytics", icon: "📊" },
   { id: "financials", label: "Revenue Reports", icon: "▧" },

@@ -73,6 +73,28 @@ export const ownerApi = {
       currency: "USD",
     }),
 
+  /** Grant an owner/manager/agent seat with an equity split (club_owner_add). */
+  addOwner: (
+    clubId: string,
+    userId: string,
+    role: "owner" | "manager" | "agent",
+    equityBps: number,
+    canConfigure: boolean,
+  ) =>
+    call<{ id?: string; role?: string; equity_bps?: number }>("club_owner_add", {
+      club_id: clubId,
+      user_id: userId,
+      role,
+      equity_bps: equityBps,
+      can_configure: canConfigure,
+    }),
+  /** Read a player's allocated balance inside a club (balance_get). */
+  getBalance: (clubId: string, userId: string) =>
+    call<{ balance?: number; currency?: string; locked_amount?: number }>("balance_get", {
+      club_id: clubId,
+      user_id: userId,
+    }),
+
   /** House rake aggregated over a period (day|week|month|quarter|year|all). */
   rakeReport: (clubId: string, period: string) =>
     call<RakeReport>("club_rake_report", { club_id: clubId, period }),

@@ -12,6 +12,7 @@ import { GlobalSettings } from "./GlobalSettings";
 import { GuestGate } from "./GuestGate";
 import { MemberAnalytics } from "./MemberAnalytics";
 import { MemberManagement } from "./MemberManagement";
+import { OperatorsEquity } from "./OperatorsEquity";
 import { Overview } from "./Overview";
 import { OwnerShell } from "./OwnerShell";
 import { QuickStats } from "./QuickStats";
@@ -530,6 +531,18 @@ export function OwnerHub() {
           />
           <QuickStats data={emptyQuick} />
         </div>
+      )}
+
+      {section === "operators" && (
+        <OperatorsEquity
+          clubId={club?.id ?? ""}
+          roster={roster}
+          canManage={canManage}
+          demo={demo}
+          onChanged={() => {
+            if (club?.id) void reloadRoster(club.id);
+          }}
+        />
       )}
 
       {section === "announcements" && (
