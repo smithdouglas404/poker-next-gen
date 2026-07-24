@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { Button, Field, Input, Select } from "@/features/ui";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
@@ -13,6 +14,7 @@ type SetupTab = "general" | "structure" | "financials" | "rules";
 
 const EMPTY_DRAFT: DraftForm = {
   name: "",
+  clubId: "",
   variant: "texas-holdem",
   buyIn: 100,
   fee: 10,
@@ -75,6 +77,23 @@ export function CreateTournamentPanel({
 }) {
   const [tab, setTab] = useState<SetupTab>("general");
   const [draft, setDraft] = useState<DraftForm>(EMPTY_DRAFT);
+  const [clubs, setClubs] = useState<Array<{ id: string; name: string }>>([]);
+
+  // Load the operator's clubs so the tournament can be bound to one.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = (await callSessionRpc("club_list", {})) as { clubs?: Array<{ id: string; name: string }> };
+        if (!cancelled) setClubs(Array.isArray(data?.clubs) ? data.clubs : []);
+      } catch {
+        if (!cancelled) setClubs([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const set = <K extends keyof DraftForm>(k: K, v: DraftForm[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
@@ -147,7 +166,17 @@ export function CreateTournamentPanel({
                 <Field label="Variant">
                   <Select value={draft.variant} onChange={(e) => set("variant", e.target.value)}>
                     <option value="texas-holdem">Texas Hold&apos;em</option>
-                    <option value="plo">Pot-Limit Omaha</option>
+                    <option value="omaha">Pot-Limit Omaha</option>
+                  </Select>
+                </Field>
+                <Field label="Club" hint="Leave as Platform for a network-wide event.">
+                  <Select value={draft.clubId} onChange={(e) => set("clubId", e.target.value)}>
+                    <option value="">Platform (no club)</option>
+                    {clubs.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
                   </Select>
                 </Field>
                 <Field label="Buy-in Amount ($)">

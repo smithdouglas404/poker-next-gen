@@ -25,6 +25,9 @@ export async function listTournaments(): Promise<Tournament[]> {
 export async function createTournament(draft: DraftForm): Promise<Tournament> {
   const payload = {
     name: draft.name,
+    // Bind the tournament to a club (empty => platform tournament). Previously
+    // never sent, so the rich panel could only make platform tournaments.
+    club_id: draft.clubId || undefined,
     variant: draft.variant,
     buy_in_minor: Math.round(draft.buyIn * 100),
     fee_minor: Math.round(draft.fee * 100),
@@ -34,6 +37,33 @@ export async function createTournament(draft: DraftForm): Promise<Tournament> {
     scheduled_at: draft.scheduledAt ? new Date(draft.scheduledAt).toISOString() : new Date().toISOString(),
   };
   return (await callSessionRpc("tournament_create", payload)) as Tournament;
+}
+
+/** tournament_start → seat entrants and launch the director + tables. Requires
+ *  ≥1 blind level and prize tiers summing to 100% (server-enforced). */
+export async function startTournament(
+  tournamentId: string,
+): Promise<{ director_match_id?: string; table_match_ids?: string[]; status?: string }> {
+  return (await callSessionRpc("tournament_start", { tournament_id: tournamentId })) as {
+    director_match_id?: string;
+    table_match_ids?: string[];
+    status?: string;
+  };
+}
+
+/** balancing_rule_set → configure multi-table balancing for a tournament. */
+export async function setBalancingRule(
+  tournamentId: string,
+  maxSeatDifference: number,
+  breakTableAtOrBelow: number,
+  strategy: "balanced" | "random",
+): Promise<unknown> {
+  return callSessionRpc("balancing_rule_set", {
+    tournament_id: tournamentId,
+    max_seat_difference: maxSeatDifference,
+    break_table_at_or_below: breakTableAtOrBelow,
+    strategy,
+  });
 }
 
 /** tournament_register → buys the current player into a tournament. */

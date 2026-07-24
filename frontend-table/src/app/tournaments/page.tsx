@@ -10,6 +10,8 @@ import {
   blindLevels,
   createTournament,
   finalizeTournament,
+  startTournament,
+  setBalancingRule,
   leaderboardTop,
   listTournaments,
   prizePool,
@@ -274,6 +276,36 @@ export default function TournamentsPage() {
     [tournaments, demo, notify, load],
   );
 
+  const onStart = useCallback(
+    async (id: string) => {
+      const t = tournaments.find((x) => x.id === id);
+      if (demo) {
+        setTournaments((list) => list.map((x) => (x.id === id ? { ...x, status: "running" } : x)));
+        notify(`Demo: "${t?.name ?? "event"}" would launch via tournament_start.`);
+        return;
+      }
+      try {
+        const res = await startTournament(id);
+        notify(`Started "${t?.name ?? "tournament"}" — ${res.table_match_ids?.length ?? 0} table(s) live.`);
+        await load();
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Start failed", "err");
+      }
+    },
+    [tournaments, demo, notify, load],
+  );
+
+  const onSetBalancingRule = useCallback(
+    async (id: string, seatDiff: number, breakAt: number, strategy: "balanced" | "random") => {
+      if (demo) {
+        notify("Demo: balancing rule would save via balancing_rule_set.");
+        return;
+      }
+      await setBalancingRule(id, seatDiff, breakAt, strategy);
+    },
+    [demo, notify],
+  );
+
   const totalPrizeMinor = useMemo(
     () => tournaments.reduce((s, t) => s + (counts[t.id] ?? 0) * t.buy_in_minor, 0),
     [tournaments, counts],
@@ -358,6 +390,8 @@ export default function TournamentsPage() {
             loadAnalytics={loadAnalytics}
             onCreate={() => setShowCreate(true)}
             onFinalize={onFinalize}
+            onStart={onStart}
+            onSetBalancingRule={onSetBalancingRule}
             demo={demo}
           />
         ) : (

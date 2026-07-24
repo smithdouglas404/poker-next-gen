@@ -117,6 +117,7 @@ export type TopTab = "lobby" | "center" | "board";
 /** Draft held client-side by the create panel before publish. */
 export interface DraftForm {
   name: string;
+  clubId: string; // owning club (empty = platform tournament)
   variant: string;
   buyIn: number; // dollars
   fee: number; // dollars
