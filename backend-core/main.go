@@ -290,6 +290,16 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		}
 	}
 
+	// Clerk (clerk.com) OAuth bridge: verify a Clerk session JWT passed to
+	// authenticateCustom and map it to a stable Nakama account. No-op unless
+	// CLERK_JWT_ISSUER is set, so device/email auth is unaffected when unused.
+	if err := initializer.RegisterBeforeAuthenticateCustom(rpc.ClerkBeforeAuthCustom); err != nil {
+		return err
+	}
+	if rpc.ClerkEnabled() {
+		logger.Info("Clerk OAuth bridge enabled (issuer configured)")
+	}
+
 	if err := initializer.RegisterMatch(protocol.MatchModule, func(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule) (runtime.Match, error) {
 		return &holdem.Handler{}, nil
 	}); err != nil {
