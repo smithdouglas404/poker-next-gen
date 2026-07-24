@@ -131,4 +131,10 @@ export interface DraftForm {
   lateReg: boolean;
   scheduledAt: string; // datetime-local value
   regCloseAt: string; // datetime-local value (late-reg close)
+  // Operator-authored structure. When present (non-empty) these override the
+  // preset generators (structures.ts) on publish — every SB/BB/ante/duration and
+  // every payout tier (incl. per-tier guaranteed_minor) is sent verbatim via
+  // blind_level_add / prize_pool_add. Undefined => fall back to the preset ladder.
+  customBlinds?: BlindLevel[];
+  customPrizes?: Prize[];
 }

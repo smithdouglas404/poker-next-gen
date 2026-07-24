@@ -240,9 +240,18 @@ export default function TournamentsPage() {
         // Persist the derived blind ladder and payout tiers alongside the bracket
         // (best-effort — the bracket is already live even if a level/tier fails).
         if (created?.id) {
+          // Operator-edited grids win; otherwise expand the chosen preset.
+          const levels =
+            draft.customBlinds && draft.customBlinds.length > 0
+              ? draft.customBlinds
+              : buildBlindLevels(draft);
+          const tiers =
+            draft.customPrizes && draft.customPrizes.length > 0
+              ? draft.customPrizes
+              : buildPrizeTiers(draft.payoutStructure);
           await Promise.allSettled([
-            ...buildBlindLevels(draft).map((lvl) => blindLevelAdd(created.id, lvl)),
-            ...buildPrizeTiers(draft.payoutStructure).map((p) => prizePoolAdd(created.id, p)),
+            ...levels.map((lvl) => blindLevelAdd(created.id, lvl)),
+            ...tiers.map((p) => prizePoolAdd(created.id, p)),
           ]);
         }
         notify(`Published "${draft.name}" with structure & payouts.`);

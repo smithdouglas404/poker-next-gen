@@ -8,9 +8,14 @@ import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
 import { Tag } from "./atoms";
 import { dollars } from "./format";
-import type { DraftForm } from "./types";
+import { buildBlindLevels, buildPrizeTiers } from "./structures";
+import type { BlindLevel, DraftForm, Prize } from "./types";
 
 type SetupTab = "general" | "structure" | "financials" | "rules";
+
+// Compact numeric cell used across the blind & payout editors.
+const CELL =
+  "w-full rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-sm text-white outline-none focus:border-gold/50";
 
 const EMPTY_DRAFT: DraftForm = {
   name: "",
@@ -76,7 +81,13 @@ export function CreateTournamentPanel({
   busy: boolean;
 }) {
   const [tab, setTab] = useState<SetupTab>("general");
-  const [draft, setDraft] = useState<DraftForm>(EMPTY_DRAFT);
+  const [draft, setDraft] = useState<DraftForm>(() => ({
+    ...EMPTY_DRAFT,
+    // Seed concrete, operator-editable grids from the presets so the Structure
+    // and Financials tabs always open on a real ladder they can tweak per-cell.
+    customBlinds: buildBlindLevels(EMPTY_DRAFT),
+    customPrizes: buildPrizeTiers(EMPTY_DRAFT.payoutStructure),
+  }));
   const [clubs, setClubs] = useState<Array<{ id: string; name: string }>>([]);
 
   // Load the operator's clubs so the tournament can be bound to one.
@@ -97,6 +108,41 @@ export function CreateTournamentPanel({
 
   const set = <K extends keyof DraftForm>(k: K, v: DraftForm[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
+
+  // ── Editable blind ladder ────────────────────────────────────────────────
+  const blinds = draft.customBlinds ?? [];
+  const setBlinds = (next: BlindLevel[]) => setDraft((d) => ({ ...d, customBlinds: next }));
+  const editBlind = (i: number, patch: Partial<BlindLevel>) =>
+    setBlinds(blinds.map((b, j) => (j === i ? { ...b, ...patch } : b)));
+  const addBlind = () => {
+    const played = blinds.filter((b) => !b.is_break);
+    const last = played[played.length - 1];
+    const nextLevel = played.length + 1;
+    const bb = last ? Math.round((last.big_blind * 1.5) / 100) * 100 : 100;
+    setBlinds([
+      ...blinds,
+      { level: nextLevel, small_blind: Math.round(bb / 2), big_blind: bb, ante: Math.round(bb / 8 / 10) * 10, duration_secs: Math.max(60, draft.levelMinutes * 60) },
+    ]);
+  };
+  const addBreak = () =>
+    setBlinds([...blinds, { level: 0, small_blind: 0, big_blind: 0, ante: 0, duration_secs: 300, is_break: true }]);
+  const removeBlind = (i: number) => setBlinds(blinds.filter((_, j) => j !== i));
+  const regenBlinds = () => setBlinds(buildBlindLevels(draft));
+
+  // ── Editable payout ladder ───────────────────────────────────────────────
+  const prizes = draft.customPrizes ?? [];
+  const setPrizes = (next: Prize[]) => setDraft((d) => ({ ...d, customPrizes: next }));
+  const editPrize = (i: number, patch: Partial<Prize>) =>
+    setPrizes(prizes.map((p, j) => (j === i ? { ...p, ...patch } : p)));
+  const addPrize = () =>
+    setPrizes([
+      ...prizes,
+      { rank_from: prizes.length + 1, rank_to: prizes.length + 1, payout_bps: 0, guaranteed_minor: 0 },
+    ]);
+  const removePrize = (i: number) => setPrizes(prizes.filter((_, j) => j !== i));
+  const regenPrizes = () => setPrizes(buildPrizeTiers(draft.payoutStructure));
+  const payoutTotalBps = prizes.reduce((s, p) => s + (Number(p.payout_bps) || 0), 0);
+  const payoutOk = payoutTotalBps === 10000;
 
   const estPrizeMinor = useMemo(
     () => Math.max(draft.guaranteedPrize * 100, draft.buyIn * 100 * draft.maxPlayers),
@@ -233,77 +279,258 @@ export function CreateTournamentPanel({
             )}
 
             {tab === "structure" && (
-              <div className="grid gap-5 sm:grid-cols-2">
-                <Field label="Starting Stack (chips)">
-                  <Input
-                    type="number"
-                    min={1000}
-                    value={draft.startingStack}
-                    onChange={(e) => set("startingStack", Number(e.target.value))}
-                  />
-                </Field>
-                <Field label="Seats Per Table">
-                  <Select
-                    value={String(draft.maxSeatsPerTable)}
-                    onChange={(e) => set("maxSeatsPerTable", Number(e.target.value))}
-                  >
-                    <option value="6">6-max</option>
-                    <option value="9">9-handed</option>
-                    <option value="2">Heads-up</option>
-                  </Select>
-                </Field>
-                <Field label="Blind Level Increase Interval">
-                  <Select
-                    value={String(draft.levelMinutes)}
-                    onChange={(e) => set("levelMinutes", Number(e.target.value))}
-                  >
-                    <option value="10">Every 10 mins</option>
-                    <option value="15">Every 15 mins</option>
-                    <option value="20">Every 20 mins</option>
-                    <option value="30">Every 30 mins</option>
-                  </Select>
-                </Field>
-                <Field label="Break Schedule" hint="Add a break between levels">
-                  <Button variant="outline" size="md" className="w-full justify-start" onClick={() => {}}>
-                    + Add Break
-                  </Button>
-                </Field>
+              <div className="space-y-5">
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field label="Starting Stack (chips)">
+                    <Input
+                      type="number"
+                      min={1000}
+                      value={draft.startingStack}
+                      onChange={(e) => set("startingStack", Number(e.target.value))}
+                    />
+                  </Field>
+                  <Field label="Seats Per Table">
+                    <Select
+                      value={String(draft.maxSeatsPerTable)}
+                      onChange={(e) => set("maxSeatsPerTable", Number(e.target.value))}
+                    >
+                      <option value="6">6-max</option>
+                      <option value="9">9-handed</option>
+                      <option value="2">Heads-up</option>
+                    </Select>
+                  </Field>
+                  <Field label="Default Level Length (mins)" hint="Applied to new levels & Regenerate">
+                    <Select
+                      value={String(draft.levelMinutes)}
+                      onChange={(e) => set("levelMinutes", Number(e.target.value))}
+                    >
+                      <option value="10">Every 10 mins</option>
+                      <option value="15">Every 15 mins</option>
+                      <option value="20">Every 20 mins</option>
+                      <option value="30">Every 30 mins</option>
+                    </Select>
+                  </Field>
+                </div>
+
+                {/* Editable blind ladder — every SB/BB/ante/duration persists via
+                    blind_level_add on publish. */}
+                <div>
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-400">
+                      Blind Structure · {blinds.length} rows
+                    </p>
+                    <button
+                      type="button"
+                      onClick={regenBlinds}
+                      className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 hover:text-gold"
+                    >
+                      ↻ Regenerate from settings
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto rounded-xl border border-white/10">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-white/10 bg-white/[0.03] text-[11px] uppercase tracking-wider text-muted">
+                          <th className="px-3 py-2">Lvl</th>
+                          <th className="px-2 py-2">Small</th>
+                          <th className="px-2 py-2">Big</th>
+                          <th className="px-2 py-2">Ante</th>
+                          <th className="px-2 py-2">Mins</th>
+                          <th className="px-2 py-2" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {blinds.map((b, i) =>
+                          b.is_break ? (
+                            <tr key={i} className="border-b border-white/5 bg-gold/[0.04]">
+                              <td className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-gold" colSpan={4}>
+                                ☕ Break
+                              </td>
+                              <td className="px-1 py-1">
+                                <input
+                                  type="number"
+                                  className={CELL}
+                                  value={Math.round(b.duration_secs / 60)}
+                                  onChange={(e) => editBlind(i, { duration_secs: (Number(e.target.value) || 0) * 60 })}
+                                />
+                              </td>
+                              <td className="px-2 py-1 text-right">
+                                <button type="button" onClick={() => removeBlind(i)} className="text-neutral-500 hover:text-brand">
+                                  ✕
+                                </button>
+                              </td>
+                            </tr>
+                          ) : (
+                            <tr key={i} className="border-b border-white/5">
+                              <td className="px-3 py-1.5 text-neutral-400">{b.level}</td>
+                              {(["small_blind", "big_blind", "ante"] as const).map((k) => (
+                                <td key={k} className="px-1 py-1">
+                                  <input
+                                    type="number"
+                                    className={CELL}
+                                    value={b[k]}
+                                    onChange={(e) => editBlind(i, { [k]: Number(e.target.value) || 0 })}
+                                  />
+                                </td>
+                              ))}
+                              <td className="px-1 py-1">
+                                <input
+                                  type="number"
+                                  className={CELL}
+                                  value={Math.round(b.duration_secs / 60)}
+                                  onChange={(e) => editBlind(i, { duration_secs: (Number(e.target.value) || 0) * 60 })}
+                                />
+                              </td>
+                              <td className="px-2 py-1 text-right">
+                                <button type="button" onClick={() => removeBlind(i)} className="text-neutral-500 hover:text-brand">
+                                  ✕
+                                </button>
+                              </td>
+                            </tr>
+                          ),
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-4">
+                    <button
+                      type="button"
+                      onClick={addBlind}
+                      className="text-xs font-semibold uppercase tracking-wider text-neutral-300 hover:text-white"
+                    >
+                      + Add level
+                    </button>
+                    <button
+                      type="button"
+                      onClick={addBreak}
+                      className="text-xs font-semibold uppercase tracking-wider text-neutral-300 hover:text-gold"
+                    >
+                      + Add break
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
             {tab === "financials" && (
-              <div className="grid gap-5 sm:grid-cols-2">
-                <Field label="Payout Structure" className="sm:col-span-2">
-                  <Select
-                    value={draft.payoutStructure}
-                    onChange={(e) => set("payoutStructure", e.target.value)}
-                  >
-                    {Object.entries(PAYOUT_LABEL).map(([k, v]) => (
-                      <option key={k} value={k}>
-                        {v}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label="Guaranteed Prize ($)">
-                  <Input
-                    type="number"
-                    min={0}
-                    value={draft.guaranteedPrize}
-                    onChange={(e) => set("guaranteedPrize", Number(e.target.value))}
-                  />
-                </Field>
-                <Field label="Admin Fee (% of buy-in)" hint="Deducted from each entry as rake">
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={draft.buyIn > 0 ? Math.round((draft.fee / draft.buyIn) * 100) : 0}
-                    onChange={(e) =>
-                      set("fee", Math.round((Number(e.target.value) / 100) * draft.buyIn))
-                    }
-                  />
-                </Field>
+              <div className="space-y-5">
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field label="Payout Preset" hint="Loads a ladder you can then edit" className="sm:col-span-2">
+                    <Select
+                      value={draft.payoutStructure}
+                      onChange={(e) => {
+                        const structure = e.target.value;
+                        setDraft((d) => ({ ...d, payoutStructure: structure, customPrizes: buildPrizeTiers(structure) }));
+                      }}
+                    >
+                      {Object.entries(PAYOUT_LABEL).map(([k, v]) => (
+                        <option key={k} value={k}>
+                          {v}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label="Guaranteed Prize ($)">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={draft.guaranteedPrize}
+                      onChange={(e) => set("guaranteedPrize", Number(e.target.value))}
+                    />
+                  </Field>
+                  <Field label="Admin Fee (% of buy-in)" hint="Deducted from each entry as rake">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={draft.buyIn > 0 ? Math.round((draft.fee / draft.buyIn) * 100) : 0}
+                      onChange={(e) =>
+                        set("fee", Math.round((Number(e.target.value) / 100) * draft.buyIn))
+                      }
+                    />
+                  </Field>
+                </div>
+
+                {/* Editable payout tiers — rank range, share %, and per-tier
+                    guarantee ($) all persist via prize_pool_add on publish. */}
+                <div>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-400">
+                    Payout Ladder · {prizes.length} tiers
+                  </p>
+                  <div className="overflow-x-auto rounded-xl border border-white/10">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-white/10 bg-white/[0.03] text-[11px] uppercase tracking-wider text-muted">
+                          <th className="px-3 py-2">From</th>
+                          <th className="px-2 py-2">To</th>
+                          <th className="px-2 py-2">Share %</th>
+                          <th className="px-2 py-2">Min Guarantee ($)</th>
+                          <th className="px-2 py-2" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {prizes.map((p, i) => (
+                          <tr key={i} className="border-b border-white/5">
+                            {(["rank_from", "rank_to"] as const).map((k) => (
+                              <td key={k} className="px-1 py-1">
+                                <input
+                                  type="number"
+                                  className={CELL}
+                                  value={p[k]}
+                                  onChange={(e) => editPrize(i, { [k]: Number(e.target.value) || 0 })}
+                                />
+                              </td>
+                            ))}
+                            <td className="px-1 py-1">
+                              <input
+                                type="number"
+                                step="0.5"
+                                className={CELL}
+                                value={p.payout_bps / 100}
+                                onChange={(e) => editPrize(i, { payout_bps: Math.round((Number(e.target.value) || 0) * 100) })}
+                              />
+                            </td>
+                            <td className="px-1 py-1">
+                              <input
+                                type="number"
+                                min={0}
+                                className={CELL}
+                                value={Math.round((p.guaranteed_minor || 0) / 100)}
+                                onChange={(e) => editPrize(i, { guaranteed_minor: (Number(e.target.value) || 0) * 100 })}
+                              />
+                            </td>
+                            <td className="px-2 py-1 text-right">
+                              <button type="button" onClick={() => removePrize(i)} className="text-neutral-500 hover:text-brand">
+                                ✕
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex gap-4">
+                      <button
+                        type="button"
+                        onClick={addPrize}
+                        className="text-xs font-semibold uppercase tracking-wider text-neutral-300 hover:text-white"
+                      >
+                        + Add tier
+                      </button>
+                      <button
+                        type="button"
+                        onClick={regenPrizes}
+                        className="text-xs font-semibold uppercase tracking-wider text-neutral-400 hover:text-gold"
+                      >
+                        ↻ Reset to preset
+                      </button>
+                    </div>
+                    <p className={cn("text-sm font-semibold", payoutOk ? "text-green" : "text-brand")}>
+                      Total {(payoutTotalBps / 100).toFixed(1)}% {payoutOk ? "✓" : "— must equal 100% to start"}
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -342,8 +569,15 @@ export function CreateTournamentPanel({
               <SummaryRow label="Est. Prize Pool" value={`${dollars(estPrizeMinor, { compact: true })}+`} tone="cyan" />
               <SummaryRow label="Total Buy-in" value={dollars(totalBuyInMinor)} />
               <SummaryRow label="Starting Chips" value={draft.startingStack.toLocaleString()} />
-              <SummaryRow label="Blind Levels" value={`${draft.numLevels} × ${draft.levelMinutes}m`} />
-              <SummaryRow label="Payout" value={PAYOUT_LABEL[draft.payoutStructure]} />
+              <SummaryRow
+                label="Blind Levels"
+                value={`${blinds.filter((b) => !b.is_break).length} lvls · ${blinds.filter((b) => b.is_break).length} breaks`}
+              />
+              <SummaryRow
+                label="Payout"
+                value={`${prizes.length} tiers · ${(payoutTotalBps / 100).toFixed(0)}%`}
+                tone={payoutOk ? "cyan" : undefined}
+              />
               <div className="flex items-center justify-between border-t border-white/10 pt-3">
                 <dt className="text-neutral-500">Status</dt>
                 <dd>
