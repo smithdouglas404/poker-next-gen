@@ -28,6 +28,7 @@ type StatsAggregate struct {
 	NetCents     int64 `json:"net_cents"`
 	BetsRaises   int64 `json:"bets_raises"`
 	Calls        int64 `json:"calls"`
+	BiggestPot   int64 `json:"biggest_pot"` // largest single-hand net win (cents)
 }
 
 // Aggregate rolls up a user's per-hand rows, optionally scoped to a club. A user
@@ -43,7 +44,8 @@ func (s *StatsStore) Aggregate(ctx context.Context, userID, clubID string) (*Sta
 			COALESCE(SUM(CASE WHEN won AND went_to_showdown THEN 1 ELSE 0 END),0),
 			COALESCE(SUM(net_cents),0),
 			COALESCE(SUM(bets_raises),0),
-			COALESCE(SUM(calls),0)
+			COALESCE(SUM(calls),0),
+			COALESCE(MAX(CASE WHEN won THEN net_cents ELSE 0 END),0)
 		FROM poker_hand_stats WHERE user_id=$1`
 	args := []interface{}{userID}
 	if clubID != "" {
@@ -53,7 +55,7 @@ func (s *StatsStore) Aggregate(ctx context.Context, userID, clubID string) (*Sta
 	var a StatsAggregate
 	err := s.db.QueryRowContext(ctx, q, args...).Scan(
 		&a.Hands, &a.VPIPHands, &a.PFRHands, &a.Showdowns, &a.Wins,
-		&a.ShowdownWins, &a.NetCents, &a.BetsRaises, &a.Calls)
+		&a.ShowdownWins, &a.NetCents, &a.BetsRaises, &a.Calls, &a.BiggestPot)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}

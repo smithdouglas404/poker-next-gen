@@ -43,6 +43,8 @@ func statsView(userID, clubID string, a *store.StatsAggregate) map[string]interf
 		"af":           statsAF(a.BetsRaises, a.Calls),
 		"net_cents":    a.NetCents,
 		"net":          dollars(a.NetCents),
+		"biggest_pot":  a.BiggestPot,
+		"biggest_pot_display": dollars(a.BiggestPot),
 	}
 	if clubID != "" {
 		v["club_id"] = clubID

@@ -67,7 +67,7 @@ Verified against the live local stack (Postgres :5433 + engine-math :8080 + Naka
 | Signup / Profile | Initial Avatar selection | **FIXED** | `profile_meta_set/get` (Nakama account metadata) — persists across devices; verified round-trip (14a4f6d+) |
 | Player Profile Dashboard | stats (hands / WL / VIP) | **WIRED** | `player_stats`, `me_verification` |
 | Player Profile Dashboard | Recent Transactions | **FIXED** | `wallet_ledger` (7c3ed4e) |
-| Player Profile Dashboard | Biggest Pot / Tournament Points / Member Since | **DEMO** | static (not fed by player_stats) |
+| Player Profile Dashboard | Biggest Pot / Tournament Points | **FIXED** | Biggest Pot = MAX winning-hand net (`player_stats.biggest_pot`); Tournament Points = HRP (`loyalty_get`). Member Since still static |
 | Player Profile Dashboard (admin) | Edit Limit / Grant Bonus / Flag for Review | **DEAD** | do not exist (only Ban / adjust-wallet do) |
 | Security Dashboard | Password / 2FA / API keys / Chips | **WIRED** | `auth_change_password`, `auth_2fa_*`, `api_key_*`, `wallet_get` |
 | Security Dashboard | Linked Social (Google/FB) | **DEAD** | static badges |

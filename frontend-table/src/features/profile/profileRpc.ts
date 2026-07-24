@@ -27,6 +27,8 @@ export interface PlayerStats {
   af: number;
   net_cents: number;
   net: string;
+  biggest_pot?: number;
+  biggest_pot_display?: string;
 }
 
 export type LeakSeverity = "info" | "warn" | "high";

@@ -97,6 +97,23 @@ export function ProfileOverview({ notify }: { notify: (msg: string, kind?: "ok" 
   const [txns, setTxns] = useState<Array<{ kind: string; amount: string; date: string; positive: boolean }>>(
     DEMO_TRANSACTIONS,
   );
+  const [hrp, setHrp] = useState(0); // High Roller Points → "Tournament Points"
+
+  // Real HRP points for the Tournament-Points stat.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const d = (await callSessionRpc("loyalty_get", {})) as { hrp_total?: number };
+        if (!cancelled && typeof d.hrp_total === "number") setHrp(d.hrp_total);
+      } catch {
+        /* offline */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     setAvatar(readAvatar());
@@ -226,8 +243,12 @@ export function ProfileOverview({ notify }: { notify: (msg: string, kind?: "ok" 
               <div className="mt-3">
                 <StatRow label="Total Hands Played" value={compact(hands)} />
                 <StatRow label="Win/Loss Ratio" value={`${winPct}%`} tone="text-green" />
-                <StatRow label="Biggest Pot Won" value="$150,000" tone="text-gold" />
-                <StatRow label="Tournament Points" value="1,200" />
+                <StatRow
+                  label="Biggest Pot Won"
+                  value={stats?.biggest_pot_display ?? money(stats?.biggest_pot ?? 0)}
+                  tone="text-gold"
+                />
+                <StatRow label="Tournament Points" value={compact(hrp)} />
               </div>
             </section>
           </div>
