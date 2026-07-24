@@ -46,6 +46,8 @@ import {
   TYPED_CONFIRM_THRESHOLD_MINOR,
 } from "./schemaForm/confirm";
 import type { RpcSchema } from "./schemaForm/schemaTypes";
+import { orderedFields } from "./schemaForm/schemaTypes";
+import { schemaFromExample, coerceSynthPayload } from "./schemaForm/autoSchema";
 import { CardHandForm, hasCardForm } from "./schemaForm/CardHandForm";
 
 const CATEGORY_ORDER: CommandCategory[] = [
@@ -191,7 +193,6 @@ function CommandCenterInner() {
   const { clubs, activeClubId, refresh: refreshClubs } = useActiveClub();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [activeCommand, setActiveCommand] = useState<CommandDefinition | null>(null);
-  const [formJson, setFormJson] = useState("");
   const [formValues, setFormValues] = useState<Record<string, unknown>>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [typedConfirm, setTypedConfirm] = useState("");
@@ -203,10 +204,21 @@ function CommandCenterInner() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [tourneyWizardOpen, setTourneyWizardOpen] = useState(false);
 
-  // The generated schema for the active command, if it has a form (P0-1).
-  const activeSchema: RpcSchema | undefined = activeCommand?.rpc
-    ? getRpcSchema(activeCommand.rpc)
-    : undefined;
+  // The form schema for the active command: the generated one (P0-1) if present,
+  // otherwise one synthesised from the command's example so EVERY command with
+  // inputs renders labelled fields (money in dollars, id pickers) — never raw
+  // JSON. `activeSynth` marks the synthesised case so submit coerces values back.
+  const { schema: activeSchema, synth: activeSynth } = useMemo<{
+    schema: RpcSchema | undefined;
+    synth: boolean;
+  }>(() => {
+    if (!activeCommand?.rpc) return { schema: undefined, synth: false };
+    const gen = getRpcSchema(activeCommand.rpc);
+    if (gen) return { schema: gen, synth: false };
+    if (hasCardForm(activeCommand.id)) return { schema: undefined, synth: false };
+    const s = schemaFromExample(activeCommand.rpc, activeCommand.example);
+    return orderedFields(s).length > 0 ? { schema: s, synth: true } : { schema: undefined, synth: false };
+  }, [activeCommand]);
 
   // Resolve club/user ids to names for the confirm sentence (P0-3), so the
   // operator reads real names, not ids.
@@ -249,8 +261,14 @@ function CommandCenterInner() {
     return { live, total: COMMAND_REGISTRY.length };
   }, []);
 
+  // A command opens a form modal only if it actually takes inputs. Zero-input
+  // reads (loyalty, wallet, lists…) just run — no empty JSON box.
   const needsModal = useCallback((command: CommandDefinition) => {
-    return Boolean(command.rpc) && !NO_PAYLOAD_COMMANDS.has(command.id) && command.id !== "healthz";
+    if (!command.rpc || command.id === "healthz") return false;
+    const gen = getRpcSchema(command.rpc);
+    if (gen && orderedFields(gen).length > 0) return true;
+    if (hasCardForm(command.id)) return true;
+    return orderedFields(schemaFromExample(command.rpc, command.example)).length > 0;
   }, []);
 
   const handleRun = useCallback(
@@ -259,19 +277,18 @@ function CommandCenterInner() {
         setActiveCommand(command);
         setConfirmOpen(false);
         setTypedConfirm("");
-        const schema = command.rpc ? getRpcSchema(command.rpc) : undefined;
-        if (schema) {
-          // Schema-driven form (P0-1): prefill from the example, inherit the
-          // active club so club_id is never typed (P0-4).
-          setFormValues(
-            initialValues(schema, activeClubId ? { club_id: activeClubId } : {}),
-          );
+        const seed = activeClubId ? { club_id: activeClubId } : {};
+        const gen = command.rpc ? getRpcSchema(command.rpc) : undefined;
+        if (gen) {
+          // Generated form (P0-1): prefill from example, inherit the active club
+          // so club_id is never typed (P0-4).
+          setFormValues(initialValues(gen, seed));
         } else if (hasCardForm(command.id)) {
-          // Visual card picker form (P1-6) for card-notation commands.
+          // Visual card-picker form for card-notation commands.
           setFormValues((command.example as Record<string, unknown>) ?? {});
         } else {
-          // Legacy fallback: raw JSON for commands without a generated form yet.
-          setFormJson(JSON.stringify(command.example ?? {}, null, 2));
+          // Synthesised form from the example — labelled fields, never raw JSON.
+          setFormValues(initialValues(schemaFromExample(command.rpc!, command.example), seed));
         }
         return;
       }
@@ -313,14 +330,18 @@ function CommandCenterInner() {
     if (!activeCommand) return;
     setBusyId(activeCommand.id);
     try {
-      const result = await runLiveCommand(activeCommand, formValues);
+      const payload =
+        activeSynth && activeSchema
+          ? coerceSynthPayload(activeSchema, formValues, activeCommand.example)
+          : formValues;
+      const result = await runLiveCommand(activeCommand, payload);
       setResults((prev) => [result, ...prev.slice(0, 9)]);
       setBannerExpanded(false);
       closeModal();
     } finally {
       setBusyId(null);
     }
-  }, [activeCommand, formValues, closeModal]);
+  }, [activeCommand, formValues, activeSynth, activeSchema, closeModal]);
 
   // "Review & Run": validate, then either confirm (money/destructive/write) or
   // run directly.
@@ -335,34 +356,6 @@ function CommandCenterInner() {
       void executeActive();
     }
   }, [activeCommand, activeSchema, formValues, executeActive]);
-
-  const submitModal = useCallback(async () => {
-    if (!activeCommand) return;
-    setBusyId(activeCommand.id);
-    try {
-      let payload: Record<string, unknown> = {};
-      if (formJson.trim()) {
-        payload = JSON.parse(formJson) as Record<string, unknown>;
-      }
-      const result = await runLiveCommand(activeCommand, payload);
-      setResults((prev) => [result, ...prev.slice(0, 9)]);
-      setBannerExpanded(false);
-      setActiveCommand(null);
-    } catch {
-      setResults((prev) => [
-        {
-          ok: false,
-          commandId: activeCommand.id,
-          message: "Invalid JSON payload.",
-          at: new Date().toISOString(),
-        },
-        ...prev.slice(0, 9),
-      ]);
-      setBannerExpanded(false);
-    } finally {
-      setBusyId(null);
-    }
-  }, [activeCommand, formJson]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -738,21 +731,13 @@ function CommandCenterInner() {
               </>
             ) : (
               <>
-                <label className="mt-5 block text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                  JSON Payload
-                </label>
-                <textarea
-                  value={formJson}
-                  onChange={(e) => setFormJson(e.target.value)}
-                  rows={10}
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 p-3 font-mono text-xs text-green outline-none focus:border-green/50"
-                />
+                <p className="mt-5 text-sm text-neutral-400">This command takes no inputs.</p>
                 <div className="mt-5 flex flex-wrap gap-3">
                   <button
                     type="button"
                     disabled={busyId !== null}
-                    onClick={submitModal}
-                    className="rounded-full bg-[#0a7d43] px-6 py-2.5 text-sm font-semibold uppercase tracking-wider text-white hover:bg-[#1c9f57] disabled:opacity-50"
+                    onClick={executeActive}
+                    className="rounded-full bg-gradient-to-r from-[#9a7b2c] via-gold to-gold-lite px-6 py-2.5 text-sm font-bold uppercase tracking-wider text-black transition hover:shadow-[0_0_22px_rgba(212,175,55,0.35)] disabled:opacity-50"
                   >
                     Run
                   </button>
