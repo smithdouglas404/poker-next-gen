@@ -5,11 +5,22 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { authenticate } from "@/lib/nakama/auth";
+import { callSessionRpc } from "@/lib/nakama/sessionRpc";
+import { AVATARS, avatarSrc } from "@/features/table/avatars";
 import { Button, Field, Input, Panel, SectionHeader } from "@/features/ui";
+import { cn } from "@/features/ui/tokens";
+
+// Starter avatars offered at onboarding — the player creates their profile and
+// picks their character together (they can buy more later in the marketplace).
+const STARTER_AVATARS = ["neon-viper", "chrome-siren", "ice-queen", "cyber-samurai", "red-wolf", "steel-ghost"]
+  .map((id) => AVATARS.find((a) => a.id === id))
+  .filter((a): a is (typeof AVATARS)[number] => Boolean(a));
 
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "signup">("login");
+  const [step, setStep] = useState<"form" | "avatar">("form");
+  const [avatar, setAvatar] = useState<string>(STARTER_AVATARS[0]?.id ?? "neon-viper");
 
   // Open directly in sign-up when linked as /login?mode=signup ("Join" button).
   useEffect(() => {
@@ -29,9 +40,25 @@ export default function LoginPage() {
     setError(null);
     try {
       await authenticate("email", { email, password, username }, mode === "signup");
-      router.push("/hub"); // land members on their home, not the marketing page
+      if (mode === "signup") {
+        // New account → pick your starter avatar (profile + avatar together).
+        setStep("avatar");
+      } else {
+        router.push("/hub"); // land members on their home, not the marketing page
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Authentication failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Persist the chosen avatar to the account, then into the customization studio.
+  const proceedWithAvatar = async () => {
+    setBusy(true);
+    try {
+      await callSessionRpc("profile_meta_set", { avatar }).catch(() => {});
+      router.push("/studio");
     } finally {
       setBusy(false);
     }
@@ -55,6 +82,73 @@ export default function LoginPage() {
   const googleLogin = async () => {
     setError("Configure NEXT_PUBLIC_GOOGLE_CLIENT_ID and Google Sign-In SDK for OAuth in production.");
   };
+
+  if (step === "avatar") {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-4 py-10 text-white">
+        <Panel className="w-full max-w-3xl p-8">
+          <SectionHeader>High Rollers Club</SectionHeader>
+          <h1 className="font-display mt-2 text-3xl font-bold">Choose Your Character</h1>
+          <p className="mt-2 text-sm text-neutral-400">
+            Your account is created. Pick a starter avatar — you can buy more and fully customize in
+            the Studio. Every avatar tracks its own battle record as you play.
+          </p>
+          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
+            {STARTER_AVATARS.map((a) => {
+              const on = avatar === a.id;
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => setAvatar(a.id)}
+                  className={cn(
+                    "group relative overflow-hidden rounded-2xl border-2 p-2 text-left transition",
+                    on ? "border-gold" : "border-white/10 hover:border-white/30",
+                  )}
+                  style={on ? { boxShadow: `0 0 22px ${a.glow}` } : undefined}
+                >
+                  <div className="aspect-square overflow-hidden rounded-xl bg-gradient-to-br from-[#1c1f27] to-[#0c0e13]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={avatarSrc(a.id)}
+                      alt={a.name}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.visibility = "hidden";
+                      }}
+                    />
+                  </div>
+                  <div className="mt-2 flex items-center justify-between px-1">
+                    <span className="font-display text-sm font-semibold text-white">{a.name}</span>
+                    <span className="text-[10px] uppercase tracking-wide text-gold/70">{a.tier}</span>
+                  </div>
+                  {on && (
+                    <span className="absolute right-3 top-3 grid h-6 w-6 place-items-center rounded-full bg-gold text-xs font-bold text-black">
+                      ✓
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+            <Button size="lg" disabled={busy} onClick={() => void proceedWithAvatar()} className="flex-1">
+              {busy ? "Saving…" : "Proceed to Customization →"}
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              disabled={busy}
+              onClick={() => router.push("/hub")}
+              className="sm:w-40"
+            >
+              Skip for now
+            </Button>
+          </div>
+        </Panel>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4 text-white">
