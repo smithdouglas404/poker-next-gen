@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { Button } from "@/features/ui";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
@@ -186,20 +187,70 @@ function FinancialCell({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Local operator chat / activity feed (matches the center master's chat rail).
- *  Not backed by an RPC — messages stay client-side this session. */
+/** Operator club chat rail, wired to the real club_chat_send / club_chat_list
+ *  RPCs against the operator's club (resolved from me_roles). Falls back to a
+ *  clearly-labelled local thread only when the caller operates no club / offline. */
 function ChatPanel() {
-  const [msgs, setMsgs] = useState<{ who: string; body: string; mine?: boolean }[]>([
-    { who: "AceKing", body: "Overlay covered on Stake Freeout — nice." },
-    { who: "System", body: 'Tournament "Stake Freeout" registration open.' },
-    { who: "Wansyl", body: "Final table in ~10 mins, railbirds welcome." },
-  ]);
+  const [msgs, setMsgs] = useState<{ who: string; body: string; mine?: boolean }[]>([]);
   const [draft, setDraft] = useState("");
+  const [clubId, setClubId] = useState<string | null>(null);
+  const [live, setLive] = useState(false);
+
+  // Resolve the operator's club, then poll its chat.
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    void (async () => {
+      let id: string | null = null;
+      try {
+        const roles = (await callSessionRpc("me_roles", {})) as { club_admin_of?: string[] };
+        id = roles?.club_admin_of?.[0] ?? null;
+        if (!id) {
+          const list = (await callSessionRpc("club_list", {})) as { clubs?: Array<{ id: string }> };
+          id = list?.clubs?.[0]?.id ?? null;
+        }
+      } catch {
+        /* offline / guest */
+      }
+      if (cancelled) return;
+      setClubId(id);
+      if (!id) {
+        setMsgs([{ who: "System", body: "Operate a club to use Global Club Chat." }]);
+        return;
+      }
+      const refresh = async () => {
+        try {
+          const r = (await callSessionRpc("club_chat_list", { club_id: id, limit: 40 })) as {
+            messages?: Array<{ username?: string; text?: string; user_id?: string }>;
+          };
+          if (cancelled) return;
+          setLive(true);
+          setMsgs(
+            (r.messages ?? []).map((m) => ({ who: m.username || "Member", body: m.text || "" })),
+          );
+        } catch {
+          /* transient */
+        }
+      };
+      await refresh();
+      timer = setInterval(refresh, 5000);
+    })();
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
+    };
+  }, []);
+
   const send = () => {
     const body = draft.trim();
     if (!body) return;
-    setMsgs((m) => [...m, { who: "You", body, mine: true }]);
     setDraft("");
+    if (clubId && live) {
+      setMsgs((m) => [...m, { who: "You", body, mine: true }]);
+      void callSessionRpc("club_chat_send", { club_id: clubId, text: body }).catch(() => {});
+    } else {
+      setMsgs((m) => [...m, { who: "You", body, mine: true }]);
+    }
   };
   return (
     <div className={cn(GLASS_PANEL, "flex flex-col p-4")}>

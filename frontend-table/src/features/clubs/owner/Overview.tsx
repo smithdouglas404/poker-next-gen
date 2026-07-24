@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
+import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { Button } from "@/features/ui";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
@@ -313,12 +314,59 @@ function FeaturedTables({ roster, demo }: { roster: RosterRow[]; demo: boolean }
   );
 }
 
+interface UpcomingRow {
+  name: string;
+  note: string;
+  buyin: string;
+  state: string;
+}
+
+// Demo fallback shown only for guest/offline (no live tournament_list).
+const DEMO_UPCOMING: UpcomingRow[] = [
+  { name: "Gold Cup Championship", note: "Sundays 20:00", buyin: "$1,000", state: "Registering" },
+  { name: "Diamond Vault Turbo", note: "Daily 21:00", buyin: "$120", state: "Registering" },
+  { name: "Nightly PLO Bounty", note: "Daily 22:30", buyin: "$60", state: "Scheduled" },
+];
+
 function UpcomingTournaments() {
-  const rows = [
-    { name: "Gold Cup Championship", note: "Prize pool $1M · Sundays 20:00", buyin: "$1,000", state: "Registering" },
-    { name: "Diamond Vault Turbo", note: "$50k GTD · Daily 21:00", buyin: "$120", state: "Late Reg" },
-    { name: "Nightly PLO Bounty", note: "$25k GTD · Daily 22:30", buyin: "$60", state: "Scheduled" },
-  ];
+  const [rows, setRows] = useState<UpcomingRow[]>(DEMO_UPCOMING);
+
+  // Real upcoming events from tournament_list (registering/scheduled first).
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = (await callSessionRpc("tournament_list", {})) as {
+          tournaments?: Array<{
+            name: string;
+            status: string;
+            buy_in_minor?: number;
+            variant?: string;
+            scheduled_at?: string;
+          }>;
+        };
+        if (cancelled) return;
+        const upcoming = (data.tournaments ?? [])
+          .filter((t) => t.status === "registering" || t.status === "scheduled")
+          .slice(0, 6)
+          .map<UpcomingRow>((t) => ({
+            name: t.name,
+            note:
+              (t.variant === "omaha" ? "PLO" : "Hold'em") +
+              (t.scheduled_at ? ` · ${new Date(t.scheduled_at).toLocaleDateString()}` : ""),
+            buyin: usdCompact(t.buy_in_minor ?? 0),
+            state: t.status === "registering" ? "Registering" : "Scheduled",
+          }));
+        if (upcoming.length > 0) setRows(upcoming);
+      } catch {
+        /* guest / offline → keep demo rows */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="space-y-3">
       {rows.map((t) => (

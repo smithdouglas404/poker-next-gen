@@ -167,6 +167,7 @@ export interface ClubSettingsBlob {
   kyc_required?: boolean;
   geo_block?: string;
   club_type?: string;
+  logo_data_url?: string; // uploaded club logo (data: URL), set from GlobalSettings/setup
 }
 
 /** Owner's club with the visibility/approval flags club_update reads/writes. */

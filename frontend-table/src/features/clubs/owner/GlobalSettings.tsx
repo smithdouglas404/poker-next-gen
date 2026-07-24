@@ -56,6 +56,7 @@ export function GlobalSettings({
   const [modRole, setModRole] = useState(s0.moderator_role ?? "Moderator");
 
   const [uiTheme, setUiTheme] = useState<"classic" | "cyber">(s0.ui_theme ?? "classic");
+  const [logoDataUrl, setLogoDataUrl] = useState<string | null>(s0.logo_data_url ?? null);
   const [isPublic, setIsPublic] = useState(club?.is_public ?? false);
   const [requireApproval, setRequireApproval] = useState(club?.require_approval ?? true);
   const [kyc, setKyc] = useState(s0.kyc_required ?? false);
@@ -85,7 +86,17 @@ export function GlobalSettings({
     moderator_role: modRole,
     kyc_required: kyc,
     geo_block: geo,
+    logo_data_url: logoDataUrl ?? undefined,
   });
+
+  // Read a picked image file into a data: URL for the club logo (≤2 MB, images).
+  const onPickLogo = (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/") || file.size > 2 * 1024 * 1024) return;
+    const reader = new FileReader();
+    reader.onload = () => setLogoDataUrl(typeof reader.result === "string" ? reader.result : null);
+    reader.readAsDataURL(file);
+  };
 
   const savePreferences = () =>
     run("prefs", () => onSaveSettings({}, mergedSettings()));
@@ -276,13 +287,26 @@ export function GlobalSettings({
         {/* Club Branding + Visibility + Geo/KYC */}
         <Card title="Club Branding & Access">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-            <button
-              type="button"
-              disabled={disabled}
-              className="flex h-24 w-40 shrink-0 items-center justify-center rounded-xl border border-dashed border-white/20 bg-white/[0.02] text-xs font-semibold uppercase tracking-wider text-white/50 transition hover:border-gold/40 hover:text-gold disabled:opacity-50"
+            <label
+              className={cn(
+                "flex h-24 w-40 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-white/20 bg-white/[0.02] text-center text-xs font-semibold uppercase tracking-wider text-white/50 transition hover:border-gold/40 hover:text-gold",
+                disabled && "pointer-events-none opacity-50",
+              )}
             >
-              Upload Logo
-            </button>
+              {logoDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logoDataUrl} alt="Club logo" className="h-full w-full object-contain" />
+              ) : (
+                "Upload Logo"
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                disabled={disabled}
+                onChange={(e) => onPickLogo(e.target.files?.[0])}
+                className="hidden"
+              />
+            </label>
             <div className="flex-1">
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/45">
                 Primary UI Theme

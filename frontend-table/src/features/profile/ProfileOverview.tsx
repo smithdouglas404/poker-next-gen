@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { AVATARS, avatarSrc } from "@/features/table/avatars";
 import { BTN_GOLD, GLASS_PANEL, GLASS_PANEL_HOVER, HEADING_SM, RARITY, cn } from "@/features/ui/tokens";
 
@@ -93,9 +94,40 @@ export function ProfileOverview({ notify }: { notify: (msg: string, kind?: "ok" 
   const [ver, setVer] = useState<Verification | null>(null);
   const [avatar, setAvatar] = useState<string>(PICKS[0].id);
   const [loading, setLoading] = useState(true);
+  const [txns, setTxns] = useState<Array<{ kind: string; amount: string; date: string; positive: boolean }>>(
+    DEMO_TRANSACTIONS,
+  );
 
   useEffect(() => {
     setAvatar(readAvatar());
+  }, []);
+
+  // Real recent transactions from the wallet ledger (falls back to demo rows).
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = (await callSessionRpc("wallet_ledger", { limit: 8 })) as {
+          ledger?: Array<{ delta?: number; reason?: string; created_at?: string }>;
+        };
+        if (cancelled) return;
+        const rows = (data.ledger ?? []).map((e) => {
+          const delta = e.delta ?? 0;
+          return {
+            kind: (e.reason ?? "transaction").replace(/_/g, " "),
+            amount: `${delta >= 0 ? "+" : "−"}${money(Math.abs(delta))}`,
+            date: e.created_at ? new Date(e.created_at).toLocaleDateString() : "",
+            positive: delta >= 0,
+          };
+        });
+        if (rows.length > 0) setTxns(rows);
+      } catch {
+        /* guest / offline → keep demo rows */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -200,9 +232,9 @@ export function ProfileOverview({ notify }: { notify: (msg: string, kind?: "ok" 
                   </tr>
                 </thead>
                 <tbody>
-                  {DEMO_TRANSACTIONS.map((t) => (
-                    <tr key={t.kind} className="border-t border-white/[0.05]">
-                      <td className="py-2 text-neutral-300">{t.kind}</td>
+                  {txns.map((t, i) => (
+                    <tr key={`${t.kind}-${i}`} className="border-t border-white/[0.05]">
+                      <td className="py-2 capitalize text-neutral-300">{t.kind}</td>
                       <td className={cn("py-2 text-right font-display font-bold", t.positive ? "text-green" : "text-brand")}>
                         {t.amount}
                       </td>
