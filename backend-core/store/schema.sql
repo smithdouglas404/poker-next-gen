@@ -1122,3 +1122,12 @@ CREATE TABLE IF NOT EXISTS poker_avatar_battle_stats (
     PRIMARY KEY (user_id, avatar_id)
 );
 CREATE INDEX IF NOT EXISTS idx_poker_avatar_battle_user ON poker_avatar_battle_stats(user_id);
+
+-- Staff moderation flag on a player, surfaced in the comprehensive staff profile.
+CREATE TABLE IF NOT EXISTS poker_player_flag (
+    user_id    TEXT PRIMARY KEY,
+    flagged    BOOLEAN NOT NULL DEFAULT FALSE,
+    reason     TEXT NOT NULL DEFAULT '',
+    flagged_by TEXT NOT NULL DEFAULT '',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

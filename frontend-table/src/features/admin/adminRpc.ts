@@ -153,7 +153,51 @@ export const adminApi = {
   // Audit
   auditList: (limit = 100, offset = 0) =>
     call<{ audit: AuditRow[] }>("admin_audit_list", { limit, offset }),
+
+  // Comprehensive staff player profile (_16)
+  playerProfile: (userId: string) =>
+    call<PlayerProfileResponse>("admin_player_profile", { user_id: userId }),
+  playerLedger: (userId: string, limit = 15) =>
+    call<{ entries: LedgerEntry[] }>("admin_ledger_search", { user_id: userId, limit }),
+  playerSetLimit: (userId: string, depositDailyCents: number) =>
+    call<{ ok: boolean; limits: RgLimits }>("admin_player_set_limit", {
+      user_id: userId,
+      deposit_daily_cents: depositDailyCents,
+    }),
+  playerFlag: (userId: string, flagged: boolean, reason: string) =>
+    call<{ ok: boolean }>("admin_player_flag", { user_id: userId, flagged, reason }),
 };
+
+export interface RgLimits {
+  deposit_daily_cents: number;
+  deposit_weekly_cents: number;
+  loss_daily_cents: number;
+  session_minutes: number;
+}
+
+export interface PlayerProfileResponse {
+  user_id: string;
+  stats: {
+    hands: number;
+    wins: number;
+    vpip_hands: number;
+    pfr_hands: number;
+    showdowns: number;
+    showdown_wins: number;
+    net_cents: number;
+    biggest_pot: number;
+  } | null;
+  limits: RgLimits;
+  flag: { flagged: boolean; reason: string; flagged_by: string; updated_at: string };
+  loyalty: { hrp_total?: number; hrp_spendable?: number; hands_played?: number; hands_won?: number };
+}
+
+export interface LedgerEntry {
+  amount_cents?: number;
+  reason?: string;
+  created_at?: string;
+  balance_cents?: number;
+}
 
 /** Cents → full dollar label, e.g. 482000 → "$4,820.00". */
 export function money(cents: number | undefined | null): string {

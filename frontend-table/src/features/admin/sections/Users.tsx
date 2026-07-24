@@ -8,6 +8,7 @@ import { adminApi, money } from "../adminRpc";
 import { Badge, Card, Empty, GoldHeading, Mono, Row, Table, Td, Th } from "../primitives";
 import type { UserRow } from "../types";
 import type { Notify } from "./shared";
+import { StaffPlayerProfile } from "./StaffPlayerProfile";
 
 export function Users({ notify }: { notify: Notify }) {
   const [query, setQuery] = useState("");
@@ -203,6 +204,8 @@ export function Users({ notify }: { notify: Notify }) {
           </div>
         </Card>
       )}
+
+      {selected && <StaffPlayerProfile user={selected} notify={notify} />}
     </div>
   );
 }
