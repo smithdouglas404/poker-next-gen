@@ -117,9 +117,29 @@ export interface Verification {
   capabilities: Record<string, boolean>;
 }
 
+export type RankTier = "enlisted" | "nco" | "officer" | "general";
+
+/** Response of `player_rank` — a US-military pay grade derived from real play. */
+export interface PlayerRank {
+  user_id: string;
+  score: number;
+  grade: string; // e.g. "E-5", "O-3", "GA"
+  name: string; // e.g. "Sergeant First Class"
+  abbr: string; // e.g. "SFC"
+  tier: RankTier;
+  insignia: string; // chevron-N | bar-N | leaf | eagle | star-N
+  components: { hands: number; wins: number; tournament_entries: number; hrp: number };
+  next_grade?: string;
+  next_name?: string;
+  next_min_score?: number;
+  progress_pct: number;
+  score_to_next: number;
+}
+
 export const profileApi = {
   // Identity / analytics
   get: () => call<Profile>("profile_get", {}),
+  rank: (userId?: string) => call<PlayerRank>("player_rank", { user_id: userId ?? "" }),
   wallet: () => call<WalletBalance>("wallet_get", {}),
   verification: () => call<Verification>("me_verification", {}),
   stats: (userId?: string, clubId?: string) =>

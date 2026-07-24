@@ -33,6 +33,21 @@ export const securityApi = {
   // account_recovery_backup_code — recover via a 2FA backup code (lost device).
   recoveryBackupCode: (input: { email: string; backup_code: string; new_password: string }) =>
     call<{ ok: boolean }>("account_recovery_backup_code", input),
+  // account_recovery_wallet_challenge — mint a nonce + message to sign with a
+  // linked wallet (uniform response for unknown addresses).
+  recoveryWalletChallenge: (address: string) =>
+    call<{ ok: boolean; nonce: string; message: string }>("account_recovery_wallet_challenge", {
+      address,
+    }),
+  // account_recovery_wallet_verify — verify the signature over the recovery
+  // message and reset the owning account's password.
+  recoveryWalletVerify: (input: {
+    address: string;
+    chain: string;
+    nonce: string;
+    signature: string;
+    new_password: string;
+  }) => call<{ ok: boolean }>("account_recovery_wallet_verify", input),
 };
 
 // Offline demo fallback for the 2FA setup panel: when the backend is

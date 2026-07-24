@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
+import { RankBadge } from "./RankBadge";
 import { AVATARS, avatarSrc } from "@/features/table/avatars";
 import { BTN_GOLD, GLASS_PANEL, GLASS_PANEL_HOVER, HEADING_SM, RARITY, cn } from "@/features/ui/tokens";
 
@@ -251,6 +252,8 @@ export function ProfileOverview({ notify }: { notify: (msg: string, kind?: "ok" 
                 <StatRow label="Tournament Points" value={compact(hrp)} />
               </div>
             </section>
+            {/* Service rank — a US-military pay grade earned from real play. */}
+            <RankBadge />
           </div>
 
           {/* Recent transactions */}
