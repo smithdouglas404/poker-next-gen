@@ -76,7 +76,7 @@ Verified against the live local stack (Postgres :5433 + engine-math :8080 + Naka
 | 2FA Setup modal | QR / code / backup / Activate | **WIRED** | `auth_2fa_setup/verify` |
 | Account Recovery | email / backup-code recovery | **WIRED** | `account_recovery_*` |
 | Account Recovery | Recover via linked crypto wallet | **DEMO** | demo wallet list; no ownership check |
-| Wallet Connection (Premium) | Connect MetaMask/Coinbase/WalletConnect/Phantom | **DEMO→backend done** | was client-only; **real signature-verified `wallet_link` backend built (#91, d157383, crypto test passing)**; FE wiring pending |
+| Wallet Connection (Premium) | Connect MetaMask/Coinbase/WalletConnect/Phantom | **WIRED** | connect → `wallet_link_challenge` → sign (personal_sign / Phantom signMessage) → `wallet_link` (secp256k1 ecrecover / ed25519 verify). Runtime-proven: challenge issues nonce, bad sig 403-rejected, Go round-trip test passes (#91) |
 | Premium Upgrade | Upgrade / Monthly-Yearly / Cancel | **WIRED** | `subscription_checkout/cancel/tiers/status` |
 
 ## C. Avatar-economy & game-flow screens
