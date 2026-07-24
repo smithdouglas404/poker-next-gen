@@ -76,7 +76,7 @@ Verified against the live local stack (Postgres :5433 + engine-math :8080 + Naka
 | Security Dashboard | Active Sessions Revoke | **DEAD (infra decision)** | the Nakama Go runtime exposes no session-enumeration/revoke API to a plugin; real revoke needs a Nakama-console/infra path, not an RPC |
 | 2FA Setup modal | QR / code / backup / Activate | **WIRED** | `auth_2fa_setup/verify` |
 | Account Recovery | email / backup-code recovery | **WIRED** | `account_recovery_*` |
-| Account Recovery | Recover via linked crypto wallet | **DEMO (product decision)** | technically feasible on the `wallet_link` verifier, but "a linked wallet can reset the account password" is an account-takeover *policy* that needs explicit product sign-off before shipping — deliberately not shipped unilaterally |
+| Account Recovery | Recover via linked crypto wallet | **FIXED** | owner-approved + shipped: `account_recovery_wallet_challenge`/`_verify` — connect → sign a domain-separated recovery message → server verifies the signature against a verified linked wallet (single-owner only) and resets the account password. Runtime-proven (challenge issues nonce, garbage sig 403); Go test `TestRecoverWalletMessageRoundTrip` PASS (positive + link→recovery replay rejected) |
 | Wallet Connection (Premium) | Connect MetaMask/Coinbase/WalletConnect/Phantom | **WIRED** | connect → `wallet_link_challenge` → sign (personal_sign / Phantom signMessage) → `wallet_link` (secp256k1 ecrecover / ed25519 verify). Runtime-proven: challenge issues nonce, bad sig 403-rejected, Go round-trip test passes (#91) |
 | Premium Upgrade | Upgrade / Monthly-Yearly / Cancel | **WIRED** | `subscription_checkout/cancel/tiers/status` |
 
@@ -129,14 +129,20 @@ Verified against the live local stack (Postgres :5433 + engine-math :8080 + Naka
 - ~~Announcement audience + delivery channel params~~ **DONE** — real persisted+whitelisted `audience`/`channel`. (Follow-up: in-table Breaking-News modal *delivery* filtered by audience — a table-side consumer feature, not a composer defect.)
 - ~~Revenue real tournament-fee source~~ **DONE** — `club_tournament_fees` (entry fee × registrations); Net Profit + Sources donut now from the two real revenue streams.
 
+**Decided — now build tasks (no longer open decisions):**
+- **OAuth via Clerk** (owner chose clerk.com) — Google/Facebook/3rd-party login for Signup + Linked Social. Real integration: Clerk keys + frontend SDK + a backend bridge that trades a verified Clerk session for a Nakama session/custom auth.
+- **Recover-via-wallet** — ✅ **DONE** (owner approved; shipped this pass).
+
 **Needs a product decision (flagged, not faked):**
-- Google/Facebook OAuth (real identity provider) — Signup + Linked Social.
-- Pay-with-Gold/ETH cosmetics rail + dye-pack purchase economy (settlement + pricing).
-- Recover-via-wallet ownership check — feasible on the `wallet_link` verifier, but shipping it means "a linked wallet can reset the account password", an account-takeover policy that needs explicit sign-off.
+- Pay-with-Gold/ETH cosmetics rail + dye-pack purchase economy (settlement + pricing oracle).
 - Club-admin 2FA enforcement + custom role-label schemes (Global Settings) — persist but unenforced by design.
 
-**Net-new (sanctioned one-phase body — pending):**
-- #84 Bounty/knockout tournaments · #85 Sidebets · #88 double-entry ledger (roadmap-large).
+**Net-new roadmap (owner-requested, scoped below in this ledger's companion notes):**
+- **Service ranks** — ✅ **DONE** (`player_rank`, US-military ladder from real play; badge on the profile).
+- Rewards / sponsor marketplace (points → travel/food/recreation catalog; buy points; redeem) — large net-new economy.
+- Per-avatar battle stats (hands/win-rate attributed to the equipped avatar).
+- Combined signup + avatar onboarding screen (profile & avatar created together).
+- #84 Bounty/knockout tournaments · #85 Sidebets · #88 double-entry ledger.
 - Admin player-profile screen (Edit-Limit/Grant-Bonus/Flag) · invite-by-code resolver + `/clubs/join` page.
 
 ---
