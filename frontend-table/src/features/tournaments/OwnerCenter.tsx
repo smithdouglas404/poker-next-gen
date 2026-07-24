@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { Button } from "@/features/ui";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
@@ -32,7 +33,7 @@ function statusTone(status: string): "green" | "red" | "gold" | "purple" {
 }
 
 interface AlertItem {
-  tone: "red" | "gold" | "cyan" | "green";
+  tone: "red" | "gold" | "steel" | "green";
   title: string;
   body: string;
 }
@@ -56,7 +57,7 @@ function buildAlerts(
     // Late-reg closing soon on a running event.
     if (t.status === "running" && t.meta?.lateReg) {
       alerts.push({
-        tone: "cyan",
+        tone: "steel",
         title: `${t.name} — late registration open`,
         body: `${registered} players remaining. Late reg closes at the next break.`,
       });
@@ -186,20 +187,70 @@ function FinancialCell({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Local operator chat / activity feed (matches the center master's chat rail).
- *  Not backed by an RPC — messages stay client-side this session. */
+/** Operator club chat rail, wired to the real club_chat_send / club_chat_list
+ *  RPCs against the operator's club (resolved from me_roles). Falls back to a
+ *  clearly-labelled local thread only when the caller operates no club / offline. */
 function ChatPanel() {
-  const [msgs, setMsgs] = useState<{ who: string; body: string; mine?: boolean }[]>([
-    { who: "AceKing", body: "Overlay covered on Stake Freeout — nice." },
-    { who: "System", body: 'Tournament "Stake Freeout" registration open.' },
-    { who: "Wansyl", body: "Final table in ~10 mins, railbirds welcome." },
-  ]);
+  const [msgs, setMsgs] = useState<{ who: string; body: string; mine?: boolean }[]>([]);
   const [draft, setDraft] = useState("");
+  const [clubId, setClubId] = useState<string | null>(null);
+  const [live, setLive] = useState(false);
+
+  // Resolve the operator's club, then poll its chat.
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    void (async () => {
+      let id: string | null = null;
+      try {
+        const roles = (await callSessionRpc("me_roles", {})) as { club_admin_of?: string[] };
+        id = roles?.club_admin_of?.[0] ?? null;
+        if (!id) {
+          const list = (await callSessionRpc("club_list", {})) as { clubs?: Array<{ id: string }> };
+          id = list?.clubs?.[0]?.id ?? null;
+        }
+      } catch {
+        /* offline / guest */
+      }
+      if (cancelled) return;
+      setClubId(id);
+      if (!id) {
+        setMsgs([{ who: "System", body: "Operate a club to use Global Club Chat." }]);
+        return;
+      }
+      const refresh = async () => {
+        try {
+          const r = (await callSessionRpc("club_chat_list", { club_id: id, limit: 40 })) as {
+            messages?: Array<{ username?: string; text?: string; user_id?: string }>;
+          };
+          if (cancelled) return;
+          setLive(true);
+          setMsgs(
+            (r.messages ?? []).map((m) => ({ who: m.username || "Member", body: m.text || "" })),
+          );
+        } catch {
+          /* transient */
+        }
+      };
+      await refresh();
+      timer = setInterval(refresh, 5000);
+    })();
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
+    };
+  }, []);
+
   const send = () => {
     const body = draft.trim();
     if (!body) return;
-    setMsgs((m) => [...m, { who: "You", body, mine: true }]);
     setDraft("");
+    if (clubId && live) {
+      setMsgs((m) => [...m, { who: "You", body, mine: true }]);
+      void callSessionRpc("club_chat_send", { club_id: clubId, text: body }).catch(() => {});
+    } else {
+      setMsgs((m) => [...m, { who: "You", body, mine: true }]);
+    }
   };
   return (
     <div className={cn(GLASS_PANEL, "flex flex-col p-4")}>
@@ -248,6 +299,8 @@ export function OwnerCenter({
   loadAnalytics,
   onCreate,
   onFinalize,
+  onStart,
+  onSetBalancingRule,
   demo,
 }: {
   tournaments: EnrichedTournament[];
@@ -255,6 +308,13 @@ export function OwnerCenter({
   loadAnalytics: (id: string) => Promise<TournamentAnalytics>;
   onCreate: () => void;
   onFinalize: (id: string) => Promise<void>;
+  onStart: (id: string) => Promise<void>;
+  onSetBalancingRule: (
+    id: string,
+    maxSeatDifference: number,
+    breakTableAtOrBelow: number,
+    strategy: "balanced" | "random",
+  ) => Promise<void>;
   demo: boolean;
 }) {
   const [bucket, setBucket] = useState<OwnerBucket>("live");
@@ -262,6 +322,12 @@ export function OwnerCenter({
   const [analytics, setAnalytics] = useState<TournamentAnalytics | null>(null);
   const [loading, setLoading] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
+  const [starting, setStarting] = useState(false);
+  // Balancing-rule config (balancing_rule_set).
+  const [seatDiff, setSeatDiff] = useState(1);
+  const [breakAt, setBreakAt] = useState(2);
+  const [strategy, setStrategy] = useState<"balanced" | "random">("balanced");
+  const [ruleMsg, setRuleMsg] = useState<string | null>(null);
   const [balancing, setBalancing] = useState(false);
   const [balanceMsg, setBalanceMsg] = useState<string | null>(null);
 
@@ -592,6 +658,24 @@ export function OwnerCenter({
                           {balanceMsg && (
                             <p className="text-xs text-neutral-400 sm:col-span-2">{balanceMsg}</p>
                           )}
+                          {selected.status === "registering" && (
+                            <Button
+                              variant="primary"
+                              size="lg"
+                              disabled={starting || demo}
+                              title="Seat entrants and launch the tables (needs ≥1 blind level and prizes summing to 100%)."
+                              onClick={async () => {
+                                setStarting(true);
+                                try {
+                                  await onStart(selected.id);
+                                } finally {
+                                  setStarting(false);
+                                }
+                              }}
+                            >
+                              {starting ? "Starting…" : "▶ Start Tournament"}
+                            </Button>
+                          )}
                           <Button
                             variant="primary"
                             size="lg"
@@ -607,6 +691,52 @@ export function OwnerCenter({
                           >
                             {finished ? "Finalized ✓" : finalizing ? "Finalizing…" : "♛ Finalize Tournament"}
                           </Button>
+                        </div>
+
+                        {/* Multi-table balancing rule (balancing_rule_set) */}
+                        <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-4">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+                            Table Balancing Rule
+                          </p>
+                          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                            <label className="block">
+                              <span className="mb-1 block text-[10px] uppercase tracking-wider text-neutral-500">Max seat gap</span>
+                              <input type="number" min={1} max={9} value={seatDiff}
+                                onChange={(e) => setSeatDiff(Number(e.target.value))}
+                                className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none" />
+                            </label>
+                            <label className="block">
+                              <span className="mb-1 block text-[10px] uppercase tracking-wider text-neutral-500">Break table at/below</span>
+                              <input type="number" min={1} max={9} value={breakAt}
+                                onChange={(e) => setBreakAt(Number(e.target.value))}
+                                className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none" />
+                            </label>
+                            <label className="block">
+                              <span className="mb-1 block text-[10px] uppercase tracking-wider text-neutral-500">Strategy</span>
+                              <select value={strategy} onChange={(e) => setStrategy(e.target.value as "balanced" | "random")}
+                                className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none">
+                                <option value="balanced">balanced</option>
+                                <option value="random">random</option>
+                              </select>
+                            </label>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={demo}
+                            onClick={async () => {
+                              setRuleMsg(null);
+                              try {
+                                await onSetBalancingRule(selected.id, seatDiff, breakAt, strategy);
+                                setRuleMsg("Balancing rule saved.");
+                              } catch (e) {
+                                setRuleMsg(e instanceof Error ? e.message : "Save failed.");
+                              }
+                            }}
+                            className="mt-3 rounded-lg border border-gold/40 bg-gold/10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gold transition hover:bg-gold/15 disabled:opacity-40"
+                          >
+                            Save balancing rule
+                          </button>
+                          {ruleMsg && <p className="mt-2 text-[11px] text-neutral-400">{ruleMsg}</p>}
                         </div>
                       </>
                     );

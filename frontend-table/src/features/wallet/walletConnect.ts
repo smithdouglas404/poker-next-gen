@@ -74,7 +74,47 @@ interface Eip1193Provider {
 
 interface PhantomSolana {
   connect(): Promise<{ publicKey: { toString(): string } }>;
+  signMessage(message: Uint8Array, encoding?: string): Promise<{ signature: Uint8Array }>;
   isPhantom?: boolean;
+}
+
+function utf8ToHex(s: string): string {
+  let h = "0x";
+  for (let i = 0; i < s.length; i++) h += s.charCodeAt(i).toString(16).padStart(2, "0");
+  return h;
+}
+
+function bytesToHex(b: Uint8Array): string {
+  return "0x" + Array.from(b).map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+
+/** Ask the connected wallet to sign the server's challenge message. Returns the
+ *  signature hex (0x…) for the backend to verify ownership, or null if the user
+ *  rejected / no provider. EVM → personal_sign; Solana → signMessage. */
+export async function signChallenge(
+  id: WalletProviderId,
+  address: string,
+  message: string,
+): Promise<string | null> {
+  const def = providerDef(id);
+  try {
+    if (def.chain === "Solana") {
+      const sol = injected().phantom?.solana;
+      if (sol?.signMessage) {
+        const res = await sol.signMessage(new TextEncoder().encode(message), "utf8");
+        return bytesToHex(res.signature);
+      }
+      return null;
+    }
+    const prov = pickEvmProvider(id);
+    if (prov) {
+      const sig = await prov.request({ method: "personal_sign", params: [utf8ToHex(message), address] });
+      return typeof sig === "string" ? sig : null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 interface InjectedWindow {

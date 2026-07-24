@@ -20,6 +20,7 @@ import (
 	"github.com/smithdouglas404/poker-next-gen/backend-core/audit"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/billing"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/bot"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/geo"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/loyalty"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/poker"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/poker/enginemath"
@@ -95,6 +96,11 @@ type MatchState struct {
 	// only after the base ActionSecs lapses, before the server auto-folds. Granted
 	// once when a player first sits; not auto-refilled.
 	TimeBank         map[string]int64
+	// TimeoutStreak counts each human's CONSECUTIVE server-acted timeouts (userID
+	// -> count); reset to 0 the moment they act voluntarily. After
+	// maxConsecutiveTimeouts the inactivity auto-kick stands them up (orbit-style
+	// AFK protection — the proven oddslingers mechanic).
+	TimeoutStreak    map[string]int
 	// Per-table shot-clock config (0 => server defaults): ActionSecsCfg is the base
 	// clock in seconds; TimeBankGrant is the one-time bank granted on sit.
 	ActionSecsCfg    int
@@ -110,6 +116,15 @@ type MatchState struct {
 	RITAgree         map[string]bool             // userID -> agreed to run it twice
 	Insurance        map[string]insurancePolicy  // userID -> accepted all-in insurance
 	InsOffered       map[string]insurancePolicy  // userID -> standing (unaccepted) offer
+	// Access & seating policy (#83). Configured at MatchInit; enforced at the
+	// join gate (JoinCode) and the sit-down gate (KYC / members / geo / wallet cap).
+	AccessType       string // "public" | "members" | "invite" (empty => public)
+	JoinCode         string // required in join metadata when AccessType == "invite"
+	AllowSpectators  bool   // when false, non-seated presences are not sent table state
+	KYCRequired      bool   // table-level KYC floor (adds to the platform floor)
+	GeoRestricted    bool   // re-check the seating player's jurisdiction at sit-down
+	WalletLimitCents int64  // cap on total chips one player may bring (0 => no cap)
+	AutoBuyBackCents int64  // auto top-up a busted player to this stack (0 => off)
 }
 
 // insurancePolicy is one all-in insurance wager, settled against the wallet (not
@@ -135,6 +150,11 @@ const actionTimeoutTicks int64 = 300
 // the base clock (actionTimeoutTicks) is 30s, so actionSecs is derived from it.
 const timeBankSecs int64 = 30
 const actionSecs int = int(actionTimeoutTicks / 10)
+
+// maxConsecutiveTimeouts is how many times the server may act for a human in a
+// row (time-outs) before the inactivity auto-kick stands them up, freeing the
+// seat so an AFK player can't hold a table hostage. Reset by any voluntary act.
+const maxConsecutiveTimeouts = 3
 
 type Handler struct{}
 
@@ -277,6 +297,36 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	if v, ok := params["allow_run_it_twice"].(bool); ok {
 		table.AllowRunItTwice = v
 	}
+	// Access & seating policy (#83). Parsed here; enforced at the join gate
+	// (join_code) and the sit-down gate (kyc / members / geo / wallet cap).
+	accessType := ""
+	if v, ok := params["access_type"].(string); ok {
+		accessType = v
+	}
+	joinCode := ""
+	if v, ok := params["join_code"].(string); ok {
+		joinCode = strings.ToUpper(strings.TrimSpace(v))
+	}
+	allowSpectators := true // default: rail is open unless the host disables it
+	if v, ok := params["allow_spectators"].(bool); ok {
+		allowSpectators = v
+	}
+	kycRequired := false
+	if v, ok := params["kyc_required"].(bool); ok {
+		kycRequired = v
+	}
+	geoRestricted := false
+	if v, ok := params["geo_restricted"].(bool); ok {
+		geoRestricted = v
+	}
+	walletLimitCents := int64(0)
+	if v, ok := numParam(params, "wallet_limit_cents"); ok && v > 0 {
+		walletLimitCents = v
+	}
+	autoBuyBackCents := int64(0)
+	if v, ok := numParam(params, "auto_buy_back_cents"); ok && v > 0 {
+		autoBuyBackCents = v
+	}
 	// Seed AI opponents at creation (server-authoritative, like OddSlingers).
 	for i := 0; i < numBots; i++ {
 		seat := table.FirstEmptySeat()
@@ -316,6 +366,7 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		InsOffered:   map[string]insurancePolicy{},
 		AntibotLog:   map[string][]antibot.ActionRecord{},
 		TimeBank:     map[string]int64{},
+		TimeoutStreak: map[string]int{},
 		ActionSecsCfg: actionSecsCfg,
 		TimeBankGrant: timeBankCfg,
 		DurationSecs: durationSecs,
@@ -324,6 +375,14 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		// are driven by the tournament director, so they opt out.
 		AutoDeal:     tournamentID == "",
 		HostUserID:   hostUserID,
+		// Access & seating policy (#83).
+		AccessType:       accessType,
+		JoinCode:         joinCode,
+		AllowSpectators:  allowSpectators,
+		KYCRequired:      kycRequired,
+		GeoRestricted:    geoRestricted,
+		WalletLimitCents: walletLimitCents,
+		AutoBuyBackCents: autoBuyBackCents,
 	}
 	label := buildLabel(state)
 	// 10 ticks/sec: a 1 Hz loop made deals, chip moves, and action prompts update
@@ -409,6 +468,19 @@ func (s *MatchState) timeBankGrant() int64 {
 }
 
 func (h *Handler) MatchJoinAttempt(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, presence runtime.Presence, metadata map[string]string) (interface{}, bool, string) {
+	s := state.(*MatchState)
+	// Invite-only tables (#83): a join must carry the correct code in metadata.
+	// The host always gets in (so they can open/manage their own table). An empty
+	// JoinCode means "invite" was selected but no code was set — treat as open.
+	if s.AccessType == "invite" && s.JoinCode != "" {
+		if uid := presence.GetUserId(); uid != "" && uid == s.HostUserID {
+			return state, true, ""
+		}
+		got := strings.ToUpper(strings.TrimSpace(metadata["join_code"]))
+		if got != s.JoinCode {
+			return state, false, "this table is invite-only — a valid join code is required"
+		}
+	}
 	return state, true, ""
 }
 
@@ -559,6 +631,25 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				buyIn = s.maxBuyIn()
 			}
 			buyIn = poker.ClampBuyIn(buyIn)
+			// Universal wallet limit (#83): cap the total chips one player may bring
+			// to this table. Clamp the buy-in down to the remaining headroom; reject
+			// when it can no longer cover the table minimum.
+			if s.WalletLimitCents > 0 {
+				existing := int64(0)
+				for _, seat := range s.Table.Seats {
+					if seat != nil && seat.UserID == userID {
+						existing += seat.Stack
+					}
+				}
+				room := s.WalletLimitCents - existing
+				if room < s.minBuyIn() {
+					sendError(dispatcher, presence, "wallet_limit", "this table's wallet limit leaves too little for the minimum buy-in")
+					continue
+				}
+				if buyIn > room {
+					buyIn = room
+				}
+			}
 			// Responsible-gambling gate: a player who has self-excluded or is in a
 			// cool-off window cannot take a seat until it lifts. (Set via
 			// rg_self_exclude / rg_cool_off — previously stored but never enforced.)
@@ -575,6 +666,41 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				if st["kyc_aml"] != "verified" {
 					sendError(dispatcher, presence, "kyc_required", "identity verification (KYC/AML) is required to sit at a real-money table")
 					continue
+				}
+			}
+			// Table-level access policy (#83): per-table gates the host set at
+			// creation, layered on top of the platform floors above.
+			// (a) Table KYC floor — verification required to sit even when the
+			// platform real-money switch is off.
+			if s.KYCRequired {
+				st, _ := store.NewVerificationStore(db).Statuses(ctx, userID)
+				if st["kyc_aml"] != "verified" {
+					sendError(dispatcher, presence, "kyc_required", "this table requires identity verification (KYC) to take a seat")
+					continue
+				}
+			}
+			// (b) Members-only — a club-bound members table only seats current
+			// club members (active status).
+			if s.AccessType == "members" && s.ClubID != "" {
+				m, _ := store.NewClubStore(db).GetMembership(ctx, s.ClubID, userID)
+				if m == nil || (m.Status != "" && m.Status != "active") {
+					sendError(dispatcher, presence, "members_only", "this table is limited to club members")
+					continue
+				}
+			}
+			// (c) Geo-restricted — re-check the seating player's jurisdiction.
+			// Fail-open on an unknown IP (the match loop may not carry one), matching
+			// the platform geofence policy; explicit deny rules are always honored.
+			if s.GeoRestricted {
+				if ip, _ := ctx.Value(runtime.RUNTIME_CTX_CLIENT_IP).(string); ip != "" {
+					if ok, reason := store.NewAdminStore(db).CheckIP(ctx, ip); !ok {
+						sendError(dispatcher, presence, "geo_blocked", reason)
+						continue
+					}
+					if ok, reason := store.NewGeoStore(db).CheckCountry(ctx, geo.Country(ctx, ip)); !ok {
+						sendError(dispatcher, presence, "geo_blocked", reason)
+						continue
+					}
 				}
 			}
 			// Tier gate: enforce the multi-table limit (tables seated at once).
@@ -727,6 +853,10 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				sendError(dispatcher, presence, "action_failed", err.Error())
 				continue
 			}
+			// Voluntary action clears the inactivity streak (they're present).
+			if s.TimeoutStreak != nil {
+				delete(s.TimeoutStreak, userID)
+			}
 			emitPlayerAction(ctx, s, userID, req.Type, req.Amount)
 			narrateAction(dispatcher, s, seatIdx, req.Type)
 			broadcastSnapshot(ctx, db, dispatcher, s, nil)
@@ -808,6 +938,13 @@ func enforceActionDeadline(ctx context.Context, db *sql.DB, dispatcher runtime.M
 	s.ActionDeadlineTick, s.ActionDeadlineSeat = 0, -1
 	emitPlayerAction(ctx, s, seat.UserID, action, 0)
 	narrateAction(dispatcher, s, seatIdx, action)
+	// Inactivity auto-kick (#86): count consecutive server-acted timeouts. The
+	// actual stand-up is deferred to standUpBusted (between hands) so removing a
+	// seat never corrupts an in-flight hand's side-pot/showdown state.
+	if s.TimeoutStreak == nil {
+		s.TimeoutStreak = map[string]int{}
+	}
+	s.TimeoutStreak[seat.UserID]++
 	broadcastSnapshot(ctx, db, dispatcher, s, nil)
 	if _, uncontested := s.Table.UncontestedWinner(); uncontested {
 		beginShowdownResolution(ctx, s)
@@ -1166,7 +1303,7 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 				sendError(dispatcher, p, "showdown_failed", res.Err.Error())
 			}
 			s.Table.ResetBetweenHands()
-			standUpBusted(s)
+			standUpBusted(ctx, db, dispatcher, s)
 			s.Phase = poker.PhaseWaiting
 			return true
 		}
@@ -1199,7 +1336,7 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		accrueCompetition(ctx, logger, db, s, potBefore)
 		s.Table.ResetBetweenHands()
 		reportTournamentBusts(ctx, db, nk, s)
-		standUpBusted(s) // cash tables: clear felted players so the table stays playable
+		standUpBusted(ctx, db, dispatcher, s) // cash tables: clear felted players so the table stays playable
 		s.Phase = poker.PhaseWaiting
 		return true
 	default:
@@ -1293,6 +1430,16 @@ func handleHostAction(ctx context.Context, db *sql.DB, dispatcher runtime.MatchD
 		SmallBlind int64  `json:"small_blind"`
 		BigBlind   int64  `json:"big_blind"`
 		Ante       int64  `json:"ante"`
+		// Comprehensive live table settings (Admin overlay "table_settings").
+		AnteOn           bool  `json:"ante_on"`
+		AnteCents        int64 `json:"ante_cents"`
+		TurnTimeSecs     int   `json:"turn_time_secs"`
+		DecisionSecs     int   `json:"decision_secs"`
+		TimeBankSecs     int64 `json:"time_bank_secs"`
+		BuyInMinCents    int64 `json:"buy_in_min_cents"`
+		BuyInMaxCents    int64 `json:"buy_in_max_cents"`
+		WalletLimitCents int64 `json:"wallet_limit_cents"`
+		SpectatorMode    bool  `json:"spectator_mode"`
 	}
 	if err := json.Unmarshal(data, &req); err != nil {
 		return
@@ -1337,6 +1484,48 @@ func handleHostAction(ctx context.Context, db *sql.DB, dispatcher runtime.MatchD
 			s.BigBlind = req.BigBlind
 			narrate(dispatcher, s, fmt.Sprintf("Host set blinds to $%d/$%d (from the next hand).", req.SmallBlind/100, req.BigBlind/100))
 		}
+	case "table_settings":
+		// Apply the Admin overlay's Comprehensive Table Settings live. Previously
+		// this action was unhandled, so every field below silently no-op'd (a
+		// "face without flow"). Blinds still arrive via set_blinds; here we apply
+		// the rest to fields with a server-side home. Behavioural-only toggles
+		// (deal-to-away, reveal-all, showdown pacing) are not yet consumed and are
+		// intentionally omitted rather than faked.
+		clampHost := func(v int) int {
+			if v < 0 {
+				return 0
+			}
+			if v > 120 {
+				return 120
+			}
+			return v
+		}
+		if req.AnteOn {
+			s.Ante = req.AnteCents
+		} else {
+			s.Ante = 0
+		}
+		if req.DecisionSecs > 0 {
+			s.ActionSecsCfg = clampHost(req.DecisionSecs)
+		} else if req.TurnTimeSecs > 0 {
+			s.ActionSecsCfg = clampHost(req.TurnTimeSecs)
+		}
+		if req.TimeBankSecs > 0 {
+			s.TimeBankGrant = req.TimeBankSecs
+		}
+		if req.BuyInMinCents > 0 {
+			s.MinBuyIn = req.BuyInMinCents
+		}
+		if req.BuyInMaxCents > 0 && req.BuyInMaxCents >= s.MinBuyIn {
+			s.MaxBuyIn = req.BuyInMaxCents
+		}
+		if req.WalletLimitCents >= 0 {
+			s.WalletLimitCents = req.WalletLimitCents
+		}
+		s.AllowSpectators = req.SpectatorMode
+		narrate(dispatcher, s, "Host updated the table settings.")
+		dispatcher.MatchLabelUpdate(buildLabel(s))
+		broadcastSnapshot(ctx, db, dispatcher, s, nil)
 	case "force_fold":
 		// Fold the seat currently on the clock (dispute / stalling / disconnect).
 		// Only the acting seat can be folded without corrupting hand state.
@@ -1749,14 +1938,55 @@ func accrueLoyalty(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *
 // cash table a felted player (bot or human) must leave the seat — leaving them
 // seated at $0 wastes a seat and, before the allMatched() fix, could deadlock the
 // betting round. Tournaments keep busted seats for elimination reporting.
-func standUpBusted(s *MatchState) {
+// standUpBusted clears felted (stack ≤ 0) players between hands so a cash table
+// stays playable. When the table has auto buy-back enabled (#86), a busted human
+// is instead auto-topped-up from their wallet to the configured stack and kept
+// seated — the proven "auto-rebuy" mechanic — falling back to standing up only
+// when their wallet can't fund the rebuy.
+func standUpBusted(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
 	if s.TournamentID != "" {
 		return
 	}
+	// Inactivity auto-kick (#86): stand up any seated human who has hit the
+	// consecutive-timeout threshold, now that the hand is over (safe point).
 	for i, seat := range s.Table.Seats {
-		if seat != nil && seat.Stack <= 0 {
-			s.Table.StandUp(i)
+		if seat == nil || seat.IsBot || s.TimeoutStreak[seat.UserID] < maxConsecutiveTimeouts {
+			continue
 		}
+		name := seat.Username
+		releaseBuyIn(ctx, db, s, i, seat.UserID, seat.Stack)
+		delete(s.SeatWallet, i)
+		delete(s.TimeoutStreak, seat.UserID)
+		_ = store.NewActiveSeatStore(db).Unregister(ctx, seat.UserID, matchIDForAudit(s))
+		s.Table.StandUp(i)
+		narrate(dispatcher, s, fmt.Sprintf("%s was removed for inactivity (%d consecutive time-outs).", name, maxConsecutiveTimeouts))
+	}
+	for i, seat := range s.Table.Seats {
+		if seat == nil || seat.Stack > 0 {
+			continue
+		}
+		if s.AutoBuyBackCents > 0 && !seat.IsBot {
+			topUp := poker.ClampBuyIn(s.AutoBuyBackCents)
+			// Respect the table band + any universal wallet cap on the seat.
+			if topUp < s.minBuyIn() {
+				topUp = s.minBuyIn()
+			}
+			if topUp > s.maxBuyIn() {
+				topUp = s.maxBuyIn()
+			}
+			if s.WalletLimitCents > 0 && topUp > s.WalletLimitCents {
+				topUp = s.WalletLimitCents
+			}
+			if topUp > 0 {
+				if w := reserveBuyIn(ctx, db, s, seat.UserID, topUp, s.SeatWallet[i]); w != "" {
+					seat.Stack += topUp
+					s.SeatWallet[i] = w
+					narrate(dispatcher, s, fmt.Sprintf("%s auto-bought back in for $%d.", seat.Username, topUp/100))
+					continue
+				}
+			}
+		}
+		s.Table.StandUp(i)
 	}
 }
 
@@ -1871,6 +2101,12 @@ func buildLabel(s *MatchState) string {
 		"sb":         s.SmallBlind,
 		"bb":         s.BigBlind,
 		"status":     poker.HandPhaseForTable(s.Table, s.Phase),
+		// Access policy (#83) so the lobby can badge/filter tables. "invite" tables
+		// omit the code itself — the label is world-readable.
+		"access_type":      s.AccessType,
+		"invite_only":      s.AccessType == "invite" || s.AccessType == "members",
+		"allow_spectators": s.AllowSpectators,
+		"club_id":          s.ClubID,
 	})
 	return string(label)
 }
@@ -1966,6 +2202,11 @@ func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) 
 
 func broadcastSnapshot(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, sender runtime.Presence) {
 	for userID, p := range s.Presences {
+		// Spectators-disabled tables (#83): only seated players (and the host) see
+		// table state, so a non-seated rail cannot watch the action.
+		if !s.AllowSpectators && userID != s.HostUserID && seatForUser(s, userID) < 0 {
+			continue
+		}
 		snap := snapshotFor(ctx, db, s, userID)
 		data, _ := json.Marshal(snap)
 		_ = dispatcher.BroadcastMessage(protocol.OpSnapshot, data, []runtime.Presence{p}, sender, true)

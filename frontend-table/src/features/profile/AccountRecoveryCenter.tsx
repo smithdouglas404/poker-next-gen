@@ -3,8 +3,9 @@
 import { useCallback, useState } from "react";
 
 import { BTN_GOLD, GLASS_PANEL, cn } from "@/features/ui/tokens";
+import { WALLET_PROVIDERS, connectWallet, providerDef, shortAddress, signChallenge } from "@/features/wallet/walletConnect";
 
-import { DEMO_WALLETS, securityApi } from "./securityRpc";
+import { securityApi } from "./securityRpc";
 
 type Notify = (msg: string, kind?: "ok" | "err") => void;
 
@@ -35,7 +36,49 @@ export function AccountRecoveryCenter({ notify }: { notify: Notify }) {
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [backupCode, setBackupCode] = useState("");
+  const [walletNewPassword, setWalletNewPassword] = useState("");
   const [busy, setBusy] = useState<null | "wallet" | "email" | "verify" | "backup" | "link">(null);
+
+  // Real wallet recovery: connect → challenge → sign the recovery message →
+  // server verifies the signature against the linked wallet and resets the
+  // account password. No email round-trip, no demo.
+  const recoverViaWallet = useCallback(
+    async (providerId: (typeof WALLET_PROVIDERS)[number]["id"]) => {
+      if (walletNewPassword.length < 8) {
+        notify("Enter a new password (8+ chars) before verifying your wallet.", "err");
+        return;
+      }
+      setBusy("wallet");
+      try {
+        const { address, demo } = await connectWallet(providerId);
+        if (demo) {
+          notify("No wallet detected — install/unlock your wallet extension and try again.", "err");
+          return;
+        }
+        const chain = providerDef(providerId).chain === "Solana" ? "solana" : "evm";
+        const { nonce, message } = await securityApi.recoveryWalletChallenge(address);
+        const signature = await signChallenge(providerId, address, message);
+        if (!signature) {
+          notify("Signature was rejected or cancelled.", "err");
+          return;
+        }
+        await securityApi.recoveryWalletVerify({
+          address,
+          chain,
+          nonce,
+          signature,
+          new_password: walletNewPassword,
+        });
+        notify(`Recovered via ${shortAddress(address)} — sign in with your new password.`);
+        setWalletNewPassword("");
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Wallet recovery failed", "err");
+      } finally {
+        setBusy(null);
+      }
+    },
+    [walletNewPassword, notify],
+  );
 
   const requestEmail = useCallback(
     async (addr: string, tag: "wallet" | "email" | "link") => {
@@ -116,34 +159,35 @@ export function AccountRecoveryCenter({ notify }: { notify: Notify }) {
       </p>
 
       <div className="mt-6 space-y-4">
-        {/* Recover via Linked Crypto Wallet */}
+        {/* Recover via Linked Crypto Wallet — real signature challenge */}
         <Section title="Recover via Linked Crypto Wallet">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              {DEMO_WALLETS.map((w) => (
-                <span
-                  key={w.id}
-                  title={`${w.name} · ${w.short} · ${w.balance}`}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/40 text-lg"
-                >
-                  {w.emoji}
-                </span>
-              ))}
-              <span className="text-xs text-neutral-500">
-                {DEMO_WALLETS.map((w) => w.name).join(" · ")}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => void requestEmail(`${DEMO_WALLETS[0].id}@wallet.recover`, "wallet")}
-              disabled={busy !== null}
-              className={cn(BTN_GOLD, GOLD_BTN, "ml-auto")}
-            >
-              {busy === "wallet" ? "Verifying…" : "Verify Wallet"}
-            </button>
+          <input
+            type="password"
+            value={walletNewPassword}
+            onChange={(e) => setWalletNewPassword(e.target.value)}
+            placeholder="New password (8+ characters)"
+            className={FIELD}
+            autoComplete="new-password"
+          />
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            {WALLET_PROVIDERS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => void recoverViaWallet(p.id)}
+                disabled={busy !== null}
+                className={cn(
+                  "flex items-center gap-2 rounded-lg border border-gold/25 bg-black/40 px-3 py-2 text-xs font-semibold text-white transition hover:border-gold/60 disabled:opacity-40",
+                )}
+              >
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: p.brand }} />
+                {busy === "wallet" ? "Verifying…" : p.name}
+              </button>
+            ))}
           </div>
           <p className="mt-2 text-[11px] text-neutral-600">
-            Verifying a linked wallet sends a recovery link to the email on file for that account.
+            Connect a wallet you previously linked to your account and sign the recovery challenge —
+            the signature proves ownership and resets your password. No email round-trip.
           </p>
         </Section>
 

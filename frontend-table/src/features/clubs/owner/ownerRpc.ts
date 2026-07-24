@@ -6,6 +6,7 @@
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 
 import type {
+  AnalyticsSeries,
   ClubAnnouncement,
   ClubChatMessage,
   ClubStats,
@@ -43,6 +44,9 @@ export const ownerApi = {
   /** Overview rollup: stats, live member count, recent activity feed. */
   quickStats: (clubId: string) =>
     call<QuickStats>("club_quick_stats", { club_id: clubId }),
+  /** Real per-day engagement/retention/revenue series (Analytics + sparklines). */
+  analyticsSeries: (clubId: string, days = 30) =>
+    call<AnalyticsSeries>("club_analytics_series", { club_id: clubId, days }),
 
   /** Pending join requests to approve/decline. */
   requests: (clubId: string) =>
@@ -67,8 +71,32 @@ export const ownerApi = {
     call<unknown>("balance_allocate", {
       club_id: clubId,
       user_id: userId,
-      amount: amountCents,
+      // Backend model PlayerAllocatedBalance uses json key `balance` (min=1);
+      // sending `amount` did not bind and bypassed validation.
+      balance: amountCents,
       currency: "USD",
+    }),
+
+  /** Grant an owner/manager/agent seat with an equity split (club_owner_add). */
+  addOwner: (
+    clubId: string,
+    userId: string,
+    role: "owner" | "manager" | "agent",
+    equityBps: number,
+    canConfigure: boolean,
+  ) =>
+    call<{ id?: string; role?: string; equity_bps?: number }>("club_owner_add", {
+      club_id: clubId,
+      user_id: userId,
+      role,
+      equity_bps: equityBps,
+      can_configure: canConfigure,
+    }),
+  /** Read a player's allocated balance inside a club (balance_get). */
+  getBalance: (clubId: string, userId: string) =>
+    call<{ balance?: number; currency?: string; locked_amount?: number }>("balance_get", {
+      club_id: clubId,
+      user_id: userId,
     }),
 
   /** House rake aggregated over a period (day|week|month|quarter|year|all). */
@@ -97,13 +125,18 @@ export const ownerApi = {
       club_id: clubId,
       limit,
     }),
-  createAnnouncement: (clubId: string, title: string, body: string, severity: string) =>
-    call<{ ok: boolean; id: string }>("club_announcement_create", {
-      club_id: clubId,
-      title,
-      body,
-      severity,
-    }),
+  createAnnouncement: (
+    clubId: string,
+    title: string,
+    body: string,
+    severity: string,
+    audience: string = "all",
+    channel: string = "overlay",
+  ) =>
+    call<{ ok: boolean; id: string; audience: string; channel: string }>(
+      "club_announcement_create",
+      { club_id: clubId, title, body, severity, audience, channel },
+    ),
 
   // ---- Club chat (Overview right-rail live feed) ----
   chatList: (clubId: string, limit = 40) =>

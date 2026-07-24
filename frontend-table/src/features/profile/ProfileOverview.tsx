@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { callSessionRpc } from "@/lib/nakama/sessionRpc";
+import { RankBadge } from "./RankBadge";
 import { AVATARS, avatarSrc } from "@/features/table/avatars";
 import { BTN_GOLD, GLASS_PANEL, GLASS_PANEL_HOVER, HEADING_SM, RARITY, cn } from "@/features/ui/tokens";
 
@@ -93,9 +95,57 @@ export function ProfileOverview({ notify }: { notify: (msg: string, kind?: "ok" 
   const [ver, setVer] = useState<Verification | null>(null);
   const [avatar, setAvatar] = useState<string>(PICKS[0].id);
   const [loading, setLoading] = useState(true);
+  const [txns, setTxns] = useState<Array<{ kind: string; amount: string; date: string; positive: boolean }>>(
+    DEMO_TRANSACTIONS,
+  );
+  const [hrp, setHrp] = useState(0); // High Roller Points → "Tournament Points"
+
+  // Real HRP points for the Tournament-Points stat.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const d = (await callSessionRpc("loyalty_get", {})) as { hrp_total?: number };
+        if (!cancelled && typeof d.hrp_total === "number") setHrp(d.hrp_total);
+      } catch {
+        /* offline */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     setAvatar(readAvatar());
+  }, []);
+
+  // Real recent transactions from the wallet ledger (falls back to demo rows).
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = (await callSessionRpc("wallet_ledger", { limit: 8 })) as {
+          ledger?: Array<{ delta?: number; reason?: string; created_at?: string }>;
+        };
+        if (cancelled) return;
+        const rows = (data.ledger ?? []).map((e) => {
+          const delta = e.delta ?? 0;
+          return {
+            kind: (e.reason ?? "transaction").replace(/_/g, " "),
+            amount: `${delta >= 0 ? "+" : "−"}${money(Math.abs(delta))}`,
+            date: e.created_at ? new Date(e.created_at).toLocaleDateString() : "",
+            positive: delta >= 0,
+          };
+        });
+        if (rows.length > 0) setTxns(rows);
+      } catch {
+        /* guest / offline → keep demo rows */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -127,6 +177,24 @@ export function ProfileOverview({ notify }: { notify: (msg: string, kind?: "ok" 
     } catch {
       /* private mode — non-fatal */
     }
+    // Persist server-side so the choice follows the player across devices.
+    void callSessionRpc("profile_meta_set", { avatar: id }).catch(() => {});
+  }, []);
+
+  // Seed the avatar from the server (falls back to the local cache set above).
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = (await callSessionRpc("profile_meta_get", {})) as { meta?: { avatar?: string } };
+        if (!cancelled && data.meta?.avatar) setAvatar(data.meta.avatar);
+      } catch {
+        /* guest / offline → keep local */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const tier = useMemo(() => vipTier(ver), [ver]);
@@ -176,10 +244,16 @@ export function ProfileOverview({ notify }: { notify: (msg: string, kind?: "ok" 
               <div className="mt-3">
                 <StatRow label="Total Hands Played" value={compact(hands)} />
                 <StatRow label="Win/Loss Ratio" value={`${winPct}%`} tone="text-green" />
-                <StatRow label="Biggest Pot Won" value="$150,000" tone="text-gold" />
-                <StatRow label="Tournament Points" value="1,200" />
+                <StatRow
+                  label="Biggest Pot Won"
+                  value={stats?.biggest_pot_display ?? money(stats?.biggest_pot ?? 0)}
+                  tone="text-gold"
+                />
+                <StatRow label="Tournament Points" value={compact(hrp)} />
               </div>
             </section>
+            {/* Service rank — a US-military pay grade earned from real play. */}
+            <RankBadge />
           </div>
 
           {/* Recent transactions */}
@@ -200,9 +274,9 @@ export function ProfileOverview({ notify }: { notify: (msg: string, kind?: "ok" 
                   </tr>
                 </thead>
                 <tbody>
-                  {DEMO_TRANSACTIONS.map((t) => (
-                    <tr key={t.kind} className="border-t border-white/[0.05]">
-                      <td className="py-2 text-neutral-300">{t.kind}</td>
+                  {txns.map((t, i) => (
+                    <tr key={`${t.kind}-${i}`} className="border-t border-white/[0.05]">
+                      <td className="py-2 capitalize text-neutral-300">{t.kind}</td>
                       <td className={cn("py-2 text-right font-display font-bold", t.positive ? "text-green" : "text-brand")}>
                         {t.amount}
                       </td>

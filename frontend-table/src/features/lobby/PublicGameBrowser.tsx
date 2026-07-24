@@ -37,6 +37,7 @@ export function PublicGameBrowser({
 }) {
   const [stakes, setStakes] = useState<Set<StakeTier>>(new Set());
   const [gameType, setGameType] = useState("all");
+  const [seatsOnly, setSeatsOnly] = useState(false);
 
   const rows = useMemo<PublicTableRow[]>(() => {
     if (liveTables.length > 0) return rowsFromLiveTables(liveTables);
@@ -50,9 +51,10 @@ export function PublicGameBrowser({
         const tier = classifyStakes(r.big_blind_minor ?? 0);
         if (!stakes.has(tier)) return false;
       }
+      if (seatsOnly && r.seated >= r.capacity) return false;
       return true;
     });
-  }, [rows, gameType, stakes]);
+  }, [rows, gameType, stakes, seatsOnly]);
 
   const toggleStake = (t: StakeTier) =>
     setStakes((prev) => {
@@ -108,6 +110,25 @@ export function PublicGameBrowser({
               </option>
             ))}
           </select>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-400">
+            Seats
+          </span>
+          <button
+            type="button"
+            onClick={() => setSeatsOnly((v) => !v)}
+            aria-pressed={seatsOnly}
+            className={cn(
+              "rounded-full border px-4 py-1.5 text-xs font-bold uppercase tracking-wide transition",
+              seatsOnly
+                ? "border-green/60 bg-green/15 text-green"
+                : "border-white/12 bg-white/[0.02] text-neutral-300 hover:border-white/30",
+            )}
+          >
+            Open Seats
+          </button>
         </div>
 
         <button

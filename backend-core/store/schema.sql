@@ -404,6 +404,12 @@ CREATE TABLE IF NOT EXISTS poker_loyalty (
     hands_won    BIGINT NOT NULL DEFAULT 0,
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- Spendable points balance: distinct from hrp_total (which is the LIFETIME
+-- earned total that drives the player's service rank and never decreases).
+-- Earning HRP raises both; redeeming rewards or spending only draws down the
+-- spendable balance; buying points tops up spendable only (never lifetime, so
+-- purchased points can't inflate rank).
+ALTER TABLE poker_loyalty ADD COLUMN IF NOT EXISTS hrp_spendable BIGINT NOT NULL DEFAULT 0;
 
 -- Permanent achievement unlocks shown on a player's profile.
 CREATE TABLE IF NOT EXISTS poker_achievement (
@@ -746,6 +752,11 @@ CREATE TABLE IF NOT EXISTS poker_club_announcement (
 );
 
 CREATE INDEX IF NOT EXISTS idx_poker_club_ann_club ON poker_club_announcement(club_id, created_at DESC);
+-- Targeting: who receives the broadcast and how it is delivered. `audience` is
+-- one of all|private|tournament; `channel` is overlay|modal|chat. Real params
+-- persisted per broadcast (previously appended to the body as a text tag).
+ALTER TABLE poker_club_announcement ADD COLUMN IF NOT EXISTS audience TEXT NOT NULL DEFAULT 'all';
+ALTER TABLE poker_club_announcement ADD COLUMN IF NOT EXISTS channel TEXT NOT NULL DEFAULT 'overlay';
 
 CREATE TABLE IF NOT EXISTS poker_club_event (
     id TEXT PRIMARY KEY,
@@ -1018,3 +1029,83 @@ CREATE TABLE IF NOT EXISTS poker_insurance (
 );
 CREATE INDEX IF NOT EXISTS idx_poker_insurance_match ON poker_insurance(match_id, hand_no);
 CREATE INDEX IF NOT EXISTS idx_poker_insurance_user ON poker_insurance(user_id);
+
+-- ============================================================
+-- self-custody wallet linking (#91): signature-verified external
+-- wallets (EVM secp256k1 / Solana ed25519) bound to an account.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS poker_wallet_link_nonce (
+    user_id TEXT NOT NULL,
+    nonce TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, nonce)
+);
+CREATE INDEX IF NOT EXISTS idx_poker_wln_created ON poker_wallet_link_nonce(created_at);
+
+CREATE TABLE IF NOT EXISTS poker_linked_wallet (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    provider TEXT NOT NULL,            -- metamask | coinbase | walletconnect | phantom
+    chain TEXT NOT NULL,               -- evm | solana
+    address TEXT NOT NULL,             -- checksummed EVM 0x… or base58 Solana
+    verified BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, address)
+);
+CREATE INDEX IF NOT EXISTS idx_poker_linked_wallet_user ON poker_linked_wallet(user_id);
+
+-- ---------------------------------------------------------------------------
+-- Rewards / sponsor marketplace — players redeem their spendable HRP for
+-- sponsored rewards (travel, food, recreation, experiences, merch). A sponsor
+-- offers reward_items priced in points; redeeming creates a redemption record
+-- (voucher) that an operator fulfils. Players can also buy points with chips.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS poker_reward_sponsor (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    category    TEXT NOT NULL DEFAULT 'experiences',
+    description TEXT NOT NULL DEFAULT '',
+    logo_url    TEXT NOT NULL DEFAULT '',
+    active      BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS poker_reward_item (
+    id              TEXT PRIMARY KEY,
+    sponsor_id      TEXT NOT NULL REFERENCES poker_reward_sponsor(id) ON DELETE CASCADE,
+    category        TEXT NOT NULL DEFAULT 'experiences',
+    title           TEXT NOT NULL,
+    description     TEXT NOT NULL DEFAULT '',
+    image_url       TEXT NOT NULL DEFAULT '',
+    points_cost     BIGINT NOT NULL DEFAULT 0,
+    cash_value_cents BIGINT NOT NULL DEFAULT 0,
+    stock           INT NOT NULL DEFAULT -1,   -- -1 = unlimited
+    active          BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_poker_reward_item_cat ON poker_reward_item(category, active);
+
+CREATE TABLE IF NOT EXISTS poker_reward_redemption (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    item_id      TEXT NOT NULL,
+    sponsor_id   TEXT NOT NULL DEFAULT '',
+    title        TEXT NOT NULL DEFAULT '',
+    category     TEXT NOT NULL DEFAULT '',
+    points_spent BIGINT NOT NULL DEFAULT 0,
+    status       TEXT NOT NULL DEFAULT 'pending',  -- pending | fulfilled | cancelled
+    voucher_code TEXT NOT NULL DEFAULT '',
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fulfilled_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_poker_reward_redemption_user ON poker_reward_redemption(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_poker_reward_redemption_status ON poker_reward_redemption(status, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS poker_points_purchase (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL,
+    points     BIGINT NOT NULL DEFAULT 0,
+    cost_cents BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_poker_points_purchase_user ON poker_points_purchase(user_id, created_at DESC);

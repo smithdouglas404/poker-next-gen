@@ -64,6 +64,27 @@ export interface QuickStats {
   activity: ClubActivity[];
 }
 
+/** One day of the real analytics series (club_analytics_series). */
+export interface AnalyticsSeriesPoint {
+  day: string;
+  label: string;
+  active: number;
+  events: number;
+  new_members: number;
+  returning: number;
+  rake_cents: number;
+  members_cumulative: number;
+}
+
+/** Response of club_analytics_series — real per-day engagement/revenue trends. */
+export interface AnalyticsSeries {
+  club_id: string;
+  days: number;
+  series: AnalyticsSeriesPoint[];
+  new_total: number;
+  returning_total: number;
+}
+
 /** Join request / invitation from club_requests_list. */
 export interface JoinRequest {
   id: string;
@@ -111,6 +132,7 @@ export type OwnerSection =
   | "tables"
   | "tournaments"
   | "members"
+  | "operators"
   | "announcements"
   | "analytics"
   | "financials"
@@ -125,6 +147,8 @@ export interface ClubAnnouncement {
   title: string;
   body: string;
   severity: string; // info | warning | critical
+  audience?: string; // all | private | tournament
+  channel?: string; // overlay | modal | chat
   created_by: string;
   created_at: string;
 }
@@ -148,6 +172,7 @@ export interface RakeConfig {
   cap_minor: number; // max rake per pot, cents
   no_flop_no_drop: boolean;
   min_pot_minor: number; // cents
+  public?: boolean; // opt-in public rake transparency (backend json key is `public`)
   is_active?: boolean;
 }
 
@@ -165,6 +190,7 @@ export interface ClubSettingsBlob {
   kyc_required?: boolean;
   geo_block?: string;
   club_type?: string;
+  logo_data_url?: string; // uploaded club logo (data: URL), set from GlobalSettings/setup
 }
 
 /** Owner's club with the visibility/approval flags club_update reads/writes. */

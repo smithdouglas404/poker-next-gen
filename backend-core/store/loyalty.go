@@ -11,41 +11,76 @@ type LoyaltyStore struct{ db *sql.DB }
 
 func NewLoyaltyStore(db *sql.DB) *LoyaltyStore { return &LoyaltyStore{db: db} }
 
-// Loyalty is a player's lifetime HRP and hand counts.
+// Loyalty is a player's lifetime HRP and hand counts. HRPTotal is the lifetime
+// earned total (drives service rank, never decreases); HRPSpendable is the
+// redeemable balance used in the rewards marketplace.
 type Loyalty struct {
-	UserID      string `json:"user_id"`
-	HRPTotal    int64  `json:"hrp_total"`
-	HandsPlayed int64  `json:"hands_played"`
-	HandsWon    int64  `json:"hands_won"`
+	UserID       string `json:"user_id"`
+	HRPTotal     int64  `json:"hrp_total"`
+	HRPSpendable int64  `json:"hrp_spendable"`
+	HandsPlayed  int64  `json:"hands_played"`
+	HandsWon     int64  `json:"hands_won"`
 }
 
 // Get returns the player's loyalty row (zero-valued if none yet).
 func (s *LoyaltyStore) Get(ctx context.Context, userID string) (Loyalty, error) {
 	l := Loyalty{UserID: userID}
 	err := s.db.QueryRowContext(ctx,
-		`SELECT hrp_total, hands_played, hands_won FROM poker_loyalty WHERE user_id=$1`, userID).
-		Scan(&l.HRPTotal, &l.HandsPlayed, &l.HandsWon)
+		`SELECT hrp_total, hrp_spendable, hands_played, hands_won FROM poker_loyalty WHERE user_id=$1`, userID).
+		Scan(&l.HRPTotal, &l.HRPSpendable, &l.HandsPlayed, &l.HandsWon)
 	if err == sql.ErrNoRows {
 		return l, nil
 	}
 	return l, err
 }
 
-// Award increments HRP and hand counters in one upsert, returning the new totals.
+// Award increments lifetime HRP, the spendable balance, and hand counters in one
+// upsert. Earned points raise BOTH the lifetime total (rank) and the spendable
+// balance (rewards) by the same amount.
 func (s *LoyaltyStore) Award(ctx context.Context, userID string, hrp, playedDelta, wonDelta int64) (Loyalty, error) {
 	l := Loyalty{UserID: userID}
 	err := s.db.QueryRowContext(ctx, `
-		INSERT INTO poker_loyalty (user_id, hrp_total, hands_played, hands_won, updated_at)
-		VALUES ($1,$2,$3,$4,NOW())
+		INSERT INTO poker_loyalty (user_id, hrp_total, hrp_spendable, hands_played, hands_won, updated_at)
+		VALUES ($1,$2,$2,$3,$4,NOW())
 		ON CONFLICT (user_id) DO UPDATE SET
-			hrp_total    = poker_loyalty.hrp_total + $2,
-			hands_played = poker_loyalty.hands_played + $3,
-			hands_won    = poker_loyalty.hands_won + $4,
-			updated_at   = NOW()
-		RETURNING hrp_total, hands_played, hands_won`,
+			hrp_total     = poker_loyalty.hrp_total + $2,
+			hrp_spendable = poker_loyalty.hrp_spendable + $2,
+			hands_played  = poker_loyalty.hands_played + $3,
+			hands_won     = poker_loyalty.hands_won + $4,
+			updated_at    = NOW()
+		RETURNING hrp_total, hrp_spendable, hands_played, hands_won`,
 		userID, hrp, playedDelta, wonDelta).
-		Scan(&l.HRPTotal, &l.HandsPlayed, &l.HandsWon)
+		Scan(&l.HRPTotal, &l.HRPSpendable, &l.HandsPlayed, &l.HandsWon)
 	return l, err
+}
+
+// SpendPoints atomically draws down the spendable balance (rewards redemption).
+// Returns false without mutating when the balance is insufficient. Lifetime HRP
+// (rank) is untouched.
+func (s *LoyaltyStore) SpendPoints(ctx context.Context, userID string, points int64) (bool, error) {
+	if points <= 0 {
+		return false, nil
+	}
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE poker_loyalty SET hrp_spendable = hrp_spendable - $2, updated_at = NOW()
+		WHERE user_id = $1 AND hrp_spendable >= $2`, userID, points)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n == 1, nil
+}
+
+// AddSpendable tops up ONLY the spendable balance (e.g. buying points with
+// chips) — never the lifetime total, so purchased points can't inflate rank.
+func (s *LoyaltyStore) AddSpendable(ctx context.Context, userID string, points int64) error {
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO poker_loyalty (user_id, hrp_spendable, updated_at)
+		VALUES ($1,$2,NOW())
+		ON CONFLICT (user_id) DO UPDATE SET
+			hrp_spendable = poker_loyalty.hrp_spendable + $2,
+			updated_at    = NOW()`, userID, points)
+	return err
 }
 
 // UnlockAchievement records an achievement once. Returns true if it was newly

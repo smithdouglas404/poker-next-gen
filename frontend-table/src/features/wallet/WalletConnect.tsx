@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { Button, Field, Input, Select } from "@/features/ui";
 import { BTN_GOLD, GLASS_PANEL, GLASS_PANEL_HOVER, HEADING_SM, STATUS_CHIP, cn } from "@/features/ui/tokens";
 import { dollarsToCents, usd, walletApi, type BucketBalance } from "@/features/wallet/walletRpc";
@@ -13,9 +14,32 @@ import {
   removeConnection,
   saveConnection,
   shortAddress,
+  signChallenge,
   type ConnectionMap,
   type WalletProviderId,
 } from "@/features/wallet/walletConnect";
+
+/** Server-side proof-of-ownership link: challenge → sign → wallet_link. Returns
+ *  true when the backend verified the signature and bound the wallet. */
+async function linkOnChain(id: WalletProviderId, address: string): Promise<boolean> {
+  try {
+    const ch = (await callSessionRpc("wallet_link_challenge", {})) as { nonce?: string; message?: string };
+    if (!ch.nonce || !ch.message) return false;
+    const signature = await signChallenge(id, address, ch.message);
+    if (!signature) return false;
+    const chain = providerDef(id).chain === "Solana" ? "solana" : "evm";
+    const res = (await callSessionRpc("wallet_link", {
+      provider: id,
+      chain,
+      address,
+      nonce: ch.nonce,
+      signature,
+    })) as { ok?: boolean };
+    return !!res.ok;
+  } catch {
+    return false;
+  }
+}
 
 /* ------------------------------------------------------------------ */
 /* Brand logo marks — inline SVG, exempt from the palette (they are     */
@@ -112,12 +136,18 @@ export function WalletConnect({ balanceCents, buckets, notify, onDone }: Props) 
           const map = saveConnection(id, { address, demo, connectedAt: Date.now() });
           setConns(map);
           setActive(id);
-          notify(
-            demo
-              ? `${providerDef(id).name} linked (demo address — install the extension to link on-chain).`
-              : `${providerDef(id).name} connected · ${shortAddress(address)}`,
-            "ok",
-          );
+          if (demo) {
+            notify(`${providerDef(id).name} linked (demo address — install the extension to link on-chain).`);
+          } else {
+            // Prove ownership server-side: sign the challenge and persist via wallet_link.
+            const verified = await linkOnChain(id, address);
+            notify(
+              verified
+                ? `${providerDef(id).name} verified & linked · ${shortAddress(address)}`
+                : `${providerDef(id).name} connected · ${shortAddress(address)} (sign the request to verify ownership)`,
+              verified ? "ok" : "err",
+            );
+          }
         } catch (e) {
           notify(e instanceof Error ? e.message : "Wallet connection failed", "err");
         } finally {

@@ -161,6 +161,14 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		"bomb_pot_ante":      req.BombPotAnte,
 		"allow_insurance":    req.AllowInsurance,
 		"allow_run_it_twice": req.AllowRunItTwice,
+		// Access & seating policy (#83) — previously dropped by the backend.
+		"access_type":         req.AccessType,
+		"join_code":           strings.ToUpper(strings.TrimSpace(req.JoinCode)),
+		"allow_spectators":    req.AllowSpectators,
+		"kyc_required":        req.KYCRequired,
+		"geo_restricted":      req.GeoRestricted,
+		"wallet_limit_cents":  req.WalletLimitCents,
+		"auto_buy_back_cents": req.AutoBuyBackCents,
 	})
 	if err != nil {
 		return "", err

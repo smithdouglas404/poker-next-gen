@@ -70,7 +70,7 @@ export default function HandsPage() {
     setVerify(null);
     setVerifying(true);
     try {
-      const data = (await callSessionRpc("audit_verify", { match_id: h.match_id, hand_no: h.hand_no })) as VerifyResult;
+      const data = (await callSessionRpc("audit_verify_hand", { match_id: h.match_id, hand_no: h.hand_no })) as VerifyResult;
       setVerify(data);
     } catch {
       setVerify({ chain_ok: false, errors: ["Verification unavailable"] });

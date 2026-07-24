@@ -78,6 +78,60 @@ func (s *TournamentExtStore) RegisteredCount(ctx context.Context, tournamentID s
 	return n, err
 }
 
+// ClubTournamentFeesRow is one tournament's real fee/entry contribution.
+type ClubTournamentFeesRow struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Status      string `json:"status"`
+	FeeMinor    int64  `json:"fee_minor"`
+	BuyInMinor  int64  `json:"buy_in_minor"`
+	Entries     int64  `json:"entries"`
+	FeeTotal    int64  `json:"fee_total"`
+	BuyInTotal  int64  `json:"buy_in_total"`
+}
+
+// ClubTournamentFees sums the club's real tournament-fee revenue — the entry fee
+// (fee_minor) charged per registration, over every tournament owned by the club,
+// optionally within a trailing window. This is the authoritative replacement for
+// the client-side "≈25% of rake" model. Returns the grand total plus a per-
+// tournament breakdown (newest first). `interval` is a fixed Postgres literal
+// chosen by the caller (never user-supplied); empty means all-time.
+func (s *TournamentExtStore) ClubTournamentFees(ctx context.Context, clubID, interval string) (int64, int64, int64, []ClubTournamentFeesRow, error) {
+	where := "t.club_id=$1"
+	if interval != "" {
+		where += " AND t.created_at >= NOW() - INTERVAL '" + interval + "'"
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT t.id, t.name, t.status, t.fee_minor, t.buy_in_minor,
+		       COALESCE(r.cnt, 0) AS entries
+		FROM poker_tournament t
+		LEFT JOIN (
+			SELECT tournament_id, COUNT(*) AS cnt
+			FROM poker_tournament_registration GROUP BY tournament_id
+		) r ON r.tournament_id = t.id
+		WHERE `+where+`
+		ORDER BY t.created_at DESC`, clubID)
+	if err != nil {
+		return 0, 0, 0, nil, err
+	}
+	defer rows.Close()
+	var feeTotal, buyInTotal, entryTotal int64
+	out := []ClubTournamentFeesRow{}
+	for rows.Next() {
+		var r ClubTournamentFeesRow
+		if err := rows.Scan(&r.ID, &r.Name, &r.Status, &r.FeeMinor, &r.BuyInMinor, &r.Entries); err != nil {
+			return 0, 0, 0, nil, err
+		}
+		r.FeeTotal = r.FeeMinor * r.Entries
+		r.BuyInTotal = r.BuyInMinor * r.Entries
+		feeTotal += r.FeeTotal
+		buyInTotal += r.BuyInTotal
+		entryTotal += r.Entries
+		out = append(out, r)
+	}
+	return feeTotal, buyInTotal, entryTotal, out, rows.Err()
+}
+
 // PlayersLeft returns the number of still-alive entrants (registered or
 // playing, i.e. not yet busted). During the registering phase this equals the
 // registered count.

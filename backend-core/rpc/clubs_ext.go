@@ -228,6 +228,39 @@ func ClubRakeReport(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 	return string(out), nil
 }
 
+// ClubTournamentFees returns the club's real tournament-fee revenue over {period}
+// — the entry fee (fee_minor) charged per registration, summed across every
+// tournament the club owns, plus the buy-in throughput and a per-tournament
+// breakdown. This is the authoritative source for the Revenue Reports
+// "Tournament Fees" figure (previously a client-modeled 25%-of-rake guess).
+// Configurer-gated (house-revenue data).
+func ClubTournamentFees(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	var req struct {
+		ClubID string `json:"club_id"`
+		Period string `json:"period"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" {
+		return "", runtime.NewError("club_id required", 3)
+	}
+	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+		return "", err
+	}
+	feeTotal, buyInTotal, entries, breakdown, err := store.NewTournamentExtStore(db).
+		ClubTournamentFees(ctx, req.ClubID, clubsextInterval(req.Period))
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	out, _ := json.Marshal(map[string]interface{}{
+		"club_id":          req.ClubID,
+		"period":           req.Period,
+		"fee_total_minor":  feeTotal,
+		"buyin_total_minor": buyInTotal,
+		"entries":          entries,
+		"tournaments":      breakdown,
+	})
+	return string(out), nil
+}
+
 // ClubMemberStats returns the club roster as per-member analytics rows
 // (balance, activity count, role). Configurer-gated.
 func ClubMemberStats(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
@@ -270,6 +303,39 @@ func ClubQuickStats(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 		"stats":        stats,
 		"member_count": memberCount,
 		"activity":     activity,
+	})
+	return string(out), nil
+}
+
+// ClubAnalyticsSeries returns a real per-day engagement / retention / revenue
+// series for a club (active members, event volume, new-vs-returning, running
+// member total, and rake per day) over the trailing window. Backs the Member
+// Analytics charts and the Club Overview sparklines with stored data — no demo.
+// Configurer-gated (owner analytics).
+func ClubAnalyticsSeries(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	var req struct {
+		ClubID string `json:"club_id"`
+		Days   int    `json:"days"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" {
+		return "", runtime.NewError("club_id required", 3)
+	}
+	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+		return "", err
+	}
+	if req.Days <= 0 {
+		req.Days = 30
+	}
+	series, newTotal, retTotal, err := store.NewClubExtStore(db).AnalyticsSeries(ctx, req.ClubID, req.Days)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	out, _ := json.Marshal(map[string]interface{}{
+		"club_id":          req.ClubID,
+		"days":             len(series),
+		"series":           series,
+		"new_total":        newTotal,
+		"returning_total":  retTotal,
 	})
 	return string(out), nil
 }
@@ -542,6 +608,8 @@ func ClubAnnouncementCreate(ctx context.Context, logger runtime.Logger, db *sql.
 		Title    string `json:"title"`
 		Body     string `json:"body"`
 		Severity string `json:"severity"`
+		Audience string `json:"audience"`
+		Channel  string `json:"channel"`
 	}
 	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" || req.Title == "" {
 		return "", runtime.NewError("club_id and title required", 3)
@@ -550,15 +618,40 @@ func ClubAnnouncementCreate(ctx context.Context, logger runtime.Logger, db *sql.
 	if err != nil {
 		return "", err
 	}
+	// Whitelist the targeting params so a bad value can't be stored.
+	audience := announceAudience(req.Audience)
+	channel := announceChannel(req.Channel)
 	es := store.NewClubExtStore(db)
 	id, err := es.CreateAnnouncement(ctx, &store.ClubAnnouncement{
-		ClubID: req.ClubID, Title: req.Title, Body: req.Body, Severity: req.Severity, CreatedBy: author,
+		ClubID: req.ClubID, Title: req.Title, Body: req.Body, Severity: req.Severity,
+		Audience: audience, Channel: channel, CreatedBy: author,
 	})
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	_ = es.LogActivity(ctx, req.ClubID, author, "announcement", req.Title)
-	return `{"ok":true,"id":"` + id + `"}`, nil
+	out, _ := json.Marshal(map[string]interface{}{"ok": true, "id": id, "audience": audience, "channel": channel})
+	return string(out), nil
+}
+
+// announceAudience clamps the target-audience param to a known value.
+func announceAudience(v string) string {
+	switch v {
+	case "private", "tournament":
+		return v
+	default:
+		return "all"
+	}
+}
+
+// announceChannel clamps the delivery-channel param to a known value.
+func announceChannel(v string) string {
+	switch v {
+	case "modal", "chat":
+		return v
+	default:
+		return "overlay"
+	}
 }
 
 // ClubEventList returns a club's scheduled events (soonest first).

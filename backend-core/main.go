@@ -60,6 +60,8 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"wallet_get":                  rpc.WalletGet,
 		"wallet_ledger":               rpc.WalletLedger,
 		"profile_get":                 rpc.ProfileGet,
+		"profile_meta_get":            rpc.ProfileMetaGet,
+		"profile_meta_set":            rpc.ProfileMetaSet,
 		"me_roles":                    rpc.MeRoles,
 		"loyalty_get":                 rpc.LoyaltyGet,
 		"matchmaker_enqueue":          rpc.MatchmakerEnqueue,
@@ -92,6 +94,11 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"nowpayments_balance":         rpc.NowPaymentsBalance,
 		"wallet_withdraw":             rpc.WalletWithdraw,
 		"withdrawal_list":             rpc.WithdrawalList,
+		// Self-custody wallet linking (#91): signature-verified external wallets.
+		"wallet_link_challenge":       rpc.WalletLinkChallenge,
+		"wallet_link":                 rpc.WalletLink,
+		"wallet_linked_list":          rpc.WalletLinkedList,
+		"wallet_unlink":               rpc.WalletUnlink,
 		"withdrawal_approve_admin":    rpc.WithdrawalApproveAdmin,
 		"withdrawal_reject_admin":     rpc.WithdrawalRejectAdmin,
 		"daily_bonus_status":          rpc.DailyBonusStatus,
@@ -137,11 +144,22 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"clubwar_result":    rpc.ClubwarResult,
 		// Stats / leaderboards
 		"player_stats":       rpc.PlayerStats,
+		"player_rank":        rpc.PlayerRank,
+		"rewards_catalog":          rpc.RewardsCatalog,
+		"points_balance":           rpc.PointsBalance,
+		"reward_redeem":            rpc.RewardRedeem,
+		"points_purchase":          rpc.PointsPurchase,
+		"reward_redemptions_list":  rpc.RewardRedemptionsList,
+		"reward_sponsor_upsert":    rpc.RewardSponsorUpsert,
+		"reward_item_upsert":       rpc.RewardItemUpsert,
+		"reward_redemptions_pending": rpc.RewardRedemptionsPending,
+		"reward_redemption_fulfil": rpc.RewardRedemptionFulfil,
 		"leak_report":        rpc.LeakReport,
 		"hand_history":       rpc.HandHistory,
 		"stats_head_to_head": rpc.StatsHeadToHead,
 		"loyalty_history":    rpc.LoyaltyHistory,
 		"leaderboard_top":    rpc.LeaderboardTop,
+		"season_current":     rpc.SeasonCurrent,
 		// Missions / battle pass / referrals
 		"missions_list":               rpc.MissionsList,
 		"mission_claim":               rpc.MissionClaim,
@@ -165,6 +183,8 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"account_recovery_request_email": rpc.AccountRecoveryRequestEmail,
 		"account_recovery_verify_email":  rpc.AccountRecoveryVerifyEmail,
 		"account_recovery_backup_code":   rpc.AccountRecoveryBackupCode,
+		"account_recovery_wallet_challenge": rpc.AccountRecoveryWalletChallenge,
+		"account_recovery_wallet_verify":    rpc.AccountRecoveryWalletVerify,
 		"api_key_create":                 rpc.ApiKeyCreate,
 		"api_key_list":                   rpc.ApiKeyList,
 		"api_key_revoke":                 rpc.ApiKeyRevoke,
@@ -176,8 +196,10 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"club_roster":              rpc.ClubRoster,
 		"club_rankings":            rpc.ClubRankings,
 		"club_rake_report":         rpc.ClubRakeReport,
+		"club_tournament_fees":     rpc.ClubTournamentFees,
 		"club_member_stats":        rpc.ClubMemberStats,
 		"club_quick_stats":         rpc.ClubQuickStats,
+		"club_analytics_series":    rpc.ClubAnalyticsSeries,
 		"club_invite":              rpc.ClubInvite,
 		"club_invite_revoke":       rpc.ClubInviteRevoke,
 		"club_join_request":        rpc.ClubJoinRequest,
@@ -266,6 +288,16 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		if err := initializer.RegisterRpc(id, fn); err != nil {
 			return err
 		}
+	}
+
+	// Clerk (clerk.com) OAuth bridge: verify a Clerk session JWT passed to
+	// authenticateCustom and map it to a stable Nakama account. No-op unless
+	// CLERK_JWT_ISSUER is set, so device/email auth is unaffected when unused.
+	if err := initializer.RegisterBeforeAuthenticateCustom(rpc.ClerkBeforeAuthCustom); err != nil {
+		return err
+	}
+	if rpc.ClerkEnabled() {
+		logger.Info("Clerk OAuth bridge enabled (issuer configured)")
 	}
 
 	if err := initializer.RegisterMatch(protocol.MatchModule, func(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule) (runtime.Match, error) {

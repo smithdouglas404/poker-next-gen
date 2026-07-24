@@ -64,10 +64,6 @@ export function PremiumMarket({
             >
               <div className="relative">
                 <CosmeticThumb preview={c.preview_ref} kind={c.kind} rarity={c.rarity} />
-                {/* 360° preview affordance */}
-                <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full border border-white/15 bg-black/60 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-neutral-200 backdrop-blur-md">
-                  <span aria-hidden>↻</span> 360°
-                </span>
                 <button
                   type="button"
                   onClick={() => onWishlist(c)}

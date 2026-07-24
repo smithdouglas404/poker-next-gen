@@ -151,6 +151,22 @@ type TableCreateRequest struct {
 	// accrue to those standings (empty => not participating).
 	WarID    string `json:"war_id,omitempty" label:"Club War"`
 	LeagueID string `json:"league_id,omitempty" label:"League"`
+	// Access & seating policy (#83). Previously the rich setup form sent these keys
+	// but the backend dropped them ("faces without flows"). Now first-class:
+	//  - AccessType "public" | "members" | "invite" (empty => public). "members"
+	//    requires club membership to sit; "invite" requires a matching JoinCode.
+	//  - AllowSpectators: when false, only seated players receive table state.
+	//  - KYCRequired: table-level KYC floor (in addition to the platform floor).
+	//  - GeoRestricted: re-check the seating player's jurisdiction at sit-down.
+	//  - WalletLimitCents: cap total chips a single player may bring to the table.
+	//  - AutoBuyBackCents: auto top-up a busted player to this stack (0 => off).
+	AccessType       string `json:"access_type,omitempty" enum:"public,members,invite" label:"Access Type"`
+	JoinCode         string `json:"join_code,omitempty" label:"Table Join Code"`
+	AllowSpectators  bool   `json:"allow_spectators,omitempty" label:"Allow Spectators"`
+	KYCRequired      bool   `json:"kyc_required,omitempty" label:"Require KYC to sit"`
+	GeoRestricted    bool   `json:"geo_restricted,omitempty" label:"Geo-Restricted"`
+	WalletLimitCents int64  `json:"wallet_limit_cents,omitempty" validate:"min=0" unit:"money_minor" label:"Universal Wallet Limit"`
+	AutoBuyBackCents int64  `json:"auto_buy_back_cents,omitempty" validate:"min=0" unit:"money_minor" label:"Auto Buy-Back"`
 }
 
 // ClubMemberRoleRequest is the club_member_role RPC payload: promote/demote a

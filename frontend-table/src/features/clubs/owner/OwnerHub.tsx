@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { Button } from "@/features/ui";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
@@ -12,6 +13,7 @@ import { GlobalSettings } from "./GlobalSettings";
 import { GuestGate } from "./GuestGate";
 import { MemberAnalytics } from "./MemberAnalytics";
 import { MemberManagement } from "./MemberManagement";
+import { OperatorsEquity } from "./OperatorsEquity";
 import { Overview } from "./Overview";
 import { OwnerShell } from "./OwnerShell";
 import { QuickStats } from "./QuickStats";
@@ -33,6 +35,7 @@ import {
 import { compact, ownerApi, usdCompact } from "./ownerRpc";
 import { EmptyState, SectionTitle } from "./ui";
 import type {
+  AnalyticsSeries,
   ClubAnnouncement,
   ClubChatMessage,
   ClubSettingsBlob,
@@ -70,6 +73,7 @@ export function OwnerHub() {
   const [announcements, setAnnouncements] = useState<ClubAnnouncement[]>([]);
   const [chat, setChat] = useState<ClubChatMessage[]>([]);
   const [rakeConfig, setRakeConfig] = useState<RakeConfig | null>(null);
+  const [series, setSeries] = useState<AnalyticsSeries | null>(null);
 
   const [section, setSection] = useState<OwnerSection>("overview");
   const [toast, setToast] = useState<Toast | null>(null);
@@ -180,12 +184,13 @@ export function OwnerHub() {
       setRole(owned.role);
 
       // Load all owner data in parallel; individual failures degrade gracefully.
-      const [quickRes, ledgerRes, annRes, chatRes, rakeRes] = await Promise.allSettled([
+      const [quickRes, ledgerRes, annRes, chatRes, rakeRes, seriesRes] = await Promise.allSettled([
         ownerApi.quickStats(owned.club.id),
         ownerApi.rakeLedger(owned.club.id),
         ownerApi.announcements(owned.club.id),
         ownerApi.chatList(owned.club.id),
         ownerApi.rakeConfigGet(owned.club.id),
+        ownerApi.analyticsSeries(owned.club.id, 30),
       ]);
       if (cancelled) return;
 
@@ -194,6 +199,7 @@ export function OwnerHub() {
       if (annRes.status === "fulfilled") setAnnouncements(annRes.value.announcements ?? []);
       if (chatRes.status === "fulfilled") setChat((chatRes.value.messages ?? []).slice().reverse());
       if (rakeRes.status === "fulfilled" && rakeRes.value?.club_id) setRakeConfig(rakeRes.value);
+      if (seriesRes.status === "fulfilled" && seriesRes.value?.series) setSeries(seriesRes.value);
 
       await Promise.all([
         reloadRoster(owned.club.id),
@@ -340,13 +346,21 @@ export function OwnerHub() {
   );
 
   const onBroadcast = useCallback(
-    async (title: string, body: string, severity: string) => {
+    async (
+      title: string,
+      body: string,
+      severity: string,
+      audience: string = "all",
+      channel: string = "overlay",
+    ) => {
       const optimistic: ClubAnnouncement = {
         id: `local-${Date.now()}`,
         club_id: club?.id ?? DEMO_CLUB.id,
         title,
         body,
         severity,
+        audience,
+        channel,
         created_by: role ?? "owner",
         created_at: new Date().toISOString(),
       };
@@ -356,7 +370,7 @@ export function OwnerHub() {
         return;
       }
       try {
-        await ownerApi.createAnnouncement(club.id, title, body, severity);
+        await ownerApi.createAnnouncement(club.id, title, body, severity, audience, channel);
         const r = await ownerApi.announcements(club.id);
         setAnnouncements(r.announcements ?? []);
         notify(`Broadcast sent: "${title}".`);
@@ -450,6 +464,30 @@ export function OwnerHub() {
       ? Math.max(1000, Math.round(quick.stats.chips_won / quick.stats.hands))
       : DEMO_OVERVIEW_SPARKS.potCents[DEMO_OVERVIEW_SPARKS.potCents.length - 1];
 
+  // Real trend series from club_analytics_series (zero-filled 30-day window).
+  // Sparklines/charts read stored data; the two cards with no per-day source
+  // (Active Tables, Average Pot) fall back to a neutral baseline while their
+  // headline value stays real — see the Sparkbars empty-array fallback.
+  const liveSeries = !demo && series?.series?.length ? series.series : null;
+  const overviewSparks = liveSeries
+    ? {
+        members: liveSeries.map((p) => p.members_cumulative),
+        tables: [],
+        volumeCents: liveSeries.map((p) => p.rake_cents),
+        potCents: [],
+        rakeCents: liveSeries.map((p) => p.rake_cents),
+      }
+    : DEMO_OVERVIEW_SPARKS;
+  const memberAnalytics = liveSeries
+    ? {
+        months: liveSeries.map((p) => p.label),
+        activeMembers: liveSeries.map((p) => p.active),
+        tableVolumeCents: liveSeries.map((p) => p.rake_cents),
+        newPlayers: series?.new_total ?? 0,
+        returningPlayers: series?.returning_total ?? 0,
+      }
+    : DEMO_ANALYTICS;
+
   const cards: StatCard[] = [
     { label: "Total Stakes", value: usdCompact(bankroll), sub: "Across all club tables", accent: "gold" },
     { label: "Active Now", value: compact(onlineCount), sub: "Live in-vault", accent: "green" },
@@ -508,7 +546,7 @@ export function OwnerHub() {
           bankrollCents={bankroll}
           rakeTotalCents={rakeTotalCents}
           avgPotCents={avgPotCents}
-          sparks={DEMO_OVERVIEW_SPARKS}
+          sparks={overviewSparks}
           chat={chat}
           demo={demo}
           canManage={canManage}
@@ -532,6 +570,18 @@ export function OwnerHub() {
         </div>
       )}
 
+      {section === "operators" && (
+        <OperatorsEquity
+          clubId={club?.id ?? ""}
+          roster={roster}
+          canManage={canManage}
+          demo={demo}
+          onChanged={() => {
+            if (club?.id) void reloadRoster(club.id);
+          }}
+        />
+      )}
+
       {section === "announcements" && (
         <Announcements
           announcements={announcements}
@@ -542,7 +592,7 @@ export function OwnerHub() {
       )}
 
       {section === "analytics" && (
-        <MemberAnalytics roster={roster} analytics={DEMO_ANALYTICS} demo={demo} />
+        <MemberAnalytics roster={roster} analytics={memberAnalytics} demo={demo} />
       )}
 
       {section === "settings" && (
@@ -613,6 +663,50 @@ function DerivedSection({
 }) {
   const s = quick.stats;
   const seated = roster.filter((m) => m.locked_amount > 0).length;
+
+  // Real featured tables / series from table_list / tournament_list (demo fallback).
+  const [featured, setFeatured] = useState<{ name: string; note: string }[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        if (tournaments) {
+          const d = (await callSessionRpc("tournament_list", {})) as {
+            tournaments?: Array<{ name: string; status: string; buy_in_minor?: number; variant?: string }>;
+          };
+          const rows = (d.tournaments ?? [])
+            .filter((t) => t.status !== "finished")
+            .slice(0, 4)
+            .map((t) => ({
+              name: t.name,
+              note: `${usdCompact(t.buy_in_minor ?? 0)} · ${t.variant === "omaha" ? "PLO" : "Hold'em"} · ${t.status}`,
+            }));
+          if (!cancelled && rows.length) setFeatured(rows);
+        } else {
+          const d = (await callSessionRpc("table_list", {})) as {
+            matches?: Array<{ label?: string }>;
+          };
+          const rows = (d.matches ?? []).slice(0, 5).map((m) => {
+            let l: { room_id?: string; sb?: number; bb?: number; seated?: number } = {};
+            try {
+              l = JSON.parse(m.label ?? "{}");
+            } catch {
+              /* label not json */
+            }
+            const blinds = l.sb && l.bb ? `$${l.sb / 100} / $${l.bb / 100}` : "";
+            return { name: l.room_id || "Table", note: `${blinds}${blinds ? " · " : ""}${l.seated ?? 0} seated` };
+          });
+          if (!cancelled && rows.length) setFeatured(rows);
+        }
+      } catch {
+        /* guest / offline → keep demo rows */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tournaments]);
+
   const cards: StatCard[] = tournaments
     ? [
         { label: "Tournament Wins", value: `${s?.tourney_wins ?? 0}`, sub: "All-time", accent: "gold" },
@@ -644,15 +738,16 @@ function DerivedSection({
           {tournaments ? "Featured Series" : "Featured Tables"}
         </p>
         <div className="mt-4 space-y-3">
-          {(tournaments
-            ? [
-                { name: "Gold Cup Championship", note: "Prize pool $1M · Sundays 20:00" },
-                { name: "Diamond Vault Turbo", note: "$50k GTD · Daily 21:00" },
-              ]
-            : [
-                { name: "High Stakes — Table 1", note: "$500 / $1k · 6-max" },
-                { name: "Nightly PLO — Table 3", note: "$25 / $50 · Pot-Limit Omaha" },
-              ]
+          {(featured ??
+            (tournaments
+              ? [
+                  { name: "Gold Cup Championship", note: "Prize pool $1M · Sundays 20:00" },
+                  { name: "Diamond Vault Turbo", note: "$50k GTD · Daily 21:00" },
+                ]
+              : [
+                  { name: "High Stakes — Table 1", note: "$500 / $1k · 6-max" },
+                  { name: "Nightly PLO — Table 3", note: "$25 / $50 · Pot-Limit Omaha" },
+                ])
           ).map((t) => (
             <div
               key={t.name}

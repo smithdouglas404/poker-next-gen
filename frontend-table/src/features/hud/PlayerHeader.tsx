@@ -90,6 +90,9 @@ export function PlayerHeader() {
             <Link href="/lobby" className={menuLink} onClick={() => setOpen(false)}>
               🎲 Lobby
             </Link>
+            <Link href="/rewards" className={menuLink} onClick={() => setOpen(false)}>
+              🎁 Rewards marketplace
+            </Link>
             <button type="button" onClick={copyId} className={cn(menuLink, "w-full text-left")}>
               🆔 Copy account ID
             </button>

@@ -33,6 +33,7 @@ export interface SetupForm {
   currency: string;
   clubType: ClubType;
   requireApproval: boolean;
+  acceptsGlobalWallet: boolean;
   brandColor: string;
   creditLimitCents: number;
   logoDataUrl: string | null;
@@ -89,6 +90,7 @@ export const clubSetup = {
         slug,
         description: form.description.trim(),
         currency: form.currency,
+        accepts_global_wallet: form.acceptsGlobalWallet,
       });
       // Apply the rest of the onboarding config to the freshly-created club.
       // Non-fatal: a create that succeeds but an update that fails still yields

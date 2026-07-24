@@ -95,6 +95,7 @@ export default function LiveCinematicTable() {
         heroHole: null as [string, string] | null,
         maxSeats: DEFAULT_MAX_SEATS,
         showPot: false,
+        announce: "",
       };
     }
 
@@ -128,8 +129,20 @@ export default function LiveCinematicTable() {
           isBot: !!s.is_bot,
           isButton: s.index === snapshot.button_seat,
           betLabel: (s.bet ?? 0) > 0 ? formatCents(s.bet ?? 0) : undefined,
+          betMinor: s.bet ?? 0,
         } satisfies SceneSeat;
       });
+
+    // Transient banner: at showdown, name the top winner, their pot, and the
+    // winning hand; the scene shows it as a center-top announcement.
+    let announce = "";
+    if (showdown?.winners?.length) {
+      const top = [...showdown.winners].sort((a, b) => (b.pot ?? 0) - (a.pot ?? 0))[0];
+      const name =
+        top.username ?? snapshot.seats.find((s) => s.index === top.seat)?.username ?? `Seat ${(top.seat ?? 0) + 1}`;
+      const amt = (top.pot ?? 0) > 0 ? ` wins ${formatCents(top.pot ?? 0)}` : " wins";
+      announce = `${name}${amt}${top.hand ? ` · ${top.hand}` : ""}`;
+    }
 
     return {
       seats,
@@ -138,6 +151,7 @@ export default function LiveCinematicTable() {
       heroHole,
       maxSeats: total,
       showPot: snapshot.pot > 0,
+      announce,
     };
   }, [snapshot, holeCards, showdown, heroUserId, mode]);
 
@@ -150,6 +164,7 @@ export default function LiveCinematicTable() {
       mode={mode}
       maxSeats={scene.maxSeats}
       showPot={scene.showPot}
+      announce={scene.announce}
       overlay={<TableAdminOverlay demo={demo} />}
     />
   );

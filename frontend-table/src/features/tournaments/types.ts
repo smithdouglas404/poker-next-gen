@@ -117,6 +117,7 @@ export type TopTab = "lobby" | "center" | "board";
 /** Draft held client-side by the create panel before publish. */
 export interface DraftForm {
   name: string;
+  clubId: string; // owning club (empty = platform tournament)
   variant: string;
   buyIn: number; // dollars
   fee: number; // dollars
@@ -130,4 +131,10 @@ export interface DraftForm {
   lateReg: boolean;
   scheduledAt: string; // datetime-local value
   regCloseAt: string; // datetime-local value (late-reg close)
+  // Operator-authored structure. When present (non-empty) these override the
+  // preset generators (structures.ts) on publish — every SB/BB/ante/duration and
+  // every payout tier (incl. per-tier guaranteed_minor) is sent verbatim via
+  // blind_level_add / prize_pool_add. Undefined => fall back to the preset ladder.
+  customBlinds?: BlindLevel[];
+  customPrizes?: Prize[];
 }

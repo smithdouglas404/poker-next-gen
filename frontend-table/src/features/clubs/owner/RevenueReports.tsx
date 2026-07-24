@@ -95,17 +95,19 @@ function Kpi({
   value,
   spark,
   color,
+  sub,
 }: {
   label: string;
   value: string;
   spark: number[];
   color: string;
+  sub?: string;
 }) {
   return (
     <div className={cn(GLASS_PANEL, "p-5")}>
       <div className="flex items-start justify-between">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">{label}</p>
-        <span className="text-[10px] uppercase tracking-[0.15em] text-white/30">30-day</span>
+        <span className="text-[10px] uppercase tracking-[0.15em] text-white/30">{sub ?? "30-day"}</span>
       </div>
       <p className="font-display mt-1.5 text-3xl font-bold" style={{ color }}>
         {value}
@@ -137,15 +139,22 @@ export function RevenueReports() {
   const [houseBalance, setHouseBalance] = useState(0);
   const [fin, setFin] = useState<AdminFinancials | null>(null);
   const [log, setLog] = useState(DEMO_REVENUE_LOG);
+  const [tourneyFees, setTourneyFees] = useState<number | null>(null);
   const [demoData, setDemoData] = useState(false);
 
   const load = useCallback(async (clubId: string, p: Period) => {
-    const [reportRes, ledgerRes, finRes] = await Promise.allSettled([
+    const [reportRes, ledgerRes, finRes, tourneyRes] = await Promise.allSettled([
       screensApi.rakeReport(clubId, p),
       screensApi.rakeLedger(clubId),
       screensApi.financials(),
+      screensApi.tournamentFees(clubId, p),
     ]);
     let anyLive = false;
+    // Real tournament-fee revenue (entry fee × registrations); null → fall back
+    // to the modelled estimate below.
+    setTourneyFees(
+      tourneyRes.status === "fulfilled" ? tourneyRes.value.fee_total_minor ?? 0 : null,
+    );
     if (reportRes.status === "fulfilled") {
       anyLive = true;
       setSeries(reportRes.value.series ?? []);
@@ -188,6 +197,7 @@ export function RevenueReports() {
       setFin(DEMO_FINANCIALS);
       setHouseBalance(DEMO_FINANCIALS.wallet_float_cents);
       setLog(DEMO_REVENUE_LOG);
+      setTourneyFees(null);
       setDemoData(true);
       return;
     }
@@ -196,17 +206,22 @@ export function RevenueReports() {
 
   const demo = owned.demo || demoData;
 
-  // Derived KPIs. Total revenue ≈ rake + tournament fees; tournament fees taken
-  // as a modelled 20% of rake when no separate ledger exists; net profit =
-  // revenue − withdrawals paid.
+  // Derived KPIs. Tournament fees come from the real club_tournament_fees RPC
+  // (entry fee × registrations); only when that is unavailable (guest/offline)
+  // do we fall back to a modelled 25%-of-rake estimate. Net profit = rake +
+  // tournament fees − withdrawals paid (deposits are float, not revenue).
   const rakeCollected = fin?.rake_collected_cents ?? rakeTotal;
-  const tournamentFees = Math.round(rakeCollected * 0.25);
-  const totalRevenue = rakeCollected + tournamentFees + (fin?.deposits_credited_cents ?? 0) * 0.5;
+  const feesModelled = tourneyFees === null;
+  const tournamentFees = feesModelled ? Math.round(rakeCollected * 0.25) : (tourneyFees ?? 0);
+  const totalRevenue = rakeCollected + tournamentFees;
   const netProfit = Math.max(0, totalRevenue - (fin?.withdrawals_paid_cents ?? 0));
 
   const seriesVals = useMemo(() => series.map((s) => s.amount), [series]);
-  const cashPct = 65;
-  const tourneyPct = 35;
+  // Revenue-source split from the two real revenue streams (rake vs tournament
+  // fees). Falls back to a neutral 65/35 only when both are zero.
+  const cashPct =
+    totalRevenue > 0 ? Math.round((rakeCollected / totalRevenue) * 100) : 65;
+  const tourneyPct = totalRevenue > 0 ? 100 - cashPct : 35;
 
   return (
     <OwnerPageShell
@@ -239,7 +254,7 @@ export function RevenueReports() {
         <Kpi label="Total Revenue" value={usd(totalRevenue)} spark={seriesVals} color="#f5c518" />
         <Kpi label="Net Profit" value={usd(netProfit)} spark={seriesVals.map((v) => v * 0.7)} color="#22c55e" />
         <Kpi label="Rake Collected" value={usd(rakeCollected)} spark={seriesVals.map((v) => v * 0.6)} color="#e01e2b" />
-        <Kpi label="Tournament Fees" value={usd(tournamentFees)} spark={seriesVals.map((v, i) => v * (0.2 + (i % 5) * 0.05))} color="#f5c518" />
+        <Kpi label="Tournament Fees" value={usd(tournamentFees)} spark={seriesVals.map((v, i) => v * (0.2 + (i % 5) * 0.05))} color="#f5c518" sub={feesModelled ? "estimated" : "entries × fee"} />
       </div>
 
       {/* Trend + donut */}
