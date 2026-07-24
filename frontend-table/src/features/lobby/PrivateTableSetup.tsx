@@ -150,22 +150,24 @@ export function PrivateTableSetup({
       num_bots: isPublic ? 0 : bots,
       variant,
       duration_mins: durationMins,
-      // Extended table configuration — sent with the create RPC. Unknown fields
-      // are ignored server-side today; this keeps the wiring honest (the exact
-      // config the host chose is what gets transmitted).
+      // Table features + shot clock — these bind to real TableCreateRequest
+      // fields (backend-core/protocol/messages.go). All default-off, so a plain
+      // table is unchanged; the host's chosen toggles now actually take effect.
+      allow_straddle: features.straddle,
+      allow_bomb_pot: features.bombPot,
+      allow_run_it_twice: features.runItTwice,
+      action_secs: decisionSecs,
+      min_players: minPlayers,
+      // ---- Not yet backed by TableCreateRequest — sent for forward-compat but
+      // ignored server-side today; tracked in COMMAND_CENTER_WORKFLOW_MAP.md
+      // (Phase 2 backend work or a proper club picker in Phase 1). ----
       invite_only: inviteOnly,
       allow_spectators: spectators,
-      bomb_pot: features.bombPot,
-      straddle: features.straddle,
-      run_it_twice: features.runItTwice,
       ante: features.ante,
       public: accessType === "public",
       sponsor_club_id: isPublic ? sponsorClub : undefined,
-      // ---- Advanced Table Access Configuration (detailed_8) ----
       access_type: accessType,
       join_code: accessType === "invite" ? joinCode.trim().toUpperCase() || undefined : undefined,
-      min_players: minPlayers,
-      decision_time_secs: decisionSecs,
       auto_away_on_timeout: autoAwayTimeout,
       auto_away_below: autoAwayBelow ? autoAwayBelowN : 0,
       geo_restricted: geoRestricted,

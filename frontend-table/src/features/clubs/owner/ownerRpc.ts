@@ -67,7 +67,9 @@ export const ownerApi = {
     call<unknown>("balance_allocate", {
       club_id: clubId,
       user_id: userId,
-      amount: amountCents,
+      // Backend model PlayerAllocatedBalance uses json key `balance` (min=1);
+      // sending `amount` did not bind and bypassed validation.
+      balance: amountCents,
       currency: "USD",
     }),
 

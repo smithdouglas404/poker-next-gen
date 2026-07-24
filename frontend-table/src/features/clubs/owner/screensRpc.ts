@@ -94,7 +94,8 @@ export const screensApi = {
     call<unknown>("balance_allocate", {
       club_id: clubId,
       user_id: userId,
-      amount: amountCents,
+      // Backend json key is `balance` (min=1); `amount` did not bind.
+      balance: amountCents,
       currency: "USD",
     }),
   /** Pending + recent invitations for a club (club_requests_list). */

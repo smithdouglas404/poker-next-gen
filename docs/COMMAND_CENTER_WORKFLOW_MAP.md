@@ -128,6 +128,53 @@ and fixes defective wiring.
 
 ---
 
+## 6a. Verified Change/Build ledger (firsthand source read)
+
+Corrections after reading the structs directly: `PlayerAllocatedBalance.LockedAmount`
+is `server:"true"` (not a client field); several `PrivateTableSetup` fields have
+**no `TableCreateRequest` counterpart** and need backend work, not a rename.
+
+**MUST CHANGE — Phase 0 (pure wiring bugs, frontend-only):**
+- `owner/ownerRpc.ts:70` + `owner/screensRpc.ts:97`: `amount:` → `balance:` (backend json key is `balance`, `required,min=1`).
+- `app/hands/page.tsx:73`: `audit_verify` → `audit_verify_hand` (registered name).
+- `lobby/PrivateTableSetup.tsx:156-175`: rename keys with a backend home —
+  `straddle`→`allow_straddle`, `run_it_twice`→`allow_run_it_twice`,
+  `bomb_pot`→`allow_bomb_pot`, `ante`→`bomb_pot_ante`,
+  `decision_time_secs`→`action_secs`, `sponsor_club_id`→`club_id`; add
+  `min_buy_in`/`max_buy_in`/`time_bank_secs` from existing UI state.
+
+**MUST BUILD — later phases:**
+- Phase 1 (UI extend): tournament `club_id` picker in `CreateTournamentPanel`;
+  rake `cap_minor`/`no_flop_no_drop`/`min_pot_minor`/`is_public` in `GlobalSettings`;
+  `accepts_global_wallet` on club create.
+- Phase 2 (new screens/sections): Owner Hub "Operators & Equity" (`club_owner_add`,
+  `balance_get`); tournament custom blind/prize editors + Start + Balancing tab.
+- Phase 2 (backend): add `TableCreateRequest` fields for the currently home-less
+  UI options (KYC-required, geo-restricted, operating-hours, wallet-limit,
+  auto-buyback, spectators, auto-away) — or remove them from the UI.
+
+## 6b. Proven oddslingers mechanics — how the "good stuff" is used
+
+Probed `backend-core` for each proven mechanic (`grep` over `*.go`):
+
+| Mechanic (oddslingers ref) | backend-core | Plan |
+|---|---|---|
+| Per-table timebank | HAVE (`action_secs`/`time_bank_secs`) | expose (Phase 0 table key-fix) |
+| Hand-history replay | HAVE (`stats.go`) | surfaced at `/hands` |
+| Player stats / leak-detect | HAVE (`handstats.go`) | keep |
+| Auto-rebuy / pending-rebuy | PARTIAL (`match/holdem/handler.go`) | Phase 2 — back UI `auto_buy_back` |
+| Admin/owner succession | PARTIAL (`store/clubs_ext.go`) | Phase 2 — confirm + extend to tables/MTT |
+| Inactivity auto-kick (orbits) | MISSING | Phase 2 backend — back UI `auto_away` |
+| Double-entry polymorphic ledger | MISSING | Roadmap — unify wallet+club+rake, auditable |
+| Bounty / knockout variant | MISSING | net-new (product decision) |
+| Sidebets | MISSING | net-new (product decision) |
+| Bankroll seasons | UNCLEAR (missions/league only) | confirm; leaderboard resets |
+
+Key point: **auto-rebuy, inactivity auto-kick, and the double-entry ledger back UI
+controls we already show but that currently no-op** — porting them cures the same
+"faces without flows" problem. Bounty / sidebets / seasons are net-new and need an
+explicit product decision.
+
 ## 6. Verification
 
 Local stack (Postgres :5433 + engine-math :8080 + Nakama :7350 with the Go
