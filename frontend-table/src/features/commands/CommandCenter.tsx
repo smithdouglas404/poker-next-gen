@@ -48,7 +48,6 @@ import {
 import type { RpcSchema } from "./schemaForm/schemaTypes";
 import { orderedFields } from "./schemaForm/schemaTypes";
 import { schemaFromExample, coerceSynthPayload } from "./schemaForm/autoSchema";
-import { CardHandForm, hasCardForm } from "./schemaForm/CardHandForm";
 
 const CATEGORY_ORDER: CommandCategory[] = [
   "platform",
@@ -215,7 +214,6 @@ function CommandCenterInner() {
     if (!activeCommand?.rpc) return { schema: undefined, synth: false };
     const gen = getRpcSchema(activeCommand.rpc);
     if (gen) return { schema: gen, synth: false };
-    if (hasCardForm(activeCommand.id)) return { schema: undefined, synth: false };
     const s = schemaFromExample(activeCommand.rpc, activeCommand.example);
     return orderedFields(s).length > 0 ? { schema: s, synth: true } : { schema: undefined, synth: false };
   }, [activeCommand]);
@@ -267,7 +265,6 @@ function CommandCenterInner() {
     if (!command.rpc || command.id === "healthz") return false;
     const gen = getRpcSchema(command.rpc);
     if (gen && orderedFields(gen).length > 0) return true;
-    if (hasCardForm(command.id)) return true;
     return orderedFields(schemaFromExample(command.rpc, command.example)).length > 0;
   }, []);
 
@@ -283,11 +280,9 @@ function CommandCenterInner() {
           // Generated form (P0-1): prefill from example, inherit the active club
           // so club_id is never typed (P0-4).
           setFormValues(initialValues(gen, seed));
-        } else if (hasCardForm(command.id)) {
-          // Visual card-picker form for card-notation commands.
-          setFormValues((command.example as Record<string, unknown>) ?? {});
         } else {
-          // Synthesised form from the example — labelled fields, never raw JSON.
+          // Synthesised form from the example — labelled fields (pickers, card
+          // pickers, sliders, dropdowns), never raw JSON.
           setFormValues(initialValues(schemaFromExample(command.rpc!, command.example), seed));
         }
         return;
@@ -696,29 +691,6 @@ function CommandCenterInner() {
                     className="rounded-full bg-gradient-to-r from-[#9a7b2c] via-gold to-gold-lite px-6 py-2.5 text-sm font-bold uppercase tracking-wider text-black transition hover:shadow-[0_0_22px_rgba(212,175,55,0.35)] disabled:opacity-50"
                   >
                     {needsConfirm(activeCommand.rpc ?? "") ? "Review & Run" : "Run"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="rounded-full border border-white/20 px-6 py-2.5 text-sm font-semibold uppercase tracking-wider text-neutral-300 hover:bg-white/5"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </>
-            ) : hasCardForm(activeCommand.id) ? (
-              <>
-                <div className="mt-5">
-                  <CardHandForm commandId={activeCommand.id} values={formValues} onChange={setFormValues} />
-                </div>
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    disabled={busyId !== null}
-                    onClick={executeActive}
-                    className="rounded-full bg-gradient-to-r from-[#9a7b2c] via-gold to-gold-lite px-6 py-2.5 text-sm font-bold uppercase tracking-wider text-black transition hover:shadow-[0_0_22px_rgba(212,175,55,0.35)] disabled:opacity-50"
-                  >
-                    Run
                   </button>
                   <button
                     type="button"

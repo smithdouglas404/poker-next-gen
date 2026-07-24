@@ -2,9 +2,12 @@
 
 import { useMemo } from "react";
 
+import { enrichField } from "./autoSchema";
 import { BasisPointsInput } from "./BasisPointsInput";
-import { ClubPicker, UserPicker } from "./EntityPickers";
+import { CardField, HandsField } from "./CardPicker";
+import { ClubPicker, TournamentPicker, UserPicker } from "./EntityPickers";
 import { MoneyInput } from "./MoneyInput";
+import { SliderInput } from "./SliderInput";
 import { orderedFields, type FieldSchema, type RpcSchema } from "./schemaTypes";
 import { validate } from "./validate";
 
@@ -33,7 +36,8 @@ export function SchemaForm({
 
   const set = (name: string, v: unknown) => onChange({ ...values, [name]: v });
 
-  const fields = orderedFields(schema);
+  // Upgrade every field (generated OR synthesized) to its richest control.
+  const fields = orderedFields(schema).map(({ name, field }) => ({ name, field: enrichField(name, field) }));
   const clubId = (values["club_id"] as string) || "";
 
   return (
@@ -66,20 +70,16 @@ function Field({
   error?: string;
   children: React.ReactNode;
 }) {
-  const required = false; // required marker handled by parent schema; label shows *
   return (
     <div>
-      <label htmlFor={name} className="mb-1 flex items-baseline justify-between">
-        <span className="text-sm font-medium text-neutral-200">
-          {field.title ?? name}
-        </span>
-        {field.description && (
-          <span className="text-[10px] text-neutral-500">{field.description}</span>
-        )}
+      <label htmlFor={name} className="mb-0.5 block text-sm font-medium text-neutral-200">
+        {field.title ?? name}
       </label>
+      {field.description && (
+        <p className="mb-1.5 text-[11px] leading-relaxed text-neutral-400">{field.description}</p>
+      )}
       {children}
       {error && <p className="mt-1 text-[11px] text-red-400">{error}</p>}
-      {required && null}
     </div>
   );
 }
@@ -101,8 +101,10 @@ function renderWidget({
 }): React.ReactNode {
   const ref = field["x-ref"];
   const unit = field["x-unit"];
+  const widget = field["x-widget"];
+  const placeholder = field["x-placeholder"] ?? "";
 
-  // Entity pickers (P0-1).
+  // Entity pickers (P0-1) — bound to live data.
   if (ref === "club") {
     return <ClubPicker id={name} value={(value as string) ?? ""} onChange={(v) => set(name, v)} invalid={invalid} />;
   }
@@ -118,13 +120,36 @@ function renderWidget({
     );
   }
   if (ref === "tournament") {
+    return <TournamentPicker id={name} value={(value as string) ?? ""} onChange={(v) => set(name, v)} invalid={invalid} />;
+  }
+
+  // Card fields → 52-card visual picker (single group or one-per-player).
+  if (widget === "cards") {
+    return <CardField label="" value={(value as string) ?? ""} max={field["x-max"] ?? 5} onChange={(v) => set(name, v)} />;
+  }
+  if (widget === "hands") {
     return (
-      <input
+      <HandsField
+        value={Array.isArray(value) ? (value as string[]) : []}
+        cardsPerHand={field["x-max"] ?? 2}
+        label={name.includes("villain") ? "Opponent" : "Player"}
+        onChange={(v) => set(name, v)}
+      />
+    );
+  }
+
+  // Sliders → bounded numbers and percents.
+  if (widget === "slider") {
+    return (
+      <SliderInput
         id={name}
-        value={(value as string) ?? ""}
-        onChange={(e) => set(name, e.target.value)}
-        placeholder="Tournament id"
-        className={`${FIELD} ${invalid ? "border-brand/60" : ""}`}
+        value={Number(value) || field.minimum || 0}
+        onChange={(v) => set(name, v)}
+        min={field.minimum ?? 0}
+        max={field.maximum ?? 100}
+        step={field.step ?? 1}
+        unit={unit}
+        invalid={invalid}
       />
     );
   }
@@ -226,6 +251,7 @@ function renderWidget({
       id={name}
       type={field.format === "date-time" ? "datetime-local" : "text"}
       value={(value as string) ?? ""}
+      placeholder={placeholder}
       onChange={(e) => set(name, e.target.value)}
       className={`${FIELD} ${invalid ? "border-brand/60" : ""}`}
     />

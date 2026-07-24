@@ -60,6 +60,77 @@ export function ClubPicker({
   );
 }
 
+interface TournamentOption {
+  id: string;
+  name: string;
+  status?: string;
+}
+
+/**
+ * TournamentPicker (UI review P1-6): a dropdown of real tournaments from the
+ * live `tournament_list` RPC, so the operator picks an event by name/status
+ * instead of pasting a `tournament_id`. Falls back to a text input if none load.
+ */
+export function TournamentPicker({
+  value,
+  onChange,
+  id,
+  invalid,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  id?: string;
+  invalid?: boolean;
+}) {
+  const [items, setItems] = useState<TournamentOption[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = (await callSessionRpc("tournament_list", {})) as { tournaments?: TournamentOption[] } | null;
+        if (!cancelled) setItems(Array.isArray(data?.tournaments) ? data!.tournaments! : []);
+      } catch {
+        if (!cancelled) setItems([]);
+      } finally {
+        if (!cancelled) setLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loaded && items.length === 0) {
+    return (
+      <input
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="No tournaments yet — create one first"
+        className={`${FIELD} ${invalid ? "border-brand/60" : ""}`}
+      />
+    );
+  }
+
+  return (
+    <select
+      id={id}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`${FIELD} ${invalid ? "border-brand/60" : ""}`}
+    >
+      <option value="" className="bg-surface-2">Select a tournament…</option>
+      {items.map((t) => (
+        <option key={t.id} value={t.id} className="bg-surface-2 text-white">
+          {t.name}{t.status ? ` — ${t.status}` : ""}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 interface MemberOption {
   user_id: string;
   username: string;

@@ -111,6 +111,54 @@ export function CardPicker({
   );
 }
 
+/** Several card groups — one per player. Value is an array of notation strings
+ *  ("AsAh", "7c2d"); onChange emits the same. Used for `holes` / `villain_holes`. */
+export function HandsField({
+  value,
+  onChange,
+  cardsPerHand,
+  label = "Player",
+}: {
+  value: string[];
+  onChange: (v: string[]) => void;
+  cardsPerHand: number;
+  label?: string;
+}) {
+  const hands = Array.isArray(value) ? value : [];
+  const setAt = (i: number, v: string) => onChange(hands.map((h, idx) => (idx === i ? v : h)));
+  const addHand = () => onChange([...hands, ""]);
+  const removeHand = (i: number) => onChange(hands.filter((_, idx) => idx !== i));
+
+  return (
+    <div className="space-y-2">
+      {hands.map((h, i) => (
+        <div key={i} className="rounded-xl border border-white/10 bg-white/[0.02] p-2.5">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+              {label} {i + 1}
+            </span>
+            <button
+              type="button"
+              onClick={() => removeHand(i)}
+              className="text-[11px] text-neutral-500 hover:text-brand"
+            >
+              Remove
+            </button>
+          </div>
+          <CardField label="" value={h} max={cardsPerHand} onChange={(v) => setAt(i, v)} />
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={addHand}
+        className="w-full rounded-xl border border-dashed border-white/15 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gold hover:border-gold/40 hover:bg-white/[0.03]"
+      >
+        + Add {label.toLowerCase()}
+      </button>
+    </div>
+  );
+}
+
 /** A labeled card field: shows the notation + a button to pick visually. */
 export function CardField({
   label,
@@ -127,7 +175,7 @@ export function CardField({
   const cards = parseCards(value);
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-neutral-200">{label}</label>
+      {label && <label className="mb-1 block text-sm font-medium text-neutral-200">{label}</label>}
       <div className="flex items-center gap-2">
         <div className="flex min-h-[38px] flex-1 flex-wrap items-center gap-1 rounded-xl border border-white/10 bg-black/40 px-2 py-1.5">
           {cards.length === 0 && <span className="text-xs text-neutral-500">No cards picked</span>}

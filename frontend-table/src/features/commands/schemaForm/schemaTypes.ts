@@ -27,6 +27,14 @@ export interface FieldSchema {
   "x-unit"?: FieldUnit;
   "x-ref"?: EntityRef;
   "x-order"?: number;
+  /** Greyed example text shown inside an empty input (format hint). */
+  "x-placeholder"?: string;
+  /** Rich input control to use instead of a plain box. */
+  "x-widget"?: "slider" | "cards" | "hands";
+  /** Slider step (x-widget: slider). */
+  step?: number;
+  /** Max cards for a card field, or cards-per-hand for a hands field. */
+  "x-max"?: number;
 }
 
 export interface RpcSchema {
