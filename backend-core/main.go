@@ -92,6 +92,11 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"nowpayments_balance":         rpc.NowPaymentsBalance,
 		"wallet_withdraw":             rpc.WalletWithdraw,
 		"withdrawal_list":             rpc.WithdrawalList,
+		// Self-custody wallet linking (#91): signature-verified external wallets.
+		"wallet_link_challenge":       rpc.WalletLinkChallenge,
+		"wallet_link":                 rpc.WalletLink,
+		"wallet_linked_list":          rpc.WalletLinkedList,
+		"wallet_unlink":               rpc.WalletUnlink,
 		"withdrawal_approve_admin":    rpc.WithdrawalApproveAdmin,
 		"withdrawal_reject_admin":     rpc.WithdrawalRejectAdmin,
 		"daily_bonus_status":          rpc.DailyBonusStatus,

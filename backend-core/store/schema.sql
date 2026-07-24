@@ -1018,3 +1018,27 @@ CREATE TABLE IF NOT EXISTS poker_insurance (
 );
 CREATE INDEX IF NOT EXISTS idx_poker_insurance_match ON poker_insurance(match_id, hand_no);
 CREATE INDEX IF NOT EXISTS idx_poker_insurance_user ON poker_insurance(user_id);
+
+-- ============================================================
+-- self-custody wallet linking (#91): signature-verified external
+-- wallets (EVM secp256k1 / Solana ed25519) bound to an account.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS poker_wallet_link_nonce (
+    user_id TEXT NOT NULL,
+    nonce TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, nonce)
+);
+CREATE INDEX IF NOT EXISTS idx_poker_wln_created ON poker_wallet_link_nonce(created_at);
+
+CREATE TABLE IF NOT EXISTS poker_linked_wallet (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    provider TEXT NOT NULL,            -- metamask | coinbase | walletconnect | phantom
+    chain TEXT NOT NULL,               -- evm | solana
+    address TEXT NOT NULL,             -- checksummed EVM 0x… or base58 Solana
+    verified BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, address)
+);
+CREATE INDEX IF NOT EXISTS idx_poker_linked_wallet_user ON poker_linked_wallet(user_id);
