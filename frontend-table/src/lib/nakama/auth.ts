@@ -104,3 +104,18 @@ export async function ensureSession(): Promise<Session> {
   }
   return authenticate("device", {}, true);
 }
+
+// authenticateClerk trades a Clerk session JWT for a Nakama session. The token
+// is passed in vars["clerk_jwt"]; the backend's RegisterBeforeAuthenticateCustom
+// hook verifies its signature against Clerk's JWKS and rewrites the account id to
+// a stable "clerk:<sub>". The placeholder id satisfies Nakama's 6–128 char rule
+// before the hook overrides it. This is the glue that turns a Clerk (Google/etc.)
+// login into a real, server-verified game session.
+export async function authenticateClerk(clerkJwt: string): Promise<Session> {
+  const client = createNakamaClient();
+  const session = await client.authenticateCustom("clerkbridge", true, undefined, {
+    clerk_jwt: clerkJwt,
+  });
+  persistSession(session);
+  return session;
+}

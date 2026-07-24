@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { SignInButton, SignUpButton, UserButton, SignedIn, SignedOut } from "@clerk/nextjs";
+import { SignInButton, SignUpButton, UserButton, Show } from "@clerk/nextjs";
 
 import { BTN_GOLD, GLASS_PANEL, cn } from "@/features/ui/tokens";
 
