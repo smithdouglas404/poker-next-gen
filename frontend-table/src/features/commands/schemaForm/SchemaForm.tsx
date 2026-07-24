@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { BasisPointsInput } from "./BasisPointsInput";
 import { ClubPicker, UserPicker } from "./EntityPickers";
@@ -14,9 +14,10 @@ const FIELD =
 /**
  * SchemaForm (UI review P0-1): renders a real, labeled form from a generated
  * RPC schema — pickers for entity refs, MoneyInput/BasisPointsInput for money
- * and rake, selects for enums, toggles for booleans. Raw JSON is available only
- * behind the "Advanced" toggle. One renderer covers every command, so a club
- * owner never edits braces or pastes an internal id.
+ * and rake, selects for enums, toggles for booleans. One renderer covers every
+ * command, so a club owner never sees, edits, or pastes raw JSON: every input
+ * is a plain-English labelled control. There is deliberately no raw-JSON escape
+ * hatch — the Command Center is an operator tool, not a payload editor.
  */
 export function SchemaForm({
   schema,
@@ -27,10 +28,6 @@ export function SchemaForm({
   values: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
 }) {
-  const [advanced, setAdvanced] = useState(false);
-  const [jsonText, setJsonText] = useState("");
-  const [jsonError, setJsonError] = useState<string | null>(null);
-
   const errors = useMemo(() => validate(schema, values), [schema, values]);
   const errorFor = (name: string) => errors.find((e) => e.field === name);
 
@@ -39,57 +36,21 @@ export function SchemaForm({
   const fields = orderedFields(schema);
   const clubId = (values["club_id"] as string) || "";
 
-  const openAdvanced = () => {
-    setJsonText(JSON.stringify(values, null, 2));
-    setJsonError(null);
-    setAdvanced(true);
-  };
-
   return (
     <div className="space-y-4">
-      {!advanced &&
-        fields.map(({ name, field }) => (
-          <Field key={name} name={name} field={field} error={errorFor(name)?.message}>
-            {renderWidget({ name, field, value: values[name], set, clubId, invalid: Boolean(errorFor(name)) })}
-          </Field>
-        ))}
+      {fields.map(({ name, field }) => (
+        <Field key={name} name={name} field={field} error={errorFor(name)?.message}>
+          {renderWidget({ name, field, value: values[name], set, clubId, invalid: Boolean(errorFor(name)) })}
+        </Field>
+      ))}
 
-      {advanced && (
-        <div>
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-500">
-            Raw JSON payload (advanced)
-          </label>
-          <textarea
-            value={jsonText}
-            onChange={(e) => {
-              setJsonText(e.target.value);
-              try {
-                const parsed = e.target.value.trim() ? JSON.parse(e.target.value) : {};
-                setJsonError(null);
-                onChange(parsed as Record<string, unknown>);
-              } catch (err) {
-                setJsonError(err instanceof Error ? err.message : "Invalid JSON");
-              }
-            }}
-            rows={12}
-            className="w-full rounded-xl border border-white/10 bg-black/40 p-3 font-mono text-xs text-green outline-none focus:border-green/50"
-          />
-          {jsonError && <p className="mt-1 text-xs text-red-400">{jsonError}</p>}
+      {errors.length > 0 && (
+        <div className="flex items-center justify-end border-t border-white/5 pt-3">
+          <span className="text-[11px] text-red-400">
+            {errors.length} field{errors.length > 1 ? "s" : ""} need attention
+          </span>
         </div>
       )}
-
-      <div className="flex items-center justify-between border-t border-white/5 pt-3">
-        <button
-          type="button"
-          onClick={() => (advanced ? setAdvanced(false) : openAdvanced())}
-          className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 hover:text-white"
-        >
-          {advanced ? "← Back to form" : "Advanced: raw JSON"}
-        </button>
-        {!advanced && errors.length > 0 && (
-          <span className="text-[11px] text-red-400">{errors.length} field{errors.length > 1 ? "s" : ""} need attention</span>
-        )}
-      </div>
     </div>
   );
 }

@@ -58,6 +58,7 @@ export function initialValues(
   const example = schema.examples?.[0] ?? {};
   for (const { name, field } of orderedFields(schema)) {
     if (name in example) base[name] = example[name];
+    else if (field.default !== undefined) base[name] = field.default;
     else if (field.type === "boolean") base[name] = false;
     else if (field.type === "integer" || field.type === "number") base[name] = 0;
     else base[name] = "";
