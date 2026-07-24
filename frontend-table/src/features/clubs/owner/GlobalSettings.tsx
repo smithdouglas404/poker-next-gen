@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 import { Button, Select } from "@/features/ui";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
@@ -382,9 +383,11 @@ export function GlobalSettings({
               Link payout wallets and analytics feeds to your club.
             </p>
             <div className="mt-4">
-              <Button variant="gold" size="sm" disabled={disabled}>
-                Connect
-              </Button>
+              <Link href="/wallet">
+                <Button variant="gold" size="sm" disabled={disabled}>
+                  Connect
+                </Button>
+              </Link>
             </div>
           </div>
           {demo && (
