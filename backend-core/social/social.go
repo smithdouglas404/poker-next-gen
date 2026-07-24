@@ -17,6 +17,17 @@ const GlobalHands = "global_hands"
 // GlobalHRP is the id of the all-time High Roller Points leaderboard.
 const GlobalHRP = "global_hrp"
 
+// Bankroll seasons: mirror boards that reset monthly so competition restarts each
+// season while the all-time boards keep accumulating. Nakama auto-resets on the
+// CRON and preserves the prior season's final records (queryable by expiry).
+const (
+	SeasonWinnings = "season_winnings"
+	SeasonHands    = "season_hands"
+	SeasonHRP      = "season_hrp"
+	// SeasonReset fires 00:00 UTC on the 1st of every month.
+	SeasonReset = "0 0 1 * *"
+)
+
 // EnsureLeaderboards creates the platform leaderboards idempotently. Calling it
 // when a board already exists returns an error, which is expected and ignored.
 func EnsureLeaderboards(ctx context.Context, nk runtime.NakamaModule) {
@@ -24,30 +35,37 @@ func EnsureLeaderboards(ctx context.Context, nk runtime.NakamaModule) {
 	_ = nk.LeaderboardCreate(ctx, GlobalWinnings, true, "desc", "incr", "", nil, true)
 	_ = nk.LeaderboardCreate(ctx, GlobalHands, true, "desc", "incr", "", nil, true)
 	_ = nk.LeaderboardCreate(ctx, GlobalHRP, true, "desc", "incr", "", nil, true)
+	// Seasonal mirrors: same accumulate semantics, monthly reset schedule.
+	_ = nk.LeaderboardCreate(ctx, SeasonWinnings, true, "desc", "incr", SeasonReset, nil, true)
+	_ = nk.LeaderboardCreate(ctx, SeasonHands, true, "desc", "incr", SeasonReset, nil, true)
+	_ = nk.LeaderboardCreate(ctx, SeasonHRP, true, "desc", "incr", SeasonReset, nil, true)
 }
 
-// RecordWinnings increments a player's winnings on the global leaderboard.
+// RecordWinnings increments a player's winnings on the all-time and season boards.
 func RecordWinnings(ctx context.Context, nk runtime.NakamaModule, userID, username string, amount int64) {
 	if userID == "" || amount <= 0 {
 		return
 	}
 	_, _ = nk.LeaderboardRecordWrite(ctx, GlobalWinnings, userID, username, amount, 0, nil, nil)
+	_, _ = nk.LeaderboardRecordWrite(ctx, SeasonWinnings, userID, username, amount, 0, nil, nil)
 }
 
-// RecordHands increments a player's hands-played count on the global leaderboard.
+// RecordHands increments a player's hands-played count on the all-time and season boards.
 func RecordHands(ctx context.Context, nk runtime.NakamaModule, userID, username string, count int64) {
 	if userID == "" || count <= 0 {
 		return
 	}
 	_, _ = nk.LeaderboardRecordWrite(ctx, GlobalHands, userID, username, count, 0, nil, nil)
+	_, _ = nk.LeaderboardRecordWrite(ctx, SeasonHands, userID, username, count, 0, nil, nil)
 }
 
-// RecordHRP increments a player's High Roller Points on the global leaderboard.
+// RecordHRP increments a player's High Roller Points on the all-time and season boards.
 func RecordHRP(ctx context.Context, nk runtime.NakamaModule, userID, username string, hrp int64) {
 	if userID == "" || hrp <= 0 {
 		return
 	}
 	_, _ = nk.LeaderboardRecordWrite(ctx, GlobalHRP, userID, username, hrp, 0, nil, nil)
+	_, _ = nk.LeaderboardRecordWrite(ctx, SeasonHRP, userID, username, hrp, 0, nil, nil)
 }
 
 // Notify sends a persistent in-app notification to a player.

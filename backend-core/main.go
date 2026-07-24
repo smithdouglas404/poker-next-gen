@@ -142,6 +142,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"stats_head_to_head": rpc.StatsHeadToHead,
 		"loyalty_history":    rpc.LoyaltyHistory,
 		"leaderboard_top":    rpc.LeaderboardTop,
+		"season_current":     rpc.SeasonCurrent,
 		// Missions / battle pass / referrals
 		"missions_list":               rpc.MissionsList,
 		"mission_claim":               rpc.MissionClaim,

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
-import { blindLevels, leaderboardTop, tournamentStatus } from "./api";
+import { blindLevels, leaderboardTop, seasonCurrent, tournamentStatus } from "./api";
 import { DEMO_BLINDS, DEMO_LEADERBOARD, demoStatus } from "./demo";
 import { blinds } from "./format";
 import type { BlindLevel, EnrichedTournament, LeaderEntry, TournamentStatus } from "./types";
@@ -102,6 +102,10 @@ export function Leaderboard({
   const [levels, setLevels] = useState<BlindLevel[]>([]);
   const [board, setBoard] = useState<LeaderEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  // Bankroll-season toggle: "all" = all-time board, "season" = monthly-resetting
+  // season board (with the season's end date shown).
+  const [scope, setScope] = useState<"all" | "season">("all");
+  const [seasonEndsAt, setSeasonEndsAt] = useState(0);
 
   const selected = tournaments.find((t) => t.id === selectedId) ?? tournaments[0] ?? null;
   const id = selected?.id ?? null;
@@ -119,10 +123,13 @@ export function Leaderboard({
       return;
     }
     (async () => {
-      const [statusRes, levelsRes, boardRes] = await Promise.allSettled([
+      // Season scope reads the platform season board directly (not tournament
+      // standings); all-time keeps the tournament-standings-first behaviour.
+      const [statusRes, levelsRes, boardRes, seasonRes] = await Promise.allSettled([
         tournamentStatus(id),
         blindLevels(id),
-        leaderboardTop("chips", 20),
+        leaderboardTop("chips", 20, scope),
+        scope === "season" ? seasonCurrent("winnings", 20) : Promise.resolve(null),
       ]);
       if (cancelled) return;
       const s = statusRes.status === "fulfilled" ? statusRes.value : demoStatus(id);
@@ -130,13 +137,20 @@ export function Leaderboard({
       const live = boardRes.status === "fulfilled" ? boardRes.value : [];
       setStatus(s);
       setLevels(levelsRes.status === "fulfilled" && levelsRes.value.length > 0 ? levelsRes.value : DEMO_BLINDS);
-      setBoard(standings.length > 0 ? standings : live.length > 0 ? live : DEMO_LEADERBOARD);
+      if (scope === "season") {
+        const season = seasonRes.status === "fulfilled" ? seasonRes.value : null;
+        setSeasonEndsAt(season?.ends_at ?? 0);
+        const entries = season?.entries?.length ? season.entries : live;
+        setBoard(entries.length > 0 ? entries : DEMO_LEADERBOARD);
+      } else {
+        setBoard(standings.length > 0 ? standings : live.length > 0 ? live : DEMO_LEADERBOARD);
+      }
       setLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [id, demo]);
+  }, [id, demo, scope]);
 
   const poolMinor = useMemo(() => {
     if (status?.prize_pool_minor) return status.prize_pool_minor;
@@ -166,18 +180,42 @@ export function Leaderboard({
         <h1 className="font-display text-3xl font-bold uppercase tracking-tight text-white">
           Tournament Leaderboard
         </h1>
-        <select
-          value={selected.id}
-          onChange={(e) => onSelect(e.target.value)}
-          className="rounded-lg border border-white/10 bg-[#262d38] px-4 py-2 text-sm font-semibold text-neutral-200 outline-none focus:border-brand/40"
-        >
-          {tournaments.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* All-time vs bankroll-season scope */}
+          <div className="flex overflow-hidden rounded-lg border border-white/10 bg-[#262d38] text-[11px] font-bold uppercase tracking-wider">
+            {(["all", "season"] as const).map((sc) => (
+              <button
+                key={sc}
+                type="button"
+                onClick={() => setScope(sc)}
+                className={cn(
+                  "px-3 py-2 transition",
+                  scope === sc ? "bg-gold text-black" : "text-neutral-400 hover:text-white",
+                )}
+              >
+                {sc === "all" ? "All-Time" : "This Season"}
+              </button>
+            ))}
+          </div>
+          <select
+            value={selected.id}
+            onChange={(e) => onSelect(e.target.value)}
+            className="rounded-lg border border-white/10 bg-[#262d38] px-4 py-2 text-sm font-semibold text-neutral-200 outline-none focus:border-brand/40"
+          >
+            {tournaments.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
+
+      {scope === "season" && seasonEndsAt > 0 && (
+        <p className="text-[11px] uppercase tracking-[0.2em] text-gold/70">
+          Season resets {new Date(seasonEndsAt * 1000).toLocaleDateString(undefined, { month: "long", day: "numeric" })}
+        </p>
+      )}
 
       {/* Top stat bar */}
       <div

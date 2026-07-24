@@ -110,12 +110,30 @@ export async function blindLevels(tournamentId: string): Promise<BlindLevel[]> {
   return data.levels ?? [];
 }
 
-/** leaderboard_top → global ranked ladder (chips/winnings). */
-export async function leaderboardTop(metric = "chips", limit = 5): Promise<LeaderEntry[]> {
-  const data = (await callSessionRpc("leaderboard_top", { metric, limit })) as {
+/** leaderboard_top → global ranked ladder (chips/winnings). period "season"
+ *  reads the monthly-resetting bankroll-season board; anything else = all-time. */
+export async function leaderboardTop(
+  metric = "chips",
+  limit = 5,
+  period: "all" | "season" = "all",
+): Promise<LeaderEntry[]> {
+  const data = (await callSessionRpc("leaderboard_top", { metric, limit, period })) as {
     entries?: LeaderEntry[];
   };
   return data.entries ?? [];
+}
+
+/** season_current → active bankroll-season window + top standings. */
+export async function seasonCurrent(
+  metric = "winnings",
+  limit = 20,
+): Promise<{ starts_at: number; ends_at: number; entries: LeaderEntry[] }> {
+  const data = (await callSessionRpc("season_current", { metric, limit })) as {
+    starts_at?: number;
+    ends_at?: number;
+    entries?: LeaderEntry[];
+  };
+  return { starts_at: data.starts_at ?? 0, ends_at: data.ends_at ?? 0, entries: data.entries ?? [] };
 }
 
 /** blind_level_add → persist a single blind level onto a tournament structure. */
