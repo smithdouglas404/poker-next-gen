@@ -63,9 +63,9 @@ export function MemberAnalytics({
           </div>
         </div>
 
-        {/* Total Table Volume — columns */}
+        {/* Rake Collected — columns (real per-day club revenue) */}
         <div className={cn(GLASS_PANEL, "p-5")}>
-          <p className="font-display text-lg font-semibold text-white">Total Table Volume</p>
+          <p className="font-display text-lg font-semibold text-white">Rake Collected</p>
           <div className="mt-3">
             <ColumnChart
               values={analytics.tableVolumeCents}

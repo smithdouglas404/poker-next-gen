@@ -6,6 +6,7 @@
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 
 import type {
+  AnalyticsSeries,
   ClubAnnouncement,
   ClubChatMessage,
   ClubStats,
@@ -43,6 +44,9 @@ export const ownerApi = {
   /** Overview rollup: stats, live member count, recent activity feed. */
   quickStats: (clubId: string) =>
     call<QuickStats>("club_quick_stats", { club_id: clubId }),
+  /** Real per-day engagement/retention/revenue series (Analytics + sparklines). */
+  analyticsSeries: (clubId: string, days = 30) =>
+    call<AnalyticsSeries>("club_analytics_series", { club_id: clubId, days }),
 
   /** Pending join requests to approve/decline. */
   requests: (clubId: string) =>

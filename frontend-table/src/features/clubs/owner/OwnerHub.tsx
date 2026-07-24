@@ -35,6 +35,7 @@ import {
 import { compact, ownerApi, usdCompact } from "./ownerRpc";
 import { EmptyState, SectionTitle } from "./ui";
 import type {
+  AnalyticsSeries,
   ClubAnnouncement,
   ClubChatMessage,
   ClubSettingsBlob,
@@ -72,6 +73,7 @@ export function OwnerHub() {
   const [announcements, setAnnouncements] = useState<ClubAnnouncement[]>([]);
   const [chat, setChat] = useState<ClubChatMessage[]>([]);
   const [rakeConfig, setRakeConfig] = useState<RakeConfig | null>(null);
+  const [series, setSeries] = useState<AnalyticsSeries | null>(null);
 
   const [section, setSection] = useState<OwnerSection>("overview");
   const [toast, setToast] = useState<Toast | null>(null);
@@ -182,12 +184,13 @@ export function OwnerHub() {
       setRole(owned.role);
 
       // Load all owner data in parallel; individual failures degrade gracefully.
-      const [quickRes, ledgerRes, annRes, chatRes, rakeRes] = await Promise.allSettled([
+      const [quickRes, ledgerRes, annRes, chatRes, rakeRes, seriesRes] = await Promise.allSettled([
         ownerApi.quickStats(owned.club.id),
         ownerApi.rakeLedger(owned.club.id),
         ownerApi.announcements(owned.club.id),
         ownerApi.chatList(owned.club.id),
         ownerApi.rakeConfigGet(owned.club.id),
+        ownerApi.analyticsSeries(owned.club.id, 30),
       ]);
       if (cancelled) return;
 
@@ -196,6 +199,7 @@ export function OwnerHub() {
       if (annRes.status === "fulfilled") setAnnouncements(annRes.value.announcements ?? []);
       if (chatRes.status === "fulfilled") setChat((chatRes.value.messages ?? []).slice().reverse());
       if (rakeRes.status === "fulfilled" && rakeRes.value?.club_id) setRakeConfig(rakeRes.value);
+      if (seriesRes.status === "fulfilled" && seriesRes.value?.series) setSeries(seriesRes.value);
 
       await Promise.all([
         reloadRoster(owned.club.id),
@@ -452,6 +456,30 @@ export function OwnerHub() {
       ? Math.max(1000, Math.round(quick.stats.chips_won / quick.stats.hands))
       : DEMO_OVERVIEW_SPARKS.potCents[DEMO_OVERVIEW_SPARKS.potCents.length - 1];
 
+  // Real trend series from club_analytics_series (zero-filled 30-day window).
+  // Sparklines/charts read stored data; the two cards with no per-day source
+  // (Active Tables, Average Pot) fall back to a neutral baseline while their
+  // headline value stays real — see the Sparkbars empty-array fallback.
+  const liveSeries = !demo && series?.series?.length ? series.series : null;
+  const overviewSparks = liveSeries
+    ? {
+        members: liveSeries.map((p) => p.members_cumulative),
+        tables: [],
+        volumeCents: liveSeries.map((p) => p.rake_cents),
+        potCents: [],
+        rakeCents: liveSeries.map((p) => p.rake_cents),
+      }
+    : DEMO_OVERVIEW_SPARKS;
+  const memberAnalytics = liveSeries
+    ? {
+        months: liveSeries.map((p) => p.label),
+        activeMembers: liveSeries.map((p) => p.active),
+        tableVolumeCents: liveSeries.map((p) => p.rake_cents),
+        newPlayers: series?.new_total ?? 0,
+        returningPlayers: series?.returning_total ?? 0,
+      }
+    : DEMO_ANALYTICS;
+
   const cards: StatCard[] = [
     { label: "Total Stakes", value: usdCompact(bankroll), sub: "Across all club tables", accent: "gold" },
     { label: "Active Now", value: compact(onlineCount), sub: "Live in-vault", accent: "green" },
@@ -510,7 +538,7 @@ export function OwnerHub() {
           bankrollCents={bankroll}
           rakeTotalCents={rakeTotalCents}
           avgPotCents={avgPotCents}
-          sparks={DEMO_OVERVIEW_SPARKS}
+          sparks={overviewSparks}
           chat={chat}
           demo={demo}
           canManage={canManage}
@@ -556,7 +584,7 @@ export function OwnerHub() {
       )}
 
       {section === "analytics" && (
-        <MemberAnalytics roster={roster} analytics={DEMO_ANALYTICS} demo={demo} />
+        <MemberAnalytics roster={roster} analytics={memberAnalytics} demo={demo} />
       )}
 
       {section === "settings" && (

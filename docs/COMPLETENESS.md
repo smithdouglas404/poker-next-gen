@@ -9,10 +9,10 @@ Two automated gates back this ledger (run them yourself):
 
 | Gate | Command | Result |
 |---|---|---|
-| **RPC coverage** — every registered RPC is reachable | `node backend-core/scripts/rpc_coverage.mjs` | **226 registered · 0 MISSING · 0 ERROR** (82 return data, 123 validate input, 21 destructive-skipped). Exits non-zero if any endpoint is dead. |
+| **RPC coverage** — every registered RPC is reachable | `node backend-core/scripts/rpc_coverage.mjs` | **229 registered · 0 MISSING · 0 ERROR** (83 return data, 125 validate input, 21 destructive-skipped). Exits non-zero if any endpoint is dead. |
 | **Theme lint** — no off-brand "Neon Vault" cyan palette in screens | `node frontend-table/scripts/theme_lint.mjs` | **0 forbidden-palette hits.** All screens are on the GGPoker token theme. (230 advisory off-token hexes = mostly shades/tints + dye swatches + wallet brand icons.) |
 
-**What this proves:** the backend is real — 226 endpoints, none phantom. The screens
+**What this proves:** the backend is real — 229 endpoints, none phantom. The screens
 are on-theme. The remaining work is a *finite, named* list of controls that render but
 don't yet reach a flow ("faces without flows"), catalogued below.
 
@@ -40,7 +40,7 @@ Verified against the live local stack (Postgres :5433 + engine-math :8080 + Naka
 | Revenue Reports | rake series / ledger / house balance | **WIRED** | `club_rake_report`, `rake_ledger_get`, `admin_financials` |
 | Revenue Reports | Net Profit / Tournament Fees / Sources donut | **DEMO** | client-modeled (RevenueReports.tsx:203-209); no tournament-fee RPC |
 | Member Analytics | Member Activity table | **WIRED** | `club_member_stats` |
-| Member Analytics | 3 charts (Active / Volume / New-vs-Returning) | **DEMO** | always `DEMO_ANALYTICS` (OwnerHub.tsx:558); no time-series RPC |
+| Member Analytics | 3 charts (Active / Rake / New-vs-Returning) | **FIXED** | real `club_analytics_series` (per-day active members, rake, new-vs-returning distinct split); demo only offline |
 | Global Settings | Rake %, cap, min-pot, no-flop, public | **WIRED** | `rake_config_set` |
 | Global Settings | Timezone/Language/theme/2FA-flag/roles/KYC/geo | **WIRED** | `club_update` settings_json |
 | Global Settings | **Upload Logo** | **FIXED** | real file picker → `club_update` (7c3ed4e) |
@@ -56,7 +56,7 @@ Verified against the live local stack (Postgres :5433 + engine-math :8080 + Naka
 | Initial Club Setup | Create Club (+logo, color, type, credit) | **WIRED** | `club_create` + `club_update` |
 | Club Overview | KPI cards / Activity / Global Club Chat | **WIRED** | `club_quick_stats`, `club_chat_send/list` |
 | Club Overview | Upcoming Tournaments | **FIXED** | `tournament_list` (7c3ed4e) |
-| Club Overview | Sparklines | **DEMO** | always `DEMO_OVERVIEW_SPARKS`; no series RPC |
+| Club Overview | Sparklines | **FIXED** | Members / 24h-volume / Rake sparklines from real `club_analytics_series`; Active-Tables & Avg-Pot sparklines use the neutral baseline (no per-day source) while their headline value stays real |
 
 ## B. Player / account screens
 
@@ -125,7 +125,7 @@ Verified against the live local stack (Postgres :5433 + engine-math :8080 + Naka
 - Session-revoke RPC (Nakama session mgmt).
 
 **Medium backend:**
-- Analytics time-series RPC → MemberAnalytics + Overview sparklines (stop `DEMO_ANALYTICS`).
+- ~~Analytics time-series RPC → MemberAnalytics + Overview sparklines~~ **DONE** — `club_analytics_series` (real per-day active/rake/new-vs-returning + running member total).
 - Announcement audience + delivery channel params + in-table Breaking-News modal by audience.
 - Revenue real tournament-fee source (stop client-modeling Net Profit/Fees/donut).
 

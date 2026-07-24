@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -473,6 +474,169 @@ func (s *ClubExtStore) RakeReport(ctx context.Context, clubID, interval string) 
 		"hand_count": count,
 		"series":     series,
 	}, rows.Err()
+}
+
+// AnalyticsSeriesPoint is one day of the club engagement/retention series.
+type AnalyticsSeriesPoint struct {
+	Day               string `json:"day"`   // YYYY-MM-DD
+	Label             string `json:"label"` // MM-DD short label for chart axes
+	Active            int    `json:"active"`
+	Events            int    `json:"events"`
+	NewMembers        int    `json:"new_members"`
+	Returning         int    `json:"returning"`
+	RakeCents         int64  `json:"rake_cents"`
+	MembersCumulative int    `json:"members_cumulative"`
+}
+
+// AnalyticsSeries builds a real per-day engagement/retention/revenue series for a
+// club over the trailing `days` window. Every point is derived from stored data:
+// distinct active members and event volume from poker_club_activity, joins from
+// poker_club_member.joined_at (new vs returning split + running member total), and
+// rake from poker_rake_ledger. Days with no data are zero-filled so the series is
+// a fixed length the sparklines/charts can render directly. Returns the series
+// plus the aggregate new/returning totals for the donut.
+func (s *ClubExtStore) AnalyticsSeries(ctx context.Context, clubID string, days int) ([]AnalyticsSeriesPoint, int, int, error) {
+	if days <= 0 {
+		days = 30
+	}
+	if days > 90 {
+		days = 90
+	}
+	interval := fmt.Sprintf("%d days", days)
+
+	// Per-day distinct-active + event volume from the activity feed.
+	type actRow struct{ events, active int }
+	actByDay := map[string]actRow{}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS day,
+		       COUNT(*) AS events, COUNT(DISTINCT user_id) AS active
+		FROM poker_club_activity
+		WHERE club_id=$1 AND created_at >= NOW() - INTERVAL '`+interval+`'
+		GROUP BY day`, clubID)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	for rows.Next() {
+		var day string
+		var r actRow
+		if err := rows.Scan(&day, &r.events, &r.active); err != nil {
+			rows.Close()
+			return nil, 0, 0, err
+		}
+		actByDay[day] = r
+	}
+	rows.Close()
+
+	// Returning = distinct active members that day who joined on an earlier day.
+	retByDay := map[string]int{}
+	rows, err = s.db.QueryContext(ctx, `
+		SELECT to_char(date_trunc('day', a.created_at), 'YYYY-MM-DD') AS day,
+		       COUNT(DISTINCT a.user_id) AS returning
+		FROM poker_club_activity a
+		JOIN poker_club_member m ON m.club_id=a.club_id AND m.user_id=a.user_id
+		WHERE a.club_id=$1 AND a.created_at >= NOW() - INTERVAL '`+interval+`'
+		  AND date_trunc('day', m.joined_at) < date_trunc('day', a.created_at)
+		GROUP BY day`, clubID)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	for rows.Next() {
+		var day string
+		var n int
+		if err := rows.Scan(&day, &n); err != nil {
+			rows.Close()
+			return nil, 0, 0, err
+		}
+		retByDay[day] = n
+	}
+	rows.Close()
+
+	// New members per day (joins) + running total up to the window start.
+	newByDay := map[string]int{}
+	rows, err = s.db.QueryContext(ctx, `
+		SELECT to_char(date_trunc('day', joined_at), 'YYYY-MM-DD') AS day, COUNT(*) AS n
+		FROM poker_club_member
+		WHERE club_id=$1 AND joined_at >= NOW() - INTERVAL '`+interval+`'
+		GROUP BY day`, clubID)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	for rows.Next() {
+		var day string
+		var n int
+		if err := rows.Scan(&day, &n); err != nil {
+			rows.Close()
+			return nil, 0, 0, err
+		}
+		newByDay[day] = n
+	}
+	rows.Close()
+
+	// Members that joined before the window — the running-total baseline.
+	var baseMembers int
+	_ = s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM poker_club_member
+		 WHERE club_id=$1 AND joined_at < NOW() - INTERVAL '`+interval+`'`, clubID).Scan(&baseMembers)
+
+	// Rake collected per day.
+	rakeByDay := map[string]int64{}
+	rows, err = s.db.QueryContext(ctx, `
+		SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS day,
+		       COALESCE(SUM(amount),0) AS rake
+		FROM poker_rake_ledger
+		WHERE club_id=$1 AND created_at >= NOW() - INTERVAL '`+interval+`'
+		GROUP BY day`, clubID)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	for rows.Next() {
+		var day string
+		var rake int64
+		if err := rows.Scan(&day, &rake); err != nil {
+			rows.Close()
+			return nil, 0, 0, err
+		}
+		rakeByDay[day] = rake
+	}
+	rows.Close()
+
+	// Aggregate new vs returning as true distinct head-counts over the window
+	// (not a sum of per-day rows, which would double-count multi-day members):
+	// new = members joined inside the window; returning = distinct members active
+	// inside the window who joined before it started.
+	var newTotal, retTotal int
+	_ = s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM poker_club_member
+		 WHERE club_id=$1 AND joined_at >= NOW() - INTERVAL '`+interval+`'`, clubID).Scan(&newTotal)
+	_ = s.db.QueryRowContext(ctx, `
+		SELECT COUNT(DISTINCT a.user_id)
+		FROM poker_club_activity a
+		JOIN poker_club_member m ON m.club_id=a.club_id AND m.user_id=a.user_id
+		WHERE a.club_id=$1 AND a.created_at >= NOW() - INTERVAL '`+interval+`'
+		  AND m.joined_at < NOW() - INTERVAL '`+interval+`'`, clubID).Scan(&retTotal)
+
+	// Zero-fill the ordered window (oldest → newest) and accumulate members.
+	out := make([]AnalyticsSeriesPoint, 0, days)
+	today := time.Now().UTC()
+	running := baseMembers
+	for i := days - 1; i >= 0; i-- {
+		d := today.AddDate(0, 0, -i)
+		key := d.Format("2006-01-02")
+		a := actByDay[key]
+		nm := newByDay[key]
+		running += nm
+		out = append(out, AnalyticsSeriesPoint{
+			Day:               key,
+			Label:             d.Format("01-02"),
+			Active:            a.active,
+			Events:            a.events,
+			NewMembers:        nm,
+			Returning:         retByDay[key],
+			RakeCents:         rakeByDay[key],
+			MembersCumulative: running,
+		})
+	}
+	return out, newTotal, retTotal, nil
 }
 
 // --- Roster & member analytics ---

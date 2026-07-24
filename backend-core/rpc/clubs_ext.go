@@ -274,6 +274,39 @@ func ClubQuickStats(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 	return string(out), nil
 }
 
+// ClubAnalyticsSeries returns a real per-day engagement / retention / revenue
+// series for a club (active members, event volume, new-vs-returning, running
+// member total, and rake per day) over the trailing window. Backs the Member
+// Analytics charts and the Club Overview sparklines with stored data — no demo.
+// Configurer-gated (owner analytics).
+func ClubAnalyticsSeries(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	var req struct {
+		ClubID string `json:"club_id"`
+		Days   int    `json:"days"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" {
+		return "", runtime.NewError("club_id required", 3)
+	}
+	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+		return "", err
+	}
+	if req.Days <= 0 {
+		req.Days = 30
+	}
+	series, newTotal, retTotal, err := store.NewClubExtStore(db).AnalyticsSeries(ctx, req.ClubID, req.Days)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	out, _ := json.Marshal(map[string]interface{}{
+		"club_id":          req.ClubID,
+		"days":             len(series),
+		"series":           series,
+		"new_total":        newTotal,
+		"returning_total":  retTotal,
+	})
+	return string(out), nil
+}
+
 // ClubInvite creates an invitation (club → user). Configurer-gated.
 func ClubInvite(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	var req struct {
