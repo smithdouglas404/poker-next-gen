@@ -228,6 +228,39 @@ func ClubRakeReport(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 	return string(out), nil
 }
 
+// ClubTournamentFees returns the club's real tournament-fee revenue over {period}
+// — the entry fee (fee_minor) charged per registration, summed across every
+// tournament the club owns, plus the buy-in throughput and a per-tournament
+// breakdown. This is the authoritative source for the Revenue Reports
+// "Tournament Fees" figure (previously a client-modeled 25%-of-rake guess).
+// Configurer-gated (house-revenue data).
+func ClubTournamentFees(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	var req struct {
+		ClubID string `json:"club_id"`
+		Period string `json:"period"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" {
+		return "", runtime.NewError("club_id required", 3)
+	}
+	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+		return "", err
+	}
+	feeTotal, buyInTotal, entries, breakdown, err := store.NewTournamentExtStore(db).
+		ClubTournamentFees(ctx, req.ClubID, clubsextInterval(req.Period))
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	out, _ := json.Marshal(map[string]interface{}{
+		"club_id":          req.ClubID,
+		"period":           req.Period,
+		"fee_total_minor":  feeTotal,
+		"buyin_total_minor": buyInTotal,
+		"entries":          entries,
+		"tournaments":      breakdown,
+	})
+	return string(out), nil
+}
+
 // ClubMemberStats returns the club roster as per-member analytics rows
 // (balance, activity count, role). Configurer-gated.
 func ClubMemberStats(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {

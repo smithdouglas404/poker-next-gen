@@ -184,6 +184,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"club_roster":              rpc.ClubRoster,
 		"club_rankings":            rpc.ClubRankings,
 		"club_rake_report":         rpc.ClubRakeReport,
+		"club_tournament_fees":     rpc.ClubTournamentFees,
 		"club_member_stats":        rpc.ClubMemberStats,
 		"club_quick_stats":         rpc.ClubQuickStats,
 		"club_analytics_series":    rpc.ClubAnalyticsSeries,

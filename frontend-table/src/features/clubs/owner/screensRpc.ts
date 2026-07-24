@@ -116,7 +116,31 @@ export const screensApi = {
       club_id: clubId,
     }),
   financials: () => call<{ financials?: AdminFinancials }>("admin_financials", {}),
+  tournamentFees: (clubId: string, period: string) =>
+    call<TournamentFeesReport>("club_tournament_fees", { club_id: clubId, period }),
 };
+
+/** One tournament's real fee/entry contribution (club_tournament_fees). */
+export interface TournamentFeeRow {
+  id: string;
+  name: string;
+  status: string;
+  fee_minor: number;
+  buy_in_minor: number;
+  entries: number;
+  fee_total: number;
+  buy_in_total: number;
+}
+
+/** Response of club_tournament_fees — real entry-fee revenue for a club. */
+export interface TournamentFeesReport {
+  club_id: string;
+  period: string;
+  fee_total_minor: number;
+  buyin_total_minor: number;
+  entries: number;
+  tournaments: TournamentFeeRow[];
+}
 
 export interface RakeDay {
   day: string;

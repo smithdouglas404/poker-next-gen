@@ -9,10 +9,10 @@ Two automated gates back this ledger (run them yourself):
 
 | Gate | Command | Result |
 |---|---|---|
-| **RPC coverage** — every registered RPC is reachable | `node backend-core/scripts/rpc_coverage.mjs` | **229 registered · 0 MISSING · 0 ERROR** (83 return data, 125 validate input, 21 destructive-skipped). Exits non-zero if any endpoint is dead. |
+| **RPC coverage** — every registered RPC is reachable | `node backend-core/scripts/rpc_coverage.mjs` | **230 registered · 0 MISSING · 0 ERROR** (84 return data, 125 validate input, 21 destructive-skipped). Exits non-zero if any endpoint is dead. |
 | **Theme lint** — no off-brand "Neon Vault" cyan palette in screens | `node frontend-table/scripts/theme_lint.mjs` | **0 forbidden-palette hits.** All screens are on the GGPoker token theme. (230 advisory off-token hexes = mostly shades/tints + dye swatches + wallet brand icons.) |
 
-**What this proves:** the backend is real — 229 endpoints, none phantom. The screens
+**What this proves:** the backend is real — 230 endpoints, none phantom. The screens
 are on-theme. The remaining work is a *finite, named* list of controls that render but
 don't yet reach a flow ("faces without flows"), catalogued below.
 
@@ -38,7 +38,7 @@ Verified against the live local stack (Postgres :5433 + engine-math :8080 + Naka
 | Invite Flow | Send / Resend / Revoke | **WIRED** | `club_invite`, `club_invite_revoke` (ClubInvitations.tsx) |
 | Invite Flow | Welcome-card "unique code" | **DEMO** | client hash `inviteCode()`; expiry client-computed |
 | Revenue Reports | rake series / ledger / house balance | **WIRED** | `club_rake_report`, `rake_ledger_get`, `admin_financials` |
-| Revenue Reports | Net Profit / Tournament Fees / Sources donut | **DEMO** | client-modeled (RevenueReports.tsx:203-209); no tournament-fee RPC |
+| Revenue Reports | Net Profit / Tournament Fees / Sources donut | **FIXED** | real `club_tournament_fees` (entry fee × registrations, per-tournament breakdown); Net Profit = rake+fees−withdrawals; Sources donut split from the two real streams. Falls back to the modelled estimate (labeled "estimated") only offline. Runtime-proven: seeded a $5-fee tournament + 1 entrant → fee_total_minor delta +500 |
 | Member Analytics | Member Activity table | **WIRED** | `club_member_stats` |
 | Member Analytics | 3 charts (Active / Rake / New-vs-Returning) | **FIXED** | real `club_analytics_series` (per-day active members, rake, new-vs-returning distinct split); demo only offline |
 | Global Settings | Rake %, cap, min-pot, no-flop, public | **WIRED** | `rake_config_set` |
@@ -127,7 +127,7 @@ Verified against the live local stack (Postgres :5433 + engine-math :8080 + Naka
 **Medium backend:**
 - ~~Analytics time-series RPC → MemberAnalytics + Overview sparklines~~ **DONE** — `club_analytics_series` (real per-day active/rake/new-vs-returning + running member total).
 - ~~Announcement audience + delivery channel params~~ **DONE** — real persisted+whitelisted `audience`/`channel`. (Remaining follow-up: in-table Breaking-News modal *delivery* filtered by audience — a table-side consumer feature, not a composer defect.)
-- Revenue real tournament-fee source (stop client-modeling Net Profit/Fees/donut).
+- ~~Revenue real tournament-fee source~~ **DONE** — `club_tournament_fees` (entry fee × registrations); Net Profit + Sources donut now from the two real revenue streams.
 
 **Needs a product decision (flagged, not faked):**
 - Google/Facebook OAuth (real identity provider).
