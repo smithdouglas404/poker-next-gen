@@ -158,23 +158,28 @@ export function PrivateTableSetup({
       allow_run_it_twice: features.runItTwice,
       action_secs: decisionSecs,
       min_players: minPlayers,
-      // ---- Not yet backed by TableCreateRequest — sent for forward-compat but
-      // ignored server-side today; tracked in COMMAND_CENTER_WORKFLOW_MAP.md
-      // (Phase 2 backend work or a proper club picker in Phase 1). ----
-      invite_only: inviteOnly,
+      // ---- Access & seating policy — now first-class TableCreateRequest fields
+      // (#83): enforced at the join gate (join_code) and the sit-down gate
+      // (kyc_required, members access, geo_restricted, wallet_limit_cents) and
+      // reflected in the match label (access_type, allow_spectators). ----
+      access_type: accessType,
+      join_code: accessType === "invite" ? joinCode.trim().toUpperCase() || undefined : undefined,
       allow_spectators: spectators,
+      geo_restricted: geoRestricted,
+      kyc_required: kycRequired,
+      wallet_limit_cents: dollarsToCents(walletLimitDollars),
+      auto_buy_back_cents: dollarsToCents(autoBuyBackDollars),
+      // ---- Still forward-compat (no backend home yet): auto-away needs orbit
+      // counting (#86); operating_hours needs a schedule/window model; public +
+      // sponsor_club_id are the club-economics path (deferred). Sent so the UI
+      // state is preserved once those land. ----
+      invite_only: inviteOnly,
       ante: features.ante,
       public: accessType === "public",
       sponsor_club_id: isPublic ? sponsorClub : undefined,
-      access_type: accessType,
-      join_code: accessType === "invite" ? joinCode.trim().toUpperCase() || undefined : undefined,
       auto_away_on_timeout: autoAwayTimeout,
       auto_away_below: autoAwayBelow ? autoAwayBelowN : 0,
-      geo_restricted: geoRestricted,
-      kyc_required: kycRequired,
       operating_hours: operatingHours,
-      wallet_limit_cents: dollarsToCents(walletLimitDollars),
-      auto_buy_back_cents: dollarsToCents(autoBuyBackDollars),
     };
 
     try {
