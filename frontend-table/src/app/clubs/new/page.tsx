@@ -36,6 +36,7 @@ export default function ClubSetupPage() {
   const [currency, setCurrency] = useState("USD");
   const [clubType, setClubType] = useState<ClubType>("private");
   const [requireApproval, setRequireApproval] = useState(true);
+  const [acceptsGlobalWallet, setAcceptsGlobalWallet] = useState(true);
   const [brandColor, setBrandColor] = useState(BRAND_SWATCHES[0].value);
   const [creditLimit, setCreditLimit] = useState(""); // dollars string
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
@@ -100,6 +101,7 @@ export default function ClubSetupPage() {
         currency,
         clubType,
         requireApproval,
+        acceptsGlobalWallet,
         brandColor,
         creditLimitCents,
         logoDataUrl,
@@ -291,6 +293,19 @@ export default function ClubSetupPage() {
                   on={requireApproval}
                   color={brandColor}
                   onToggle={() => setRequireApproval((v) => !v)}
+                />
+              </div>
+              <div className="mt-3 flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                <div className="min-w-0 pr-3">
+                  <p className="text-sm font-medium text-neutral-200">Accept global-wallet buy-ins</p>
+                  <p className="text-[11px] text-neutral-500">
+                    Let members buy in from their platform wallet, not only club-allocated chips.
+                  </p>
+                </div>
+                <Toggle
+                  on={acceptsGlobalWallet}
+                  color={brandColor}
+                  onToggle={() => setAcceptsGlobalWallet((v) => !v)}
                 />
               </div>
             </SetupSection>
