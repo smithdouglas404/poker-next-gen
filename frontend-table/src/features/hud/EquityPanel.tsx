@@ -75,7 +75,7 @@ export function EquityPanel() {
 
   return (
     <div className="pointer-events-auto rounded-xl border border-white/[0.06] bg-surface px-3 py-2 text-xs shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
-      <p className="text-[10px] uppercase tracking-wider text-muted">rs_poker strength</p>
+      <p className="text-[10px] uppercase tracking-wider text-muted">Current Hand Strength</p>
       <p className="font-semibold capitalize text-foreground">{category}</p>
       {equity !== null && <p className="text-green">Showdown equity {equity}%</p>}
     </div>

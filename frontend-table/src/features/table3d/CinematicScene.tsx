@@ -48,6 +48,9 @@ export interface SceneSeat {
   /** Chips committed on the current street, pre-formatted (e.g. "$400"); shown as
    *  a bet chip in front of the seat. Absent when the seat has no live bet. */
   betLabel?: string;
+  /** Raw committed-bet minor units — sizes the physical bet chip stack on the
+   *  felt in front of the seat (0/undefined => no chips). */
+  betMinor?: number;
 }
 
 export interface CinematicSceneProps {
@@ -63,6 +66,9 @@ export interface CinematicSceneProps {
   maxSeats: number;
   /** Whether the chip pot is present (hidden on an empty idle table). */
   showPot?: boolean;
+  /** Transient table announcement (winner, all-in, blinds up, host message)
+   *  shown as a center-top banner over the felt. Empty/undefined hides it. */
+  announce?: string;
   /**
    * Overlay layered on top of the canvas. When provided (the proof passes its
    * full showcase HUD), the intrinsic minimal HUD is suppressed so the proof
@@ -161,12 +167,22 @@ function Board({ board }: { board: string[] }) {
 
 /* ---------------- chips ---------------- */
 
-function ChipStack({ position, color, count }: { position: [number, number, number]; color: string; count: number }) {
+function ChipStack({
+  position,
+  color,
+  count,
+  radius = 0.16,
+}: {
+  position: [number, number, number];
+  color: string;
+  count: number;
+  radius?: number;
+}) {
   const chips = [];
   for (let i = 0; i < count; i++) {
     chips.push(
-      <mesh key={i} position={[0, i * 0.032, 0]} castShadow>
-        <cylinderGeometry args={[0.26, 0.26, 0.03, 40]} />
+      <mesh key={i} position={[0, i * 0.026, 0]} castShadow>
+        <cylinderGeometry args={[radius, radius, 0.024, 32]} />
         <meshStandardMaterial color={color} metalness={0.25} roughness={0.5} />
       </mesh>,
     );
@@ -174,16 +190,33 @@ function ChipStack({ position, color, count }: { position: [number, number, numb
   return <group position={position}>{chips}</group>;
 }
 
+// Central pot pile — a tight, restrained cluster of small stacks just below the
+// board. Kept deliberately compact (small radius, low counts) so it reads as a
+// neat pot, not an oversized tower; per-seat bets ride out in front of each seat.
 function Pot() {
   return (
-    <group position={[0, 0.05, 1.55]}>
-      <ChipStack position={[-0.32, 0, 0]} color="#c9302c" count={7} />
-      <ChipStack position={[0, 0, 0.05]} color="#1f2937" count={11} />
-      <ChipStack position={[0.32, 0, 0]} color="#2f6bff" count={6} />
-      <ChipStack position={[0.02, 0, -0.42]} color="#e9c46a" count={9} />
-      <ChipStack position={[-0.34, 0, -0.4]} color="#1fa85a" count={5} />
+    <group position={[0, 0.05, 1.5]}>
+      <ChipStack position={[-0.19, 0, 0]} color="#c9302c" count={4} />
+      <ChipStack position={[0, 0, 0.03]} color="#1f2937" count={6} />
+      <ChipStack position={[0.19, 0, 0]} color="#2f6bff" count={3} />
+      <ChipStack position={[0.01, 0, -0.24]} color="#e9c46a" count={5} />
+      <ChipStack position={[-0.2, 0, -0.23]} color="#1fa85a" count={3} />
     </group>
   );
+}
+
+// A player's committed bet, shown as a small physical chip stack on the felt
+// between their seat and the pot (mirrors the reference table). Height scales
+// with the wager; all-in bets glow red, others gold.
+function SeatBetChips({ seat, total }: { seat: SceneSeat; total: number }) {
+  if (!seat.betMinor || seat.betMinor <= 0) return null;
+  const p = seatPoint(seat.index, total);
+  // 44% of the way from the seat toward table center, resting on the felt.
+  const bx = p[0] * 0.56;
+  const bz = p[2] * 0.56;
+  const count = Math.max(1, Math.min(6, Math.round(seat.betMinor / 5000)));
+  const color = seat.state === "allin" ? "#ff3b46" : "#e9c46a";
+  return <ChipStack position={[bx, 0.05, bz]} color={color} count={count} radius={0.13} />;
 }
 
 /* ---------------- avatars ---------------- */
@@ -376,6 +409,11 @@ function Scene({ seats, board, mode, maxSeats, showPot }: {
         );
       })}
 
+      {/* Per-seat committed bets as physical chips on the felt (real geometry). */}
+      {seats.map((s) => (
+        <SeatBetChips key={`bet-${s.index}`} seat={s} total={maxSeats} />
+      ))}
+
       <ContactShadows position={[0, 0.01, 0]} opacity={0.5} scale={16} blur={2.4} far={5} resolution={512} color="#000000" />
 
       <EffectComposer>
@@ -401,9 +439,24 @@ function HeroCard({ code }: { code: string }) {
   );
 }
 
-function SceneHud({ potLabel, heroHole }: { potLabel: string; heroHole: [string, string] | null }) {
+function SceneHud({ potLabel, heroHole, announce }: { potLabel: string; heroHole: [string, string] | null; announce?: string }) {
   return (
     <div className="pointer-events-none absolute inset-0 select-none">
+      {announce && (
+        <div className="absolute left-1/2 top-[20%] -translate-x-1/2 text-center">
+          <div
+            className="rounded-full border border-gold/50 px-6 py-2 font-display text-base font-bold uppercase tracking-[0.2em] text-gold"
+            style={{
+              background: "rgba(8,10,14,0.82)",
+              backdropFilter: "blur(10px)",
+              boxShadow: "0 0 26px rgba(233,196,106,0.4), inset 0 0 12px rgba(0,0,0,0.4)",
+              animation: "seatWinPulse 1.6s ease-in-out infinite",
+            }}
+          >
+            {announce}
+          </div>
+        </div>
+      )}
       {potLabel && (
         <div className="absolute left-1/2 top-[56%] -translate-x-1/2 text-center">
           <div className="text-[11px] uppercase tracking-[0.3em] text-white/45">Pot</div>
@@ -429,6 +482,7 @@ export function CinematicScene({
   mode,
   maxSeats,
   showPot = true,
+  announce,
   children,
   overlay,
 }: CinematicSceneProps) {
@@ -457,7 +511,7 @@ export function CinematicScene({
           <Scene seats={seats} board={board} mode={mode} maxSeats={maxSeats} showPot={showPot} />
         </Suspense>
       </Canvas>
-      {children ?? <SceneHud potLabel={potLabel} heroHole={heroHole} />}
+      {children ?? <SceneHud potLabel={potLabel} heroHole={heroHole} announce={announce} />}
       {overlay}
     </div>
   );
