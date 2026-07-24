@@ -746,6 +746,11 @@ CREATE TABLE IF NOT EXISTS poker_club_announcement (
 );
 
 CREATE INDEX IF NOT EXISTS idx_poker_club_ann_club ON poker_club_announcement(club_id, created_at DESC);
+-- Targeting: who receives the broadcast and how it is delivered. `audience` is
+-- one of all|private|tournament; `channel` is overlay|modal|chat. Real params
+-- persisted per broadcast (previously appended to the body as a text tag).
+ALTER TABLE poker_club_announcement ADD COLUMN IF NOT EXISTS audience TEXT NOT NULL DEFAULT 'all';
+ALTER TABLE poker_club_announcement ADD COLUMN IF NOT EXISTS channel TEXT NOT NULL DEFAULT 'overlay';
 
 CREATE TABLE IF NOT EXISTS poker_club_event (
     id TEXT PRIMARY KEY,

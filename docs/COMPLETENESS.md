@@ -47,7 +47,7 @@ Verified against the live local stack (Postgres :5433 + engine-math :8080 + Naka
 | Global Settings | **Connect External Wallets** | **FIXED** | links to /wallet; real `wallet_link` backend now exists (d157383); FE wiring pending |
 | Global Settings | Admin/Mod role selects, 2FA toggle | **DEMO** | stored as strings/flags in settings_json; grant no real role |
 | Announcements | Broadcast Now (post + list) | **WIRED** | `club_announcement_create/list`, `announcement_create/list` |
-| Announcements | Target Audience / Delivery Style | **DEMO** | only appends text tag / severity; no real channel param |
+| Announcements | Target Audience / Delivery Style | **FIXED** | real `audience` (all/private/tournament) + `channel` (overlay/modal/chat) params persisted & returned by `club_announcement_create`/`_list`, whitelisted server-side, shown as badges on Recent Broadcasts. (In-table modal *delivery* filtered by audience is a separate consumer feature — noted below.) |
 | Announcements | Rich-text toolbar (B/I/U/link) | **FIXED** | real markdown wrap of the selection (wrapSelection) |
 | Sponsorship Payouts | List / Record | **WIRED** | `sponsorship_payout_list/create` |
 | Public Table Browser (Classic) | grid / Join | **WIRED** | `table_list` → `joinRoom` |
@@ -126,7 +126,7 @@ Verified against the live local stack (Postgres :5433 + engine-math :8080 + Naka
 
 **Medium backend:**
 - ~~Analytics time-series RPC → MemberAnalytics + Overview sparklines~~ **DONE** — `club_analytics_series` (real per-day active/rake/new-vs-returning + running member total).
-- Announcement audience + delivery channel params + in-table Breaking-News modal by audience.
+- ~~Announcement audience + delivery channel params~~ **DONE** — real persisted+whitelisted `audience`/`channel`. (Remaining follow-up: in-table Breaking-News modal *delivery* filtered by audience — a table-side consumer feature, not a composer defect.)
 - Revenue real tournament-fee source (stop client-modeling Net Profit/Fees/donut).
 
 **Needs a product decision (flagged, not faked):**

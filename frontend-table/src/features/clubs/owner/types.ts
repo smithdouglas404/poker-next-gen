@@ -147,6 +147,8 @@ export interface ClubAnnouncement {
   title: string;
   body: string;
   severity: string; // info | warning | critical
+  audience?: string; // all | private | tournament
+  channel?: string; // overlay | modal | chat
   created_by: string;
   created_at: string;
 }

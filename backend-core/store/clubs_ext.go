@@ -690,13 +690,17 @@ func (s *ClubExtStore) Roster(ctx context.Context, clubID string) ([]ClubRosterR
 
 // --- Announcements ---
 
-// ClubAnnouncement is a posted club notice.
+// ClubAnnouncement is a posted club notice. Audience (all|private|tournament)
+// and Channel (overlay|modal|chat) are real targeting params persisted per
+// broadcast, so the composer's controls round-trip rather than decorating text.
 type ClubAnnouncement struct {
 	ID        string    `json:"id"`
 	ClubID    string    `json:"club_id"`
 	Title     string    `json:"title"`
 	Body      string    `json:"body"`
 	Severity  string    `json:"severity"`
+	Audience  string    `json:"audience"`
+	Channel   string    `json:"channel"`
 	CreatedBy string    `json:"created_by"`
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -709,11 +713,17 @@ func (s *ClubExtStore) CreateAnnouncement(ctx context.Context, a *ClubAnnounceme
 	if a.Severity == "" {
 		a.Severity = "info"
 	}
+	if a.Audience == "" {
+		a.Audience = "all"
+	}
+	if a.Channel == "" {
+		a.Channel = "overlay"
+	}
 	a.CreatedAt = time.Now().UTC()
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO poker_club_announcement (id, club_id, title, body, severity, created_by, created_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-		a.ID, a.ClubID, a.Title, a.Body, a.Severity, a.CreatedBy, a.CreatedAt)
+		INSERT INTO poker_club_announcement (id, club_id, title, body, severity, audience, channel, created_by, created_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+		a.ID, a.ClubID, a.Title, a.Body, a.Severity, a.Audience, a.Channel, a.CreatedBy, a.CreatedAt)
 	return a.ID, err
 }
 
@@ -723,7 +733,7 @@ func (s *ClubExtStore) ListAnnouncements(ctx context.Context, clubID string, lim
 		limit = 50
 	}
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, club_id, title, body, severity, created_by, created_at
+		SELECT id, club_id, title, body, severity, audience, channel, created_by, created_at
 		FROM poker_club_announcement WHERE club_id=$1 ORDER BY created_at DESC LIMIT $2`, clubID, limit)
 	if err != nil {
 		return nil, err
@@ -732,7 +742,7 @@ func (s *ClubExtStore) ListAnnouncements(ctx context.Context, clubID string, lim
 	out := []ClubAnnouncement{}
 	for rows.Next() {
 		var a ClubAnnouncement
-		if err := rows.Scan(&a.ID, &a.ClubID, &a.Title, &a.Body, &a.Severity, &a.CreatedBy, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.ClubID, &a.Title, &a.Body, &a.Severity, &a.Audience, &a.Channel, &a.CreatedBy, &a.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, a)

@@ -346,13 +346,21 @@ export function OwnerHub() {
   );
 
   const onBroadcast = useCallback(
-    async (title: string, body: string, severity: string) => {
+    async (
+      title: string,
+      body: string,
+      severity: string,
+      audience: string = "all",
+      channel: string = "overlay",
+    ) => {
       const optimistic: ClubAnnouncement = {
         id: `local-${Date.now()}`,
         club_id: club?.id ?? DEMO_CLUB.id,
         title,
         body,
         severity,
+        audience,
+        channel,
         created_by: role ?? "owner",
         created_at: new Date().toISOString(),
       };
@@ -362,7 +370,7 @@ export function OwnerHub() {
         return;
       }
       try {
-        await ownerApi.createAnnouncement(club.id, title, body, severity);
+        await ownerApi.createAnnouncement(club.id, title, body, severity, audience, channel);
         const r = await ownerApi.announcements(club.id);
         setAnnouncements(r.announcements ?? []);
         notify(`Broadcast sent: "${title}".`);

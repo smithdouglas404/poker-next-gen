@@ -36,7 +36,13 @@ export function Announcements({
   announcements: ClubAnnouncement[];
   demo: boolean;
   canManage: boolean;
-  onBroadcast: (title: string, body: string, severity: string) => Promise<void>;
+  onBroadcast: (
+    title: string,
+    body: string,
+    severity: string,
+    audience: Audience,
+    channel: DeliveryStyle,
+  ) => Promise<void>;
 }) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -68,11 +74,11 @@ export function Announcements({
     if (!canSend) return;
     setBusy(true);
     const finalTitle = title.trim() || body.trim().split("\n")[0].slice(0, 80) || "Club Announcement";
-    const audienceTag =
-      audience === "all" ? "" : audience === "private" ? " [Private Tables]" : " [Tournament]";
     void (async () => {
       try {
-        await onBroadcast(finalTitle, body.trim() + audienceTag, deliveryMeta.severity);
+        // Audience + delivery channel are real params persisted server-side —
+        // no longer appended to the body as a text tag.
+        await onBroadcast(finalTitle, body.trim(), deliveryMeta.severity, audience, delivery);
         setTitle("");
         setBody("");
       } finally {
@@ -259,6 +265,16 @@ export function Announcements({
                       <span className="shrink-0 text-[10px] text-white/35">{relTime(a.created_at)}</span>
                     </div>
                     {a.body && <p className="mt-1 line-clamp-2 text-xs text-white/55">{a.body}</p>}
+                    {(a.audience || a.channel) && (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        <span className="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-white/50">
+                          {AUDIENCE.find((x) => x.id === a.audience)?.label ?? "All Players"}
+                        </span>
+                        <span className="rounded border border-gold/20 bg-gold/[0.06] px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-gold/70">
+                          {DELIVERY.find((x) => x.id === a.channel)?.label ?? "Sleek Overlay"}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

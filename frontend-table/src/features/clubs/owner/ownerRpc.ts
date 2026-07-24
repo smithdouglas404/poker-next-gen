@@ -125,13 +125,18 @@ export const ownerApi = {
       club_id: clubId,
       limit,
     }),
-  createAnnouncement: (clubId: string, title: string, body: string, severity: string) =>
-    call<{ ok: boolean; id: string }>("club_announcement_create", {
-      club_id: clubId,
-      title,
-      body,
-      severity,
-    }),
+  createAnnouncement: (
+    clubId: string,
+    title: string,
+    body: string,
+    severity: string,
+    audience: string = "all",
+    channel: string = "overlay",
+  ) =>
+    call<{ ok: boolean; id: string; audience: string; channel: string }>(
+      "club_announcement_create",
+      { club_id: clubId, title, body, severity, audience, channel },
+    ),
 
   // ---- Club chat (Overview right-rail live feed) ----
   chatList: (clubId: string, limit = 40) =>

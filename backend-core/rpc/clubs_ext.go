@@ -575,6 +575,8 @@ func ClubAnnouncementCreate(ctx context.Context, logger runtime.Logger, db *sql.
 		Title    string `json:"title"`
 		Body     string `json:"body"`
 		Severity string `json:"severity"`
+		Audience string `json:"audience"`
+		Channel  string `json:"channel"`
 	}
 	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" || req.Title == "" {
 		return "", runtime.NewError("club_id and title required", 3)
@@ -583,15 +585,40 @@ func ClubAnnouncementCreate(ctx context.Context, logger runtime.Logger, db *sql.
 	if err != nil {
 		return "", err
 	}
+	// Whitelist the targeting params so a bad value can't be stored.
+	audience := announceAudience(req.Audience)
+	channel := announceChannel(req.Channel)
 	es := store.NewClubExtStore(db)
 	id, err := es.CreateAnnouncement(ctx, &store.ClubAnnouncement{
-		ClubID: req.ClubID, Title: req.Title, Body: req.Body, Severity: req.Severity, CreatedBy: author,
+		ClubID: req.ClubID, Title: req.Title, Body: req.Body, Severity: req.Severity,
+		Audience: audience, Channel: channel, CreatedBy: author,
 	})
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	_ = es.LogActivity(ctx, req.ClubID, author, "announcement", req.Title)
-	return `{"ok":true,"id":"` + id + `"}`, nil
+	out, _ := json.Marshal(map[string]interface{}{"ok": true, "id": id, "audience": audience, "channel": channel})
+	return string(out), nil
+}
+
+// announceAudience clamps the target-audience param to a known value.
+func announceAudience(v string) string {
+	switch v {
+	case "private", "tournament":
+		return v
+	default:
+		return "all"
+	}
+}
+
+// announceChannel clamps the delivery-channel param to a known value.
+func announceChannel(v string) string {
+	switch v {
+	case "modal", "chat":
+		return v
+	default:
+		return "overlay"
+	}
 }
 
 // ClubEventList returns a club's scheduled events (soonest first).
