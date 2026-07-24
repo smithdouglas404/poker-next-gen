@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import { SignInButton, SignUpButton, UserButton, SignedIn, SignedOut } from "@clerk/nextjs";
 
 import { BTN_GOLD, GLASS_PANEL, cn } from "@/features/ui/tokens";
 
@@ -22,7 +23,7 @@ const NAV: Array<{ label: string; href: string }> = [
 // the member home (CommandCenter has its own nav), the auth page, and the live
 // table/proof. The global nav only fills the gap on deep section pages that
 // otherwise have no top-level navigation (studio, marketplace, wallet, …).
-const HIDE_ON = ["/", "/hub", "/login", "/table", "/proof"];
+const HIDE_ON = ["/", "/hub", "/login", "/table", "/proof", "/sign-in", "/sign-up"];
 
 export function SiteNav() {
   const pathname = usePathname() || "/";
@@ -70,7 +71,7 @@ export function SiteNav() {
           ))}
         </nav>
 
-        {/* access-code join (desktop) */}
+        {/* access-code join & auth (desktop) */}
         <div className="ml-auto hidden items-center gap-2 md:flex">
           <div className={cn(GLASS_PANEL, "flex items-center gap-1 py-1 pl-3 pr-1")}>
             <input
@@ -91,12 +92,24 @@ export function SiteNav() {
               Join
             </button>
           </div>
-          <Link
-            href="/login"
-            className={cn(BTN_GOLD, "rounded-lg px-4 py-2 text-xs uppercase tracking-wide")}
-          >
-            Sign in
-          </Link>
+          
+          {/* Clerk Auth Controls */}
+          <SignedOut>
+            <SignInButton mode="modal">
+              <button className={cn(BTN_GOLD, "rounded-lg px-4 py-2 text-xs uppercase tracking-wide cursor-pointer")}>
+                Sign in
+              </button>
+            </SignInButton>
+            <SignUpButton mode="modal">
+              <button className="rounded-lg border border-white/30 px-4 py-2 text-xs uppercase tracking-wide text-white hover:bg-white/10 transition cursor-pointer">
+                Sign up
+              </button>
+            </SignUpButton>
+          </SignedOut>
+          
+          <SignedIn>
+            <UserButton />
+          </SignedIn>
         </div>
 
         {/* mobile toggle */}
@@ -145,15 +158,30 @@ export function SiteNav() {
               Join
             </button>
           </div>
-          <Link
-            href="/login"
-            onClick={() => setMenuOpen(false)}
-            className={cn(BTN_GOLD, "mt-3 block rounded-lg py-2.5 text-center text-xs uppercase tracking-wide")}
-          >
-            Sign in
-          </Link>
+          
+          {/* Mobile Clerk Auth Controls */}
+          <div className="mt-3 flex gap-2">
+            <SignedOut>
+              <SignInButton mode="modal">
+                <button className={cn(BTN_GOLD, "flex-1 rounded-lg py-2.5 text-xs uppercase tracking-wide cursor-pointer")}>
+                  Sign in
+                </button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <button className="flex-1 rounded-lg border border-white/30 py-2.5 text-xs uppercase tracking-wide text-white hover:bg-white/10 transition cursor-pointer">
+                  Sign up
+                </button>
+              </SignUpButton>
+            </SignedOut>
+            <SignedIn>
+              <div className="flex-1">
+                <UserButton />
+              </div>
+            </SignedIn>
+          </div>
         </div>
       )}
     </header>
   );
 }
+
