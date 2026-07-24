@@ -76,6 +76,32 @@ func rankForScore(score int64) (rankRung, *rankRung) {
 	return cur, nil
 }
 
+// AvatarBattleStats returns the caller's per-avatar battle records (hands, wins,
+// win rate) — each character's "battle condition." Optional {user_id} for a
+// public/opponent view.
+func AvatarBattleStats(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	caller, err := callerID(ctx)
+	if err != nil {
+		return "", err
+	}
+	var req struct {
+		UserID string `json:"user_id"`
+	}
+	if payload != "" {
+		_ = json.Unmarshal([]byte(payload), &req)
+	}
+	target := req.UserID
+	if target == "" {
+		target = caller
+	}
+	stats, err := store.NewAvatarStatsStore(db).List(ctx, target)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	out, _ := json.Marshal(map[string]interface{}{"user_id": target, "avatars": stats})
+	return string(out), nil
+}
+
 // PlayerRank derives a player's US-military-style HRC rank from real activity
 // (hands, wins, tournament entries, HRP). Returns the rank, the composite score
 // and its components, and progress toward the next promotion. Caller by default,

@@ -67,6 +67,40 @@ function StatRow({ label, value, tone }: { label: string; value: string; tone?: 
   );
 }
 
+// Battle record for the equipped avatar — rounds played + win rate accrued to
+// that character (avatar_battle_stats). Renders nothing until data arrives.
+function AvatarBattleRecord({ avatarId }: { avatarId: string }) {
+  const [rec, setRec] = useState<{ hands: number; win_rate_pct: number } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await profileApi.avatarBattle();
+        const match = data.avatars.find((a) => a.avatar_id === avatarId);
+        if (!cancelled) setRec(match ? { hands: match.hands, win_rate_pct: match.win_rate_pct } : { hands: 0, win_rate_pct: 0 });
+      } catch {
+        /* offline → hide */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [avatarId]);
+  if (!rec) return null;
+  return (
+    <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-black/30 px-3 py-2">
+      <div>
+        <p className="text-[9px] uppercase tracking-[0.2em] text-white/40">Battle Record</p>
+        <p className="font-display text-sm font-bold text-white">{compact(rec.hands)} hands</p>
+      </div>
+      <div className="text-right">
+        <p className="text-[9px] uppercase tracking-[0.2em] text-white/40">Win Rate</p>
+        <p className="font-display text-sm font-bold text-green">{rec.win_rate_pct}%</p>
+      </div>
+    </div>
+  );
+}
+
 function AchievementBadge({ a }: { a: Achievement }) {
   const r = RARITY[a.tier];
   return (
@@ -221,7 +255,8 @@ export function ProfileOverview({ notify }: { notify: (msg: string, kind?: "ok" 
               </span>
             </div>
           </div>
-          <div className="p-4">
+          <div className="space-y-3 p-4">
+            <AvatarBattleRecord avatarId={avatar} />
             <Link href="/profile/security" className={cn(BTN_GOLD, "flex w-full items-center justify-center rounded-xl px-4 py-2.5 text-sm uppercase tracking-wide")}>
               Edit Avatar
             </Link>

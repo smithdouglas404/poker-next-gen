@@ -1109,3 +1109,16 @@ CREATE TABLE IF NOT EXISTS poker_points_purchase (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_poker_points_purchase_user ON poker_points_purchase(user_id, created_at DESC);
+
+-- Per-avatar battle record: hands played and won attributed to the character a
+-- player had equipped when each hand settled. Powers each avatar's "battle
+-- condition" (rounds played, win rate) on the marketplace/profile.
+CREATE TABLE IF NOT EXISTS poker_avatar_battle_stats (
+    user_id    TEXT NOT NULL,
+    avatar_id  TEXT NOT NULL,
+    hands      BIGINT NOT NULL DEFAULT 0,
+    wins       BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, avatar_id)
+);
+CREATE INDEX IF NOT EXISTS idx_poker_avatar_battle_user ON poker_avatar_battle_stats(user_id);

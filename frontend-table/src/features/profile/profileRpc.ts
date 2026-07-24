@@ -136,10 +136,26 @@ export interface PlayerRank {
   score_to_next: number;
 }
 
+/** One avatar's battle record (avatar_battle_stats). */
+export interface AvatarBattleStat {
+  avatar_id: string;
+  hands: number;
+  wins: number;
+  win_rate_pct: number;
+  updated_at: string;
+}
+
+export interface AvatarBattleResponse {
+  user_id: string;
+  avatars: AvatarBattleStat[];
+}
+
 export const profileApi = {
   // Identity / analytics
   get: () => call<Profile>("profile_get", {}),
   rank: (userId?: string) => call<PlayerRank>("player_rank", { user_id: userId ?? "" }),
+  avatarBattle: (userId?: string) =>
+    call<AvatarBattleResponse>("avatar_battle_stats", { user_id: userId ?? "" }),
   wallet: () => call<WalletBalance>("wallet_get", {}),
   verification: () => call<Verification>("me_verification", {}),
   stats: (userId?: string, clubId?: string) =>

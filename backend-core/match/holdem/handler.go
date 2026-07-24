@@ -1881,6 +1881,31 @@ func recordWinnings(ctx context.Context, nk runtime.NakamaModule, s *MatchState,
 
 // accrueLoyalty awards HRP to every human who played this hand (1 base, +2 for
 // winning, times their subscription-tier multiplier) and unlocks any newly-earned
+// equippedAvatarID reads the player's currently-equipped avatar from their
+// account metadata (the same key profile_meta_set writes). Returns "" for bots,
+// guests without a pick, or on any error — attribution is best-effort and must
+// never break a hand.
+func equippedAvatarID(ctx context.Context, nk runtime.NakamaModule, userID string) string {
+	if userID == "" {
+		return ""
+	}
+	acct, err := nk.AccountGetId(ctx, userID)
+	if err != nil || acct.GetUser() == nil {
+		return ""
+	}
+	meta := acct.GetUser().GetMetadata()
+	if meta == "" {
+		return ""
+	}
+	var m struct {
+		Avatar string `json:"avatar"`
+	}
+	if err := json.Unmarshal([]byte(meta), &m); err != nil {
+		return ""
+	}
+	return m.Avatar
+}
+
 // achievements. HRP is earned by PLAYING, so losers still progress. Called before
 // ResetBetweenHands, while seats still carry the hand's state.
 func accrueLoyalty(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *MatchState, res poker.ShowdownResult) {
@@ -1916,6 +1941,11 @@ func accrueLoyalty(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *
 		l, err := ls.Award(ctx, seat.UserID, hrp, 1, wonDelta)
 		if err != nil {
 			continue
+		}
+		// Attribute this hand to the character the player has equipped, so every
+		// avatar accrues its own battle record (rounds played + win rate).
+		if av := equippedAvatarID(ctx, nk, seat.UserID); av != "" {
+			_ = store.NewAvatarStatsStore(db).Increment(ctx, seat.UserID, av, won)
 		}
 		// Ledger the HRP event (loyalty_history) and feed the native HRP + hands
 		// leaderboards (best-effort — never break the hand).

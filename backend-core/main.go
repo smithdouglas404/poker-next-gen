@@ -145,6 +145,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		// Stats / leaderboards
 		"player_stats":       rpc.PlayerStats,
 		"player_rank":        rpc.PlayerRank,
+		"avatar_battle_stats": rpc.AvatarBattleStats,
 		"rewards_catalog":          rpc.RewardsCatalog,
 		"points_balance":           rpc.PointsBalance,
 		"reward_redeem":            rpc.RewardRedeem,
