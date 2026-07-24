@@ -96,6 +96,11 @@ type MatchState struct {
 	// only after the base ActionSecs lapses, before the server auto-folds. Granted
 	// once when a player first sits; not auto-refilled.
 	TimeBank         map[string]int64
+	// TimeoutStreak counts each human's CONSECUTIVE server-acted timeouts (userID
+	// -> count); reset to 0 the moment they act voluntarily. After
+	// maxConsecutiveTimeouts the inactivity auto-kick stands them up (orbit-style
+	// AFK protection — the proven oddslingers mechanic).
+	TimeoutStreak    map[string]int
 	// Per-table shot-clock config (0 => server defaults): ActionSecsCfg is the base
 	// clock in seconds; TimeBankGrant is the one-time bank granted on sit.
 	ActionSecsCfg    int
@@ -145,6 +150,11 @@ const actionTimeoutTicks int64 = 300
 // the base clock (actionTimeoutTicks) is 30s, so actionSecs is derived from it.
 const timeBankSecs int64 = 30
 const actionSecs int = int(actionTimeoutTicks / 10)
+
+// maxConsecutiveTimeouts is how many times the server may act for a human in a
+// row (time-outs) before the inactivity auto-kick stands them up, freeing the
+// seat so an AFK player can't hold a table hostage. Reset by any voluntary act.
+const maxConsecutiveTimeouts = 3
 
 type Handler struct{}
 
@@ -356,6 +366,7 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		InsOffered:   map[string]insurancePolicy{},
 		AntibotLog:   map[string][]antibot.ActionRecord{},
 		TimeBank:     map[string]int64{},
+		TimeoutStreak: map[string]int{},
 		ActionSecsCfg: actionSecsCfg,
 		TimeBankGrant: timeBankCfg,
 		DurationSecs: durationSecs,
@@ -842,6 +853,10 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				sendError(dispatcher, presence, "action_failed", err.Error())
 				continue
 			}
+			// Voluntary action clears the inactivity streak (they're present).
+			if s.TimeoutStreak != nil {
+				delete(s.TimeoutStreak, userID)
+			}
 			emitPlayerAction(ctx, s, userID, req.Type, req.Amount)
 			narrateAction(dispatcher, s, seatIdx, req.Type)
 			broadcastSnapshot(ctx, db, dispatcher, s, nil)
@@ -923,6 +938,13 @@ func enforceActionDeadline(ctx context.Context, db *sql.DB, dispatcher runtime.M
 	s.ActionDeadlineTick, s.ActionDeadlineSeat = 0, -1
 	emitPlayerAction(ctx, s, seat.UserID, action, 0)
 	narrateAction(dispatcher, s, seatIdx, action)
+	// Inactivity auto-kick (#86): count consecutive server-acted timeouts. The
+	// actual stand-up is deferred to standUpBusted (between hands) so removing a
+	// seat never corrupts an in-flight hand's side-pot/showdown state.
+	if s.TimeoutStreak == nil {
+		s.TimeoutStreak = map[string]int{}
+	}
+	s.TimeoutStreak[seat.UserID]++
 	broadcastSnapshot(ctx, db, dispatcher, s, nil)
 	if _, uncontested := s.Table.UncontestedWinner(); uncontested {
 		beginShowdownResolution(ctx, s)
@@ -1281,7 +1303,7 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 				sendError(dispatcher, p, "showdown_failed", res.Err.Error())
 			}
 			s.Table.ResetBetweenHands()
-			standUpBusted(s)
+			standUpBusted(ctx, db, dispatcher, s)
 			s.Phase = poker.PhaseWaiting
 			return true
 		}
@@ -1314,7 +1336,7 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		accrueCompetition(ctx, logger, db, s, potBefore)
 		s.Table.ResetBetweenHands()
 		reportTournamentBusts(ctx, db, nk, s)
-		standUpBusted(s) // cash tables: clear felted players so the table stays playable
+		standUpBusted(ctx, db, dispatcher, s) // cash tables: clear felted players so the table stays playable
 		s.Phase = poker.PhaseWaiting
 		return true
 	default:
@@ -1916,14 +1938,55 @@ func accrueLoyalty(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *
 // cash table a felted player (bot or human) must leave the seat — leaving them
 // seated at $0 wastes a seat and, before the allMatched() fix, could deadlock the
 // betting round. Tournaments keep busted seats for elimination reporting.
-func standUpBusted(s *MatchState) {
+// standUpBusted clears felted (stack ≤ 0) players between hands so a cash table
+// stays playable. When the table has auto buy-back enabled (#86), a busted human
+// is instead auto-topped-up from their wallet to the configured stack and kept
+// seated — the proven "auto-rebuy" mechanic — falling back to standing up only
+// when their wallet can't fund the rebuy.
+func standUpBusted(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
 	if s.TournamentID != "" {
 		return
 	}
+	// Inactivity auto-kick (#86): stand up any seated human who has hit the
+	// consecutive-timeout threshold, now that the hand is over (safe point).
 	for i, seat := range s.Table.Seats {
-		if seat != nil && seat.Stack <= 0 {
-			s.Table.StandUp(i)
+		if seat == nil || seat.IsBot || s.TimeoutStreak[seat.UserID] < maxConsecutiveTimeouts {
+			continue
 		}
+		name := seat.Username
+		releaseBuyIn(ctx, db, s, i, seat.UserID, seat.Stack)
+		delete(s.SeatWallet, i)
+		delete(s.TimeoutStreak, seat.UserID)
+		_ = store.NewActiveSeatStore(db).Unregister(ctx, seat.UserID, matchIDForAudit(s))
+		s.Table.StandUp(i)
+		narrate(dispatcher, s, fmt.Sprintf("%s was removed for inactivity (%d consecutive time-outs).", name, maxConsecutiveTimeouts))
+	}
+	for i, seat := range s.Table.Seats {
+		if seat == nil || seat.Stack > 0 {
+			continue
+		}
+		if s.AutoBuyBackCents > 0 && !seat.IsBot {
+			topUp := poker.ClampBuyIn(s.AutoBuyBackCents)
+			// Respect the table band + any universal wallet cap on the seat.
+			if topUp < s.minBuyIn() {
+				topUp = s.minBuyIn()
+			}
+			if topUp > s.maxBuyIn() {
+				topUp = s.maxBuyIn()
+			}
+			if s.WalletLimitCents > 0 && topUp > s.WalletLimitCents {
+				topUp = s.WalletLimitCents
+			}
+			if topUp > 0 {
+				if w := reserveBuyIn(ctx, db, s, seat.UserID, topUp, s.SeatWallet[i]); w != "" {
+					seat.Stack += topUp
+					s.SeatWallet[i] = w
+					narrate(dispatcher, s, fmt.Sprintf("%s auto-bought back in for $%d.", seat.Username, topUp/100))
+					continue
+				}
+			}
+		}
+		s.Table.StandUp(i)
 	}
 }
 
