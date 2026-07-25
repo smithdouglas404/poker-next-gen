@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { formatMoney } from "@/features/commands/schemaForm/format";
+import { HandReplayer } from "@/features/hands/HandReplayer";
 
 // Hand History browser (UI review P1-8): replaces the "paste a match UUID"
 // audit prompt with a real list of the player's recent hands, each verifiable
@@ -45,6 +46,7 @@ export default function HandsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<HandRow | null>(null);
+  const [replay, setReplay] = useState<HandRow | null>(null);
   const [verify, setVerify] = useState<VerifyResult | null>(null);
   const [verifying, setVerifying] = useState(false);
 
@@ -159,13 +161,22 @@ export default function HandsPage() {
                     </td>
                     <td className="px-3 py-3 text-neutral-500">{when(h.created_at)}</td>
                     <td className="px-3 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => openHand(h)}
-                        className="text-xs font-semibold uppercase tracking-wider text-gold hover:text-gold-lite"
-                      >
-                        Verify →
-                      </button>
+                      <div className="flex items-center justify-end gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setReplay(h)}
+                          className="text-xs font-semibold uppercase tracking-wider text-cyan hover:text-white"
+                        >
+                          ▶ Replay
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openHand(h)}
+                          className="text-xs font-semibold uppercase tracking-wider text-gold hover:text-gold-lite"
+                        >
+                          Verify →
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -240,6 +251,15 @@ export default function HandsPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {replay && (
+        <HandReplayer
+          matchId={replay.match_id}
+          handNo={replay.hand_no}
+          label={replay.table_label || replay.room_id}
+          onClose={() => setReplay(null)}
+        />
       )}
     </div>
   );
