@@ -11,6 +11,7 @@ import { GameStatusRail } from "@/features/hud/GameStatusRail";
 import { EquityPanel } from "@/features/hud/EquityPanel";
 import { SidebetPanel } from "@/features/hud/SidebetPanel";
 import { HandVerifyPanel } from "@/features/hud/HandVerifyPanel";
+import { ShowdownVerifyCTA } from "@/features/game/ShowdownVerifyCTA";
 import { BuyInSlider, TableLog } from "@/features/hud/TableLog";
 import { TableEmptyState } from "@/features/hud/TableEmptyState";
 import { ChatPanel } from "@/features/hud/ChatPanel";
@@ -59,6 +60,7 @@ export function TableHud({ children }: { children: React.ReactNode }) {
             <EquityPanel />
             {showGamePanels && <SidebetPanel />}
             {showGamePanels && <HandVerifyPanel />}
+            {showGamePanels && <ShowdownVerifyCTA />}
             {showGamePanels && <TableLog />}
             <ChatPanel />
             <HandHistoryPanel />
