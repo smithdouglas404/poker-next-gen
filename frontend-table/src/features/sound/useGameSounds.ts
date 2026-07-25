@@ -43,7 +43,17 @@ export function useGameSounds() {
   const prevTurnActive = useRef(false);
   const prevShowdown = useRef<unknown>(null);
   const prevButtonSeat = useRef<number | null>(null);
+  const prevHandNo = useRef<number | null>(null);
   const hydrated = useRef(false);
+
+  // New hand starting (hand_no increments) → riffle-shuffle the deck, just before
+  // the deal cue fires off the hole cards arriving.
+  useEffect(() => {
+    const handNo = snapshot?.hand_no ?? null;
+    if (handNo === null) return;
+    if (prevHandNo.current !== null && handNo > prevHandNo.current) play("shuffle");
+    prevHandNo.current = handNo;
+  }, [snapshot?.hand_no, play]);
 
   // Hole cards dealt (0 -> N transition).
   useEffect(() => {
@@ -93,13 +103,18 @@ export function useGameSounds() {
     prevTurnActive.current = active;
   }, [actionRequired, snapshot?.seats, profile.userId, play]);
 
-  // Showdown result: dramatic reveal, then the winner payoff a beat later.
+  // Showdown result: dramatic reveal, the winner payoff a beat later, then the
+  // chips being swept from the pot to the winner.
   useEffect(() => {
     if (showdown && showdown !== prevShowdown.current) {
       play("showdown");
-      const t = setTimeout(() => play("win"), 550);
+      const tWin = setTimeout(() => play("win"), 550);
+      const tCollect = setTimeout(() => play("collect"), 1050);
       prevShowdown.current = showdown;
-      return () => clearTimeout(t);
+      return () => {
+        clearTimeout(tWin);
+        clearTimeout(tCollect);
+      };
     }
     prevShowdown.current = showdown;
   }, [showdown, play]);

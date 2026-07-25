@@ -16,6 +16,7 @@
  */
 
 export type SoundCue =
+  | "shuffle"
   | "deal"
   | "flip"
   | "check"
@@ -23,6 +24,7 @@ export type SoundCue =
   | "call"
   | "fold"
   | "win"
+  | "collect"
   | "turn"
   | "button"
   | "showdown";
@@ -53,12 +55,17 @@ interface NoiseStep {
 }
 
 const NOISE_RECIPES: Partial<Record<SoundCue, NoiseStep>> = {
+  // Deck riffle-shuffle before the deal — a longer filtered whoosh that sweeps
+  // down as the cards cascade. (No recorded shuffle exists; this is the synth cue.)
+  shuffle: { dur: 0.42, filter: "bandpass", freq: 2000, q: 0.5, gain: 0.34, sweepTo: 900 },
   // Card skimmed across felt to a player — a quick bright flick.
   deal: { dur: 0.08, filter: "bandpass", freq: 2600, q: 0.8, gain: 0.5, sweepTo: 3600 },
   // Community card snapped face-up — sharper, higher.
   flip: { dur: 0.06, filter: "bandpass", freq: 3800, q: 0.9, gain: 0.55, sweepTo: 5200 },
   // Folded cards sliding away — a soft "shhk" that decays downward.
   fold: { dur: 0.2, filter: "lowpass", freq: 1400, q: 0.6, gain: 0.4, sweepTo: 450 },
+  // Chips swept from the pot to the winner — a fuller low slide under the chip layer.
+  collect: { dur: 0.26, filter: "lowpass", freq: 1600, q: 0.5, gain: 0.4, sweepTo: 620 },
 };
 
 /** Audio file (in /sounds/) backing each cue, when present. Cues without a file
@@ -71,6 +78,7 @@ const CUE_FILES: Partial<Record<SoundCue, string>> = {
   call: "call",
   fold: "fold",
   win: "win",
+  collect: "chip-collect", // oddslingers return_chips.mp3 — chips swept to the winner
   turn: "turn-notify",
   showdown: "showdown",
 };
@@ -79,6 +87,7 @@ const CUE_FILES: Partial<Record<SoundCue, string>> = {
 const CHIP_LAYER: Partial<Record<SoundCue, "clink" | "stack">> = {
   bet: "stack",
   call: "clink",
+  collect: "stack", // the pot-sweep gets a chip-stack layer on top of the slide
 };
 
 const AUDIO_EXTENSIONS = [".mp3", ".wav", ".ogg", ".m4a", ".webm"];
@@ -96,6 +105,9 @@ interface ToneStep {
 
 /** Synth fallback recipes for each cue (used when no audio file is loaded). */
 const RECIPES: Record<SoundCue, ToneStep[]> = {
+  // Fallback only — shuffle/collect normally play their NOISE_RECIPES.
+  shuffle: [{ freq: 240, at: 0, dur: 0.4, gain: 0.12, type: "sawtooth" }],
+  collect: [{ freq: 300, at: 0, dur: 0.18, gain: 0.16, type: "sine" }],
   deal: [{ freq: 880, at: 0, dur: 0.07, gain: 0.18, type: "triangle" }],
   // Community card turned over — a quick, brighter snap than the deal blip.
   flip: [{ freq: 1200, at: 0, dur: 0.05, gain: 0.16, type: "triangle" }],
@@ -185,9 +197,12 @@ class SoundManager {
     if (this.packHydrated || typeof window === "undefined") return;
     this.packHydrated = true;
     try {
-      this.pack = window.localStorage.getItem(PACK_KEY) === "recorded" ? "recorded" : "studio";
+      // Default to the recorded pack (real samples) — only an explicit "studio"
+      // choice keeps the synthesized fallback. Cues without a recorded file still
+      // fall through to synth per-cue in play(), so this is always safe.
+      this.pack = window.localStorage.getItem(PACK_KEY) === "studio" ? "studio" : "recorded";
     } catch {
-      /* default to studio */
+      this.pack = "recorded";
     }
   }
 
