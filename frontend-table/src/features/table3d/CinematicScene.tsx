@@ -191,8 +191,9 @@ function seatPoint(index: number, total: number): [number, number, number] {
   const e = ACTIVE_ELLIPSE;
   if (e.stadiumL != null) {
     const pt = stadiumPoint(index / total, e.stadiumL, e.sz, e.y);
-    pt[0] = Math.sign(pt[0]) * Math.min(Math.abs(pt[0]), SEAT_XMAX);
-    return pt;
+    // PORTRAIT table: yaw the ring 90 deg so the long run lies along Z (into the
+    // screen). Seats line the left/right rails; hero sits at the near short end.
+    return [pt[2], pt[1], -pt[0]];
   }
   const a = (index / total) * Math.PI * 2 + Math.PI / 2;
   return [Math.cos(a) * e.sx, e.y, Math.sin(a) * e.sz];
@@ -246,7 +247,9 @@ function TableBody() {
     return { feltG, goldG, rimG, railG, stripeG, underG };
   }, []);
   return (
-    <group>
+    // PORTRAIT orientation: the stadium is authored with its straight run along X,
+    // so the body is yawed 90 deg to lay that run along Z (into the screen).
+    <group rotation={[0, Math.PI / 2, 0]}>
       {/* floor — grounds the table in a room instead of a void */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -TABLE_H, 0]} receiveShadow>
         <planeGeometry args={[60, 60]} />
@@ -484,7 +487,7 @@ function BoardCard({ code, x, delay }: { code: string; x: number; delay: number 
     // BoxGeometry face order: px, nx, py, ny, pz, nz  (py = top)
     return [white, white, top, white, white, white];
   }, [face]);
-  const ref = useDealIn([x, 0.075, -0.15], delay, true);
+  const ref = useDealIn([x, 0.075, -1.9], delay, true);
   return (
     <group ref={ref}>
       <mesh castShadow material={mats}>
@@ -536,7 +539,7 @@ function ChipStack({
 }
 
 // Where the central pot sits (chips + the DOM pot label ride here).
-const POT_POS: [number, number, number] = [0, 0.05, 1.5];
+const POT_POS: [number, number, number] = [0, 0.05, 0.5];
 
 // Central pot pile — a tight cluster of colored stacks just below the board whose
 // heights now SCALE with the pot value (bigger pot → taller stacks), clamped so it
@@ -1226,7 +1229,7 @@ export function CinematicScene({
       "linear-gradient(180deg,#04060a,#070b12 60%,#04060a)";
   const cameraCfg = backdrop
     ? { position: backdrop.camera.position, fov: backdrop.camera.fov }
-    : { position: [0, 9.0, 7.0] as [number, number, number], fov: 40 };
+    : { position: [0, 6.1, 8.3] as [number, number, number], fov: 40 };
   return (
     <div className="relative h-screen w-screen overflow-hidden" style={{ background: wrapperBg }}>
       <Canvas
