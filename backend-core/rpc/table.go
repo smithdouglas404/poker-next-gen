@@ -169,6 +169,7 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		"geo_restricted":      req.GeoRestricted,
 		"wallet_limit_cents":  req.WalletLimitCents,
 		"auto_buy_back_cents": req.AutoBuyBackCents,
+		"no_max_buyin":        req.NoMaxBuyIn,
 	})
 	if err != nil {
 		return "", err

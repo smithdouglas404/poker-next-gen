@@ -125,6 +125,7 @@ type MatchState struct {
 	GeoRestricted    bool   // re-check the seating player's jurisdiction at sit-down
 	WalletLimitCents int64  // cap on total chips one player may bring (0 => no cap)
 	AutoBuyBackCents int64  // auto top-up a busted player to this stack (0 => off)
+	NoMaxBuyIn       bool   // unlimited buy-in (no max) — PLAY-MONEY tables only
 }
 
 // insurancePolicy is one all-in insurance wager, settled against the wallet (not
@@ -327,6 +328,12 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	if v, ok := numParam(params, "auto_buy_back_cents"); ok && v > 0 {
 		autoBuyBackCents = v
 	}
+	// Unlimited buy-in (no max) — honored ONLY for play-money tables; a real-money
+	// table always keeps its max buy-in cap (table-stakes / AML).
+	noMaxBuyIn := false
+	if v, ok := params["no_max_buyin"].(bool); ok && v && !realMoneyEnabled() {
+		noMaxBuyIn = true
+	}
 	// Seed AI opponents at creation (server-authoritative, like OddSlingers).
 	for i := 0; i < numBots; i++ {
 		seat := table.FirstEmptySeat()
@@ -383,6 +390,7 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		GeoRestricted:    geoRestricted,
 		WalletLimitCents: walletLimitCents,
 		AutoBuyBackCents: autoBuyBackCents,
+		NoMaxBuyIn:       noMaxBuyIn,
 	}
 	label := buildLabel(state)
 	// 10 ticks/sec: a 1 Hz loop made deals, chip moves, and action prompts update
@@ -627,10 +635,15 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			if buyIn < s.minBuyIn() {
 				buyIn = s.minBuyIn()
 			}
-			if buyIn > s.maxBuyIn() {
-				buyIn = s.maxBuyIn()
+			// Unlimited (play-money) tables skip the max cap + global clamp; the
+			// table floor above still applies. Capped / real-money tables enforce
+			// the table max and the global safety clamp.
+			if !s.NoMaxBuyIn {
+				if buyIn > s.maxBuyIn() {
+					buyIn = s.maxBuyIn()
+				}
+				buyIn = poker.ClampBuyIn(buyIn)
 			}
-			buyIn = poker.ClampBuyIn(buyIn)
 			// Universal wallet limit (#83): cap the total chips one player may bring
 			// to this table. Clamp the buy-in down to the remaining headroom; reject
 			// when it can no longer cover the table minimum.
@@ -2101,7 +2114,7 @@ func standUpBusted(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDisp
 			if topUp < s.minBuyIn() {
 				topUp = s.minBuyIn()
 			}
-			if topUp > s.maxBuyIn() {
+			if !s.NoMaxBuyIn && topUp > s.maxBuyIn() {
 				topUp = s.maxBuyIn()
 			}
 			if s.WalletLimitCents > 0 && topUp > s.WalletLimitCents {

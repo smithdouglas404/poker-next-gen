@@ -80,6 +80,9 @@ export function PrivateTableSetup({
   const [sbDollars, setSbDollars] = useState(1);
   const [bbDollars, setBbDollars] = useState(2);
   const [buyInDollars, setBuyInDollars] = useState(isPlayMoney ? 20 : 500);
+  // Unlimited buy-in (no max) — play-money tables only; the backend ignores it
+  // on real-money tables (AML/table-stakes).
+  const [noMaxBuyIn, setNoMaxBuyIn] = useState(false);
   const [seats, setSeats] = useState(6);
   const [bots, setBots] = useState(0);
   const [durationMins, setDurationMins] = useState(0);
@@ -175,6 +178,7 @@ export function PrivateTableSetup({
       kyc_required: kycRequired,
       wallet_limit_cents: dollarsToCents(walletLimitDollars),
       auto_buy_back_cents: dollarsToCents(autoBuyBackDollars),
+      no_max_buyin: isPlayMoney ? noMaxBuyIn : false,
       // ---- Still forward-compat (no backend home yet): auto-away needs orbit
       // counting (#86); operating_hours needs a schedule/window model; public +
       // sponsor_club_id are the club-economics path (deferred). Sent so the UI
@@ -248,9 +252,23 @@ export function PrivateTableSetup({
         )}
 
         {isPlayMoney && (
-          <div className="rounded-xl border border-green/30 bg-green/[0.06] p-3 text-sm text-[#bff5d3]">
-            <span className="font-bold uppercase tracking-wider text-green">🎮 Free play</span> — low
-            stakes, open seating, no KYC required to sit. The friction-free way to learn the tables.
+          <div className="space-y-3 rounded-xl border border-green/30 bg-green/[0.06] p-3 text-sm text-[#bff5d3]">
+            <p>
+              <span className="font-bold uppercase tracking-wider text-green">🎮 Free play</span> — low
+              stakes, open seating, no KYC required to sit. The friction-free way to learn the tables.
+            </p>
+            <label className="flex cursor-pointer items-center gap-2 text-neutral-200">
+              <input
+                type="checkbox"
+                checked={noMaxBuyIn}
+                onChange={(e) => setNoMaxBuyIn(e.target.checked)}
+                className="h-4 w-4 accent-green"
+              />
+              <span>
+                Unlimited buy-in (no max) — play-money only. Players can bring any amount above the
+                table minimum.
+              </span>
+            </label>
           </div>
         )}
 

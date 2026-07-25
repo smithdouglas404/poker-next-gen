@@ -167,6 +167,8 @@ type TableCreateRequest struct {
 	GeoRestricted    bool   `json:"geo_restricted,omitempty" label:"Geo-Restricted"`
 	WalletLimitCents int64  `json:"wallet_limit_cents,omitempty" validate:"min=0" unit:"money_minor" label:"Universal Wallet Limit"`
 	AutoBuyBackCents int64  `json:"auto_buy_back_cents,omitempty" validate:"min=0" unit:"money_minor" label:"Auto Buy-Back"`
+	//  - NoMaxBuyIn: unlimited buy-in (no max) — honored on PLAY-MONEY tables only.
+	NoMaxBuyIn bool `json:"no_max_buyin,omitempty" label:"Unlimited buy-in (play money)"`
 }
 
 // ClubMemberRoleRequest is the club_member_role RPC payload: promote/demote a
