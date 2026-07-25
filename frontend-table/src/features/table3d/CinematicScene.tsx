@@ -110,6 +110,8 @@ export interface CinematicSceneProps {
   /** Transient table announcement (winner, all-in, blinds up, host message)
    *  shown as a center-top banner over the felt. Empty/undefined hides it. */
   announce?: string;
+  /** Two lines printed flat on the felt above the board. */
+  feltText?: [string, string];
   /**
    * Overlay layered on top of the canvas. When provided (the proof passes its
    * full showcase HUD), the intrinsic minimal HUD is suppressed so the proof
@@ -914,7 +916,8 @@ function SeatTile({ seat, index }: { seat?: SceneSeat; index: number }) {
       <div
         style={{
           width: UI.frameW, height: UI.frameH, borderRadius: 12,
-          border: `2px solid ${ring}`, background: "rgba(11,14,19,0.92)",
+          border: `2px solid ${vacant ? "#2AC6D0" : ring}`, background: "rgba(15,23,42,0.38)",
+          backdropFilter: "blur(6px)",
           boxShadow: vacant ? "none" : `0 0 26px ${glow}, 0 0 0 2px rgba(212,175,55,0.28)`,
           display: "flex", alignItems: "center", justifyContent: "center",
           opacity: seat?.state === "folded" ? 0.55 : 1,
@@ -950,7 +953,7 @@ function SeatTile({ seat, index }: { seat?: SceneSeat; index: number }) {
         <div
           style={{
             width: UI.badgeW, height: UI.badgeH, marginTop: 6, borderRadius: 8, padding: "2px 4px",
-            background: "rgba(8,10,14,0.86)", border: "1px solid rgba(255,255,255,0.12)",
+            background: "rgba(15,23,42,0.55)", border: "1px solid #2AC6D0", backdropFilter: "blur(6px)",
             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
             opacity: seat.state === "folded" ? 0.6 : 1,
           }}
@@ -984,7 +987,7 @@ function SeatLayer3D({ seats, maxSeats }: { seats: SceneSeat[]; maxSeats: number
 
 /* ---------------- scene ---------------- */
 
-function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, potMinor, winnerSeat, winNonce, feltControls, backdrop }: {
+function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, potMinor, winnerSeat, winNonce, feltControls, backdrop, feltText }: {
   seats: SceneSeat[];
   board: string[];
   mode: AvatarMode;
@@ -997,6 +1000,7 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
   winNonce: number;
   feltControls?: FeltControls;
   backdrop?: BakedConfig;
+  feltText?: [string, string];
 }) {
   // Set the active seat ellipse BEFORE any seatPoint() call this render. A baked
   // plate supplies its own ellipse so seats land on the painted chairs; the
@@ -1034,9 +1038,9 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
           <color attach="background" args={["#05070c"]} />
           <fog attach="fog" args={["#05070c", 12, 26]} />
 
-          <ambientLight intensity={0.22} color="#2a4d78" />
-          <hemisphereLight intensity={0.3} color="#1CB5C9" groundColor="#0A231C" />
-          <spotLight position={[0, 11, 0.5]} angle={0.5} penumbra={0.85} intensity={3.4} color="#dff6ff" castShadow shadow-mapSize={[2048, 2048]} />
+          <ambientLight intensity={0.55} color="#7fd8e0" />
+          <hemisphereLight intensity={0.6} color="#1CB5C9" groundColor="#0A231C" />
+          <spotLight position={[0, 12, 0]} angle={0.62} penumbra={0.7} intensity={9.0} color="#eafcff" castShadow shadow-mapSize={[2048, 2048]} />
           <pointLight position={[-7.5, 3.2, -3]} intensity={2.2} decay={0} color="#1CB5C9" />
           <pointLight position={[7.5, 3.2, -2]} intensity={2.0} decay={0} color="#4DEEEA" />
           <pointLight position={[0, 2.4, -7.5]} intensity={1.3} decay={0} color="#0A231C" />
@@ -1080,6 +1084,18 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
         ) : null;
       })}
 
+      {/* Felt information block, laid FLAT on the felt above the community cards
+          (drei <Html transform> rotates the DOM into the felt plane). */}
+      {feltText && (
+        <Html transform rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.06, -3.15]}
+          zIndexRange={[5, 0]} style={{ pointerEvents: "none" }} distanceFactor={6}>
+          <div style={{ width: 380, height: 50, textAlign: "center", textShadow: "0 1px 4px rgba(0,0,0,0.7)" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#E2F1F1", lineHeight: "18px" }}>{feltText[0]}</div>
+            <div style={{ fontSize: 12, color: "#C8E6C9", lineHeight: "18px" }}>{feltText[1]}</div>
+          </div>
+        </Html>
+      )}
+
       {/* Seat tiles anchored in 3D (engineering: avatars are gameplay, not flat HUD). */}
       {mode !== "3d" && <SeatLayer3D seats={seats} maxSeats={maxSeats} />}
 
@@ -1104,7 +1120,7 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
       <EffectComposer>
         {[
           <Bloom key="bloom" intensity={baked ? 0.5 : 0.85} luminanceThreshold={baked ? 0.6 : 0.42} luminanceSmoothing={0.25} mipmapBlur />,
-          ...(baked ? [] : [<Vignette key="vignette" eskil={false} offset={0.22} darkness={0.95} />]),
+          ...(baked ? [] : [<Vignette key="vignette" eskil={false} offset={0.32} darkness={0.8} />]),
         ]}
       </EffectComposer>
     </>
@@ -1223,6 +1239,7 @@ export function CinematicScene({
   announce,
   feltControls,
   backdrop,
+  feltText,
   children,
   overlay,
 }: CinematicSceneProps) {
@@ -1237,7 +1254,7 @@ export function CinematicScene({
       "linear-gradient(180deg,#04060a,#070b12 60%,#04060a)";
   const cameraCfg = backdrop
     ? { position: backdrop.camera.position, fov: backdrop.camera.fov }
-    : { position: [0, 3.25, 11.5] as [number, number, number], fov: 32 };
+    : { position: [0, 10.6, 8.4] as [number, number, number], fov: 40 };
   return (
     <div className="relative h-screen w-screen overflow-hidden" style={{ background: wrapperBg }}>
       <Canvas
@@ -1251,7 +1268,7 @@ export function CinematicScene({
         }}
       >
         <Suspense fallback={null}>
-          <Scene seats={seats} board={board} mode={mode} maxSeats={maxSeats} showPot={showPot} handLive={handLive} dealNonce={dealNonce} potMinor={potMinor} winnerSeat={winnerSeat} winNonce={winNonce} feltControls={feltControls} backdrop={backdrop} />
+          <Scene seats={seats} board={board} mode={mode} maxSeats={maxSeats} showPot={showPot} handLive={handLive} dealNonce={dealNonce} potMinor={potMinor} winnerSeat={winnerSeat} winNonce={winNonce} feltControls={feltControls} backdrop={backdrop} feltText={feltText} />
         </Suspense>
       </Canvas>
       {children ?? <SceneHud potLabel={potLabel} heroHole={heroHole} announce={announce} />}
