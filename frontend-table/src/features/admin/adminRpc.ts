@@ -100,6 +100,13 @@ export const adminApi = {
   collusionReview: (flagId: string, status: "confirmed" | "dismissed", note: string) =>
     call<{ ok: boolean }>("collusion_flag_review", { flag_id: flagId, status, note }),
   /** Run the automated collusion scan (chip-dump / soft-play / shared-device) — writes flags. */
+  /** All live certified (global-wallet) cash games, for HRC platform admins. */
+  cashGames: () =>
+    call<{ cash_games: { match_id: string; label: string; size: number; certified: boolean }[]; count: number }>(
+      "admin_cash_games",
+      {},
+    ),
+
   collusionScan: (minHands = 15, threshold = 0.5) =>
     call<{ scanned: number; flagged: number; flags: CollusionFlag[] }>("collusion_scan", {
       min_hands: minHands,

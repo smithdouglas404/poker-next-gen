@@ -194,4 +194,5 @@ export type AdminSection =
   | "support"
   | "finance"
   | "platform"
+  | "cashgames"
   | "audit";

@@ -713,9 +713,16 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 					continue
 				}
 			}
-			wallet := reserveBuyIn(ctx, db, s, userID, buyIn, req.Wallet)
+			// Certification rule: registered players buy in from the certified
+			// global wallet; only guests use club-allocated comp chips.
+			guest := isGuest(ctx, nk, userID)
+			wallet := reserveBuyIn(ctx, db, s, userID, buyIn, req.Wallet, guest)
 			if wallet == "" {
-				sendError(dispatcher, presence, "buy_in_failed", "not enough funds in the selected wallet")
+				msg := "not enough funds in the selected wallet"
+				if !guest && s.ClubID != "" {
+					msg = "cash games require a funded global wallet — club chips can't be used"
+				}
+				sendError(dispatcher, presence, "buy_in_failed", msg)
 				continue
 			}
 			username := presence.GetUsername()
@@ -745,7 +752,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			// a club's private/coded table is recorded so the operator can reconcile
 			// their position later. They play under the operator's per-table limit
 			// (WalletLimitCents); their net is read from the ledger at settle time.
-			if s.ClubID != "" && s.AccessType != "public" && isGuest(ctx, nk, userID) {
+			if s.ClubID != "" && s.AccessType != "public" && guest {
 				_, _ = store.NewGuestSessionStore(db).Create(ctx, &store.GuestSession{
 					ClubID:     s.ClubID,
 					MatchID:    matchKey,
@@ -1772,23 +1779,27 @@ func clubAcceptsGlobal(ctx context.Context, db *sql.DB, clubID string) bool {
 // ("global" | "club" | "tournament"), or "" on failure (insufficient funds).
 // At a club table the club-issued balance is used unless the player picked
 // "global" AND the club accepts it.
-func reserveBuyIn(ctx context.Context, db *sql.DB, s *MatchState, userID string, amount int64, wallet string) string {
+// reserveBuyIn reserves a player's buy-in. HRC certification rule: CASH GAMES are
+// GLOBAL-WALLET ONLY — every registered player buys into a cash table with their
+// funded, KYC-verified global wallet, never club-allocated chips, whether the
+// table was stood up by a club owner or a sponsor. Club-allocated chips are only
+// for GUESTS / comps at coded tables (tracked for operator reconciliation, #P7).
+// Tournaments are director-managed (no wallet debit here). The player's `wallet`
+// preference no longer selects the source for registered players — the rule does.
+func reserveBuyIn(ctx context.Context, db *sql.DB, s *MatchState, userID string, amount int64, wallet string, guest bool) string {
 	amount = poker.ClampBuyIn(amount)
 	if s.TournamentID != "" {
 		return "tournament" // director-managed; no wallet debit
 	}
-	if s.ClubID != "" {
-		if wallet == "global" && clubAcceptsGlobal(ctx, db, s.ClubID) {
-			if err := store.NewWalletStore(db).Debit(ctx, userID, amount, "table_buyin"); err != nil {
-				return ""
-			}
-			return "global"
-		}
+	if s.ClubID != "" && guest {
+		// Guest / comp seat only: club-allocated chips, under the operator's limit.
 		if err := store.NewClubStore(db).LockBalance(ctx, s.ClubID, userID, amount); err != nil {
 			return ""
 		}
 		return "club"
 	}
+	// Registered player (club or non-club table) = certified cash game → the
+	// global wallet only. No club-chip fallback; a funded global wallet is required.
 	if err := store.NewWalletStore(db).Debit(ctx, userID, amount, "table_buyin"); err != nil {
 		return ""
 	}
@@ -2097,7 +2108,7 @@ func standUpBusted(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDisp
 				topUp = s.WalletLimitCents
 			}
 			if topUp > 0 {
-				if w := reserveBuyIn(ctx, db, s, seat.UserID, topUp, s.SeatWallet[i]); w != "" {
+				if w := reserveBuyIn(ctx, db, s, seat.UserID, topUp, s.SeatWallet[i], s.SeatWallet[i] == "club"); w != "" {
 					seat.Stack += topUp
 					s.SeatWallet[i] = w
 					narrate(dispatcher, s, fmt.Sprintf("%s auto-bought back in for $%d.", seat.Username, topUp/100))

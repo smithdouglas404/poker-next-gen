@@ -164,6 +164,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"admin_player_profile":   rpc.AdminPlayerProfile,
 		"admin_player_set_limit": rpc.AdminPlayerSetLimit,
 		"admin_player_flag":      rpc.AdminPlayerFlag,
+		"admin_cash_games":       rpc.AdminCashGames,
 		"rewards_catalog":          rpc.RewardsCatalog,
 		"points_balance":           rpc.PointsBalance,
 		"reward_redeem":            rpc.RewardRedeem,
