@@ -9,6 +9,7 @@ import { PreActionBar } from "@/features/hud/PreActionBar";
 import { ActionTimer } from "@/features/hud/ActionTimer";
 import { GameStatusRail } from "@/features/hud/GameStatusRail";
 import { EquityPanel } from "@/features/hud/EquityPanel";
+import { SidebetPanel } from "@/features/hud/SidebetPanel";
 import { HandVerifyPanel } from "@/features/hud/HandVerifyPanel";
 import { BuyInSlider, TableLog } from "@/features/hud/TableLog";
 import { TableEmptyState } from "@/features/hud/TableEmptyState";
@@ -56,6 +57,7 @@ export function TableHud({ children }: { children: React.ReactNode }) {
             <HostPanel />
             {showGamePanels && <BuyInSlider />}
             <EquityPanel />
+            {showGamePanels && <SidebetPanel />}
             {showGamePanels && <HandVerifyPanel />}
             {showGamePanels && <TableLog />}
             <ChatPanel />

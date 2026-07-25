@@ -1148,3 +1148,25 @@ CREATE TABLE IF NOT EXISTS poker_player_flag (
     flagged_by TEXT NOT NULL DEFAULT '',
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Player-vs-player side bets at a table. Proposer offers a proposition + stake
+-- (escrowed on offer); an acceptor matches it (escrowed on accept). Settlement
+-- pays the pot (both stakes) either to a conceded winner or split by engine-math
+-- equity of the two showdown hands. Escrow guarantees stakes exist before payout.
+CREATE TABLE IF NOT EXISTS poker_sidebet (
+    id            TEXT PRIMARY KEY,
+    match_id      TEXT NOT NULL DEFAULT '',
+    hand_no       INT NOT NULL DEFAULT 0,
+    proposer      TEXT NOT NULL,
+    proposer_name TEXT NOT NULL DEFAULT '',
+    acceptor      TEXT NOT NULL DEFAULT '',
+    acceptor_name TEXT NOT NULL DEFAULT '',
+    proposition   TEXT NOT NULL DEFAULT '',
+    stake_minor   BIGINT NOT NULL DEFAULT 0,
+    status        TEXT NOT NULL DEFAULT 'offered',  -- offered | accepted | settled | cancelled
+    winner        TEXT NOT NULL DEFAULT '',
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    settled_at    TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_poker_sidebet_match ON poker_sidebet(match_id, status);
+CREATE INDEX IF NOT EXISTS idx_poker_sidebet_party ON poker_sidebet(proposer, acceptor);
