@@ -1170,3 +1170,28 @@ CREATE TABLE IF NOT EXISTS poker_sidebet (
 );
 CREATE INDEX IF NOT EXISTS idx_poker_sidebet_match ON poker_sidebet(match_id, status);
 CREATE INDEX IF NOT EXISTS idx_poker_sidebet_party ON poker_sidebet(proposer, acceptor);
+
+-- Double-entry ledger (#88): auditable chips. Every money movement is a txn whose
+-- entries (postings) MUST sum to zero — a debit of one account is a credit of
+-- another. Account balance = SUM(amount_minor) over its entries; the global sum
+-- over ALL entries is invariantly zero (trial balance), which the reconciliation
+-- RPC proves. Accounts are string handles: "user:<id>", "house:rake",
+-- "house:deposits", "house:withdrawals", "escrow:sidebet", "pool:bounty", …
+CREATE TABLE IF NOT EXISTS poker_ledger_txn (
+    id         TEXT PRIMARY KEY,
+    kind       TEXT NOT NULL DEFAULT '',
+    ref        TEXT NOT NULL DEFAULT '',
+    memo       TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS poker_ledger_entry (
+    id           BIGSERIAL PRIMARY KEY,
+    txn_id       TEXT NOT NULL REFERENCES poker_ledger_txn(id) ON DELETE CASCADE,
+    account      TEXT NOT NULL,
+    amount_minor BIGINT NOT NULL,   -- signed: credit > 0, debit < 0
+    currency     TEXT NOT NULL DEFAULT 'USD',
+    reason       TEXT NOT NULL DEFAULT '',
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_poker_ledger_entry_acct ON poker_ledger_entry(account, id DESC);
+CREATE INDEX IF NOT EXISTS idx_poker_ledger_entry_txn ON poker_ledger_entry(txn_id);

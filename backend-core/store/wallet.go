@@ -70,7 +70,28 @@ func (s *WalletStore) Debit(ctx context.Context, userID string, amount int64, re
 		VALUES ($1,$2,$3,$4,$5,NOW())`, NewID("wl"), userID, -amount, after, reason); err != nil {
 		return err
 	}
+	// Double-entry mirror (#88): user debited, house:<reason> credited — same txn.
+	if err := postLedgerLegs(ctx, tx, "user:"+userID, "house:"+reason, amount, reason); err != nil {
+		return err
+	}
 	return tx.Commit()
+}
+
+// postLedgerLegs writes a balanced 2-leg double-entry transaction inside an
+// existing DB tx: `amount` moves from `from` (debited) to `to` (credited). The
+// two legs sum to zero, so the global ledger trial balance stays invariantly 0.
+func postLedgerLegs(ctx context.Context, tx *sql.Tx, from, to string, amount int64, reason string) error {
+	txnID := NewID("ltx")
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO poker_ledger_txn (id,kind,ref,memo) VALUES ($1,'wallet',$2,$3)`,
+		txnID, from, reason); err != nil {
+		return err
+	}
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO poker_ledger_entry (txn_id,account,amount_minor,reason)
+		VALUES ($1,$2,$3,$5),($1,$4,$6,$5)`,
+		txnID, from, -amount, to, reason, amount)
+	return err
 }
 
 // Credit atomically adds funds and records a ledger entry in one transaction.
@@ -95,6 +116,10 @@ func (s *WalletStore) Credit(ctx context.Context, userID string, amount int64, r
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO poker_wallet_ledger (id,user_id,delta,balance_after,reason,created_at)
 		VALUES ($1,$2,$3,$4,$5,NOW())`, NewID("wl"), userID, amount, after, reason); err != nil {
+		return err
+	}
+	// Double-entry mirror (#88): house:<reason> debited, user credited — same txn.
+	if err := postLedgerLegs(ctx, tx, "house:"+reason, "user:"+userID, amount, reason); err != nil {
 		return err
 	}
 	return tx.Commit()
