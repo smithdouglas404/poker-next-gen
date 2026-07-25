@@ -22,6 +22,7 @@ const NAV: { href: string; label: string; icon: string }[] = [
   { href: "/lobby", label: "Live Tables", icon: "cards" },
   { href: "/tournaments", label: "Tournaments", icon: "trophy" },
   { href: "/trainer", label: "Trainer", icon: "cards" },
+  { href: "/staking", label: "Staking", icon: "vault" },
   { href: "/rewards", label: "Rewards", icon: "trophy" },
   { href: "/wallet", label: "Vault", icon: "vault" },
   { href: "/profile", label: "Settings", icon: "cog" },

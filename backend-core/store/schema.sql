@@ -1171,6 +1171,31 @@ CREATE TABLE IF NOT EXISTS poker_sidebet (
 CREATE INDEX IF NOT EXISTS idx_poker_sidebet_match ON poker_sidebet(match_id, status);
 CREATE INDEX IF NOT EXISTS idx_poker_sidebet_party ON poker_sidebet(proposer, acceptor);
 
+-- Staking / backing marketplace (P10). A backer escrows a stake and posts an
+-- open offer; a player accepts and receives the stake as bankroll; either party
+-- proposes a repay amount and the other confirms (mutual manual settle — no
+-- oracle tying repayment to live table results). Play-money only (the RPC layer
+-- rejects when REAL_MONEY_ENABLED is on). Escrow ordering guarantees a payout
+-- never exceeds the stake advanced.
+CREATE TABLE IF NOT EXISTS poker_staking_deal (
+    id                 TEXT PRIMARY KEY,
+    backer             TEXT NOT NULL,
+    backer_name        TEXT NOT NULL DEFAULT '',
+    player             TEXT NOT NULL DEFAULT '',
+    player_name        TEXT NOT NULL DEFAULT '',
+    stake_minor        BIGINT NOT NULL DEFAULT 0,
+    markup_bps         INT NOT NULL DEFAULT 0,       -- backer's intended profit share (terms/display only)
+    note               TEXT NOT NULL DEFAULT '',
+    status             TEXT NOT NULL DEFAULT 'offered', -- offered | active | settle_proposed | settled | cancelled | declined
+    settle_proposed_by TEXT NOT NULL DEFAULT '',      -- user id that proposed the current repay
+    repay_minor        BIGINT NOT NULL DEFAULT 0,     -- proposed / agreed repay to the backer
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    settled_at         TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_poker_staking_open ON poker_staking_deal(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_poker_staking_backer ON poker_staking_deal(backer);
+CREATE INDEX IF NOT EXISTS idx_poker_staking_player ON poker_staking_deal(player);
+
 -- Double-entry ledger (#88): auditable chips. Every money movement is a txn whose
 -- entries (postings) MUST sum to zero — a debit of one account is a credit of
 -- another. Account balance = SUM(amount_minor) over its entries; the global sum
