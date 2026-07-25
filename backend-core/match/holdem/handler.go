@@ -1351,6 +1351,7 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 			}
 			s.Table.ResetBetweenHands()
 			standUpBusted(ctx, db, dispatcher, s)
+			evictExcluded(ctx, db, dispatcher, s)
 			s.Phase = poker.PhaseWaiting
 			return true
 		}
@@ -1388,6 +1389,7 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		s.Table.ResetBetweenHands()
 		reportTournamentBusts(ctx, db, nk, s)
 		standUpBusted(ctx, db, dispatcher, s) // cash tables: clear felted players so the table stays playable
+		evictExcluded(ctx, db, dispatcher, s) // RG: remove players who self-excluded mid-session (#95)
 		s.Phase = poker.PhaseWaiting
 		return true
 	default:
@@ -2143,6 +2145,35 @@ func standUpBusted(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDisp
 			}
 		}
 		s.Table.StandUp(i)
+	}
+}
+
+// evictExcluded stands up any seated human who has self-excluded or entered a
+// cool-off WHILE seated (#95). Responsible-gambling status is checked at the
+// sit-down gate (OpSitDown), but a player who self-excludes mid-session would
+// otherwise keep playing until they voluntarily stand up. Run only at the safe
+// between-hands point (right after standUpBusted), so no cards or pot chips are
+// live — the same reason the Tier-0 cashout-lock permits it. Reuses the proven
+// eviction idiom: releaseBuyIn → delete SeatWallet → Unregister → StandUp.
+func evictExcluded(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
+	if s.TournamentID != "" {
+		return // tournament seats can't cash out mid-event; RG is enforced at registration
+	}
+	rg := store.NewResponsibleStore(db)
+	for i, seat := range s.Table.Seats {
+		if seat == nil || seat.IsBot {
+			continue
+		}
+		blocked, kind, _, err := rg.IsRestricted(ctx, seat.UserID)
+		if err != nil || !blocked {
+			continue
+		}
+		name := seat.Username
+		releaseBuyIn(ctx, db, s, i, seat.UserID, seat.Stack)
+		delete(s.SeatWallet, i)
+		_ = store.NewActiveSeatStore(db).Unregister(ctx, seat.UserID, matchIDForAudit(s))
+		s.Table.StandUp(i)
+		narrate(dispatcher, s, fmt.Sprintf("%s was removed (%s) and their chips returned.", name, strings.ReplaceAll(kind, "_", "-")))
 	}
 }
 

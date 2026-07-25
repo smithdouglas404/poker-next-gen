@@ -152,9 +152,14 @@ func pokerAward(t *Table, winners []int, amount int64) {
 	if len(winners) == 0 || amount <= 0 {
 		return
 	}
-	share := amount / int64(len(winners))
-	remainder := amount % int64(len(winners))
-	for i, seat := range winners {
+	// Odd-chip rule (TDA Rule 25): an indivisible remainder goes to the first
+	// winning seat clockwise from the button (first seat left of the button),
+	// not the lowest seat index. winners is sorted ascending, so rotate it to
+	// begin at the first winner past the button (wrapping) before distributing.
+	order := oddChipOrder(winners, t.ButtonSeat)
+	share := amount / int64(len(order))
+	remainder := amount % int64(len(order))
+	for i, seat := range order {
 		if t.Seats[seat] == nil {
 			continue
 		}
@@ -164,6 +169,29 @@ func pokerAward(t *Table, winners []int, amount int64) {
 		}
 		t.Seats[seat].Stack += pay
 	}
+}
+
+// oddChipOrder returns winners rotated so the first entry is the first winner
+// clockwise from the button (the seat left of the button gets the odd chip). The
+// input is assumed ascending by seat index; the output preserves clockwise order
+// starting just past the button. A single winner (the common case) is returned
+// unchanged, so a non-split pot is byte-for-byte identical to before.
+func oddChipOrder(winners []int, button int) []int {
+	if len(winners) < 2 {
+		return winners
+	}
+	start := 0
+	for i, seat := range winners {
+		if seat > button {
+			start = i
+			break
+		}
+	}
+	// If no winner is past the button, all are at/before it → wrap to winners[0].
+	out := make([]int, 0, len(winners))
+	out = append(out, winners[start:]...)
+	out = append(out, winners[:start]...)
+	return out
 }
 
 // HandCategory returns rs_poker category string for a seat at showdown.
