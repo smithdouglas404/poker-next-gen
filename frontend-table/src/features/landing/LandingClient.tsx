@@ -91,13 +91,13 @@ export function LandingClient() {
               How it works
             </Link>
             <Link
-              href="/login"
+              href="/sign-in"
               className="rounded-lg px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:text-white"
             >
               Sign in
             </Link>
             <Link
-              href="/login?mode=signup"
+              href="/sign-up"
               className={cn(BTN_GOLD, "rounded-lg px-4 py-2 text-sm uppercase tracking-wide")}
             >
               Join
