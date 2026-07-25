@@ -34,6 +34,21 @@ function seatState(
   return "idle";
 }
 
+// At showdown the server discloses the shown hands in showdown.hands (keyed by
+// seat index or user id). Returns a seat's revealed [card, card] to flip face-up,
+// or undefined while the hand is in progress / that seat is not shown.
+function revealedHole(
+  showdown: ShowdownMessage | null,
+  seatIndex: number,
+  userId?: string,
+): [string, string] | undefined {
+  const hands = showdown?.hands;
+  if (!hands) return undefined;
+  const h: CardView[] | undefined = hands[String(seatIndex)] ?? (userId ? hands[userId] : undefined);
+  if (h && h.length >= 2) return [h[0].code, h[1].code];
+  return undefined;
+}
+
 function ringForState(state: SceneSeat["state"]): string {
   switch (state) {
     case "active":
@@ -136,6 +151,7 @@ export default function LiveCinematicTable() {
           betLabel: (s.bet ?? 0) > 0 ? formatCents(s.bet ?? 0) : undefined,
           betMinor: s.bet ?? 0,
           stackMinor: s.stack ?? 0,
+          revealHole: revealedHole(showdown, s.index, s.user_id),
         } satisfies SceneSeat;
       });
 

@@ -53,6 +53,9 @@ export interface SceneSeat {
   betMinor?: number;
   /** Raw stack minor units — sizes the player's physical chip pile beside the seat. */
   stackMinor?: number;
+  /** At showdown, the seat's REVEALED hole cards (four-color codes) — flips the
+   *  face-down backs up to show the real hand. Absent = stay face-down. */
+  revealHole?: [string, string];
 }
 
 export interface CinematicSceneProps {
@@ -248,8 +251,40 @@ function Deck({ nonce }: { nonce: number }) {
   );
 }
 
-// Two face-down hole cards dealt in front of a seated, in-hand player (opponents;
-// the hero also gets backs on the felt while seeing their real cards in the DOM).
+// A small face-up hole card (revealed at showdown) — four-color face on top, flips
+// up from face-down over ~0.5s on first mount.
+function HoleFace({ code }: { code: string }) {
+  const face = useMemo(() => cardFaceTexture(code), [code]);
+  const mats = useMemo(() => {
+    const white = new THREE.MeshStandardMaterial({ color: "#f4f6f8", roughness: 0.5 });
+    const top = new THREE.MeshStandardMaterial({ map: face, roughness: 0.42, emissive: new THREE.Color("#ffffff"), emissiveMap: face, emissiveIntensity: 0.16 });
+    return [white, white, top, white, white, white];
+  }, [face]);
+  const ref = useRef<THREE.Group>(null);
+  const startRef = useRef<number | null>(null);
+  useFrame((state) => {
+    const g = ref.current;
+    if (!g) return;
+    const now = state.clock.getElapsedTime() * 1000;
+    if (startRef.current === null) startRef.current = now;
+    const k = Math.min(1, (now - startRef.current) / 480);
+    const e = 1 - Math.pow(1 - k, 3);
+    g.rotation.x = -Math.PI * (1 - e); // flip face-down → face-up
+    g.position.y = 0.05 + Math.sin(k * Math.PI) * 0.12; // small lift as it turns
+  });
+  return (
+    <group ref={ref}>
+      <mesh castShadow material={mats}>
+        <boxGeometry args={[0.44, 0.02, 0.62]} />
+      </mesh>
+    </group>
+  );
+}
+
+// Hole cards in front of a seated, in-hand player. Face-DOWN backs during the hand
+// (opponents; the hero also gets backs while seeing their real cards in the DOM);
+// at showdown, when the server reveals a seat's hand, the backs flip up to the real
+// four-color faces.
 function SeatHoleCards({ seat, total }: { seat: SceneSeat; total: number }) {
   const p = seatPoint(seat.index, total);
   const len = Math.hypot(p[0], p[2]) || 1;
@@ -263,6 +298,20 @@ function SeatHoleCards({ seat, total }: { seat: SceneSeat; total: number }) {
   const yaw = Math.atan2(-p[0], -p[2]);
   const ref0 = useDealIn([bx - perpX * 0.13, 0.055, bz - perpZ * 0.13], seat.index * 100);
   const ref1 = useDealIn([bx + perpX * 0.13, 0.055, bz + perpZ * 0.13], seat.index * 100 + 55);
+  const reveal = seat.revealHole;
+  if (reveal) {
+    // Revealed at showdown: face-up cards at the same fanned positions.
+    return (
+      <>
+        <group position={[bx - perpX * 0.13, 0.055, bz - perpZ * 0.13]} rotation={[0, yaw + 0.12, 0]}>
+          <HoleFace code={reveal[0]} />
+        </group>
+        <group position={[bx + perpX * 0.13, 0.055, bz + perpZ * 0.13]} rotation={[0, yaw - 0.12, 0]}>
+          <HoleFace code={reveal[1]} />
+        </group>
+      </>
+    );
+  }
   return (
     <>
       <group ref={ref0}>
@@ -430,6 +479,34 @@ function SeatBetChips({ seat, total }: { seat: SceneSeat; total: number }) {
   const count = Math.max(1, Math.min(6, Math.round(seat.betMinor / 5000)));
   const color = seat.state === "allin" ? "#ff3b46" : "#e9c46a";
   return <ChipStack position={[bx, 0.05, bz]} color={color} count={count} radius={0.13} />;
+}
+
+// A chip continuously arcing from a betting seat toward the pot — the "chips pushed
+// in" motion from the reference. Loops while the seat has a live bet; hidden
+// otherwise. Hooks run unconditionally (visibility is toggled inside the frame).
+function BetFlight({ seat, total }: { seat: SceneSeat; total: number }) {
+  const p = seatPoint(seat.index, total);
+  const sx = p[0] * 0.56;
+  const sz = p[2] * 0.56;
+  const ref = useRef<THREE.Group>(null);
+  const has = !!seat.betMinor && seat.betMinor > 0;
+  useFrame((state) => {
+    const g = ref.current;
+    if (!g) return;
+    if (!has) {
+      g.visible = false;
+      return;
+    }
+    g.visible = true;
+    const k = (state.clock.getElapsedTime() % 1.25) / 1.25; // 0..1 loop
+    g.position.set(sx + (POT_POS[0] - sx) * k, 0.06 + Math.sin(k * Math.PI) * 0.34, sz + (POT_POS[2] - sz) * k);
+    g.scale.setScalar(1 - 0.4 * k);
+  });
+  return (
+    <group ref={ref} visible={false}>
+      <ChipStack position={[0, 0, 0]} color="#4a9eb0" count={2} radius={0.11} />
+    </group>
+  );
 }
 
 /* ---------------- avatars ---------------- */
@@ -694,6 +771,10 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
       {seats.map((s) => (
         <SeatBetChips key={`bet-${s.index}`} seat={s} total={maxSeats} />
       ))}
+
+      {/* Chips arcing from each betting seat toward the pot while a hand is live. */}
+      {handLive &&
+        seats.map((s) => <BetFlight key={`flight-${s.index}`} seat={s} total={maxSeats} />)}
 
       <ContactShadows position={[0, 0.01, 0]} opacity={0.5} scale={16} blur={2.4} far={5} resolution={512} color="#000000" />
 
