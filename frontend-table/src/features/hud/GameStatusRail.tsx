@@ -15,7 +15,6 @@
 import { useEffect, useState } from "react";
 
 import { formatCents, useGame } from "@/features/game/GameProvider";
-import { usePreAction } from "@/features/hud/preAction";
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
@@ -80,18 +79,19 @@ function CurrentBetPill() {
 }
 
 function SitOutToggle() {
-  const { snapshot, profile } = useGame();
-  const [preAction, setPreAction] = usePreAction();
-  const away = preAction === "fold";
+  const { snapshot, profile, sitOut } = useGame();
 
   // Only meaningful once the hero is actually seated at a live table.
-  const seated = !!snapshot?.seats.some((s) => s.user_id === profile.userId && s.status !== "empty");
-  if (!seated) return null;
+  const heroSeat = snapshot?.seats.find((s) => s.user_id === profile.userId && s.status !== "empty");
+  if (!heroSeat) return null;
+  // Real server-side sit-out (keeps the seat, held out of the next hand) — the same
+  // op the on-felt control uses, so the two stay consistent.
+  const away = heroSeat.sitting_out ?? false;
 
   return (
     <button
       type="button"
-      onClick={() => setPreAction(away ? "none" : "fold")}
+      onClick={() => void sitOut(!away)}
       className={cn(
         GLASS_PANEL,
         "pointer-events-auto flex items-center gap-3 px-4 py-2 text-sm transition-colors",

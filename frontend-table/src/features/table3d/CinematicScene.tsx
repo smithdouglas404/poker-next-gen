@@ -58,8 +58,22 @@ export interface SceneSeat {
   revealHole?: [string, string];
 }
 
+// On-felt player controls (sit-out toggle at the hero seat + "sit here" markers on
+// empty seats to change seats). Provided by the live table; omitted by the /proof
+// demo. serverIndex is the real seat index for moveSeat(); sceneIndex is the rotated
+// index used to place the marker via seatPoint (hero is rotated to scene index 0).
+export interface FeltControls {
+  heroSittingOut: boolean;
+  canMove: boolean;
+  emptySeats: { serverIndex: number; sceneIndex: number }[];
+  onSitOut: (on: boolean) => void;
+  onMove: (serverIndex: number) => void;
+}
+
 export interface CinematicSceneProps {
   seats: SceneSeat[];
+  /** On-felt sit-out / change-seat controls (live table only). */
+  feltControls?: FeltControls;
   /** Community board as four-color card codes, e.g. ["As","Kd","7c"]. */
   board: string[];
   /** Pre-formatted pot label for the intrinsic center HUD. */
@@ -717,7 +731,7 @@ function GlbFigure({ seat, total }: { seat: SceneSeat; total: number }) {
 
 /* ---------------- scene ---------------- */
 
-function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, potMinor, winnerSeat, winNonce }: {
+function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, potMinor, winnerSeat, winNonce, feltControls }: {
   seats: SceneSeat[];
   board: string[];
   mode: AvatarMode;
@@ -728,6 +742,7 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
   potMinor: number;
   winnerSeat: number;
   winNonce: number;
+  feltControls?: FeltControls;
 }) {
   const winTarget = useMemo<[number, number, number] | null>(() => {
     if (winnerSeat < 0) return null;
@@ -792,12 +807,61 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
       {handLive &&
         seats.map((s) => <BetFlight key={`flight-${s.index}`} seat={s} total={maxSeats} />)}
 
+      {/* On-felt sit-out toggle + change-seat markers. */}
+      {feltControls && <FeltControlsLayer ctl={feltControls} total={maxSeats} />}
+
       <ContactShadows position={[0, 0.01, 0]} opacity={0.5} scale={16} blur={2.4} far={5} resolution={512} color="#000000" />
 
       <EffectComposer>
         <Bloom intensity={0.55} luminanceThreshold={0.55} luminanceSmoothing={0.2} mipmapBlur />
         <Vignette eskil={false} offset={0.28} darkness={0.82} />
       </EffectComposer>
+    </>
+  );
+}
+
+/* ---------------- on-felt player controls ---------------- */
+
+// Sit-out toggle anchored beside the hero seat + "Sit here" markers on empty seats
+// (between hands) to change seats. Rendered as drei <Html> so the buttons live in
+// the DOM (crisp text) but are anchored to real felt positions.
+function FeltControlsLayer({ ctl, total }: { ctl: FeltControls; total: number }) {
+  const hero = seatPoint(0, total); // hero is rotated to scene index 0 (bottom-center)
+  return (
+    <>
+      <Html
+        position={[hero[0] - 1.35, 0.6, hero[2]]}
+        center
+        zIndexRange={[30, 0]}
+        style={{ pointerEvents: "auto" }}
+      >
+        <button
+          onClick={() => ctl.onSitOut(!ctl.heroSittingOut)}
+          className="whitespace-nowrap rounded-full border border-gold/50 bg-black/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-gold backdrop-blur-md hover:bg-gold/15"
+        >
+          {ctl.heroSittingOut ? "I'm Back" : "Sit Out"}
+        </button>
+      </Html>
+      {ctl.canMove &&
+        ctl.emptySeats.map((e) => {
+          const p = seatPoint(e.sceneIndex, total);
+          return (
+            <Html
+              key={e.serverIndex}
+              position={[p[0], 0.3, p[2]]}
+              center
+              zIndexRange={[30, 0]}
+              style={{ pointerEvents: "auto" }}
+            >
+              <button
+                onClick={() => ctl.onMove(e.serverIndex)}
+                className="whitespace-nowrap rounded-full border border-white/25 bg-black/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/90 backdrop-blur-md hover:border-gold/50 hover:text-gold"
+              >
+                Sit here
+              </button>
+            </Html>
+          );
+        })}
     </>
   );
 }
@@ -866,6 +930,7 @@ export function CinematicScene({
   winnerSeat = -1,
   winNonce = 0,
   announce,
+  feltControls,
   children,
   overlay,
 }: CinematicSceneProps) {
@@ -891,7 +956,7 @@ export function CinematicScene({
         }}
       >
         <Suspense fallback={null}>
-          <Scene seats={seats} board={board} mode={mode} maxSeats={maxSeats} showPot={showPot} handLive={handLive} dealNonce={dealNonce} potMinor={potMinor} winnerSeat={winnerSeat} winNonce={winNonce} />
+          <Scene seats={seats} board={board} mode={mode} maxSeats={maxSeats} showPot={showPot} handLive={handLive} dealNonce={dealNonce} potMinor={potMinor} winnerSeat={winnerSeat} winNonce={winNonce} feltControls={feltControls} />
         </Suspense>
       </Canvas>
       {children ?? <SceneHud potLabel={potLabel} heroHole={heroHole} announce={announce} />}

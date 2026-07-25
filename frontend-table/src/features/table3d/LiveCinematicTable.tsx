@@ -16,7 +16,7 @@ import { avatarDef } from "@/features/table/avatars";
 import { heroSeatIndex } from "@/features/table/syncGameToCanvas";
 import { DEFAULT_MAX_SEATS, MAX_SEATS, MIN_SEATS } from "@/features/game/protocol";
 import type { CardView, SeatView, ShowdownMessage, TableSnapshot } from "@/features/game/protocol";
-import { CinematicScene, type SceneSeat } from "./CinematicScene";
+import { CinematicScene, type SceneSeat, type FeltControls } from "./CinematicScene";
 import { TableAdminOverlay } from "./TableAdminOverlay";
 import { DEMO_HERO_ID, DEMO_HOLE, DEMO_SHOWDOWN, DEMO_SNAPSHOT } from "./demoSnapshot";
 
@@ -197,6 +197,27 @@ export default function LiveCinematicTable() {
     };
   }, [snapshot, holeCards, showdown, heroUserId, mode]);
 
+  // On-felt sit-out toggle + change-seat markers (live, seated hero only). Computed
+  // outside the memo so it captures the stable sitOut/moveSeat callbacks.
+  const feltControls: FeltControls | undefined = (() => {
+    if (demo || !snapshot) return undefined;
+    const total = Math.min(MAX_SEATS, Math.max(MIN_SEATS, snapshot.max_seats ?? snapshot.seats.length));
+    const heroIdx = heroSeatIndex(snapshot.seats, heroUserId);
+    if (heroIdx < 0) return undefined; // not seated → no controls
+    const heroSeat = snapshot.seats.find((s) => s.index === heroIdx);
+    const canMove = (snapshot.phase ?? "waiting") === "waiting";
+    const emptySeats = snapshot.seats
+      .filter((s) => s.status === "empty" && s.index < total)
+      .map((s) => ({ serverIndex: s.index, sceneIndex: (s.index - heroIdx + total) % total }));
+    return {
+      heroSittingOut: heroSeat?.sitting_out ?? false,
+      canMove,
+      emptySeats,
+      onSitOut: (on: boolean) => void live.sitOut(on),
+      onMove: (idx: number) => void live.moveSeat(idx),
+    };
+  })();
+
   return (
     <CinematicScene
       seats={scene.seats}
@@ -212,6 +233,7 @@ export default function LiveCinematicTable() {
       winnerSeat={scene.winnerSeat}
       winNonce={scene.winNonce}
       announce={scene.announce}
+      feltControls={feltControls}
       overlay={<TableAdminOverlay demo={demo} />}
     />
   );
