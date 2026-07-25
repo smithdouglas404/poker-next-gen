@@ -560,7 +560,7 @@ function BetFlight({ seat, total }: { seat: SceneSeat; total: number }) {
 function SeatPill({ seat }: { seat: SceneSeat }) {
   const dim = seat.state === "folded";
   return (
-    <div style={{ width: 132, transform: "translateY(6px)", opacity: dim ? 0.5 : 1, pointerEvents: "none" }} className="flex flex-col items-center gap-1">
+    <div style={{ width: 148, transform: "translateY(16px)", opacity: dim ? 0.5 : 1, pointerEvents: "none" }} className="flex flex-col items-center gap-1">
       <div
         className="rounded-md px-2 py-0.5 text-center"
         style={{ background: "rgba(8,10,14,0.82)", border: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(6px)" }}
@@ -627,25 +627,33 @@ function SeatPortrait2D({ seat, total }: { seat: SceneSeat; total: number }) {
   // Portrait diameter (px). Enlarged so the character reads as the hero of the
   // seat (the 2.5D avatar is the headline art, not a thumbnail).
   const SIZE = 148;
+  // Hero (scene seat 0, bottom-center) sits directly beneath the DOM hero cards
+  // + action bar, so lift its portrait up off the felt to clear them — the big
+  // hole cards must never cover the character's face.
+  const anchorY = seat.index === 0 ? 1.05 : 0.42;
   return (
-    <Html position={[p[0], 0.42, p[2]]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
+    <Html position={[p[0], anchorY, p[2]]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
       <div className="flex flex-col items-center">
         <div style={{ position: "relative", opacity: seat.state === "folded" ? 0.55 : 1, animation: anim, animationDelay: `${(seat.index % 6) * 0.35}s` }}>
+          {/* Rounded-SQUARE portrait tile (per the approved reference art) — a
+              card-like frame, not a circle: dark bezel, neon state edge, gold trim. */}
           <div
             style={{
-              width: SIZE, height: SIZE, borderRadius: "50%", overflow: "hidden",
+              width: SIZE, height: SIZE, borderRadius: 16, overflow: "hidden",
               border: `3px solid ${ringColor}`,
+              background: "#0b0e13",
               boxShadow: `0 0 38px ${glow}, 0 0 0 2px rgba(212,175,55,0.35), inset 0 0 14px rgba(0,0,0,0.55)`,
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={src} alt="" width={SIZE} height={SIZE} style={{ objectFit: "cover", display: "block", imageRendering: "auto" }} />
           </div>
-          {/* owned badge */}
+          {/* owned badge — bottom-center on the tile edge, like the reference's seat badge */}
           <div
             style={{
-              position: "absolute", right: 2, bottom: 22, width: 28, height: 28, borderRadius: "50%",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
+              position: "absolute", left: "50%", bottom: -12, transform: "translateX(-50%)",
+              width: 26, height: 26, borderRadius: "50%",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13,
               background: "linear-gradient(180deg,#f3e2ad,#d4af37)", color: "#3a2c07",
               border: "1.5px solid rgba(0,0,0,0.4)", boxShadow: "0 0 10px rgba(212,175,55,0.6)",
             }}
