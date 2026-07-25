@@ -96,6 +96,8 @@ export default function LiveCinematicTable() {
         maxSeats: DEFAULT_MAX_SEATS,
         showPot: false,
         announce: "",
+        handLive: false,
+        dealNonce: 0,
       };
     }
 
@@ -144,6 +146,14 @@ export default function LiveCinematicTable() {
       announce = `${name}${amt}${top.hand ? ` · ${top.hand}` : ""}`;
     }
 
+    // A hand is live once dealing starts (not the between-hands "waiting" phase) —
+    // used to draw the deck + face-down opponent cards on the felt.
+    const handLive =
+      (!!snapshot.phase && snapshot.phase !== "waiting") ||
+      snapshot.board.length > 0 ||
+      snapshot.pot > 0 ||
+      heroHole !== null;
+
     return {
       seats,
       board: snapshot.board.filter((c) => c.face_up).map((c) => c.code),
@@ -152,6 +162,8 @@ export default function LiveCinematicTable() {
       maxSeats: total,
       showPot: snapshot.pot > 0,
       announce,
+      handLive,
+      dealNonce: snapshot.hand_no ?? 0,
     };
   }, [snapshot, holeCards, showdown, heroUserId, mode]);
 
@@ -164,6 +176,8 @@ export default function LiveCinematicTable() {
       mode={mode}
       maxSeats={scene.maxSeats}
       showPot={scene.showPot}
+      handLive={scene.handLive}
+      dealNonce={scene.dealNonce}
       announce={scene.announce}
       overlay={<TableAdminOverlay demo={demo} />}
     />

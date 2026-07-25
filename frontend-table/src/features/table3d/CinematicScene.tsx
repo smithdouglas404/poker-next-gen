@@ -10,8 +10,8 @@
 // [0,6.9,7.9] fov 42) are the binding contract in CLAUDE.md — do not "improve".
 
 import * as THREE from "three";
-import { Suspense, useMemo, type ReactNode } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Suspense, useMemo, useRef, type ReactNode } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { Environment, Lightformer, Html, useGLTF, Clone, ContactShadows } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 
@@ -66,6 +66,11 @@ export interface CinematicSceneProps {
   maxSeats: number;
   /** Whether the chip pot is present (hidden on an empty idle table). */
   showPot?: boolean;
+  /** A hand is in progress — draw face-down hole cards in front of each in-hand
+   *  seat and show the deck. Off between hands (empty felt). */
+  handLive?: boolean;
+  /** Changes each new hand (the hand number) — triggers the deck's shuffle riffle. */
+  dealNonce?: number;
   /** Transient table announcement (winner, all-in, blinds up, host message)
    *  shown as a center-top banner over the felt. Empty/undefined hides it. */
   announce?: string;
@@ -139,7 +144,134 @@ function TableBody() {
 
 /* ---------------- cards ---------------- */
 
-function BoardCard({ code, x }: { code: string; x: number }) {
+// Where the deck sits (dealer's right, off the board). Cards deal-in FROM here.
+const DECK_POS: [number, number, number] = [2.95, 0.09, -0.15];
+
+// useDealIn animates a group from the deck to `target`, easing out over ~0.42s
+// after `delayMs`, so a freshly-mounted card flies to its slot. `flip` also turns
+// the card face-up (board reveal). Everything settles to the static target, so if
+// the timing is ever off the card still ends in exactly its resting place.
+function useDealIn(target: [number, number, number], delayMs: number, flip = false) {
+  const ref = useRef<THREE.Group>(null);
+  const startRef = useRef<number | null>(null);
+  useFrame((state) => {
+    const g = ref.current;
+    if (!g) return;
+    const now = state.clock.getElapsedTime() * 1000;
+    if (startRef.current === null) startRef.current = now + delayMs;
+    const local = now - startRef.current;
+    if (local < 0) {
+      g.position.set(DECK_POS[0], DECK_POS[1], DECK_POS[2]);
+      g.rotation.set(flip ? -Math.PI / 2 : 0, g.rotation.y, 0);
+      g.scale.setScalar(0.86);
+      return;
+    }
+    const DUR = 420;
+    const k = Math.min(1, local / DUR);
+    const e = 1 - Math.pow(1 - k, 3); // easeOutCubic
+    g.position.set(
+      DECK_POS[0] + (target[0] - DECK_POS[0]) * e,
+      DECK_POS[1] + (target[1] - DECK_POS[1]) * e + Math.sin(k * Math.PI) * 0.25, // slight arc
+      DECK_POS[2] + (target[2] - DECK_POS[2]) * e,
+    );
+    if (flip) g.rotation.x = -Math.PI / 2 * (1 - e);
+    g.scale.setScalar(0.86 + 0.14 * e);
+  });
+  return ref;
+}
+
+// Face-down card back — GGPoker dark-red with a gold rim. Used for the deck and
+// every opponent's hole cards (the hero's real cards are the DOM overlay).
+function CardBack({ w = 0.44, h = 0.62 }: { w?: number; h?: number }) {
+  return (
+    <group>
+      <mesh castShadow>
+        <boxGeometry args={[w, 0.02, h]} />
+        <meshStandardMaterial color="#6f1420" metalness={0.2} roughness={0.5} />
+      </mesh>
+      <mesh position={[0, 0.011, 0]}>
+        <boxGeometry args={[w * 0.82, 0.006, h * 0.86]} />
+        <meshStandardMaterial color="#e9c46a" emissive="#8a6a1e" emissiveIntensity={0.35} metalness={0.9} roughness={0.35} />
+      </mesh>
+    </group>
+  );
+}
+
+// The deck by the dealer — a neat stack of thin cards with a card-back top. Riffle-
+// wiggles for ~0.5s whenever `nonce` (the hand number) changes: the visible shuffle.
+function Deck({ nonce }: { nonce: number }) {
+  const ref = useRef<THREE.Group>(null);
+  const prev = useRef(nonce);
+  const animAt = useRef<number | null>(null);
+  useFrame((state) => {
+    const now = state.clock.getElapsedTime() * 1000;
+    if (nonce !== prev.current) {
+      prev.current = nonce;
+      animAt.current = now;
+    }
+    const g = ref.current;
+    if (!g) return;
+    if (animAt.current === null) return;
+    const local = now - animAt.current;
+    const DUR = 520;
+    if (local > DUR) {
+      animAt.current = null;
+      g.rotation.z = 0;
+      g.position.set(DECK_POS[0], DECK_POS[1], DECK_POS[2]);
+      return;
+    }
+    const k = local / DUR;
+    g.rotation.z = Math.sin(k * Math.PI * 3) * 0.22;
+    g.position.set(DECK_POS[0], DECK_POS[1] + Math.sin(k * Math.PI) * 0.14, DECK_POS[2]);
+  });
+  const chips = [];
+  for (let i = 0; i < 10; i++) {
+    chips.push(
+      <mesh key={i} position={[0, i * 0.02, 0]} castShadow>
+        <boxGeometry args={[0.44, 0.02, 0.62]} />
+        <meshStandardMaterial color={i === 9 ? "#6f1420" : "#f4f6f8"} roughness={0.5} />
+      </mesh>,
+    );
+  }
+  return (
+    <group ref={ref} position={DECK_POS} rotation={[0, -0.3, 0]}>
+      {chips}
+    </group>
+  );
+}
+
+// Two face-down hole cards dealt in front of a seated, in-hand player (opponents;
+// the hero also gets backs on the felt while seeing their real cards in the DOM).
+function SeatHoleCards({ seat, total }: { seat: SceneSeat; total: number }) {
+  const p = seatPoint(seat.index, total);
+  const len = Math.hypot(p[0], p[2]) || 1;
+  const ux = p[0] / len;
+  const uz = p[2] / len;
+  const perpX = -uz; // tangent, to fan the two cards side by side
+  const perpZ = ux;
+  const base = 0.74; // in front of the seat, toward center
+  const bx = p[0] * base;
+  const bz = p[2] * base;
+  const yaw = Math.atan2(-p[0], -p[2]);
+  const ref0 = useDealIn([bx - perpX * 0.13, 0.055, bz - perpZ * 0.13], seat.index * 100);
+  const ref1 = useDealIn([bx + perpX * 0.13, 0.055, bz + perpZ * 0.13], seat.index * 100 + 55);
+  return (
+    <>
+      <group ref={ref0}>
+        <group rotation={[0, yaw + 0.12, 0]}>
+          <CardBack />
+        </group>
+      </group>
+      <group ref={ref1}>
+        <group rotation={[0, yaw - 0.12, 0]}>
+          <CardBack />
+        </group>
+      </group>
+    </>
+  );
+}
+
+function BoardCard({ code, x, delay }: { code: string; x: number; delay: number }) {
   const face = useMemo(() => cardFaceTexture(code), [code]);
   const mats = useMemo(() => {
     const white = new THREE.MeshStandardMaterial({ color: "#f4f6f8", roughness: 0.5 });
@@ -147,10 +279,13 @@ function BoardCard({ code, x }: { code: string; x: number }) {
     // BoxGeometry face order: px, nx, py, ny, pz, nz  (py = top)
     return [white, white, top, white, white, white];
   }, [face]);
+  const ref = useDealIn([x, 0.075, -0.15], delay, true);
   return (
-    <mesh position={[x, 0.075, -0.15]} rotation={[0, 0, 0]} castShadow material={mats}>
-      <boxGeometry args={[0.66, 0.03, 0.92]} />
-    </mesh>
+    <group ref={ref}>
+      <mesh castShadow material={mats}>
+        <boxGeometry args={[0.66, 0.03, 0.92]} />
+      </mesh>
+    </group>
   );
 }
 
@@ -159,7 +294,7 @@ function Board({ board }: { board: string[] }) {
   return (
     <group>
       {board.map((c, i) => (
-        <BoardCard key={`${c}-${i}`} code={c} x={start + i * 0.86} />
+        <BoardCard key={`${c}-${i}`} code={c} x={start + i * 0.86} delay={i * 130} />
       ))}
     </group>
   );
@@ -367,12 +502,14 @@ function GlbFigure({ seat, total }: { seat: SceneSeat; total: number }) {
 
 /* ---------------- scene ---------------- */
 
-function Scene({ seats, board, mode, maxSeats, showPot }: {
+function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce }: {
   seats: SceneSeat[];
   board: string[];
   mode: AvatarMode;
   maxSeats: number;
   showPot: boolean;
+  handLive: boolean;
+  dealNonce: number;
 }) {
   return (
     <>
@@ -395,6 +532,14 @@ function Scene({ seats, board, mode, maxSeats, showPot }: {
       <TableBody />
       <Board board={board} />
       {showPot && <Pot />}
+      {handLive && <Deck nonce={dealNonce} />}
+
+      {/* Face-down hole cards in front of every in-hand (non-folded) seat while a
+          hand is live — deals in from the deck, so opponents visibly have cards. */}
+      {handLive &&
+        seats
+          .filter((s) => s.state !== "folded")
+          .map((s) => <SeatHoleCards key={`hole-${s.index}`} seat={s} total={maxSeats} />)}
 
       {/* Dealer button is rendered per-seat (SeatPill) from snapshot.button_seat. */}
 
@@ -482,6 +627,8 @@ export function CinematicScene({
   mode,
   maxSeats,
   showPot = true,
+  handLive = false,
+  dealNonce = 0,
   announce,
   children,
   overlay,
@@ -508,7 +655,7 @@ export function CinematicScene({
         }}
       >
         <Suspense fallback={null}>
-          <Scene seats={seats} board={board} mode={mode} maxSeats={maxSeats} showPot={showPot} />
+          <Scene seats={seats} board={board} mode={mode} maxSeats={maxSeats} showPot={showPot} handLive={handLive} dealNonce={dealNonce} />
         </Suspense>
       </Canvas>
       {children ?? <SceneHud potLabel={potLabel} heroHole={heroHole} announce={announce} />}
