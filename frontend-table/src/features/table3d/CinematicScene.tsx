@@ -490,10 +490,21 @@ function SeatPortrait2D({ seat, total }: { seat: SceneSeat; total: number }) {
   const ringColor = seat.ringColor;
   const glow = seat.state === "active" ? "rgba(243,193,75,0.75)" : seat.state === "allin" ? "rgba(255,59,70,0.7)" : "rgba(91,100,114,0.5)";
   const src = seat.avatar ? avatarSrc(seat.avatar) : avatarSrc("neon-viper");
+  // Bring the portrait to life: gentle idle float, an eager bob on the player's
+  // turn, a win pulse for the winner (shared globals.css keyframes). Folded seats
+  // hold still. Staggered so seats don't float in unison.
+  const anim =
+    seat.state === "winner"
+      ? "seatWinPulse 0.9s ease-out"
+      : seat.state === "active"
+        ? "seatTurnBob 1.6s ease-in-out infinite"
+        : seat.state === "folded"
+          ? "none"
+          : "seatIdleFloat 4s ease-in-out infinite";
   return (
     <Html position={[p[0], 0.35, p[2]]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
       <div className="flex flex-col items-center">
-        <div style={{ position: "relative", opacity: seat.state === "folded" ? 0.55 : 1 }}>
+        <div style={{ position: "relative", opacity: seat.state === "folded" ? 0.55 : 1, animation: anim, animationDelay: `${(seat.index % 6) * 0.35}s` }}>
           <div
             style={{
               width: 104, height: 104, borderRadius: "50%", overflow: "hidden",
@@ -561,13 +572,34 @@ function GlbFigure({ seat, total }: { seat: SceneSeat; total: number }) {
   // reads as a full seated body (torso + lap at the felt) rather than a bust.
   const fx = p[0] * 1.14;
   const fz = p[2] * 1.14;
+  // Procedural "life": a gentle breathing bob + sway that works even on the static
+  // Tripo meshes (which ship no skeletal clips). It intensifies on the player's
+  // turn and pops on a win, and freezes when folded. Staggered per seat.
+  const figureRef = useRef<THREE.Group>(null);
+  const seed = seat.index * 1.7;
+  useFrame((state) => {
+    const g = figureRef.current;
+    if (!g) return;
+    const t = state.clock.getElapsedTime();
+    const active = seat.state === "active";
+    const winner = seat.state === "winner";
+    if (seat.state === "folded") {
+      g.position.y = 0.24;
+      g.rotation.z = 0;
+      return;
+    }
+    const amp = winner ? 0.11 : active ? 0.06 : 0.028;
+    const spd = winner ? 6 : active ? 3.2 : 1.5;
+    g.position.y = 0.24 + Math.sin(t * spd + seed) * amp;
+    g.rotation.z = Math.sin(t * spd * 0.5 + seed) * (active || winner ? 0.045 : 0.016);
+  });
   return (
     <group>
       <group position={[fx, 0.0, fz]} rotation={[0, yaw, 0]}>
         <SeatChair ring={seat.ringColor} />
         {/* seated figure: larger scale, hips at the seat pad so the lap sits at
             felt height and the head clears the rail — a fuller HRC-style body. */}
-        <group position={[0, 0.24, 0.06]} scale={1.28}>
+        <group ref={figureRef} position={[0, 0.24, 0.06]} scale={1.28}>
           <Clone object={gltf.scene} castShadow />
         </group>
       </group>
