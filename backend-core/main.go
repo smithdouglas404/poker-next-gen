@@ -278,6 +278,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"antibot_scan_all":             rpc.AntibotScanAll,
 		"antibot_flags_list":           rpc.AntibotFlagsList,
 		"antibot_ban":                  rpc.AntibotBan,
+		"collusion_scan":               rpc.CollusionScan,
 		"collusion_list":               rpc.CollusionList,
 		"collusion_flag_review":        rpc.CollusionFlagReview,
 		"announcement_create":          rpc.AnnouncementCreate,

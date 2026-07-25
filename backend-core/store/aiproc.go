@@ -129,6 +129,17 @@ func (s *AiprocStore) FlagCollusion(ctx context.Context, userA, userB, matchID, 
 	return id, err
 }
 
+// CollusionFlagExists reports whether an OPEN collusion flag already exists for
+// this unordered pair (either ordering), so re-scans don't create duplicates.
+func (s *AiprocStore) CollusionFlagExists(ctx context.Context, userA, userB string) (bool, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM poker_collusion_flag
+		WHERE status='open' AND ((user_a=$1 AND user_b=$2) OR (user_a=$2 AND user_b=$1))`,
+		userA, userB).Scan(&n)
+	return n > 0, err
+}
+
 // ListCollusion returns flags, newest first, optionally filtered by status.
 func (s *AiprocStore) ListCollusion(ctx context.Context, status string, limit int) ([]AiprocCollusionFlag, error) {
 	if limit <= 0 || limit > 500 {

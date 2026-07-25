@@ -173,6 +173,56 @@ func (s *StatsStore) HeadToHead(ctx context.Context, userID, opponentID, clubID 
 	return &r, nil
 }
 
+// CollusionPair aggregates one candidate pair's shared-hand record for the
+// collusion scanner (a<b, so each unordered pair appears once).
+type CollusionPair struct {
+	UserA     string
+	UserB     string
+	Hands     int64
+	NetACents int64
+	NetBCents int64
+	Showdowns int64
+	MatchID   string
+}
+
+// CollusionCandidatePairs returns every pair of players who shared at least
+// minHands hands (self-join of poker_hand_stats on match+hand), with their net
+// sums and a shared-showdown count — the raw evidence the collusion scanner
+// scores. Excludes bots (user ids are humans in poker_hand_stats). Bounded.
+func (s *StatsStore) CollusionCandidatePairs(ctx context.Context, minHands, limit int) ([]CollusionPair, error) {
+	if minHands <= 0 {
+		minHands = 15
+	}
+	if limit <= 0 || limit > 2000 {
+		limit = 500
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT a.user_id, b.user_id, COUNT(*),
+		       COALESCE(SUM(a.net_cents),0), COALESCE(SUM(b.net_cents),0),
+		       COALESCE(SUM(CASE WHEN a.went_to_showdown AND b.went_to_showdown THEN 1 ELSE 0 END),0),
+		       MAX(a.match_id)
+		FROM poker_hand_stats a
+		JOIN poker_hand_stats b
+		  ON a.match_id=b.match_id AND a.hand_no=b.hand_no AND a.user_id < b.user_id
+		GROUP BY a.user_id, b.user_id
+		HAVING COUNT(*) >= $1
+		ORDER BY COUNT(*) DESC
+		LIMIT $2`, minHands, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []CollusionPair{}
+	for rows.Next() {
+		var p CollusionPair
+		if err := rows.Scan(&p.UserA, &p.UserB, &p.Hands, &p.NetACents, &p.NetBCents, &p.Showdowns, &p.MatchID); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
 // HandIndexRow is one row of the searchable hand list, joined with the caller's
 // own per-hand result (net/won) so the history reads as "my hands".
 type HandIndexRow struct {

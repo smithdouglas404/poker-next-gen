@@ -128,6 +128,77 @@ func AntibotBan(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 
 // CollusionList returns queued collusion flags, optionally filtered by ?status.
 // Admin only.
+// CollusionScan scans candidate player pairs for chip-dumping / soft-play and
+// writes a review flag (poker_collusion_flag) for pairs over the threshold —
+// feeding the existing admin Collusion queue that only had manual entry before.
+// Admin only; on-demand (mirrors antibot_scan_all). Pairs already flagged (open)
+// are skipped so re-scans don't duplicate. Params: {min_hands, threshold, limit}.
+func CollusionScan(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	if _, err := aiprocRequireAdmin(ctx); err != nil {
+		return "", err
+	}
+	var req struct {
+		MinHands  int     `json:"min_hands"`
+		Threshold float64 `json:"threshold"`
+		Limit     int     `json:"limit"`
+	}
+	if payload != "" {
+		_ = json.Unmarshal([]byte(payload), &req)
+	}
+	if req.Threshold <= 0 {
+		req.Threshold = 0.5
+	}
+	as := store.NewAiprocStore(db)
+	ss := store.NewStatsStore(db)
+
+	// Build the shared-device pair set (multi-account booster): every unordered
+	// pair (a<b) that appears together under any device fingerprint.
+	shared := map[string]bool{}
+	if fps, err := as.MultiAccountFingerprints(ctx, 500); err == nil {
+		for _, f := range fps {
+			ids := f.UserIDs
+			for i := 0; i < len(ids); i++ {
+				for j := i + 1; j < len(ids); j++ {
+					a, b := ids[i], ids[j]
+					if a > b {
+						a, b = b, a
+					}
+					shared[a+"|"+b] = true
+				}
+			}
+		}
+	}
+
+	pairs, err := ss.CollusionCandidatePairs(ctx, req.MinHands, req.Limit)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	scanned, flagged := 0, 0
+	for _, p := range pairs {
+		scanned++
+		score, reasons := antibot.ScoreCollusion(antibot.CollusionSignal{
+			Hands:        p.Hands,
+			NetACents:    p.NetACents,
+			NetBCents:    p.NetBCents,
+			Showdowns:    p.Showdowns,
+			SharedDevice: shared[p.UserA+"|"+p.UserB],
+		})
+		if score < req.Threshold {
+			continue
+		}
+		if exists, _ := as.CollusionFlagExists(ctx, p.UserA, p.UserB); exists {
+			continue
+		}
+		if _, err := as.FlagCollusion(ctx, p.UserA, p.UserB, p.MatchID, strings.Join(reasons, ", "), score); err != nil {
+			return "", runtime.NewError(err.Error(), 13)
+		}
+		flagged++
+	}
+	open, _ := as.ListCollusion(ctx, "open", 200)
+	out, _ := json.Marshal(map[string]interface{}{"scanned": scanned, "flagged": flagged, "flags": open})
+	return string(out), nil
+}
+
 func CollusionList(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	if _, err := aiprocRequireAdmin(ctx); err != nil {
 		return "", err

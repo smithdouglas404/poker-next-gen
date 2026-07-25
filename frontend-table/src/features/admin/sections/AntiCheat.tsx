@@ -164,9 +164,10 @@ function Antibot({ notify }: { notify: Notify }) {
 
 function Collusion({ notify }: { notify: Notify }) {
   const [rows, setRows] = useState<CollusionFlag[]>([]);
-  const [status, setStatus] = useState("pending");
+  const [status, setStatus] = useState("open");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -179,6 +180,20 @@ function Collusion({ notify }: { notify: Notify }) {
       setLoading(false);
     }
   }, [status, notify]);
+
+  const scan = useCallback(async () => {
+    setScanning(true);
+    try {
+      const res = await adminApi.collusionScan();
+      notify(`Scanned ${res.scanned} pairs — ${res.flagged} new flag${res.flagged === 1 ? "" : "s"}.`);
+      setStatus("open");
+      await load();
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Scan failed", "err");
+    } finally {
+      setScanning(false);
+    }
+  }, [load, notify]);
 
   useEffect(() => {
     void load();
@@ -203,12 +218,22 @@ function Collusion({ notify }: { notify: Notify }) {
       eyebrow="Pattern review"
       title="Collusion flags"
       actions={
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void scan()}
+            disabled={scanning}
+            className="rounded-lg border border-brand/40 bg-brand/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-brand hover:bg-brand/20 disabled:opacity-40"
+          >
+            {scanning ? "Scanning…" : "Run scan"}
+          </button>
         <Select value={status} onChange={(e) => setStatus(e.target.value)} className="w-40">
-          <option value="pending">Pending</option>
+          <option value="open">Open</option>
           <option value="confirmed">Confirmed</option>
           <option value="dismissed">Dismissed</option>
           <option value="">All</option>
         </Select>
+        </div>
       }
     >
       {rows.length === 0 ? (

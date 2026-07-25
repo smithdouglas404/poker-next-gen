@@ -99,6 +99,12 @@ export const adminApi = {
     call<{ flags: CollusionFlag[] }>("collusion_list", { status, limit }),
   collusionReview: (flagId: string, status: "confirmed" | "dismissed", note: string) =>
     call<{ ok: boolean }>("collusion_flag_review", { flag_id: flagId, status, note }),
+  /** Run the automated collusion scan (chip-dump / soft-play / shared-device) — writes flags. */
+  collusionScan: (minHands = 15, threshold = 0.5) =>
+    call<{ scanned: number; flagged: number; flags: CollusionFlag[] }>("collusion_scan", {
+      min_hands: minHands,
+      threshold,
+    }),
   hitlList: (status = "", limit = 50) =>
     call<{ queue: HitlItem[] }>("hitl_list", { status, limit }),
   hitlReview: (id: string, status: "approved" | "rejected", note: string) =>
