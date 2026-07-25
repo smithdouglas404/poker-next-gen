@@ -91,9 +91,9 @@ export function feltTexture(): THREE.CanvasTexture {
   c.width = S; c.height = S;
   const ctx = c.getContext("2d")!;
   const g = ctx.createRadialGradient(S / 2, S / 2, S * 0.05, S / 2, S / 2, S * 0.62);
-  g.addColorStop(0, "#1c7d4e");
-  g.addColorStop(0.55, "#0f5f39");
-  g.addColorStop(1, "#053821");
+  g.addColorStop(0, "#1B4A3D");
+  g.addColorStop(0.55, "#153A31");
+  g.addColorStop(1, "#0A231C");
   ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
 
   // weave noise
@@ -105,17 +105,37 @@ export function feltTexture(): THREE.CanvasTexture {
   }
   ctx.putImageData(img, 0, 0);
 
+  // circuit-board traces etched into the felt (also drives the bump map)
+  ctx.save();
+  ctx.strokeStyle = "rgba(77,238,234,0.16)";
+  ctx.fillStyle = "rgba(28,181,201,0.26)";
+  ctx.lineWidth = 3;
+  for (let tr = 0; tr < 120; tr++) {
+    let x = Math.random() * S, y = Math.random() * S;
+    ctx.beginPath(); ctx.moveTo(x, y);
+    const segs = 2 + Math.floor(Math.random() * 3);
+    for (let k = 0; k < segs; k++) {
+      const len = 40 + Math.random() * 130;
+      if (k % 2 === 0) x += (Math.random() < 0.5 ? -1 : 1) * len;
+      else y += (Math.random() < 0.5 ? -1 : 1) * len;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+
   // gold inner ring line
-  ctx.strokeStyle = "rgba(212,175,55,0.85)"; ctx.lineWidth = 6;
+  ctx.strokeStyle = "rgba(28,181,201,0.85)"; ctx.lineWidth = 6;
   ctx.beginPath(); ctx.arc(S / 2, S / 2, S * 0.40, 0, Math.PI * 2); ctx.stroke();
-  ctx.strokeStyle = "rgba(212,175,55,0.30)"; ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(77,238,234,0.30)"; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(S / 2, S / 2, S * 0.36, 0, Math.PI * 2); ctx.stroke();
 
   // club mark (lion diamond)
   ctx.save();
   ctx.translate(S / 2, S / 2);
   ctx.globalAlpha = 0.22;
-  ctx.fillStyle = "#d4af37";
+  ctx.fillStyle = "#4DEEEA";
   ctx.font = "bold 150px Georgia, serif";
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText("♦", 0, -6);

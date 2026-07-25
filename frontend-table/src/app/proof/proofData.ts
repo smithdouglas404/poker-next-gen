@@ -9,7 +9,9 @@ export interface ProofSeat {
   state: "idle" | "active" | "allin" | "folded" | "winner";
   action?: { label: string; amount?: string; tone: "fold" | "call" | "raise" | "allin" };
   hole?: [string, string]; // shown on some seats
-  use3d?: boolean; // in "mix" mode this seat renders a 3D GLB (Tripo) character
+  use3d?: boolean;
+  /** Holds the dealer button (top arc of the runway). */
+  isButton?: boolean; // in "mix" mode this seat renders a 3D GLB (Tripo) character
   model?: string; // optional per-seat GLB path (Tripo output on Railway)
 }
 
@@ -24,7 +26,7 @@ export const PROOF_SEATS: ProofSeat[] = [
   { index: 2, name: "Ice Queen",    stack: "$9,900",  avatar: "ice-queen",     ring: "#5b6472", state: "folded",  action: { label: "FOLD",  tone: "fold" } },
   { index: 3, name: "Shadow King",  stack: "$31,300", avatar: "shadow-king",   ring: "#5b6472", state: "idle",    action: { label: "BET",   amount: "$4,000", tone: "raise" }, use3d: true },
   { index: 4, name: "Void Witch",   stack: "$6,400",  avatar: "void-witch",    ring: "#ef4444", state: "allin",   action: { label: "ALL-IN", amount: "$6,400", tone: "allin" } },
-  { index: 5, name: "Gold Phantom", stack: "$22,100", avatar: "gold-phantom",  ring: "#5b6472", state: "folded",  action: { label: "FOLD",  tone: "fold" } },
+  { index: 5, name: "Gold Phantom", stack: "$22,100", avatar: "gold-phantom",  ring: "#5b6472", state: "folded",  action: { label: "FOLD",  tone: "fold" }, isButton: true },
   { index: 6, name: "Red Wolf",     stack: "$14,700", avatar: "red-wolf",      ring: "#5b6472", state: "idle" },
   { index: 7, name: "Chrome Siren", stack: "$16,800", avatar: "chrome-siren",  ring: "#5b6472", state: "idle",    action: { label: "CALL",  amount: "$4,000", tone: "call" }, use3d: true },
   { index: 8, name: "Tech Monk",    stack: "$12,300", avatar: "tech-monk",     ring: "#5b6472", state: "idle" },

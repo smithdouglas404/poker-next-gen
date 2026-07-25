@@ -258,31 +258,31 @@ function TableBody() {
 
       {/* underbody */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -(TABLE_H + 0.08), 0]} geometry={g.underG}>
-        <meshStandardMaterial color="#0a0d12" metalness={0.3} roughness={0.7} />
+        <meshStandardMaterial color="#0A231C" metalness={0.3} roughness={0.7} />
       </mesh>
 
       {/* felt top */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} geometry={g.feltG} receiveShadow>
-        <meshStandardMaterial map={felt} roughness={0.92} metalness={0.02} />
+        <meshStandardMaterial map={felt} bumpMap={felt} bumpScale={0.035} roughness={0.9} metalness={0.03} />
       </mesh>
 
       {/* gold inner ring (flat) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.035, 0]} geometry={g.goldG}>
-        <meshStandardMaterial color="#f1cf6b" emissive="#8a6a1e" emissiveIntensity={0.5} metalness={1} roughness={0.28} side={THREE.DoubleSide} />
+        <meshStandardMaterial color="#4DEEEA" emissive="#0f6b73" emissiveIntensity={0.55} metalness={1} roughness={0.28} side={THREE.DoubleSide} />
       </mesh>
 
       {/* red neon rim at felt edge (GGPoker brand glow) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]} geometry={g.rimG}>
-        <meshBasicMaterial color="#ff2d3f" side={THREE.DoubleSide} toneMapped={false} />
+        <meshBasicMaterial color="#1CB5C9" side={THREE.DoubleSide} toneMapped={false} />
       </mesh>
 
       {/* gunmetal outer rail (raised, beveled) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} geometry={g.railG} castShadow receiveShadow>
-        <meshStandardMaterial color="#171b22" metalness={0.95} roughness={0.32} />
+        <meshStandardMaterial color="#1E2638" metalness={0.95} roughness={0.32} />
       </mesh>
       {/* gold pinstripe on the rail */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.30, 0]} geometry={g.stripeG}>
-        <meshStandardMaterial color="#e9c46a" emissive="#6b501a" emissiveIntensity={0.35} metalness={1} roughness={0.3} side={THREE.DoubleSide} />
+        <meshStandardMaterial color="#1CB5C9" emissive="#0b5a63" emissiveIntensity={0.4} metalness={1} roughness={0.3} side={THREE.DoubleSide} />
       </mesh>
     </group>
   );
@@ -1026,17 +1026,17 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
           <color attach="background" args={["#05070c"]} />
           <fog attach="fog" args={["#05070c", 12, 26]} />
 
-          <ambientLight intensity={0.35} color="#6a86b8" />
-          <hemisphereLight intensity={0.45} color="#2a4d78" groundColor="#08170f" />
-          <spotLight position={[0, 9.5, 2.5]} angle={0.62} penumbra={0.9} intensity={2.6} color="#fff4d8" castShadow shadow-mapSize={[1024, 1024]} />
-          <pointLight position={[-7.5, 3.2, -3]} intensity={2.2} decay={0} color="#ff2d3f" />
-          <pointLight position={[7.5, 3.2, -2]} intensity={2.0} decay={0} color="#ffcf6a" />
-          <pointLight position={[0, 2.4, -7.5]} intensity={1.3} decay={0} color="#c8102e" />
+          <ambientLight intensity={0.22} color="#2a4d78" />
+          <hemisphereLight intensity={0.3} color="#1CB5C9" groundColor="#0A231C" />
+          <spotLight position={[0, 11, 0.5]} angle={0.5} penumbra={0.85} intensity={3.4} color="#dff6ff" castShadow shadow-mapSize={[2048, 2048]} />
+          <pointLight position={[-7.5, 3.2, -3]} intensity={2.2} decay={0} color="#1CB5C9" />
+          <pointLight position={[7.5, 3.2, -2]} intensity={2.0} decay={0} color="#4DEEEA" />
+          <pointLight position={[0, 2.4, -7.5]} intensity={1.3} decay={0} color="#0A231C" />
 
           <Environment resolution={128}>
             <Lightformer intensity={1.4} form="rect" position={[0, 6, 1]} scale={[9, 4, 1]} color="#ffffff" />
-            <Lightformer intensity={2.2} form="rect" position={[-6, 2, -3]} scale={[3, 6, 1]} color="#ff2d3f" />
-            <Lightformer intensity={2.0} form="rect" position={[6, 2, -3]} scale={[3, 6, 1]} color="#ffcf6a" />
+            <Lightformer intensity={2.2} form="rect" position={[-6, 2, -3]} scale={[3, 6, 1]} color="#1CB5C9" />
+            <Lightformer intensity={2.0} form="rect" position={[6, 2, -3]} scale={[3, 6, 1]} color="#4DEEEA" />
           </Environment>
 
           <TableBody />
@@ -1095,8 +1095,8 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
 
       <EffectComposer>
         {[
-          <Bloom key="bloom" intensity={baked ? 0.35 : 0.55} luminanceThreshold={baked ? 0.7 : 0.55} luminanceSmoothing={0.2} mipmapBlur />,
-          ...(baked ? [] : [<Vignette key="vignette" eskil={false} offset={0.28} darkness={0.82} />]),
+          <Bloom key="bloom" intensity={baked ? 0.5 : 0.85} luminanceThreshold={baked ? 0.6 : 0.42} luminanceSmoothing={0.25} mipmapBlur />,
+          ...(baked ? [] : [<Vignette key="vignette" eskil={false} offset={0.22} darkness={0.95} />]),
         ]}
       </EffectComposer>
     </>
@@ -1229,7 +1229,7 @@ export function CinematicScene({
       "linear-gradient(180deg,#04060a,#070b12 60%,#04060a)";
   const cameraCfg = backdrop
     ? { position: backdrop.camera.position, fov: backdrop.camera.fov }
-    : { position: [0, 6.1, 8.3] as [number, number, number], fov: 40 };
+    : { position: [0, 5.6, 8.0] as [number, number, number], fov: 46 };
   return (
     <div className="relative h-screen w-screen overflow-hidden" style={{ background: wrapperBg }}>
       <Canvas

@@ -33,6 +33,7 @@ function toSceneSeat(seat: ProofSeat): SceneSeat {
     avatar: seat.avatar,
     model_url: seat.model,
     use3d: seat.use3d,
+    isButton: seat.isButton,
   };
 }
 
@@ -64,7 +65,7 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
         style={{
           position: "absolute", left: 20, top: 20, width: 260, height: 310, borderRadius: 12,
           background: "rgba(15,23,42,0.65)", backdropFilter: "blur(10px)",
-          border: "1px solid rgba(77,238,234,0.45)", overflow: "hidden", padding: "12px 10px 10px 0",
+          border: "1px solid #2AC6D0", overflow: "hidden", padding: "12px 10px 10px 0",
         }}
       >
         {/* vertical timeline rail */}
@@ -122,26 +123,72 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
           borderTop: "10px solid #1CB5C9" }} />
       </div>
 
-      {/* top-right chat */}
-      <div className={`absolute right-5 top-5 ${GLASS_PANEL} px-3.5 py-3`} style={{ width: 210 }}>
-        <div className="mb-1.5 text-[11px] uppercase tracking-[0.2em] text-white/50">Table Chat</div>
-        <div className="space-y-1 text-[11px] leading-snug">
-          <div><span style={{ color: "#ff2d3f" }}>NeonViper:</span> <span className="text-white/70">nice pot building</span></div>
-          <div><span style={{ color: "#e9c46a" }}>IceQueen:</span> <span className="text-white/70">gg well played 🎲</span></div>
-          <div><span style={{ color: "#e01e2b" }}>ShadowKing:</span> <span className="text-white/70">all day 🔥</span></div>
+      {/* ---- Top-right overlay: EXPORT / REPLAY HAND stacked above the
+           blockchain verification panel (layout zone 1c) ---- */}
+      <div style={{ position: "absolute", right: 20, top: 20, width: 280, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button style={{ flex: 1, height: 44, borderRadius: 8, border: "1px solid rgba(233,196,106,0.55)",
+            background: "linear-gradient(180deg,#E8B84B,#C28E1E)", color: "#241a05", fontWeight: 800, fontSize: 13,
+            letterSpacing: "0.06em" }}>EXPORT</button>
+          <button style={{ flex: 1.35, height: 44, borderRadius: 8, border: "1px solid rgba(28,181,201,0.6)",
+            background: "rgba(28,181,201,0.16)", color: "#9beaf5", fontWeight: 800, fontSize: 13,
+            letterSpacing: "0.06em" }}>▶ REPLAY HAND</button>
         </div>
-        <div className="mt-2 rounded-md px-2 py-1 text-[11px] text-white/40" style={{ background: "rgba(255,255,255,0.04)" }}>Type a message…</div>
+        <div style={{ borderRadius: 12, border: "1px solid #2AC6D0", background: "rgba(15,23,42,0.65)",
+          backdropFilter: "blur(10px)", padding: "12px 14px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", color: "#4DEEEA" }}>BLOCKCHAIN HASH</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#E2F1F1", marginTop: 4, fontFamily: "ui-monospace, monospace" }}>
+            0x6c7c…d9a2c4b1
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
+            <span style={{ color: "#22c55e", fontSize: 15 }}>✓</span>
+            <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.08em", color: "#22c55e" }}>VERIFIED</span>
+          </div>
+          <div style={{ marginTop: 10, height: 34, borderRadius: 8, border: "1px solid rgba(233,196,106,0.5)",
+            background: "rgba(233,196,106,0.12)", color: "#f5d98a", fontSize: 12, fontWeight: 700,
+            display: "flex", alignItems: "center", justifyContent: "center", letterSpacing: "0.05em" }}>
+            🔗 VIEW ON BLOCKCHAIN
+          </div>
+        </div>
       </div>
 
-      {/* bottom-left table stats (cash game — not "tournament") */}
-      <div className={`absolute bottom-6 left-5 ${GLASS_PANEL} px-4 py-3`} style={{ width: 200 }}>
-        <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-[0.2em] text-white/50">Table Stats</div>
-        {[["Your Stack", "$24,500"], ["Pot", POT_LABEL], ["Players", "6 / 9"], ["Blinds", "$50 / $100"]].map(([k, v]) => (
-          <div key={k} className="flex justify-between py-[3px] text-[11px]">
-            <span className="text-white/55">{k}</span>
-            <span className="font-semibold text-white/90">{v}</span>
+      {/* ---- Bottom-left: Tournament Stats, 280x220 (layout zone 3a) ---- */}
+      <div style={{ position: "absolute", left: 20, bottom: 20, width: 280, height: 220, borderRadius: 12,
+        background: "rgba(15,23,42,0.65)", backdropFilter: "blur(10px)",
+        border: "1px solid #2AC6D0", padding: "12px 14px", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+          <span style={{ color: "#f5c518" }}>🏆</span>
+          <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", color: "#E2F1F1" }}>Tournament Stats</span>
+        </div>
+        <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 6 }}>High Rollers Main · $50/$100</div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0" }}>
+            <span style={{ color: "#94A3B8" }}>Live Stack</span>
+            <span style={{ color: "#E2F1F1", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>$45,000</span>
           </div>
-        ))}
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0" }}>
+            <span style={{ color: "#94A3B8" }}>Pot Stack</span>
+            <span style={{ color: "#E2F1F1", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>10</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0" }}>
+            <span style={{ color: "#94A3B8" }}>Live Chip Stack</span>
+            <span style={{ color: "#E2F1F1", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>$45,000</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0" }}>
+            <span style={{ color: "#94A3B8" }}>Current Bet</span>
+            <span style={{ color: "#E2F1F1", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>$600</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0" }}>
+            <span style={{ color: "#94A3B8" }}>Bet Guarantee</span>
+            <span style={{ color: "#E2F1F1", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>$500</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0" }}>
+            <span style={{ color: "#94A3B8" }}>Commission</span>
+            <span style={{ color: "#E2F1F1", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>$900</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0" }}>
+            <span style={{ color: "#94A3B8" }}>Prize Bank</span>
+            <span style={{ color: "#E2F1F1", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>1.85</span>
+          </div>
       </div>
 
       {/* ---- Felt text information block (spec §3) ----
@@ -229,6 +276,35 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
             </div>
             <span style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>Bet</span>
           </div>
+        </div>
+      </div>
+
+      {/* ---- Bottom-right: Player Analytics / Chat, 280x220 (layout zone 3c) ---- */}
+      <div style={{ position: "absolute", right: 20, bottom: 20, width: 280, height: 220, borderRadius: 12,
+        background: "rgba(15,23,42,0.65)", backdropFilter: "blur(10px)",
+        border: "1px solid #2AC6D0", padding: "12px 14px", display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+          <span style={{ color: "#4DEEEA" }}>📊</span>
+          <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", color: "#E2F1F1" }}>Player Analytics</span>
+        </div>
+        {[["Neon Viper", 68], ["Shadow King", 41], ["Void Witch", 92]].map(([n, pct]) => (
+          <div key={n as string} style={{ marginBottom: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
+              <span style={{ color: "#FFFFFF" }}>{n}</span>
+              <span style={{ color: "#94A3B8", fontVariantNumeric: "tabular-nums" }}>{pct}% VPIP</span>
+            </div>
+            <div style={{ height: 5, borderRadius: 3, background: "rgba(255,255,255,0.10)" }}>
+              <div style={{ height: 5, width: `${pct}%`, borderRadius: 3, background: "#1CB5C9",
+                boxShadow: "0 0 8px rgba(28,181,201,0.7)" }} />
+            </div>
+          </div>
+        ))}
+        <div style={{ marginTop: "auto", display: "flex", gap: 6 }}>
+          <div style={{ flex: 1, height: 30, borderRadius: 8, background: "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.12)", color: "#94A3B8", fontSize: 12,
+            display: "flex", alignItems: "center", padding: "0 10px" }}>Type message…</div>
+          <div style={{ width: 34, height: 30, borderRadius: 8, background: "#1CB5C9", color: "#0b1524",
+            display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800 }}>➤</div>
         </div>
       </div>
 
