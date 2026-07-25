@@ -127,8 +127,8 @@ export interface CinematicSceneProps {
 }
 
 // Ellipse the seats sit on (matches the proof exactly).
-const SX = 4.95;
-const SZ = 3.2;
+const SX = 4.62;
+const SZ = 3.82;
 // Active seat ellipse for the current scene. The cinematic felt uses the default
 // (SX/SZ); a baked plate overrides it (set synchronously at the top of Scene, before
 // any seatPoint() call) so seats project onto the painted chairs. There is exactly
@@ -146,36 +146,36 @@ function TableBody() {
   return (
     <group>
       {/* underbody */}
-      <mesh position={[0, -0.55, 0]} scale={[5.9, 1, 4.1]}>
+      <mesh position={[0, -0.55, 0]} scale={[5.6, 1, 4.75]}>
         <cylinderGeometry args={[1, 1.04, 1.05, 96]} />
         <meshStandardMaterial color="#0a0d12" metalness={0.3} roughness={0.7} />
       </mesh>
 
       {/* felt top */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} scale={[5.35, 3.55, 1]} receiveShadow>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} scale={[5.1, 4.15, 1]} receiveShadow>
         <circleGeometry args={[1, 128]} />
         <meshStandardMaterial map={felt} roughness={0.92} metalness={0.02} />
       </mesh>
 
       {/* gold inner ring (flat) */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.035, 0]} scale={[5.35, 3.55, 1]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.035, 0]} scale={[5.1, 4.15, 1]}>
         <ringGeometry args={[0.9, 0.94, 128]} />
         <meshStandardMaterial color="#f1cf6b" emissive="#8a6a1e" emissiveIntensity={0.5} metalness={1} roughness={0.28} side={THREE.DoubleSide} />
       </mesh>
 
       {/* red neon rim at felt edge (GGPoker brand glow) */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]} scale={[5.55, 3.72, 1]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]} scale={[5.3, 4.35, 1]}>
         <ringGeometry args={[0.985, 1.0, 160]} />
         <meshBasicMaterial color="#ff2d3f" side={THREE.DoubleSide} toneMapped={false} />
       </mesh>
 
       {/* gunmetal outer rail */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.08, 0]} scale={[5.62, 3.78, 1]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.08, 0]} scale={[5.37, 4.42, 1]}>
         <torusGeometry args={[1, 0.052, 24, 160]} />
         <meshStandardMaterial color="#171b22" metalness={0.95} roughness={0.32} />
       </mesh>
       {/* gold pinstripe on the rail */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.115, 0]} scale={[5.5, 3.68, 1]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.115, 0]} scale={[5.25, 4.3, 1]}>
         <torusGeometry args={[1, 0.012, 16, 160]} />
         <meshStandardMaterial color="#e9c46a" emissive="#6b501a" emissiveIntensity={0.35} metalness={1} roughness={0.3} />
       </mesh>
@@ -627,12 +627,15 @@ function SeatPortrait2D({ seat, total }: { seat: SceneSeat; total: number }) {
   // Portrait diameter (px). Enlarged so the character reads as the hero of the
   // seat (the 2.5D avatar is the headline art, not a thumbnail).
   const SIZE = 148;
-  // Hero (scene seat 0, bottom-center) sits directly beneath the DOM hero cards
-  // + action bar, so lift its portrait up off the felt to clear them — the big
-  // hole cards must never cover the character's face.
-  const anchorY = seat.index === 0 ? 1.05 : 0.42;
+  // Hero (scene seat 0, bottom-center) shares its screen strip with the DOM hero
+  // cards + action panel, so shift the hero tile left of the action cluster (the
+  // classic poker-client hero position) — cards/panel own bottom-center, the
+  // character's face is never covered.
+  const isHero = seat.index === 0;
+  const anchorX = isHero ? p[0] - 1.55 : p[0];
+  const anchorY = isHero ? 0.6 : 0.42;
   return (
-    <Html position={[p[0], anchorY, p[2]]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
+    <Html position={[anchorX, anchorY, p[2]]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
       <div className="flex flex-col items-center">
         <div style={{ position: "relative", opacity: seat.state === "folded" ? 0.55 : 1, animation: anim, animationDelay: `${(seat.index % 6) * 0.35}s` }}>
           {/* Rounded-SQUARE portrait tile (per the approved reference art) — a
@@ -1008,7 +1011,7 @@ export function CinematicScene({
       "linear-gradient(180deg,#04060a,#070b12 60%,#04060a)";
   const cameraCfg = backdrop
     ? { position: backdrop.camera.position, fov: backdrop.camera.fov }
-    : { position: [0, 6.9, 7.9] as [number, number, number], fov: 42 };
+    : { position: [0, 8.6, 7.4] as [number, number, number], fov: 42 };
   return (
     <div className="relative h-screen w-screen overflow-hidden" style={{ background: wrapperBg }}>
       <Canvas

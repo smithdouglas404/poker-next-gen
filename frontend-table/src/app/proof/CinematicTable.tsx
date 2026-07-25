@@ -98,20 +98,6 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
 
       {/* action bar */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
-        {/* "you know what you have" — hero's current made hand (A♥A♦ on an A♠
-            board = trip aces). Live table will read this from the engine hand rank. */}
-        <div className="mb-2 flex justify-center">
-          <div
-            className="rounded-full border border-gold/60 px-4 py-1 font-display text-[13px] font-bold uppercase tracking-[0.18em] text-gold"
-            style={{ background: "rgba(8,10,14,0.82)", backdropFilter: "blur(8px)", boxShadow: "0 0 18px rgba(233,196,106,0.35), inset 0 0 10px rgba(0,0,0,0.4)" }}
-          >
-            Trip Aces
-          </div>
-        </div>
-        <div className="mb-2 flex items-end justify-center gap-2.5">
-          {PROOF_HERO_HOLE.map((c) => <HeroCard key={c} code={c} />)}
-        </div>
-
         {/* pre-action toggles */}
         <div className="mb-2 flex justify-center gap-2">
           {[["Check / Fold", true], ["Call Any", false], ["Fold to Any", false]].map(([label, on]) => (
@@ -129,7 +115,24 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
           ))}
         </div>
 
-        <div className={`${GLASS_PANEL} px-3 py-2.5`} style={{ boxShadow: "0 10px 40px rgba(0,0,0,0.55)" }}>
+        {/* "you know what you have" — hero's current made hand (A♥A♦ on an A♠
+            board = trip aces), riding directly above the cards. Live table will
+            read this from the engine hand rank. */}
+        <div className="relative z-10 mb-1.5 flex justify-center">
+          <div
+            className="rounded-full border border-gold/60 px-4 py-1 font-display text-[13px] font-bold uppercase tracking-[0.18em] text-gold"
+            style={{ background: "rgba(8,10,14,0.82)", backdropFilter: "blur(8px)", boxShadow: "0 0 18px rgba(233,196,106,0.35), inset 0 0 10px rgba(0,0,0,0.4)" }}
+          >
+            Trip Aces
+          </div>
+        </div>
+        {/* hero hole cards tucked INTO the action panel (reference composition:
+            cards ride the panel top, they never float over the hero's face) */}
+        <div className="relative z-10 -mb-10 flex items-end justify-center gap-2.5">
+          {PROOF_HERO_HOLE.map((c) => <HeroCard key={c} code={c} />)}
+        </div>
+
+        <div className={`${GLASS_PANEL} px-3 pb-2.5 pt-12`} style={{ boxShadow: "0 10px 40px rgba(0,0,0,0.55)" }}>
           <div className="flex items-center gap-2">
             <button className="rounded-lg px-5 py-2.5 text-sm font-bold text-white" style={{ background: "linear-gradient(180deg,#b33,#7a1f1f)", border: "1px solid #d9534f" }}>FOLD</button>
             <button className="rounded-lg px-5 py-2.5 text-sm font-bold" style={{ background: "linear-gradient(180deg,#0e5c33,#0a3320)", border: "1px solid #22c55e", color: "#8ef0b0" }}>CALL <span className="opacity-80">$4,000</span></button>
