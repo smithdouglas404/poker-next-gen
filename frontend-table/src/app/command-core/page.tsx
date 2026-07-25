@@ -9,6 +9,7 @@ import { TournamentBuilderWizard } from "@/features/commands/TournamentBuilderWi
 import { walletApi, type NowPaymentsBalanceEntry } from "@/features/wallet/walletRpc";
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { BTN_GOLD, GLASS_PANEL, cn } from "@/features/ui/tokens";
+import { RequireRole } from "@/features/auth/RequireRole";
 
 // High Rollers Club :: Command Core (Session Architect). A pre-game cockpit that
 // composes the wired session-setup capabilities — variant, buy-in band, shot
@@ -17,7 +18,7 @@ import { BTN_GOLD, GLASS_PANEL, cn } from "@/features/ui/tokens";
 // builder. Vision pieces that aren't wired yet are shown as disabled Preview
 // tiles, never fake controls.
 
-export default function CommandCorePage() {
+function CommandCorePageInner() {
   const [format, setFormat] = useState<"cash" | "tournament">("cash");
   const [variant, setVariant] = useState<"holdem" | "plo">("holdem");
 
@@ -291,5 +292,13 @@ export default function CommandCorePage() {
         />
       )}
     </div>
+  );
+}
+
+export default function CommandCorePage() {
+  return (
+    <RequireRole require="platform_admin">
+      <CommandCorePageInner />
+    </RequireRole>
   );
 }

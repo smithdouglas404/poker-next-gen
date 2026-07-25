@@ -9,6 +9,7 @@ import type { Tournament } from "@/features/tournaments/types";
 import { walletApi, type NowPaymentsBalanceEntry } from "@/features/wallet/walletRpc";
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
+import { RequireRole } from "@/features/auth/RequireRole";
 
 // High Rollers Club :: Cyber-Deck. An in-game operator overview: every live table at
 // a glance, running tournaments with one-click balance/merge, an announce-all
@@ -37,7 +38,7 @@ interface TourStat {
 
 const money = (cents?: number) => (cents == null ? "—" : `$${(cents / 100).toLocaleString()}`);
 
-export default function CyberDeckPage() {
+function CyberDeckPageInner() {
   const [tables, setTables] = useState<TableRow[]>([]);
   const [tours, setTours] = useState<TourStat[]>([]);
   const [treasury, setTreasury] = useState<NowPaymentsBalanceEntry[] | null>(null);
@@ -302,5 +303,13 @@ export default function CyberDeckPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CyberDeckPage() {
+  return (
+    <RequireRole require="platform_admin">
+      <CyberDeckPageInner />
+    </RequireRole>
   );
 }
