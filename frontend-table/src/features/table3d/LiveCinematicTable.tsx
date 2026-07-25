@@ -11,7 +11,7 @@ import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { formatCents, useGame } from "@/features/game/GameProvider";
-import { useRenderMode } from "@/features/table/renderMode";
+import { useRenderMode, type RenderMode } from "@/features/table/renderMode";
 import { avatarDef } from "@/features/table/avatars";
 import { heroSeatIndex } from "@/features/table/syncGameToCanvas";
 import { DEFAULT_MAX_SEATS, MAX_SEATS, MIN_SEATS } from "@/features/game/protocol";
@@ -93,9 +93,19 @@ export default function LiveCinematicTable() {
   const demo = search.get("demo") === "1";
 
   const live = useGame();
-  const [mode] = useRenderMode();
+  const [deviceMode] = useRenderMode();
 
   const snapshot = demo ? DEMO_SNAPSHOT : live.snapshot;
+
+  // A table's owner-chosen render_style OVERRIDES the per-device preference: every
+  // seat renders in the table's style (no per-player mixing at one table). Falls
+  // back to the per-device renderMode only for style-less (legacy) tables.
+  const mode: RenderMode =
+    snapshot?.render_style === "3d"
+      ? "3d"
+      : snapshot?.render_style === "2.5d"
+        ? "2d"
+        : deviceMode;
   const holeCards: CardView[] = demo ? DEMO_HOLE : live.holeCards;
   const showdown = demo ? DEMO_SHOWDOWN : live.showdown;
   const heroUserId = demo ? DEMO_HERO_ID : live.profile.userId;

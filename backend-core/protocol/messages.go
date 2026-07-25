@@ -85,6 +85,9 @@ type TableSnapshot struct {
 	HandNo         int         `json:"hand_no"`
 	DeckCommitHash string      `json:"deck_commit_hash,omitempty"`
 	Variant        string      `json:"variant,omitempty"` // "holdem" | "plo"
+	// RenderStyle is the owner-chosen table look ("2.5d" | "3d") — every seat at the
+	// table renders in this style; empty falls back to the player's device preference.
+	RenderStyle    string      `json:"render_style,omitempty"`
 	HostUserID     string      `json:"host_user_id,omitempty"`
 	HostPaused     bool        `json:"host_paused,omitempty"`
 	// Optional table-feature capabilities (#41) so the client only shows controls
@@ -192,6 +195,9 @@ type TableCreateRequest struct {
 	AutoBuyBackCents int64  `json:"auto_buy_back_cents,omitempty" validate:"min=0" unit:"money_minor" label:"Auto Buy-Back"`
 	//  - NoMaxBuyIn: unlimited buy-in (no max) — honored on PLAY-MONEY tables only.
 	NoMaxBuyIn bool `json:"no_max_buyin,omitempty" label:"Unlimited buy-in (play money)"`
+	//  - RenderStyle: the owner-chosen table look, "2.5d" (portrait seats) or "3d"
+	//    (GLB character bodies). Applies to EVERY seat at the table (no mixing).
+	RenderStyle string `json:"render_style,omitempty" enum:"2.5d,3d" label:"Table Style"`
 }
 
 // ClubMemberRoleRequest is the club_member_role RPC payload: promote/demote a

@@ -83,6 +83,9 @@ export function PrivateTableSetup({
   // Unlimited buy-in (no max) — play-money tables only; the backend ignores it
   // on real-money tables (AML/table-stakes).
   const [noMaxBuyIn, setNoMaxBuyIn] = useState(false);
+  // Owner-chosen table look: every seat renders in this style (no per-player mixing).
+  // "" => players keep their per-device render preference.
+  const [renderStyle, setRenderStyle] = useState<"" | "2.5d" | "3d">("");
   const [seats, setSeats] = useState(6);
   const [bots, setBots] = useState(0);
   const [durationMins, setDurationMins] = useState(0);
@@ -179,6 +182,8 @@ export function PrivateTableSetup({
       wallet_limit_cents: dollarsToCents(walletLimitDollars),
       auto_buy_back_cents: dollarsToCents(autoBuyBackDollars),
       no_max_buyin: isPlayMoney ? noMaxBuyIn : false,
+      // Owner-chosen table look (overrides each player's per-device renderMode).
+      render_style: renderStyle || undefined,
       // ---- Still forward-compat (no backend home yet): auto-away needs orbit
       // counting (#86); operating_hours needs a schedule/window model; public +
       // sponsor_club_id are the club-economics path (deferred). Sent so the UI
@@ -271,6 +276,36 @@ export function PrivateTableSetup({
             </label>
           </div>
         )}
+
+        <Section
+          title="Table Look"
+          hint="You choose the whole table's style. Every seat renders the same way — no per-player mixing. Leave on Player's choice to let each player keep their own device preference."
+        >
+          <div className="grid gap-2 sm:grid-cols-3">
+            {[
+              { value: "", label: "Player's choice", sub: "Each device decides" },
+              { value: "2.5d", label: "2.5D portraits", sub: "HRC character art" },
+              { value: "3d", label: "3D avatars", sub: "GLB figures" },
+            ].map((opt) => (
+              <button
+                key={opt.value || "auto"}
+                type="button"
+                onClick={() => setRenderStyle(opt.value as "" | "2.5d" | "3d")}
+                className={cn(
+                  "rounded-xl border px-4 py-3 text-left text-sm font-semibold transition",
+                  renderStyle === opt.value
+                    ? "border-gold/50 bg-gold/10 text-gold"
+                    : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25",
+                )}
+              >
+                <span className="block">{opt.label}</span>
+                <span className="mt-0.5 block text-[11px] font-normal uppercase tracking-[0.15em] text-neutral-500">
+                  {opt.sub}
+                </span>
+              </button>
+            ))}
+          </div>
+        </Section>
 
         {isPublic && sponsorClubs && sponsorClubs.length > 0 && (
           <Section title="Sponsoring Club" hint="Only clubs you operate (via me_roles) can sponsor a public game.">

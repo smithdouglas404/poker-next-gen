@@ -170,6 +170,7 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		"wallet_limit_cents":  req.WalletLimitCents,
 		"auto_buy_back_cents": req.AutoBuyBackCents,
 		"no_max_buyin":        req.NoMaxBuyIn,
+		"render_style":        req.RenderStyle,
 	})
 	if err != nil {
 		return "", err

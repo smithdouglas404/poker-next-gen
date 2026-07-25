@@ -78,6 +78,8 @@ export interface TableSnapshot {
   deck_commit_hash?: string;
   /** "holdem" | "plo"; absent => holdem. */
   variant?: string;
+  /** Owner-chosen table look: "2.5d" | "3d". Absent => per-device renderMode. */
+  render_style?: string;
   host_user_id?: string;
   host_paused?: boolean;
 }
