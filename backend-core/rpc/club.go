@@ -138,6 +138,42 @@ func dollars(cents int64) string {
 
 // ClubJoin adds the caller to a club as a member (enforcing the owner tier's
 // member cap and the club's KYC requirement).
+// ClubResolveCode resolves a shareable invite code (club slug, or raw id) to a
+// club preview for the join-by-code page, including whether the caller is already
+// a member. Auth required but no membership needed — this is the pre-join lookup.
+func ClubResolveCode(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	userID, err := callerID(ctx)
+	if err != nil {
+		return "", err
+	}
+	var req struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.Code == "" {
+		return "", runtime.NewError("code required", 3)
+	}
+	code := strings.ToLower(strings.TrimSpace(req.Code))
+	cs := store.NewClubStore(db)
+	club, _ := cs.GetBySlug(ctx, code)
+	if club == nil {
+		// Fall back to a raw club id (invite links may carry the id).
+		club, _ = cs.GetByID(ctx, strings.TrimSpace(req.Code))
+	}
+	if club == nil || !club.IsActive {
+		return "", runtime.NewError("no club matches that code", 5)
+	}
+	members, _ := cs.CountMembers(ctx, club.ID)
+	member, _ := cs.GetMembership(ctx, club.ID, userID)
+	out, _ := json.Marshal(map[string]interface{}{
+		"club": map[string]interface{}{
+			"id": club.ID, "name": club.Name, "slug": club.Slug,
+			"description": club.Description, "members": members,
+		},
+		"already_member": member != nil,
+	})
+	return string(out), nil
+}
+
 func ClubJoin(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	userID, err := callerID(ctx)
 	if err != nil {

@@ -35,6 +35,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"club_owner_add":              rpc.ClubOwnerAdd,
 		"club_get":                    rpc.ClubGet,
 		"club_join":                   rpc.ClubJoin,
+		"club_resolve_code":           rpc.ClubResolveCode,
 		"club_leave":                  rpc.ClubLeave,
 		"club_members":                rpc.ClubMembers,
 		"club_member_role":            rpc.ClubMemberRole,

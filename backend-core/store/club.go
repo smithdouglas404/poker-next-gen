@@ -54,6 +54,21 @@ func (s *ClubStore) GetByID(ctx context.Context, id string) (*models.Club, error
 	return &c, nil
 }
 
+// GetBySlug resolves a club by its slug (the shareable join code). Case- and
+// space-insensitive on the caller side; slugs are stored normalized.
+func (s *ClubStore) GetBySlug(ctx context.Context, slug string) (*models.Club, error) {
+	var c models.Club
+	err := s.db.QueryRowContext(ctx, `SELECT id,name,slug,description,currency,accepts_global_wallet,is_active,created_at,updated_at FROM poker_club WHERE slug=$1 AND is_active`, slug).
+		Scan(&c.ID, &c.Name, &c.Slug, &c.Description, &c.Currency, &c.AcceptsGlobalWallet, &c.IsActive, &c.CreatedAt, &c.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
 func (s *ClubStore) AddOwner(ctx context.Context, o *models.Owner) error {
 	o.ID = NewID("owner")
 	now := time.Now().UTC()
