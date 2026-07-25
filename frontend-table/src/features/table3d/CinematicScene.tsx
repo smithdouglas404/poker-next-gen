@@ -174,6 +174,8 @@ function stadiumPoint(u: number, L: number, R: number, y: number): [number, numb
 const SEAT_XMAX = 6.0;
 /** Ring phase that places seat 1 (hero) at the near curve. */
 const SEAT_PHASE = 0.75;
+/** Horizontal scale on world X — widens the table so the front edge fills the frame. */
+const WIDTH_SCALE = 1.60;
 
 /* ------- Component size spec (design canvas 1920x1080) -------
  * Sizes are the design team's spec, used verbatim. POSITIONS are NOT pinned to
@@ -200,7 +202,7 @@ function seatPoint(index: number, total: number): [number, number, number] {
     // Phase 0.75 puts index 0 at the near short end; direction is negative.
     const pt = stadiumPoint(SEAT_PHASE + index / total, e.stadiumL, e.sz, e.y);
     // PORTRAIT: yaw the ring 90 deg so the long run lies along Z (into the screen).
-    return [pt[2], pt[1], -pt[0]];
+    return [pt[2] * WIDTH_SCALE, pt[1], -pt[0]];
   }
   const a = (index / total) * Math.PI * 2 + Math.PI / 2;
   return [Math.cos(a) * e.sx, e.y, Math.sin(a) * e.sz];
@@ -243,20 +245,21 @@ function TableBody() {
     const goldG = new THREE.ShapeGeometry(stadiumRing(STAD_L, FELT_R - 0.20, FELT_R - 0.25), 48);
     const rimG = new THREE.ShapeGeometry(stadiumRing(STAD_L, FELT_R + 0.04, FELT_R), 48);
     // Rail = the 4in armrest, spanning the felt edge out to FELT_R + RAIL_W.
-    const railG = new THREE.ExtrudeGeometry(stadiumRing(STAD_L, FELT_R + RAIL_W, FELT_R + 0.04), {
-      depth: 0.22, bevelEnabled: true, bevelThickness: 0.07, bevelSize: 0.07, bevelSegments: 3, curveSegments: 48,
+    const railG = new THREE.ExtrudeGeometry(stadiumRing(STAD_L, FELT_R + RAIL_W * 1.9, FELT_R + 0.04), {
+      depth: 0.34, bevelEnabled: true, bevelThickness: 0.07, bevelSize: 0.07, bevelSegments: 3, curveSegments: 48,
     });
     const stripeG = new THREE.ShapeGeometry(stadiumRing(STAD_L, FELT_R + RAIL_W * 0.66, FELT_R + RAIL_W * 0.56), 48);
     // Body drops the full 30in from just under the felt to the floor.
     const underG = new THREE.ExtrudeGeometry(stadiumShape(STAD_L, FELT_R + RAIL_W), {
       depth: TABLE_H, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.06, bevelSegments: 2, curveSegments: 48,
     });
-    return { feltG, goldG, rimG, railG, stripeG, underG };
+    const neonG = new THREE.ShapeGeometry(stadiumRing(STAD_L, FELT_R + RAIL_W * 1.95, FELT_R + RAIL_W * 1.62), 48);
+    return { feltG, goldG, rimG, railG, stripeG, underG, neonG };
   }, []);
   return (
     // PORTRAIT orientation: the stadium is authored with its straight run along X,
     // so the body is yawed 90 deg to lay that run along Z (into the screen).
-    <group rotation={[0, Math.PI / 2, 0]}>
+    <group rotation={[0, Math.PI / 2, 0]} scale={[1, 1, WIDTH_SCALE]}>
       {/* floor — grounds the table in a room instead of a void */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -TABLE_H, 0]} receiveShadow>
         <planeGeometry args={[60, 60]} />
@@ -285,8 +288,13 @@ function TableBody() {
 
       {/* gunmetal outer rail (raised, beveled) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} geometry={g.railG} castShadow receiveShadow>
-        <meshStandardMaterial color="#1E2638" metalness={0.95} roughness={0.32} />
+        <meshStandardMaterial color="#1E2638" metalness={1} roughness={0.18} envMapIntensity={1.6} />
       </mesh>
+      {/* glowing cyan neon tube wrapping the rail — real emissive geometry */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.30, 0]} geometry={g.neonG}>
+        <meshBasicMaterial color="#4DEEEA" toneMapped={false} side={THREE.DoubleSide} />
+      </mesh>
+
       {/* gold pinstripe on the rail */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.30, 0]} geometry={g.stripeG}>
         <meshStandardMaterial color="#1CB5C9" emissive="#0b5a63" emissiveIntensity={0.4} metalness={1} roughness={0.3} side={THREE.DoubleSide} />
@@ -916,7 +924,7 @@ function SeatTile({ seat, index }: { seat?: SceneSeat; index: number }) {
       <div
         style={{
           width: UI.frameW, height: UI.frameH, borderRadius: 12,
-          border: `2px solid ${vacant ? "#2AC6D0" : ring}`, background: "rgba(15,23,42,0.38)",
+          border: `2px solid ${vacant ? "#2AC6D0" : ring}`, background: "rgba(15,23,42,0.16)",
           backdropFilter: "blur(6px)",
           boxShadow: vacant ? "none" : `0 0 26px ${glow}, 0 0 0 2px rgba(212,175,55,0.28)`,
           display: "flex", alignItems: "center", justifyContent: "center",
@@ -953,7 +961,7 @@ function SeatTile({ seat, index }: { seat?: SceneSeat; index: number }) {
         <div
           style={{
             width: UI.badgeW, height: UI.badgeH, marginTop: 6, borderRadius: 8, padding: "2px 4px",
-            background: "rgba(15,23,42,0.55)", border: "1px solid #2AC6D0", backdropFilter: "blur(6px)",
+            background: "rgba(15,23,42,0.30)", border: "1px solid #2AC6D0", backdropFilter: "blur(6px)",
             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
             opacity: seat.state === "folded" ? 0.6 : 1,
           }}
@@ -1040,7 +1048,7 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
 
           <ambientLight intensity={0.55} color="#7fd8e0" />
           <hemisphereLight intensity={0.6} color="#1CB5C9" groundColor="#0A231C" />
-          <spotLight position={[0, 12, 0]} angle={0.62} penumbra={0.7} intensity={9.0} color="#eafcff" castShadow shadow-mapSize={[2048, 2048]} />
+          <spotLight position={[0, 12, 0]} angle={0.62} penumbra={0.7} intensity={13.0} color="#eafcff" castShadow shadow-mapSize={[2048, 2048]} />
           <pointLight position={[-7.5, 3.2, -3]} intensity={2.2} decay={0} color="#1CB5C9" />
           <pointLight position={[7.5, 3.2, -2]} intensity={2.0} decay={0} color="#4DEEEA" />
           <pointLight position={[0, 2.4, -7.5]} intensity={1.3} decay={0} color="#0A231C" />
@@ -1119,7 +1127,7 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
 
       <EffectComposer>
         {[
-          <Bloom key="bloom" intensity={baked ? 0.5 : 0.85} luminanceThreshold={baked ? 0.6 : 0.42} luminanceSmoothing={0.25} mipmapBlur />,
+          <Bloom key="bloom" intensity={baked ? 0.5 : 1.15} luminanceThreshold={baked ? 0.6 : 0.34} luminanceSmoothing={0.25} mipmapBlur />,
           ...(baked ? [] : [<Vignette key="vignette" eskil={false} offset={0.32} darkness={0.8} />]),
         ]}
       </EffectComposer>
@@ -1254,7 +1262,7 @@ export function CinematicScene({
       "linear-gradient(180deg,#04060a,#070b12 60%,#04060a)";
   const cameraCfg = backdrop
     ? { position: backdrop.camera.position, fov: backdrop.camera.fov }
-    : { position: [0, 10.6, 8.4] as [number, number, number], fov: 40 };
+    : { position: [0, 13.8, 6.6] as [number, number, number], fov: 44 };
   return (
     <div className="relative h-screen w-screen overflow-hidden" style={{ background: wrapperBg }}>
       <Canvas

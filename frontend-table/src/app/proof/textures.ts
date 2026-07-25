@@ -91,9 +91,9 @@ export function feltTexture(): THREE.CanvasTexture {
   c.width = S; c.height = S;
   const ctx = c.getContext("2d")!;
   const g = ctx.createRadialGradient(S / 2, S / 2, S * 0.05, S / 2, S / 2, S * 0.62);
-  g.addColorStop(0, "#2C7F63");
-  g.addColorStop(0.55, "#1B5B47");
-  g.addColorStop(1, "#0E3327");
+  g.addColorStop(0, "#1B4A3D");
+  g.addColorStop(0.55, "#153A31");
+  g.addColorStop(1, "#0A231C");
   ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
 
   // weave noise
