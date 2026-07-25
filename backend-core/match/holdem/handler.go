@@ -65,6 +65,13 @@ type MatchState struct {
 	// SeatWallet remembers which wallet each seat's buy-in was drawn from
 	// ("global" | "club") so cash-out/refund returns chips to the SAME wallet.
 	SeatWallet       map[int]string
+	// Seat-session tracking (Tier-1 C): per-seat open seat_session id, cumulative
+	// buy-in this sitting (initial + auto-rebuys), and hands dealt while seated.
+	// Drained into poker_seat_session when the player leaves (hit-and-run/rathole
+	// visibility). Advisory only — never blocks play.
+	SeatSessionID    map[int]string
+	SeatBuyIn        map[int]int64
+	SeatHands        map[int]int
 	BotCount         int
 	Rand             *rand.Rand
 	// Per-session AES-256-GCM keys (userID -> 32 raw bytes) used to encrypt each
@@ -156,6 +163,10 @@ const actionSecs int = int(actionTimeoutTicks / 10)
 // row (time-outs) before the inactivity auto-kick stands them up, freeing the
 // seat so an AFK player can't hold a table hostage. Reset by any voluntary act.
 const maxConsecutiveTimeouts = 3
+
+// Tier-1 C (hit-and-run / ratholing) thresholds. Advisory flags only.
+const ratholeWindowSecs = 30 * 60 // re-buying short within 30 min of leaving bigger = rathole
+const hitAndRunMinHands = 10      // leaving with a net win in fewer hands than this = hit-and-run
 
 type Handler struct{}
 
@@ -366,6 +377,9 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		MaxBuyIn:     maxBuyIn,
 		Presences:    map[string]runtime.Presence{},
 		SeatWallet:   map[int]string{},
+		SeatSessionID: map[int]string{},
+		SeatBuyIn:     map[int]int64{},
+		SeatHands:     map[int]int{},
 		Rand:         rand.New(rand.NewSource(time.Now().UnixNano())),
 		SessionKeys:  map[string][]byte{},
 		RITAgree:     map[string]bool{},
@@ -552,6 +566,7 @@ func (h *Handler) MatchLeave(ctx context.Context, logger runtime.Logger, db *sql
 		delete(s.Presences, p.GetUserId())
 		for i, seat := range s.Table.Seats {
 			if seat != nil && seat.UserID == p.GetUserId() {
+				closeSeatSession(ctx, db, s, i)
 				s.Table.StandUp(i)
 			}
 		}
@@ -775,6 +790,23 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 					BuyInMinor: buyIn,
 				})
 			}
+			// Seat-session tracking (Tier-1 C): record this sitting for hit-and-run /
+			// ratholing visibility. Rathole = re-buying short soon after leaving this
+			// same table with a bigger stack. Advisory only — never blocks the sit.
+			s.SeatBuyIn[req.Seat] = buyIn
+			s.SeatHands[req.Seat] = 0
+			ratholed := false
+			if prev, _ := store.NewSeatSessionStore(db).LastClosedAtTable(ctx, matchKey, userID); prev != nil && prev.LeftAt != nil {
+				if time.Since(*prev.LeftAt) < ratholeWindowSecs*time.Second && prev.StackAtLeaveMinor > buyIn {
+					ratholed = true
+				}
+			}
+			if id, err := store.NewSeatSessionStore(db).Open(ctx, &store.SeatSession{
+				MatchID: matchKey, ClubID: s.ClubID, UserID: userID, Username: username,
+				BuyInMinor: buyIn, Ratholed: ratholed,
+			}); err == nil {
+				s.SeatSessionID[req.Seat] = id
+			}
 			dispatcher.MatchLabelUpdate(buildLabel(s))
 			broadcastSnapshot(ctx, db, dispatcher, s, nil)
 
@@ -792,6 +824,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 					}
 					releaseBuyIn(ctx, db, s, i, userID, seat.Stack)
 					delete(s.SeatWallet, i)
+					closeSeatSession(ctx, db, s, i)
 					s.Table.StandUp(i)
 					stoodUp = true
 					break
@@ -1386,6 +1419,13 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		// match loop). Uses seat state before ResetBetweenHands clears it.
 		attributeHand(ctx, logger, db, s, res, plan, potBefore, rakeAmount)
 		accrueCompetition(ctx, logger, db, s, potBefore)
+		// Tally hands played this sitting for each seated human (Tier-1 C), before
+		// ResetBetweenHands clears per-hand state. Feeds the hit-and-run flag.
+		for i, seat := range s.Table.Seats {
+			if seat != nil && !seat.IsBot {
+				s.SeatHands[i]++
+			}
+		}
 		s.Table.ResetBetweenHands()
 		reportTournamentBusts(ctx, db, nk, s)
 		standUpBusted(ctx, db, dispatcher, s) // cash tables: clear felted players so the table stays playable
@@ -1528,6 +1568,7 @@ func handleHostAction(ctx context.Context, db *sql.DB, dispatcher runtime.MatchD
 			delete(s.SeatWallet, req.Seat)
 			_ = store.NewActiveSeatStore(db).Unregister(ctx, seat.UserID, matchIDForAudit(s))
 			name := seat.Username
+			closeSeatSession(ctx, db, s, req.Seat)
 			s.Table.StandUp(req.Seat)
 			narrate(dispatcher, s, fmt.Sprintf("Host removed %s from the table.", name))
 		}
@@ -1637,6 +1678,7 @@ func closeTable(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatc
 			delete(s.SeatWallet, i)
 			_ = seatReg.Unregister(ctx, seat.UserID, matchIDForAudit(s))
 		}
+		closeSeatSession(ctx, db, s, i)
 		s.Table.StandUp(i)
 	}
 	narrate(dispatcher, s, "Table closed — "+reason+". Remaining chips returned to your wallet.")
@@ -2116,6 +2158,7 @@ func standUpBusted(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDisp
 		delete(s.SeatWallet, i)
 		delete(s.TimeoutStreak, seat.UserID)
 		_ = store.NewActiveSeatStore(db).Unregister(ctx, seat.UserID, matchIDForAudit(s))
+		closeSeatSession(ctx, db, s, i)
 		s.Table.StandUp(i)
 		narrate(dispatcher, s, fmt.Sprintf("%s was removed for inactivity (%d consecutive time-outs).", name, maxConsecutiveTimeouts))
 	}
@@ -2139,11 +2182,13 @@ func standUpBusted(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDisp
 				if w := reserveBuyIn(ctx, db, s, seat.UserID, topUp, s.SeatWallet[i], s.SeatWallet[i] == "club"); w != "" {
 					seat.Stack += topUp
 					s.SeatWallet[i] = w
+					s.SeatBuyIn[i] += topUp // count the auto-rebuy toward this sitting's buy-in (Tier-1 C)
 					narrate(dispatcher, s, fmt.Sprintf("%s auto-bought back in for $%d.", seat.Username, topUp/100))
 					continue
 				}
 			}
 		}
+		closeSeatSession(ctx, db, s, i)
 		s.Table.StandUp(i)
 	}
 }
@@ -2172,9 +2217,34 @@ func evictExcluded(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDisp
 		releaseBuyIn(ctx, db, s, i, seat.UserID, seat.Stack)
 		delete(s.SeatWallet, i)
 		_ = store.NewActiveSeatStore(db).Unregister(ctx, seat.UserID, matchIDForAudit(s))
+		closeSeatSession(ctx, db, s, i)
 		s.Table.StandUp(i)
 		narrate(dispatcher, s, fmt.Sprintf("%s was removed (%s) and their chips returned.", name, strings.ReplaceAll(kind, "_", "-")))
 	}
+}
+
+// closeSeatSession finalizes the open seat_session for a seat as the player leaves
+// (Tier-1 C), computing net = stack − cumulative-buy-in and the hit-and-run flag.
+// MUST be called BEFORE s.Table.StandUp clears the seat, so it can read the stack.
+// A no-op when the seat has no open session (bots, or already closed) — safe to
+// call at every exit path.
+func closeSeatSession(ctx context.Context, db *sql.DB, s *MatchState, seatIdx int) {
+	id := s.SeatSessionID[seatIdx]
+	if id == "" {
+		return
+	}
+	var stack int64
+	if seat := s.Table.Seats[seatIdx]; seat != nil {
+		stack = seat.Stack
+	}
+	buyIn := s.SeatBuyIn[seatIdx]
+	hands := s.SeatHands[seatIdx]
+	net := stack - buyIn
+	hitAndRun := hands < hitAndRunMinHands && net > 0
+	_, _ = store.NewSeatSessionStore(db).Close(ctx, id, buyIn, hands, stack, net, hitAndRun)
+	delete(s.SeatSessionID, seatIdx)
+	delete(s.SeatBuyIn, seatIdx)
+	delete(s.SeatHands, seatIdx)
 }
 
 func reportTournamentBusts(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *MatchState) {
@@ -2235,6 +2305,7 @@ func (h *Handler) MatchSignal(ctx context.Context, logger runtime.Logger, db *sq
 	case "balance_table":
 		for i, seat := range s.Table.Seats {
 			if seat != nil && seat.Stack <= 0 {
+				closeSeatSession(ctx, db, s, i)
 				s.Table.StandUp(i)
 			}
 		}

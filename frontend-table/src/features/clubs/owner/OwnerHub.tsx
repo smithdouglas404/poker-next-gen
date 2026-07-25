@@ -14,6 +14,7 @@ import { GuestGate } from "./GuestGate";
 import { MemberAnalytics } from "./MemberAnalytics";
 import { CreditRequests } from "./CreditRequests";
 import { GuestSessions } from "./GuestSessions";
+import { SeatSessions } from "./SeatSessions";
 import { ClubNights } from "./ClubNights";
 import { MemberManagement } from "./MemberManagement";
 import { OperatorsEquity } from "./OperatorsEquity";
@@ -572,6 +573,7 @@ export function OwnerHub() {
           <div className="mt-6">
             <CreditRequests clubId={club?.id} canManage={canManage} />
             <GuestSessions clubId={club?.id} canManage={canManage} />
+            <SeatSessions clubId={club?.id} canManage={canManage} />
             <ClubNights clubId={club?.id} canManage={canManage} />
           </div>
           <QuickStats data={emptyQuick} />

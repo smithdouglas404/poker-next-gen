@@ -90,6 +90,10 @@ export const ownerApi = {
   guestSessionReconcile: (id: string) =>
     call<{ ok: boolean; net_minor: number }>("guest_session_reconcile", { id }),
 
+  /** Seat sessions (Tier-1 C): recent sittings at the club's tables with hit-and-run / rathole flags. */
+  seatSessionsList: (clubId: string) =>
+    call<{ sessions: import("./types").SeatSession[] }>("seat_sessions_list", { club_id: clubId }),
+
   /** Recurring club-night scheduler (P9): list / create templates + launch one now. */
   clubScheduleList: (clubId: string) =>
     call<{ schedules: import("./types").ClubSchedule[] }>("club_schedule_list", { club_id: clubId }),

@@ -28,6 +28,23 @@ export interface GuestSession {
   created_at: string;
 }
 
+export interface SeatSession {
+  id: string;
+  match_id: string;
+  club_id: string;
+  user_id: string;
+  username: string;
+  buy_in_minor: number;
+  hands_played: number;
+  stack_at_leave_minor: number;
+  net_minor: number;
+  ratholed: boolean;
+  hit_and_run: boolean;
+  status: string; // open | closed
+  sat_at: string;
+  left_at?: string | null;
+}
+
 export interface ClubSchedule {
   id: string;
   club_id: string;

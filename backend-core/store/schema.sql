@@ -1260,6 +1260,30 @@ CREATE TABLE IF NOT EXISTS poker_guest_session (
 CREATE INDEX IF NOT EXISTS idx_poker_guest_session_club ON poker_guest_session(club_id, status, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_poker_guest_session_user ON poker_guest_session(user_id, created_at DESC);
 
+-- Seat sessions (Tier-1 C): one row per "sitting" (sit → leave) for ALL non-bot
+-- players, capturing play duration, hands played, stack-on-leave and net so an
+-- operator can spot hit-and-run (won a little, left after very few hands) and
+-- ratholing (left bigger, re-bought short). Advisory only — nothing here blocks
+-- play. Opened on sit, closed exactly once on leave (atomic status guard).
+CREATE TABLE IF NOT EXISTS poker_seat_session (
+    id                    TEXT PRIMARY KEY,
+    match_id              TEXT NOT NULL DEFAULT '',
+    club_id               TEXT NOT NULL DEFAULT '',
+    user_id               TEXT NOT NULL,
+    username              TEXT NOT NULL DEFAULT '',
+    buy_in_minor          BIGINT NOT NULL DEFAULT 0,   -- cumulative buy-in this sitting (initial + rebuys)
+    hands_played          INT NOT NULL DEFAULT 0,
+    stack_at_leave_minor  BIGINT NOT NULL DEFAULT 0,
+    net_minor             BIGINT NOT NULL DEFAULT 0,   -- stack_at_leave − buy_in
+    ratholed              BOOLEAN NOT NULL DEFAULT FALSE,
+    hit_and_run           BOOLEAN NOT NULL DEFAULT FALSE,
+    status                TEXT NOT NULL DEFAULT 'open', -- open | closed
+    sat_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    left_at               TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_poker_seat_session_club ON poker_seat_session(club_id, sat_at DESC);
+CREATE INDEX IF NOT EXISTS idx_poker_seat_session_table_user ON poker_seat_session(match_id, user_id, status);
+
 -- Recurring "club night" templates: a saved table config + weekday/time an
 -- operator intends to run it. Launched on demand via club_night_launch_now
 -- (auto-firing at the scheduled time is a follow-up needing a poller/cron).
