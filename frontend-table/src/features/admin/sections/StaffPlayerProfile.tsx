@@ -160,7 +160,7 @@ export function StaffPlayerProfile({ user, notify }: { user: UserRow; notify: No
           <Button variant="outline" className="mt-3 w-full" disabled={busy === "limit"} onClick={saveLimit}>
             {busy === "limit" ? "Saving…" : "Save limit"}
           </Button>
-          <p className="mt-2 text-[11px] text-neutral-500">Enforced at every deposit, same as the player's own control.</p>
+          <p className="mt-2 text-[11px] text-neutral-500">Enforced at every deposit, same as the player&apos;s own control.</p>
         </Card>
 
         <Card eyebrow="Moderation" title="Flag">
