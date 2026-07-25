@@ -20,6 +20,43 @@ import {
 
 // Relative/local timestamp for the command log (UI review P1-2): "2s ago",
 // "3m ago", else a local time — never a raw ISO string.
+// RICH_HOME (Phase-3 / #31): the dedicated rich screen where each console
+// command's full workflow now lives. A command whose rpc is listed here shows a
+// "Full screen" signpost so no capability is stranded in the flat console.
+// Commands intentionally ABSENT are console-native tools that keep the console as
+// their home: solvers (hand_rank, equity_estimate, gto_advise, omaha_rank,
+// omaha_showdown, coaching_tip), diagnostics (healthz, stack_health), anti-bot
+// (antibot_score), and the raw audit-event list (audit_list) — the console's
+// lasting "Tools & Diagnostics" role.
+const RICH_HOME: Record<string, { href: string; label: string }> = {
+  profile_get: { href: "/profile", label: "Profile" },
+  wallet_get: { href: "/wallet", label: "Wallet" },
+  loyalty_get: { href: "/loyalty", label: "Loyalty" },
+  kyc_status: { href: "/kyc", label: "Identity" },
+  club_create: { href: "/clubs/new", label: "Create Club" },
+  club_list: { href: "/clubs", label: "Clubs" },
+  club_owner_add: { href: "/clubs", label: "Owner Hub · Operators & Equity" },
+  balance_allocate: { href: "/clubs", label: "Owner Hub · Members" },
+  balance_get: { href: "/clubs", label: "Owner Hub · Members" },
+  rake_config_set: { href: "/clubs", label: "Owner Hub · Settings" },
+  rake_config_get: { href: "/clubs", label: "Owner Hub · Settings" },
+  rake_ledger_get: { href: "/clubs", label: "Owner Hub · Revenue" },
+  table_create: { href: "/lobby", label: "Lobby" },
+  table_list: { href: "/lobby", label: "Lobby" },
+  matchmaker_enqueue: { href: "/lobby", label: "Lobby" },
+  tournament_create: { href: "/tournaments", label: "Tournaments" },
+  tournament_list: { href: "/tournaments", label: "Tournaments" },
+  tournament_register: { href: "/tournaments", label: "Tournaments" },
+  tournament_start: { href: "/tournaments", label: "Tournaments · Owner Center" },
+  blind_level_add: { href: "/tournaments", label: "Tournaments · Blind Editor" },
+  blind_level_list: { href: "/tournaments", label: "Tournaments" },
+  prize_pool_add: { href: "/tournaments", label: "Tournaments · Payout Editor" },
+  prize_pool_list: { href: "/tournaments", label: "Tournaments" },
+  balancing_rule_set: { href: "/tournaments", label: "Tournaments · Balancing" },
+  hand_history: { href: "/hands", label: "Hand History" },
+  audit_verify_hand: { href: "/provably-fair", label: "Proof of Play" },
+};
+
 function formatWhen(iso: string): string {
   const t = new Date(iso).getTime();
   if (Number.isNaN(t)) return iso;
@@ -140,6 +177,11 @@ function CommandCard({
   onRun: (command: CommandDefinition) => void;
 }) {
   const isLink = Boolean(command.href) && !command.rpc;
+  // Phase-3 signpost: a console command whose capability now has a dedicated rich
+  // screen shows where its full workflow lives, so nothing is orphaned in the
+  // console. Commands NOT in RICH_HOME are legitimately console-native tools
+  // (solvers, health, anti-bot, hand audit) — the console's lasting role.
+  const home = command.rpc ? RICH_HOME[command.rpc] : undefined;
 
   const inner = (
     <>
@@ -152,6 +194,11 @@ function CommandCard({
       <div className="mt-4 text-xs font-semibold uppercase tracking-wider text-gold">
         {isLink ? "Open →" : "Run Command →"}
       </div>
+      {home && !isLink && (
+        <p className="mt-1 text-[10px] uppercase tracking-wider text-neutral-500">
+          ▸ Full screen: {home.label}
+        </p>
+      )}
     </>
   );
 
