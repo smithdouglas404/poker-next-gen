@@ -170,6 +170,8 @@ function stadiumPoint(u: number, L: number, R: number, y: number): [number, numb
 // Side-middle seats sit at the stadium's widest point; clamp X so their DOM
 // tiles stay fully on screen (the table geometry may bleed — tiles may not).
 const SEAT_XMAX = 6.0;
+/** Ring phase that places seat 1 (hero) at the near curve. */
+const SEAT_PHASE = 0.75;
 
 /* ------- Component size spec (design canvas 1920x1080) -------
  * Sizes are the design team's spec, used verbatim. POSITIONS are NOT pinned to
@@ -190,9 +192,12 @@ const UI = {
 function seatPoint(index: number, total: number): [number, number, number] {
   const e = ACTIVE_ELLIPSE;
   if (e.stadiumL != null) {
-    const pt = stadiumPoint(index / total, e.stadiumL, e.sz, e.y);
-    // PORTRAIT table: yaw the ring 90 deg so the long run lies along Z (into the
-    // screen). Seats line the left/right rails; hero sits at the near short end.
+    // Seat numbering fitted to the design team's coordinate map: seat 1 (hero) at
+    // the near curve, then counter-clockwise — bottom-left, mid-left, far-left,
+    // top-left, top-centre, top-right, far-right, mid-right, bottom-right.
+    // Phase 0.75 puts index 0 at the near short end; direction is negative.
+    const pt = stadiumPoint(SEAT_PHASE + index / total, e.stadiumL, e.sz, e.y);
+    // PORTRAIT: yaw the ring 90 deg so the long run lies along Z (into the screen).
     return [pt[2], pt[1], -pt[0]];
   }
   const a = (index / total) * Math.PI * 2 + Math.PI / 2;
@@ -1232,7 +1237,7 @@ export function CinematicScene({
       "linear-gradient(180deg,#04060a,#070b12 60%,#04060a)";
   const cameraCfg = backdrop
     ? { position: backdrop.camera.position, fov: backdrop.camera.fov }
-    : { position: [0, 6.1, 8.3] as [number, number, number], fov: 40 };
+    : { position: [0, 3.25, 11.5] as [number, number, number], fov: 32 };
   return (
     <div className="relative h-screen w-screen overflow-hidden" style={{ background: wrapperBg }}>
       <Canvas
