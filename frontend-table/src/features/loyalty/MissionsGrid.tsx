@@ -7,7 +7,7 @@ import type { Mission } from "./loyaltyRpc";
 import { money, untilLabel } from "./loyaltyRpc";
 import { EmptyState, Eyebrow, GlassCard, Pill, ProgressBar } from "./ui";
 
-function MissionCard({
+export function MissionCard({
   m,
   busy,
   onClaim,

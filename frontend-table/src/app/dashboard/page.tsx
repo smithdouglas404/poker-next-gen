@@ -13,6 +13,7 @@ import {
   type TournamentRow,
 } from "@/features/dashboard/dashboardRpc";
 import { BTN_GOLD, GLASS_PANEL, GLASS_PANEL_HOVER, HEADING_SM, cn } from "@/features/ui/tokens";
+import { DailyMissionsWidget } from "@/features/dashboard/DailyMissionsWidget";
 
 /* ================================================================= sidebar */
 
@@ -554,6 +555,8 @@ export default function DashboardPage() {
               </div>
 
               <HighStakes tables={data.tables} />
+
+              <DailyMissionsWidget />
 
               <div className="grid gap-8 lg:grid-cols-[1.6fr_1fr]">
                 <EliteTournaments rows={data.tournaments} />
