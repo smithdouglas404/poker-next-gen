@@ -128,6 +128,8 @@ export interface DraftForm {
   numLevels: number;
   payoutStructure: string;
   guaranteedPrize: number; // dollars
+  knockout?: boolean; // PKO: part of buy-in becomes a head bounty
+  bounty?: number; // dollars — per-player head bounty (knockout only)
   lateReg: boolean;
   scheduledAt: string; // datetime-local value
   regCloseAt: string; // datetime-local value (late-reg close)

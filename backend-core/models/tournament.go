@@ -23,6 +23,10 @@ type TournamentBracket struct {
 	StartingStack   int64     `json:"starting_stack" db:"starting_stack" validate:"min=0" unit:"count" label:"Starting Stack"`
 	MaxPlayers      int32     `json:"max_players" db:"max_players" validate:"min=2,max=10000" unit:"count" label:"Max Players"`
 	MaxSeatsPerTable int32    `json:"max_seats_per_table" db:"max_seats_per_table" validate:"min=2,max=10" unit:"count" label:"Seats per Table"`
+	// Knockout (PKO): when true, BountyMinor of each buy-in becomes that player's
+	// head bounty, won by whoever eliminates them.
+	Knockout        bool      `json:"knockout" db:"knockout" label:"Knockout (Bounty)" help:"Eliminating a player wins their bounty."`
+	BountyMinor     int64     `json:"bounty_minor" db:"bounty_minor" validate:"min=0" unit:"money_minor" label:"Per-Player Bounty"`
 	Status          string    `json:"status" db:"status" server:"true"` // registering | running | finished
 	ScheduledAt     time.Time `json:"scheduled_at" db:"scheduled_at" label:"Scheduled Start" help:"Defaults to now."`
 	CreatedAt       time.Time `json:"created_at" db:"created_at" server:"true"`

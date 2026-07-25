@@ -34,6 +34,9 @@ export async function createTournament(draft: DraftForm): Promise<Tournament> {
     starting_stack: Math.round(draft.startingStack),
     max_players: Math.round(draft.maxPlayers),
     max_seats_per_table: Math.round(draft.maxSeatsPerTable),
+    // Knockout (PKO): part of each buy-in becomes a head bounty won on elimination.
+    knockout: draft.knockout || undefined,
+    bounty_minor: draft.knockout ? Math.round((draft.bounty ?? 0) * 100) : undefined,
     scheduled_at: draft.scheduledAt ? new Date(draft.scheduledAt).toISOString() : new Date().toISOString(),
   };
   return (await callSessionRpc("tournament_create", payload)) as Tournament;

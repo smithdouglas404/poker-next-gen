@@ -30,6 +30,8 @@ const EMPTY_DRAFT: DraftForm = {
   numLevels: 6,
   payoutStructure: "top15",
   guaranteedPrize: 0,
+  knockout: false,
+  bounty: 0,
   lateReg: true,
   scheduledAt: "",
   regCloseAt: "",
@@ -249,6 +251,30 @@ export function CreateTournamentPanel({
                     onChange={(e) => set("maxPlayers", Number(e.target.value))}
                   />
                 </Field>
+                {/* Knockout (PKO): part of each buy-in becomes a head bounty won
+                    on elimination. Bounty must be less than the buy-in. */}
+                <Field label="Knockout (Bounty)">
+                  <label className="flex items-center gap-2 py-2 text-sm text-neutral-300">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(draft.knockout)}
+                      onChange={(e) => set("knockout", e.target.checked)}
+                      className="h-4 w-4 accent-gold"
+                    />
+                    Eliminating a player wins their bounty
+                  </label>
+                </Field>
+                {draft.knockout && (
+                  <Field label="Per-Player Bounty ($)" hint="Must be less than the buy-in.">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={Math.max(0, draft.buyIn - 1)}
+                      value={draft.bounty ?? 0}
+                      onChange={(e) => set("bounty", Number(e.target.value))}
+                    />
+                  </Field>
+                )}
                 <Field label="Number of Levels">
                   <Input
                     type="number"

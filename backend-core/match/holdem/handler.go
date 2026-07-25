@@ -1322,6 +1322,10 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		}
 		recordWinnings(ctx, nk, s, res)
 		accrueLoyalty(ctx, db, nk, s, res) // HRP + achievements (before seats reset)
+		// Tournament eliminations: record finish places for busted seats and, in a
+		// knockout event, pay the eliminator the busted player's head bounty. Runs
+		// while seats still carry this hand's stacks/winners.
+		processTournamentEliminations(ctx, db, s, winners)
 		// Run-it-twice: persist the dealt boards (audit/replay). All-in insurance:
 		// pay out policies whose holder lost. Both run before ResetBetweenHands
 		// while seat/winner state is still intact; both are wallet/record only and
@@ -1881,6 +1885,62 @@ func recordWinnings(ctx context.Context, nk runtime.NakamaModule, s *MatchState,
 
 // accrueLoyalty awards HRP to every human who played this hand (1 base, +2 for
 // winning, times their subscription-tier multiplier) and unlocks any newly-earned
+// processTournamentEliminations records finish places for seats that busted this
+// hand and, in a knockout tournament, pays each eliminated player's head bounty
+// to the eliminator (the winning real player left with the largest stack). It is
+// idempotent per elimination via TournamentStore.Eliminate (WHERE status='playing')
+// and BountyStore.Claim (WHERE active), so a re-processed hand pays nothing twice.
+func processTournamentEliminations(ctx context.Context, db *sql.DB, s *MatchState, winnerGroups [][]int) {
+	if s.TournamentID == "" {
+		return
+	}
+	busted := false
+	for _, seat := range s.Table.Seats {
+		if seat != nil && seat.Stack <= 0 && seat.UserID != "" {
+			busted = true
+			break
+		}
+	}
+	if !busted {
+		return
+	}
+	ts := store.NewTournamentStore(db)
+	tour, err := ts.Get(ctx, s.TournamentID)
+	if err != nil || tour == nil {
+		return
+	}
+	// Eliminator = the winning real player left with the largest stack.
+	eliminator, best := "", int64(-1)
+	for _, group := range winnerGroups {
+		for _, idx := range group {
+			if idx < 0 || idx >= len(s.Table.Seats) {
+				continue
+			}
+			w := s.Table.Seats[idx]
+			if w != nil && !w.IsBot && w.UserID != "" && w.Stack > best {
+				eliminator, best = w.UserID, w.Stack
+			}
+		}
+	}
+	bs := store.NewBountyStore(db)
+	ws := store.NewWalletStore(db)
+	for _, seat := range s.Table.Seats {
+		if seat == nil || seat.Stack > 0 || seat.UserID == "" {
+			continue
+		}
+		place, _ := ts.CountPlaying(ctx, s.TournamentID)
+		ok, _ := ts.Eliminate(ctx, s.TournamentID, seat.UserID, place)
+		if !ok {
+			continue // no live registration (bot/filler) or already recorded
+		}
+		if tour.Knockout && eliminator != "" && eliminator != seat.UserID {
+			if amt, _ := bs.Claim(ctx, s.TournamentID, seat.UserID, eliminator); amt > 0 {
+				_ = ws.Credit(ctx, eliminator, amt, "tournament_bounty")
+			}
+		}
+	}
+}
+
 // equippedAvatarID reads the player's currently-equipped avatar from their
 // account metadata (the same key profile_meta_set writes). Returns "" for bots,
 // guests without a pick, or on any error — attribution is best-effort and must

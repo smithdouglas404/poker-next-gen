@@ -78,6 +78,18 @@ func TournamentCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk
 	if req.ScheduledAt.IsZero() {
 		req.ScheduledAt = time.Now().UTC()
 	}
+	// Knockout (PKO): the per-player bounty is carved from the buy-in, so it must
+	// leave a positive prize contribution. Non-knockout tournaments carry no bounty.
+	if req.Knockout {
+		if req.BountyMinor <= 0 {
+			return "", runtime.NewError("a knockout tournament needs a positive bounty", 3)
+		}
+		if req.BountyMinor >= req.BuyInMinor {
+			return "", runtime.NewError("bounty must be less than the buy-in", 3)
+		}
+	} else {
+		req.BountyMinor = 0
+	}
 	req.Status = "registering"
 	if err := store.NewTournamentStore(db).Create(ctx, &req); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
@@ -114,9 +126,12 @@ func TournamentRegister(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	var stack int64 = 10000
+	var knockout bool
+	var bounty int64
 	for _, t := range tournaments {
 		if t.ID == req.TournamentID {
 			stack = t.StartingStack
+			knockout, bounty = t.Knockout, t.BountyMinor
 			if t.BuyInMinor > 0 {
 				wStore := store.NewWalletStore(db)
 				if err := wStore.Debit(ctx, userID, t.BuyInMinor, "tournament_buyin"); err != nil {
@@ -128,6 +143,10 @@ func TournamentRegister(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 	}
 	if err := tStore.Register(ctx, req.TournamentID, userID, username, stack); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
+	}
+	// Arm this entrant's head bounty (funded from the buy-in) for a PKO event.
+	if knockout && bounty > 0 {
+		_ = store.NewBountyStore(db).SetBounty(ctx, req.TournamentID, userID, bounty)
 	}
 	return `{"ok":true}`, nil
 }

@@ -72,6 +72,23 @@ CREATE TABLE IF NOT EXISTS poker_tournament (
 -- before these existed. Idempotent — no-op once present.
 ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS club_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS created_by TEXT NOT NULL DEFAULT '';
+-- Bounty / knockout (PKO) support: when knockout=true, bounty_minor of each
+-- entrant's buy-in is set aside as their head bounty; eliminating a player wins
+-- their bounty (the remainder of the buy-in still funds the regular prize pool).
+ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS knockout BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS bounty_minor BIGINT NOT NULL DEFAULT 0;
+
+-- Per-player head bounty in a knockout tournament. Claimed (deactivated) when the
+-- player is eliminated; the claiming eliminator is credited the amount.
+CREATE TABLE IF NOT EXISTS poker_tournament_bounty (
+    tournament_id TEXT NOT NULL,
+    user_id       TEXT NOT NULL,
+    bounty_minor  BIGINT NOT NULL DEFAULT 0,
+    active        BOOLEAN NOT NULL DEFAULT TRUE,
+    claimed_by    TEXT NOT NULL DEFAULT '',
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (tournament_id, user_id)
+);
 
 CREATE TABLE IF NOT EXISTS poker_tournament_registration (
     id TEXT PRIMARY KEY,

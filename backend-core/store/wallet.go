@@ -142,16 +142,16 @@ func (s *TournamentStore) Create(ctx context.Context, t *models.TournamentBracke
 		t.MaxSeatsPerTable = 6
 	}
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO poker_tournament (id,name,club_id,created_by,variant,buy_in_minor,fee_minor,starting_stack,max_players,max_seats_per_table,status,scheduled_at,created_at,updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
-		t.ID, t.Name, t.ClubID, t.CreatedBy, t.Variant, t.BuyInMinor, t.FeeMinor, t.StartingStack, t.MaxPlayers, t.MaxSeatsPerTable, t.Status, t.ScheduledAt, t.CreatedAt, t.UpdatedAt)
+		INSERT INTO poker_tournament (id,name,club_id,created_by,variant,buy_in_minor,fee_minor,starting_stack,max_players,max_seats_per_table,knockout,bounty_minor,status,scheduled_at,created_at,updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+		t.ID, t.Name, t.ClubID, t.CreatedBy, t.Variant, t.BuyInMinor, t.FeeMinor, t.StartingStack, t.MaxPlayers, t.MaxSeatsPerTable, t.Knockout, t.BountyMinor, t.Status, t.ScheduledAt, t.CreatedAt, t.UpdatedAt)
 	return err
 }
 
-const tournamentCols = `id,name,club_id,created_by,variant,buy_in_minor,fee_minor,starting_stack,max_players,max_seats_per_table,status,scheduled_at,created_at,updated_at`
+const tournamentCols = `id,name,club_id,created_by,variant,buy_in_minor,fee_minor,starting_stack,max_players,max_seats_per_table,knockout,bounty_minor,status,scheduled_at,created_at,updated_at`
 
 func scanTournament(sc interface{ Scan(...any) error }, t *models.TournamentBracket) error {
-	return sc.Scan(&t.ID, &t.Name, &t.ClubID, &t.CreatedBy, &t.Variant, &t.BuyInMinor, &t.FeeMinor, &t.StartingStack, &t.MaxPlayers, &t.MaxSeatsPerTable, &t.Status, &t.ScheduledAt, &t.CreatedAt, &t.UpdatedAt)
+	return sc.Scan(&t.ID, &t.Name, &t.ClubID, &t.CreatedBy, &t.Variant, &t.BuyInMinor, &t.FeeMinor, &t.StartingStack, &t.MaxPlayers, &t.MaxSeatsPerTable, &t.Knockout, &t.BountyMinor, &t.Status, &t.ScheduledAt, &t.CreatedAt, &t.UpdatedAt)
 }
 
 // Get returns a single tournament by id (nil if not found). Used for authorization.
@@ -350,6 +350,21 @@ func (s *TournamentStore) SetFinishPlace(ctx context.Context, tournamentID, user
 		UPDATE poker_tournament_registration SET finish_place=$3, updated_at=NOW()
 		WHERE tournament_id=$1 AND user_id=$2`, tournamentID, userID, place)
 	return err
+}
+
+// Eliminate marks a player busted: status 'eliminated' + finish place. Only
+// affects a currently-playing registration (idempotent — a re-reported bust is a
+// no-op), so CountPlaying decreases exactly once per real elimination.
+func (s *TournamentStore) Eliminate(ctx context.Context, tournamentID, userID string, place int) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE poker_tournament_registration
+		SET status='eliminated', finish_place=$3, updated_at=NOW()
+		WHERE tournament_id=$1 AND user_id=$2 AND status='playing'`, tournamentID, userID, place)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n == 1, nil
 }
 
 // Finisher is a player with a recorded finishing position.
