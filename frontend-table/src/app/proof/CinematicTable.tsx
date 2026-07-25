@@ -211,10 +211,13 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
         </div>
       </div>
 
-      {/* pot label */}
-      <div className="absolute left-1/2 top-[53%] -translate-x-1/2 text-center">
-        <div className="text-[11px] uppercase tracking-[0.3em] text-white/45">Pot</div>
-        <div className="text-xl font-bold" style={{ color: "#ffe6a3", textShadow: "0 0 16px rgba(233,196,106,0.6)" }}>{POT_LABEL}</div>
+      {/* ---- Main pot label box, 85x45 (APPROVED spec) ---- */}
+      <div style={{ position: "absolute", left: "50%", top: "58%", transform: "translate(-50%,-50%)",
+        width: 85, height: 45, borderRadius: 8, background: "rgba(15,23,42,0.72)",
+        border: "1px solid #2AC6D0", backdropFilter: "blur(6px)",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.22em", color: "#94A3B8" }}>POT</div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: "#E2F1F1", fontVariantNumeric: "tabular-nums" }}>{POT_LABEL}</div>
       </div>
 
       {/* ---- Hero action control panel — built to the 1920x1080 spec ----

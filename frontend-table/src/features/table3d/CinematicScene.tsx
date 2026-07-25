@@ -873,6 +873,8 @@ function SeatTile({ seat, index }: { seat?: SceneSeat; index: number }) {
       : seat?.state === "allin" ? "rgba(255,59,70,0.7)"
         : "rgba(91,100,114,0.45)";
   const src = seat?.avatar ? avatarSrc(seat.avatar) : undefined;
+  // Active seats use the 76x76 portrait; folded/inactive shrink to 60x60 (spec).
+  const photoPx = seat?.state === "folded" ? UI.vacantInner : UI.photo;
   const anim =
     seat?.state === "winner" ? "seatWinPulse 0.9s ease-out"
       : seat?.state === "active" ? "seatTurnBob 1.6s ease-in-out infinite"
@@ -916,6 +918,7 @@ function SeatTile({ seat, index }: { seat?: SceneSeat; index: number }) {
           position: "relative",
         }}
       >
+        {/* APPROVED: folded / inactive players drop to a 60x60 portrait. */}
         {vacant ? (
           <div className="flex flex-col items-center" style={{ color: "#7f8794" }}>
             <div style={{ width: UI.vacantInner, height: UI.vacantInner, borderRadius: "50%", border: `2px dashed #5b6472`,
@@ -925,8 +928,8 @@ function SeatTile({ seat, index }: { seat?: SceneSeat; index: number }) {
         ) : (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt="" width={UI.photo} height={UI.photo}
-              style={{ width: UI.photo, height: UI.photo, objectFit: "cover", borderRadius: 10, display: "block" }} />
+            <img src={src} alt="" width={photoPx} height={photoPx}
+              style={{ width: photoPx, height: photoPx, objectFit: "cover", borderRadius: 10, display: "block" }} />
             {seat.isButton && (
               <div style={{ position: "absolute", right: -16, bottom: -10, width: UI.dealerW, height: UI.dealerH,
                 borderRadius: 12, background: "linear-gradient(180deg,#ffffff,#d8d8d8)", color: "#231b00",
@@ -1229,7 +1232,7 @@ export function CinematicScene({
       "linear-gradient(180deg,#04060a,#070b12 60%,#04060a)";
   const cameraCfg = backdrop
     ? { position: backdrop.camera.position, fov: backdrop.camera.fov }
-    : { position: [0, 5.6, 8.0] as [number, number, number], fov: 46 };
+    : { position: [0, 6.1, 8.3] as [number, number, number], fov: 40 };
   return (
     <div className="relative h-screen w-screen overflow-hidden" style={{ background: wrapperBg }}>
       <Canvas
