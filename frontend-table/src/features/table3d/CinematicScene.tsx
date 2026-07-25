@@ -624,25 +624,28 @@ function SeatPortrait2D({ seat, total }: { seat: SceneSeat; total: number }) {
         : seat.state === "folded"
           ? "none"
           : "seatIdleFloat 4s ease-in-out infinite";
+  // Portrait diameter (px). Enlarged so the character reads as the hero of the
+  // seat (the 2.5D avatar is the headline art, not a thumbnail).
+  const SIZE = 148;
   return (
-    <Html position={[p[0], 0.35, p[2]]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
+    <Html position={[p[0], 0.42, p[2]]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
       <div className="flex flex-col items-center">
         <div style={{ position: "relative", opacity: seat.state === "folded" ? 0.55 : 1, animation: anim, animationDelay: `${(seat.index % 6) * 0.35}s` }}>
           <div
             style={{
-              width: 104, height: 104, borderRadius: "50%", overflow: "hidden",
+              width: SIZE, height: SIZE, borderRadius: "50%", overflow: "hidden",
               border: `3px solid ${ringColor}`,
-              boxShadow: `0 0 30px ${glow}, 0 0 0 2px rgba(212,175,55,0.35), inset 0 0 12px rgba(0,0,0,0.55)`,
+              boxShadow: `0 0 38px ${glow}, 0 0 0 2px rgba(212,175,55,0.35), inset 0 0 14px rgba(0,0,0,0.55)`,
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt="" width={104} height={104} style={{ objectFit: "cover", display: "block", imageRendering: "auto" }} />
+            <img src={src} alt="" width={SIZE} height={SIZE} style={{ objectFit: "cover", display: "block", imageRendering: "auto" }} />
           </div>
           {/* owned badge */}
           <div
             style={{
-              position: "absolute", right: -2, bottom: 16, width: 22, height: 22, borderRadius: "50%",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11,
+              position: "absolute", right: 2, bottom: 22, width: 28, height: 28, borderRadius: "50%",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
               background: "linear-gradient(180deg,#f3e2ad,#d4af37)", color: "#3a2c07",
               border: "1.5px solid rgba(0,0,0,0.4)", boxShadow: "0 0 10px rgba(212,175,55,0.6)",
             }}
