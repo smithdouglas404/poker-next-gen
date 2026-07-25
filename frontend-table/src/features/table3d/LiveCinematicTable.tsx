@@ -98,6 +98,9 @@ export default function LiveCinematicTable() {
         announce: "",
         handLive: false,
         dealNonce: 0,
+        potMinor: 0,
+        winnerSeat: -1,
+        winNonce: 0,
       };
     }
 
@@ -132,18 +135,26 @@ export default function LiveCinematicTable() {
           isButton: s.index === snapshot.button_seat,
           betLabel: (s.bet ?? 0) > 0 ? formatCents(s.bet ?? 0) : undefined,
           betMinor: s.bet ?? 0,
+          stackMinor: s.stack ?? 0,
         } satisfies SceneSeat;
       });
 
     // Transient banner: at showdown, name the top winner, their pot, and the
     // winning hand; the scene shows it as a center-top announcement.
     let announce = "";
+    let winnerSeat = -1;
+    let winNonce = 0;
     if (showdown?.winners?.length) {
       const top = [...showdown.winners].sort((a, b) => (b.pot ?? 0) - (a.pot ?? 0))[0];
       const name =
         top.username ?? snapshot.seats.find((s) => s.index === top.seat)?.username ?? `Seat ${(top.seat ?? 0) + 1}`;
       const amt = (top.pot ?? 0) > 0 ? ` wins ${formatCents(top.pot ?? 0)}` : " wins";
       announce = `${name}${amt}${top.hand ? ` · ${top.hand}` : ""}`;
+      // Map the winner's server seat to the rotated scene index so the pot sweeps
+      // to the right spot; nonce changes when a showdown lands so the sweep fires.
+      const ws = top.seat ?? -1;
+      winnerSeat = ws >= 0 && heroIdx >= 0 ? (ws - heroIdx + total) % total : ws;
+      winNonce = (snapshot.hand_no ?? 0) + 1_000_000;
     }
 
     // A hand is live once dealing starts (not the between-hands "waiting" phase) —
@@ -164,6 +175,9 @@ export default function LiveCinematicTable() {
       announce,
       handLive,
       dealNonce: snapshot.hand_no ?? 0,
+      potMinor: snapshot.pot ?? 0,
+      winnerSeat,
+      winNonce,
     };
   }, [snapshot, holeCards, showdown, heroUserId, mode]);
 
@@ -178,6 +192,9 @@ export default function LiveCinematicTable() {
       showPot={scene.showPot}
       handLive={scene.handLive}
       dealNonce={scene.dealNonce}
+      potMinor={scene.potMinor}
+      winnerSeat={scene.winnerSeat}
+      winNonce={scene.winNonce}
       announce={scene.announce}
       overlay={<TableAdminOverlay demo={demo} />}
     />

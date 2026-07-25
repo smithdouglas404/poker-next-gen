@@ -51,6 +51,8 @@ export interface SceneSeat {
   /** Raw committed-bet minor units — sizes the physical bet chip stack on the
    *  felt in front of the seat (0/undefined => no chips). */
   betMinor?: number;
+  /** Raw stack minor units — sizes the player's physical chip pile beside the seat. */
+  stackMinor?: number;
 }
 
 export interface CinematicSceneProps {
@@ -71,6 +73,12 @@ export interface CinematicSceneProps {
   handLive?: boolean;
   /** Changes each new hand (the hand number) — triggers the deck's shuffle riffle. */
   dealNonce?: number;
+  /** Raw pot minor units — scales the central pot chip pile. */
+  potMinor?: number;
+  /** Scene index of the winning seat at showdown (-1 = none) — the pot sweeps here. */
+  winnerSeat?: number;
+  /** Changes when a showdown result lands — triggers the pot→winner chip sweep. */
+  winNonce?: number;
   /** Transient table announcement (winner, all-in, blinds up, host message)
    *  shown as a center-top banner over the felt. Empty/undefined hides it. */
   announce?: string;
@@ -325,17 +333,87 @@ function ChipStack({
   return <group position={position}>{chips}</group>;
 }
 
-// Central pot pile — a tight, restrained cluster of small stacks just below the
-// board. Kept deliberately compact (small radius, low counts) so it reads as a
-// neat pot, not an oversized tower; per-seat bets ride out in front of each seat.
-function Pot() {
+// Where the central pot sits (chips + the DOM pot label ride here).
+const POT_POS: [number, number, number] = [0, 0.05, 1.5];
+
+// Central pot pile — a tight cluster of colored stacks just below the board whose
+// heights now SCALE with the pot value (bigger pot → taller stacks), clamped so it
+// still reads as a neat pot, not an oversized tower.
+function Pot({ potMinor }: { potMinor: number }) {
+  // Multiplier vs the baseline counts; ~1 at a mid pot, up to ~2.4 at a big one.
+  const m = Math.max(0.5, Math.min(2.4, (potMinor || 0) / 60000));
+  const c = (base: number) => Math.max(1, Math.round(base * m));
   return (
-    <group position={[0, 0.05, 1.5]}>
-      <ChipStack position={[-0.19, 0, 0]} color="#c9302c" count={4} />
-      <ChipStack position={[0, 0, 0.03]} color="#1f2937" count={6} />
-      <ChipStack position={[0.19, 0, 0]} color="#2f6bff" count={3} />
-      <ChipStack position={[0.01, 0, -0.24]} color="#e9c46a" count={5} />
-      <ChipStack position={[-0.2, 0, -0.23]} color="#1fa85a" count={3} />
+    <group position={POT_POS}>
+      <ChipStack position={[-0.19, 0, 0]} color="#c9302c" count={c(4)} />
+      <ChipStack position={[0, 0, 0.03]} color="#1f2937" count={c(6)} />
+      <ChipStack position={[0.19, 0, 0]} color="#2f6bff" count={c(3)} />
+      <ChipStack position={[0.01, 0, -0.24]} color="#e9c46a" count={c(5)} />
+      <ChipStack position={[-0.2, 0, -0.23]} color="#1fa85a" count={c(3)} />
+    </group>
+  );
+}
+
+// A player's own chip pile beside their seat, sized to their stack. Two adjacent
+// stacks (steel + gold) so it reads as real chips, not the text-only stack label.
+function SeatStackChips({ seat, total }: { seat: SceneSeat; total: number }) {
+  if (!seat.stackMinor || seat.stackMinor <= 0) return null;
+  const p = seatPoint(seat.index, total);
+  const len = Math.hypot(p[0], p[2]) || 1;
+  const perpX = -p[2] / len;
+  const perpZ = p[0] / len;
+  // Just in front of the seat, offset to the side so it clears the hole cards.
+  const base = 0.92;
+  const cx = p[0] * base + perpX * 0.52;
+  const cz = p[2] * base + perpZ * 0.52;
+  const n = Math.max(3, Math.min(16, Math.round(seat.stackMinor / 15000)));
+  const half = Math.ceil(n / 2);
+  return (
+    <group position={[cx, 0.05, cz]}>
+      <ChipStack position={[-0.075, 0, 0]} color="#3a4250" count={half} radius={0.12} />
+      <ChipStack position={[0.075, 0, 0]} color="#e9c46a" count={n - half} radius={0.12} />
+    </group>
+  );
+}
+
+// Chips swept from the pot to the winner at showdown — a short burst that flies on
+// an arc from the pot to the winning seat when `nonce` changes, then fades out.
+function ChipSweep({ target, nonce }: { target: [number, number, number] | null; nonce: number }) {
+  const ref = useRef<THREE.Group>(null);
+  const prev = useRef(nonce);
+  const startRef = useRef<number | null>(null);
+  useFrame((state) => {
+    const now = state.clock.getElapsedTime() * 1000;
+    if (nonce !== prev.current) {
+      prev.current = nonce;
+      startRef.current = now;
+    }
+    const g = ref.current;
+    if (!g) return;
+    if (!target || startRef.current === null) {
+      g.visible = false;
+      return;
+    }
+    const local = now - startRef.current;
+    const DUR = 850;
+    if (local > DUR) {
+      g.visible = false;
+      return;
+    }
+    g.visible = true;
+    const k = local / DUR;
+    const e = 1 - Math.pow(1 - k, 2); // easeOut
+    g.position.set(
+      POT_POS[0] + (target[0] - POT_POS[0]) * e,
+      POT_POS[1] + (target[1] - POT_POS[1]) * e + Math.sin(k * Math.PI) * 0.45,
+      POT_POS[2] + (target[2] - POT_POS[2]) * e,
+    );
+    g.scale.setScalar(1 - 0.35 * k);
+  });
+  return (
+    <group ref={ref} visible={false}>
+      <ChipStack position={[-0.1, 0, 0]} color="#e9c46a" count={5} radius={0.14} />
+      <ChipStack position={[0.12, 0, 0.04]} color="#c9302c" count={4} radius={0.14} />
     </group>
   );
 }
@@ -502,7 +580,7 @@ function GlbFigure({ seat, total }: { seat: SceneSeat; total: number }) {
 
 /* ---------------- scene ---------------- */
 
-function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce }: {
+function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, potMinor, winnerSeat, winNonce }: {
   seats: SceneSeat[];
   board: string[];
   mode: AvatarMode;
@@ -510,7 +588,15 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce }: {
   showPot: boolean;
   handLive: boolean;
   dealNonce: number;
+  potMinor: number;
+  winnerSeat: number;
+  winNonce: number;
 }) {
+  const winTarget = useMemo<[number, number, number] | null>(() => {
+    if (winnerSeat < 0) return null;
+    const p = seatPoint(winnerSeat, maxSeats);
+    return [p[0] * 0.9, 0.06, p[2] * 0.9];
+  }, [winnerSeat, maxSeats]);
   return (
     <>
       <color attach="background" args={["#05070c"]} />
@@ -531,8 +617,14 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce }: {
 
       <TableBody />
       <Board board={board} />
-      {showPot && <Pot />}
+      {showPot && <Pot potMinor={potMinor} />}
+      <ChipSweep target={winTarget} nonce={winNonce} />
       {handLive && <Deck nonce={dealNonce} />}
+
+      {/* Each seated player's own chip pile beside their seat, sized to their stack. */}
+      {seats.map((s) => (
+        <SeatStackChips key={`stack-${s.index}`} seat={s} total={maxSeats} />
+      ))}
 
       {/* Face-down hole cards in front of every in-hand (non-folded) seat while a
           hand is live — deals in from the deck, so opponents visibly have cards. */}
@@ -629,6 +721,9 @@ export function CinematicScene({
   showPot = true,
   handLive = false,
   dealNonce = 0,
+  potMinor = 0,
+  winnerSeat = -1,
+  winNonce = 0,
   announce,
   children,
   overlay,
@@ -655,7 +750,7 @@ export function CinematicScene({
         }}
       >
         <Suspense fallback={null}>
-          <Scene seats={seats} board={board} mode={mode} maxSeats={maxSeats} showPot={showPot} handLive={handLive} dealNonce={dealNonce} />
+          <Scene seats={seats} board={board} mode={mode} maxSeats={maxSeats} showPot={showPot} handLive={handLive} dealNonce={dealNonce} potMinor={potMinor} winnerSeat={winnerSeat} winNonce={winNonce} />
         </Suspense>
       </Canvas>
       {children ?? <SceneHud potLabel={potLabel} heroHole={heroHole} announce={announce} />}
