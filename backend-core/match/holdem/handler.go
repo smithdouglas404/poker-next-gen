@@ -779,13 +779,26 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			broadcastSnapshot(ctx, db, dispatcher, s, nil)
 
 		case protocol.OpStandUp:
+			stoodUp := false
 			for i, seat := range s.Table.Seats {
 				if seat != nil && seat.UserID == userID {
+					// Cashout-lock (#32): a player holding live cards in a live hand
+					// cannot leave and pull chips from the pot. They must fold first;
+					// an all-in player waits for the hand to resolve. Folded seats
+					// and between-hands players leave freely.
+					if s.Phase != poker.PhaseWaiting && (seat.Status == poker.SeatSeated || seat.Status == poker.SeatAllIn) {
+						sendError(dispatcher, presence, "in_hand", "you can't leave mid-hand — fold first, or wait for the hand to finish")
+						break
+					}
 					releaseBuyIn(ctx, db, s, i, userID, seat.Stack)
 					delete(s.SeatWallet, i)
 					s.Table.StandUp(i)
+					stoodUp = true
 					break
 				}
+			}
+			if !stoodUp {
+				continue // blocked mid-hand or not seated — no stand-up side effects
 			}
 			_ = store.NewActiveSeatStore(db).Unregister(ctx, userID, matchIDForAudit(s))
 			dispatcher.MatchLabelUpdate(buildLabel(s))

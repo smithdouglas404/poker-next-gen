@@ -334,9 +334,8 @@ func (t *Table) StartHand(sb, bb int64) error {
 		}
 	}
 
-	// Post blinds
-	sbSeat := t.nextSeated(t.ButtonSeat)
-	bbSeat := t.nextSeated(sbSeat)
+	// Post blinds. blindSeats encodes the heads-up special case (button is the SB).
+	sbSeat, bbSeat := t.blindSeats(len(seated))
 	t.postBlind(sbSeat, sb, "SB")
 	t.postBlind(bbSeat, bb, "BB")
 	t.ActionSeat = t.nextActiveSeat(bbSeat)
@@ -440,6 +439,19 @@ func (t *Table) nextSeated(from int) int {
 	return from
 }
 
+// blindSeats returns the small-blind and big-blind seat indices for the current
+// button and seating. Heads-up (2 players) is the special case per standard
+// no-limit rules: the BUTTON posts the small blind (and acts first pre-flop);
+// the non-button seat posts the big blind. 3+ handed, the SB is the seat left of
+// the button and the BB is the seat left of the SB.
+func (t *Table) blindSeats(seatedCount int) (sbSeat, bbSeat int) {
+	if seatedCount == 2 {
+		return t.ButtonSeat, t.nextSeated(t.ButtonSeat)
+	}
+	sb := t.nextSeated(t.ButtonSeat)
+	return sb, t.nextSeated(sb)
+}
+
 func (t *Table) nextActiveSeat(from int) int {
 	for i := 1; i <= MaxSeats; i++ {
 		idx := (from + i) % MaxSeats
@@ -521,12 +533,31 @@ func (t *Table) ApplyAction(seat int, action string, amount int64) error {
 		if amount > s.Bet+s.Stack {
 			amount = s.Bet + s.Stack
 		}
+		isAllIn := amount == s.Bet+s.Stack
+		// Legal minimum raise-TO: the current bet plus the last full-raise
+		// increment (at least one big blind). A raise below this is illegal —
+		// EXCEPT an all-in shove for less, which is always allowed.
+		minRaiseTo := t.CurrentBet + t.MinRaise
+		if bb := t.BigBlindAmount(); minRaiseTo < bb {
+			minRaiseTo = bb
+		}
+		if amount < minRaiseTo && !isAllIn {
+			return fmt.Errorf("raise below minimum (min %d)", minRaiseTo)
+		}
+		// A "full raise" (increment ≥ the last full-raise size) RE-OPENS the
+		// betting for players who already acted. A short all-in that doesn't
+		// complete a full raise does NOT re-open action — prior actors may only
+		// call or fold, and the minimum-raise size is unchanged.
+		fullRaise := amount-t.CurrentBet >= t.MinRaise
+
 		add := amount - s.Bet
 		s.Stack -= add
 		s.Bet = amount
 		t.addContribution(seat, add)
 		if amount > t.CurrentBet {
-			t.MinRaise = amount - t.CurrentBet
+			if fullRaise {
+				t.MinRaise = amount - t.CurrentBet
+			}
 			t.CurrentBet = amount
 			t.LastAggressorSeat = seat // last aggressor — shows first at showdown
 		}
@@ -534,7 +565,11 @@ func (t *Table) ApplyAction(seat int, action string, amount int64) error {
 		if s.Stack == 0 {
 			s.Status = SeatAllIn
 		}
-		t.ActedThisRound = map[int]bool{seat: true}
+		if fullRaise {
+			t.ActedThisRound = map[int]bool{seat: true} // re-open action
+		} else {
+			t.ActedThisRound[seat] = true // short all-in: does not re-open
+		}
 	default:
 		return fmt.Errorf("unknown action")
 	}
