@@ -72,6 +72,10 @@ type MatchState struct {
 	SeatSessionID    map[int]string
 	SeatBuyIn        map[int]int64
 	SeatHands        map[int]int
+	// LastActionNonce dedupes a re-sent action per player (userID -> last accepted
+	// nonce): a client retry / double-tap carrying the same nonce is a no-op, so a
+	// flaky connection can't apply an action twice. Empty nonce => no dedup.
+	LastActionNonce  map[string]string
 	BotCount         int
 	Rand             *rand.Rand
 	// Per-session AES-256-GCM keys (userID -> 32 raw bytes) used to encrypt each
@@ -377,9 +381,10 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		MaxBuyIn:     maxBuyIn,
 		Presences:    map[string]runtime.Presence{},
 		SeatWallet:   map[int]string{},
-		SeatSessionID: map[int]string{},
-		SeatBuyIn:     map[int]int64{},
-		SeatHands:     map[int]int{},
+		SeatSessionID:   map[int]string{},
+		SeatBuyIn:       map[int]int64{},
+		SeatHands:       map[int]int{},
+		LastActionNonce: map[string]string{},
 		Rand:         rand.New(rand.NewSource(time.Now().UnixNano())),
 		SessionKeys:  map[string][]byte{},
 		RITAgree:     map[string]bool{},
@@ -929,9 +934,18 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			if seatIdx < 0 {
 				continue
 			}
+			// Idempotency (Tier-1 B): drop a re-sent action carrying the nonce we
+			// already accepted from this player — a client retry / double-tap must
+			// not apply twice. Empty nonce keeps the old behavior.
+			if req.Nonce != "" && s.LastActionNonce[userID] == req.Nonce {
+				continue
+			}
 			if err := s.Table.ApplyAction(seatIdx, req.Type, req.Amount); err != nil {
 				sendError(dispatcher, presence, "action_failed", err.Error())
 				continue
+			}
+			if req.Nonce != "" {
+				s.LastActionNonce[userID] = req.Nonce
 			}
 			// Voluntary action clears the inactivity streak (they're present).
 			if s.TimeoutStreak != nil {

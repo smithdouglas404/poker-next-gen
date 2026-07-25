@@ -102,6 +102,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const sessionRef = useRef<Session | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const sessionKeyRef = useRef<CryptoKey | null>(null);
+  // Per-turn action nonce (Tier-1 B idempotency): a fresh id when it becomes our
+  // turn, reused for whatever action we send that turn, so a double-tap / retry of
+  // the same turn's action carries the same nonce and the server dedupes it.
+  const turnNonceRef = useRef<string>("");
 
   const [connected, setConnected] = useState(false);
   const [matchId, setMatchId] = useState<string | null>(null);
@@ -201,6 +205,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
             );
             break;
           case OpActionRequired:
+            // New turn → new idempotency nonce for whatever we send this turn.
+            turnNonceRef.current =
+              typeof crypto !== "undefined" && crypto.randomUUID
+                ? crypto.randomUUID()
+                : `${Date.now()}-${Math.random()}`;
             setActionRequired(payload as ActionRequiredMessage);
             break;
           case OpShowdown: {
@@ -396,7 +405,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const sendAction = useCallback(
     async (type: string, amount: number) => {
-      await sendMatch(OpAction, { type, amount });
+      await sendMatch(OpAction, { type, amount, nonce: turnNonceRef.current });
       pushLog(`${type.toUpperCase()}${amount ? ` ${formatCents(amount)}` : ""}`, "action");
       setActionRequired(null);
     },

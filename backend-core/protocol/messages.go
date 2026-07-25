@@ -14,6 +14,10 @@ type SitDownRequest struct {
 type ActionRequest struct {
 	Type   string `json:"type"`
 	Amount int64  `json:"amount"`
+	// Nonce optionally dedupes a re-sent action (client retry / double-tap). When
+	// present and equal to the last nonce the server accepted from this player, the
+	// action is a no-op. Empty => no dedup (backward-compatible with old clients).
+	Nonce string `json:"nonce,omitempty"`
 }
 
 type CardView struct {
