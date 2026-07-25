@@ -176,12 +176,14 @@ function CommandCard({
   busy: boolean;
   onRun: (command: CommandDefinition) => void;
 }) {
-  const isLink = Boolean(command.href) && !command.rpc;
-  // Phase-3 signpost: a console command whose capability now has a dedicated rich
-  // screen shows where its full workflow lives, so nothing is orphaned in the
-  // console. Commands NOT in RICH_HOME are legitimately console-native tools
-  // (solvers, health, anti-bot, hand audit) — the console's lasting role.
+  // Phase-3 retirement: a command whose capability now has a dedicated rich screen
+  // (RICH_HOME) is a LAUNCHER only — it links to that screen and no longer runs an
+  // inline console form, so there is a single home for each write/config flow.
+  // Commands NOT in RICH_HOME are the console's lasting "Tools & Diagnostics" role
+  // (solvers, health, anti-bot, raw audit list) and still run inline here.
   const home = command.rpc ? RICH_HOME[command.rpc] : undefined;
+  const linkHref = home?.href ?? command.href;
+  const isLink = Boolean(linkHref) && (!command.rpc || Boolean(home));
 
   const inner = (
     <>
@@ -194,9 +196,9 @@ function CommandCard({
       <div className="mt-4 text-xs font-semibold uppercase tracking-wider text-gold">
         {isLink ? "Open →" : "Run Command →"}
       </div>
-      {home && !isLink && (
+      {home && (
         <p className="mt-1 text-[10px] uppercase tracking-wider text-neutral-500">
-          ▸ Full screen: {home.label}
+          ▸ {home.label}
         </p>
       )}
     </>
@@ -205,7 +207,7 @@ function CommandCard({
   if (isLink) {
     return (
       <Link
-        href={command.href!}
+        href={linkHref!}
         className="group rounded-2xl border border-white/[0.06] bg-[#262d38] p-5 transition hover:border-brand/40 hover:bg-white/[0.04]"
       >
         {inner}
@@ -317,6 +319,9 @@ function CommandCenterInner() {
 
   const handleRun = useCallback(
     async (command: CommandDefinition) => {
+      // Retired console commands (RICH_HOME) never execute inline — their card is a
+      // launcher to the rich screen. Guard here too in case one is reached another way.
+      if (command.rpc && RICH_HOME[command.rpc]) return;
       if (needsModal(command)) {
         setActiveCommand(command);
         setConfirmOpen(false);
