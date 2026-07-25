@@ -77,11 +77,23 @@ export function GuestSessions({ clubId, canManage }: { clubId?: string; canManag
                 className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-black/25 px-4 py-3"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-semibold text-white">{g.username || g.user_id}</p>
+                  <p className="flex items-center gap-2 truncate font-semibold text-white">
+                    {g.username || g.user_id}
+                    {g.overdue && (
+                      <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[9px] uppercase tracking-wider text-brand">
+                        overdue
+                      </span>
+                    )}
+                  </p>
                   <p className="text-[11px] text-white/50">
                     Bought in {usd(g.buy_in_minor)}
                     {g.limit_minor > 0 ? ` · limit ${usd(g.limit_minor)}` : ""} ·{" "}
                     {new Date(g.created_at).toLocaleDateString()}
+                    {g.reconcile_due_at && (
+                      <span className={g.overdue ? "text-brand" : "text-white/50"}>
+                        {" "}· due {new Date(g.reconcile_due_at).toLocaleString()}
+                      </span>
+                    )}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">

@@ -26,6 +26,8 @@ export interface GuestSession {
   net_minor: number;
   ledger_net_minor: number;
   created_at: string;
+  reconcile_due_at?: string | null; // created_at + club window; absent when no window set
+  overdue?: boolean;
 }
 
 export interface SeatSession {
@@ -248,6 +250,7 @@ export interface ClubSettingsBlob {
   geo_block?: string;
   club_type?: string;
   logo_data_url?: string; // uploaded club logo (data: URL), set from GlobalSettings/setup
+  reconcile_window_hours?: number; // when club-wallet grants must be reconciled (0 = no deadline)
 }
 
 /** Owner's club with the visibility/approval flags club_update reads/writes. */

@@ -4,11 +4,30 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"time"
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
+
+// clubReconcileWindowHours reads a club's configurable reconciliation window (in
+// hours) from its settings blob. 0 => no deadline (the operator reconciles at
+// will). This is the "club specifies WHEN club-wallet grants must be reconciled"
+// setting; the deadline is advisory (surfaced as due/overdue), not auto-enforced.
+func clubReconcileWindowHours(ctx context.Context, db *sql.DB, clubID string) int {
+	ext, err := store.NewClubExtStore(db).GetExt(ctx, clubID)
+	if err != nil || ext == nil || len(ext.SettingsJSON) == 0 {
+		return 0
+	}
+	var sj struct {
+		ReconcileWindowHours int `json:"reconcile_window_hours"`
+	}
+	if err := json.Unmarshal(ext.SettingsJSON, &sj); err != nil || sj.ReconcileWindowHours < 0 {
+		return 0
+	}
+	return sj.ReconcileWindowHours
+}
 
 // Guest table reconciliation. A guest (no registered account) who sits at a club's
 // private/coded table is recorded as an open guest-session (written from the match
@@ -36,18 +55,29 @@ func GuestSessionsPending(ctx context.Context, logger runtime.Logger, db *sql.DB
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	// Surface each guest's current ledger net alongside the row so the operator
-	// sees the live position before reconciling.
+	// sees the live position before reconciling, plus the club's reconciliation
+	// deadline (created_at + configured window) and whether it is overdue.
 	ledger := store.NewLedgerStore(db)
+	windowHours := clubReconcileWindowHours(ctx, db, req.ClubID)
+	now := time.Now()
 	type row struct {
 		store.GuestSession
-		LedgerNetMinor int64 `json:"ledger_net_minor"`
+		LedgerNetMinor int64      `json:"ledger_net_minor"`
+		ReconcileDueAt *time.Time `json:"reconcile_due_at,omitempty"`
+		Overdue        bool       `json:"overdue"`
 	}
 	out := make([]row, 0, len(list))
 	for _, g := range list {
 		net, _ := ledger.Balance(ctx, "user:"+g.UserID)
-		out = append(out, row{GuestSession: g, LedgerNetMinor: net})
+		r := row{GuestSession: g, LedgerNetMinor: net}
+		if windowHours > 0 {
+			due := g.CreatedAt.Add(time.Duration(windowHours) * time.Hour)
+			r.ReconcileDueAt = &due
+			r.Overdue = now.After(due)
+		}
+		out = append(out, r)
 	}
-	b, _ := json.Marshal(map[string]interface{}{"sessions": out})
+	b, _ := json.Marshal(map[string]interface{}{"sessions": out, "reconcile_window_hours": windowHours})
 	return string(b), nil
 }
 

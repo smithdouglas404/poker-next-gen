@@ -46,6 +46,11 @@ export function GlobalSettings({
   const [maxBuyin, setMaxBuyin] = useState(
     s0.max_buyin_cents ? String(s0.max_buyin_cents / 100) : "",
   );
+  // Reconciliation window: hours after a guest sits before their club-wallet grant
+  // must be reconciled. "" / 0 => no deadline (reconcile at will).
+  const [reconcileWindow, setReconcileWindow] = useState(
+    s0.reconcile_window_hours ? String(s0.reconcile_window_hours) : "",
+  );
   // Full rake config (CustomRakeConfiguration) — previously only percent was editable.
   const [rakeCap, setRakeCap] = useState(rake?.cap_minor ? String(rake.cap_minor / 100) : "");
   const [minPot, setMinPot] = useState(rake?.min_pot_minor ? String(rake.min_pot_minor / 100) : "");
@@ -82,6 +87,7 @@ export function GlobalSettings({
     languages,
     ui_theme: uiTheme,
     max_buyin_cents: maxBuyin ? Math.round(Number(maxBuyin) * 100) : undefined,
+    reconcile_window_hours: reconcileWindow ? Math.max(0, Math.round(Number(reconcileWindow))) : undefined,
     twofa_required: twofa,
     admin_role: adminRole,
     moderator_role: modRole,
@@ -199,6 +205,21 @@ export function GlobalSettings({
                 className="w-full rounded-lg border border-white/12 bg-black/40 py-2 pl-7 pr-3 text-sm text-white outline-none focus:border-gold/40 disabled:opacity-50"
               />
             </div>
+          </Labeled>
+          <Labeled label="Reconciliation Window (hours)">
+            <input
+              type="number"
+              min={0}
+              value={reconcileWindow}
+              onChange={(e) => setReconcileWindow(e.target.value)}
+              disabled={disabled}
+              placeholder="No deadline"
+              className="w-full rounded-lg border border-white/12 bg-black/40 py-2 px-3 text-sm text-white outline-none focus:border-gold/40 disabled:opacity-50"
+            />
+            <p className="mt-1 text-[11px] text-white/45">
+              How long after a guest sits before their club-wallet grant must be reconciled. Guest
+              Reconciliation shows a due date and flags overdue sessions. 0 / blank = no deadline.
+            </p>
           </Labeled>
           <Labeled label="Rake Cap (max per pot)">
             <div className="relative">
