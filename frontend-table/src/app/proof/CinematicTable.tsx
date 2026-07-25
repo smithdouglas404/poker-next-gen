@@ -144,6 +144,26 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
         ))}
       </div>
 
+      {/* ---- Felt text information block (spec §3) ----
+           380x50 bounding box, centred on the felt directly above the community
+           cards, transparent background (reads as printed on the felt).
+           Line 1: 13px bold #E2F1F1 | Line 2: 12px regular #C8E6C9 | 18px spacing */}
+      <div
+        style={{
+          position: "absolute", left: "50%", top: "27%", transform: "translateX(-50%)",
+          width: 380, height: 50, display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center", background: "transparent",
+          textAlign: "center", textShadow: "0 1px 4px rgba(0,0,0,0.65)",
+        }}
+      >
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#E2F1F1", lineHeight: "18px" }}>
+          HAND 812,847 | POT: $16,400
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 400, color: "#C8E6C9", lineHeight: "18px" }}>
+          WINNER: Player 1 (Full House) | TIMESTAMP: 2024-08-24
+        </div>
+      </div>
+
       {/* pot label */}
       <div className="absolute left-1/2 top-[53%] -translate-x-1/2 text-center">
         <div className="text-[11px] uppercase tracking-[0.3em] text-white/45">Pot</div>

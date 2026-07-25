@@ -171,45 +171,22 @@ function stadiumPoint(u: number, L: number, R: number, y: number): [number, numb
 // tiles stay fully on screen (the table geometry may bleed — tiles may not).
 const SEAT_XMAX = 6.0;
 
-/* ------- 2D UI layout spec (design canvas 1920x1080, origin = table centre) -------
- * Seat coordinates and component sizes are the design team's spec, used verbatim.
- * Positions are expressed as a fraction of the 1920x1080 canvas so they scale to
- * any viewport while holding the exact specified proportions. y is +up in the spec
- * (screen y is +down), so it is negated when converted to CSS `top`.
+/* ------- Component size spec (design canvas 1920x1080) -------
+ * Sizes are the design team's spec, used verbatim. POSITIONS are NOT pinned to
+ * flat pixels: per engineering, gameplay elements (cards, chips, avatars) live in
+ * 3D world units and ride the perspective camera; only HUD chrome (action panel,
+ * timeline log, chat, stats) is a flat 2D pixel overlay.
  */
-const CANVAS_W = 1920;
-const CANVAS_H = 1080;
-/** The ten seat anchors, clockwise from bottom-centre-left (index 0 = hero). */
-const SEAT_UI: { x: number; y: number }[] = [
-  { x: -180, y: -320 }, // hero (bottom centre-left)
-  { x: 180, y: -320 },
-  { x: 520, y: -220 },
-  { x: 680, y: 0 },
-  { x: 520, y: 220 },
-  { x: 180, y: 290 },
-  { x: -180, y: 290 },
-  { x: -520, y: 220 },
-  { x: -680, y: 0 },
-  { x: -520, y: -220 },
-];
 /** Component sizes, straight from the spec. */
 const UI = {
-  frameW: 110, frameH: 130, // avatar frame
-  photo: 80,                // profile image / wireframe icon
-  badgeW: 140, badgeH: 70,  // name + stack container
-  tagW: 90, tagH: 28,       // action label ("CALL", "FOLD", ...)
-  tagFont: 13,              // 12-14px bold all-caps
+  frameW: 110, frameH: 130,  // avatar frame (spec §5)
+  photo: 76,                 // seated inner portrait  (spec §5: 76x76)
+  vacantInner: 60,           // vacant inner circle     (spec §5: 60x60)
+  badgeW: 80, badgeH: 42,    // player stack badge      (spec §5: 80x42)
+  tagW: 64, tagH: 36,        // bet action badge        (spec §5: 64x36)
+  tagFont: 12,
+  dealerW: 44, dealerH: 24,  // dealer button           (spec §5: 44x24)
 };
-/** Spec coordinate -> CSS percentage of the design canvas. */
-function seatUIStyle(i: number): React.CSSProperties {
-  const p = SEAT_UI[i % SEAT_UI.length];
-  return {
-    position: "absolute",
-    left: `${50 + (p.x / CANVAS_W) * 100}%`,
-    top: `${50 - (p.y / CANVAS_H) * 100}%`,
-    transform: "translate(-50%, -50%)",
-  };
-}
 function seatPoint(index: number, total: number): [number, number, number] {
   const e = ACTIVE_ELLIPSE;
   if (e.stadiumL != null) {
@@ -277,7 +254,7 @@ function TableBody() {
       </mesh>
 
       {/* underbody */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} geometry={g.underG}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -(TABLE_H + 0.08), 0]} geometry={g.underG}>
         <meshStandardMaterial color="#0a0d12" metalness={0.3} roughness={0.7} />
       </mesh>
 
@@ -361,7 +338,7 @@ function backTexture(): THREE.Texture {
 
 // Face-down card — the real rendered card-back texture on the top face (the hero's
 // own cards are the DOM overlay; opponents/deck show this back).
-function CardBack({ w = 0.282, h = 0.401 }: { w?: number; h?: number }) {
+function CardBack({ w = 0.275, h = 0.366 }: { w?: number; h?: number }) {
   const mats = useMemo(() => {
     const back = backTexture();
     const edge = new THREE.MeshStandardMaterial({ color: "#e8ecf0", roughness: 0.5 });
@@ -405,8 +382,8 @@ function Deck({ nonce }: { nonce: number }) {
   const cards = [];
   for (let i = 0; i < 9; i++) {
     cards.push(
-      <mesh key={i} position={[0, i * 0.02, 0]} castShadow>
-        <boxGeometry args={[0.282, 0.016, 0.401]} />
+      <mesh key={i} position={[0, i * 0.016, 0]} castShadow>
+        <boxGeometry args={[0.275, 0.016, 0.366]} />
         <meshStandardMaterial color="#eef2f6" roughness={0.5} />
       </mesh>,
     );
@@ -446,7 +423,7 @@ function HoleFace({ code }: { code: string }) {
   return (
     <group ref={ref}>
       <mesh castShadow material={mats}>
-        <boxGeometry args={[0.282, 0.016, 0.401]} />
+        <boxGeometry args={[0.275, 0.016, 0.366]} />
       </mesh>
     </group>
   );
@@ -511,18 +488,18 @@ function BoardCard({ code, x, delay }: { code: string; x: number; delay: number 
   return (
     <group ref={ref}>
       <mesh castShadow material={mats}>
-        <boxGeometry args={[0.416, 0.022, 0.582]} />
+        <boxGeometry args={[0.473, 0.022, 0.641]} />
       </mesh>
     </group>
   );
 }
 
 function Board({ board }: { board: string[] }) {
-  const start = -((board.length - 1) / 2) * 0.475; // 56px card + 8px gap
+  const start = -((board.length - 1) / 2) * 0.534; // 62px card + 8px gap (spec §5)
   return (
     <group>
       {board.map((c, i) => (
-        <BoardCard key={`${c}-${i}`} code={c} x={start + i * 0.475} delay={i * 130} />
+        <BoardCard key={`${c}-${i}`} code={c} x={start + i * 0.534} delay={i * 130} />
       ))}
     </group>
   );
@@ -530,6 +507,11 @@ function Board({ board }: { board: string[] }) {
 
 /* ---------------- chips ---------------- */
 
+// Real casino chip per spec §4.3: 39mm diameter x 3.3mm thick, stacked at a
+// 0.0033m vertical offset. 1 world unit = 0.2458 m, so radius 0.0793u,
+// thickness/offset 0.0134u.
+const CHIP_R = 0.0793;
+const CHIP_T = 0.0134;
 function ChipStack({
   position,
   color,
@@ -565,11 +547,11 @@ function Pot({ potMinor }: { potMinor: number }) {
   const c = (base: number) => Math.max(1, Math.round(base * m));
   return (
     <group position={POT_POS}>
-      <ChipStack position={[-0.19, 0, 0]} color="#c9302c" count={c(4)} />
-      <ChipStack position={[0, 0, 0.03]} color="#1f2937" count={c(6)} />
-      <ChipStack position={[0.19, 0, 0]} color="#2f6bff" count={c(3)} />
-      <ChipStack position={[0.01, 0, -0.24]} color="#e9c46a" count={c(5)} />
-      <ChipStack position={[-0.2, 0, -0.23]} color="#1fa85a" count={c(3)} />
+      <ChipStack position={[-0.42, 0, 0]} color="#c9302c" count={c(8)} />
+      <ChipStack position={[-0.14, 0, 0.10]} color="#1f2937" count={c(12)} />
+      <ChipStack position={[0.14, 0, 0]} color="#2f6bff" count={c(6)} />
+      <ChipStack position={[0.42, 0, -0.10]} color="#e9c46a" count={c(10)} />
+      <ChipStack position={[0.0, 0, -0.24]} color="#1fa85a" count={c(6)} />
     </group>
   );
 }
@@ -590,8 +572,8 @@ function SeatStackChips({ seat, total }: { seat: SceneSeat; total: number }) {
   const half = Math.ceil(n / 2);
   return (
     <group position={[cx, 0.05, cz]}>
-      <ChipStack position={[-0.075, 0, 0]} color="#3a4250" count={half} radius={0.12} />
-      <ChipStack position={[0.075, 0, 0]} color="#e9c46a" count={n - half} radius={0.12} />
+      <ChipStack position={[-0.075, 0, 0]} color="#3a4250" count={half} />
+      <ChipStack position={[0.075, 0, 0]} color="#e9c46a" count={n - half} />
     </group>
   );
 }
@@ -632,8 +614,8 @@ function ChipSweep({ target, nonce }: { target: [number, number, number] | null;
   });
   return (
     <group ref={ref} visible={false}>
-      <ChipStack position={[-0.1, 0, 0]} color="#e9c46a" count={5} radius={0.14} />
-      <ChipStack position={[0.12, 0, 0.04]} color="#c9302c" count={4} radius={0.14} />
+      <ChipStack position={[-0.1, 0, 0]} color="#e9c46a" count={5} />
+      <ChipStack position={[0.12, 0, 0.04]} color="#c9302c" count={4} />
     </group>
   );
 }
@@ -649,7 +631,7 @@ function SeatBetChips({ seat, total }: { seat: SceneSeat; total: number }) {
   const bz = p[2] * 0.56;
   const count = Math.max(1, Math.min(6, Math.round(seat.betMinor / 5000)));
   const color = seat.state === "allin" ? "#ff3b46" : "#e9c46a";
-  return <ChipStack position={[bx, 0.05, bz]} color={color} count={count} radius={0.13} />;
+  return <ChipStack position={[bx, 0.05, bz]} color={color} count={count} />;
 }
 
 // A chip continuously arcing from a betting seat toward the pot — the "chips pushed
@@ -675,7 +657,7 @@ function BetFlight({ seat, total }: { seat: SceneSeat; total: number }) {
   });
   return (
     <group ref={ref} visible={false}>
-      <ChipStack position={[0, 0, 0]} color="#4a9eb0" count={2} radius={0.11} />
+      <ChipStack position={[0, 0, 0]} color="#4a9eb0" count={2} />
     </group>
   );
 }
@@ -900,19 +882,21 @@ function SeatTile({ seat, index }: { seat?: SceneSeat; index: number }) {
     allin: { bg: "rgba(60,10,14,0.95)", bd: "#ff3b46", fg: "#ff7a82" },
   }[seat.action.tone];
   return (
-    <div style={seatUIStyle(index)} className="flex flex-col items-center">
+    <div className="flex flex-col items-center">
       {/* action tag (90x28) sits above the frame */}
       {seat?.action && tone && (
         <div
           style={{
             width: UI.tagW, height: UI.tagH, marginBottom: 4, borderRadius: 6,
             display: "flex", alignItems: "center", justifyContent: "center",
+            flexDirection: "column",
             fontSize: UI.tagFont, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase",
             background: tone.bg, border: `1px solid ${tone.bd}`, color: tone.fg,
-            boxShadow: `0 0 12px ${tone.bd}55`, whiteSpace: "nowrap",
+            boxShadow: `0 0 12px ${tone.bd}55`, whiteSpace: "nowrap", overflow: "hidden",
           }}
         >
-          {seat.action.label}{seat.action.amount ? ` ${seat.action.amount}` : ""}
+          <span style={{ lineHeight: 1.1 }}>{seat.action.label}</span>
+          {seat.action.amount && <span style={{ fontSize: 10, lineHeight: 1.1, opacity: 0.9 }}>{seat.action.amount}</span>}
         </div>
       )}
 
@@ -931,9 +915,9 @@ function SeatTile({ seat, index }: { seat?: SceneSeat; index: number }) {
       >
         {vacant ? (
           <div className="flex flex-col items-center" style={{ color: "#7f8794" }}>
-            <div style={{ width: UI.photo, height: UI.photo, borderRadius: 10, border: `2px dashed #5b6472`,
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30 }}>♟</div>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", marginTop: 6 }}>VACANT</div>
+            <div style={{ width: UI.vacantInner, height: UI.vacantInner, borderRadius: "50%", border: `2px dashed #5b6472`,
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>♟</div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", marginTop: 8 }}>VACANT</div>
           </div>
         ) : (
           <>
@@ -941,8 +925,9 @@ function SeatTile({ seat, index }: { seat?: SceneSeat; index: number }) {
             <img src={src} alt="" width={UI.photo} height={UI.photo}
               style={{ width: UI.photo, height: UI.photo, objectFit: "cover", borderRadius: 10, display: "block" }} />
             {seat.isButton && (
-              <div style={{ position: "absolute", right: -8, bottom: -8, width: 24, height: 24, borderRadius: "50%",
-                background: "linear-gradient(180deg,#ffffff,#d8d8d8)", color: "#231b00", fontWeight: 900, fontSize: 11,
+              <div style={{ position: "absolute", right: -16, bottom: -10, width: UI.dealerW, height: UI.dealerH,
+                borderRadius: 12, background: "linear-gradient(180deg,#ffffff,#d8d8d8)", color: "#231b00",
+                fontWeight: 900, fontSize: 12, letterSpacing: "0.08em",
                 display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid rgba(0,0,0,0.4)" }}>D</div>
             )}
           </>
@@ -953,13 +938,13 @@ function SeatTile({ seat, index }: { seat?: SceneSeat; index: number }) {
       {!vacant && (
         <div
           style={{
-            width: UI.badgeW, minHeight: 40, marginTop: 6, borderRadius: 8, padding: "4px 8px",
+            width: UI.badgeW, height: UI.badgeH, marginTop: 6, borderRadius: 8, padding: "2px 4px",
             background: "rgba(8,10,14,0.86)", border: "1px solid rgba(255,255,255,0.12)",
             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
             opacity: seat.state === "folded" ? 0.6 : 1,
           }}
         >
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", lineHeight: 1.15 }}>{seat.name}</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", lineHeight: 1.15, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{seat.name}</div>
           <div style={{ fontSize: 12, fontWeight: 800, color: "#f3c14b", lineHeight: 1.2 }}>{seat.stack}</div>
         </div>
       )}
@@ -967,16 +952,22 @@ function SeatTile({ seat, index }: { seat?: SceneSeat; index: number }) {
   );
 }
 
-/** All ten seat anchors, rendered flat over the canvas at the spec coordinates. */
-function SeatLayer2D({ seats, maxSeats }: { seats: SceneSeat[]; maxSeats: number }) {
+/** Seat tiles anchored to their real 3D seat points (drei <Html>), so the crisp
+ *  DOM text rides the perspective camera instead of being pinned to flat pixels.
+ *  Vacant seats render the same frame until someone takes the seat. */
+function SeatLayer3D({ seats, maxSeats }: { seats: SceneSeat[]; maxSeats: number }) {
   const bySeat = new Map(seats.map((s) => [s.index, s]));
-  const n = Math.min(maxSeats, SEAT_UI.length);
   return (
-    <div className="pointer-events-none absolute inset-0 select-none" style={{ zIndex: 12 }}>
-      {Array.from({ length: n }, (_, i) => (
-        <SeatTile key={i} index={i} seat={bySeat.get(i)} />
-      ))}
-    </div>
+    <>
+      {Array.from({ length: maxSeats }, (_, i) => {
+        const p = seatPoint(i, maxSeats);
+        return (
+          <Html key={i} position={[p[0], 0.42, p[2]]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
+            <SeatTile index={i} seat={bySeat.get(i)} />
+          </Html>
+        );
+      })}
+    </>
   );
 }
 
@@ -1077,6 +1068,9 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
           </Suspense>
         ) : null;
       })}
+
+      {/* Seat tiles anchored in 3D (engineering: avatars are gameplay, not flat HUD). */}
+      {mode !== "3d" && <SeatLayer3D seats={seats} maxSeats={maxSeats} />}
 
       {/* Per-seat committed bets as physical chips on the felt (real geometry). */}
       {seats.map((s) => (
@@ -1249,7 +1243,6 @@ export function CinematicScene({
           <Scene seats={seats} board={board} mode={mode} maxSeats={maxSeats} showPot={showPot} handLive={handLive} dealNonce={dealNonce} potMinor={potMinor} winnerSeat={winnerSeat} winNonce={winNonce} feltControls={feltControls} backdrop={backdrop} />
         </Suspense>
       </Canvas>
-      {mode !== "3d" && <SeatLayer2D seats={seats} maxSeats={maxSeats} />}
       {children ?? <SceneHud potLabel={potLabel} heroHole={heroHole} announce={announce} />}
       {overlay}
     </div>
