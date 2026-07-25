@@ -12,6 +12,7 @@ import { EquityPanel } from "@/features/hud/EquityPanel";
 import { SidebetPanel } from "@/features/hud/SidebetPanel";
 import { HandVerifyPanel } from "@/features/hud/HandVerifyPanel";
 import { ShowdownVerifyCTA } from "@/features/game/ShowdownVerifyCTA";
+import { SpectatorBar } from "@/features/game/SpectatorBar";
 import { BuyInSlider, TableLog } from "@/features/hud/TableLog";
 import { TableEmptyState } from "@/features/hud/TableEmptyState";
 import { ChatPanel } from "@/features/hud/ChatPanel";
@@ -63,6 +64,7 @@ export function TableHud({ children }: { children: React.ReactNode }) {
             {showGamePanels && <ShowdownVerifyCTA />}
             {showGamePanels && <TableLog />}
             <ChatPanel />
+          <SpectatorBar />
             <HandHistoryPanel />
             <TauntBar />
             {/* Music + display settings are tall always-expanded panels; in a
