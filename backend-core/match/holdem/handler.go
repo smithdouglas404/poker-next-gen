@@ -138,6 +138,7 @@ type MatchState struct {
 	AutoBuyBackCents int64  // auto top-up a busted player to this stack (0 => off)
 	NoMaxBuyIn       bool   // unlimited buy-in (no max) — PLAY-MONEY tables only
 	RenderStyle      string // owner-chosen table look: "2.5d" | "3d" (empty => per-device)
+	TableArt         string // owner-chosen baked table plate id (empty => cinematic felt)
 }
 
 // insurancePolicy is one all-in insurance wager, settled against the wallet (not
@@ -355,6 +356,11 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	if v, ok := params["render_style"].(string); ok {
 		renderStyle = v
 	}
+	// Owner-chosen baked table plate id; empty falls back to the cinematic felt.
+	tableArt := ""
+	if v, ok := params["table_art"].(string); ok {
+		tableArt = v
+	}
 	// Seed AI opponents at creation (server-authoritative, like OddSlingers).
 	for i := 0; i < numBots; i++ {
 		seat := table.FirstEmptySeat()
@@ -417,6 +423,7 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		AutoBuyBackCents: autoBuyBackCents,
 		NoMaxBuyIn:       noMaxBuyIn,
 		RenderStyle:      renderStyle,
+		TableArt:         tableArt,
 	}
 	label := buildLabel(state)
 	// 10 ticks/sec: a 1 Hz loop made deals, chip moves, and action prompts update
@@ -2568,6 +2575,7 @@ func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) 
 		DeckCommitHash: s.Table.DeckCommitment,
 		Variant:        s.Table.Variant,
 		RenderStyle:    s.RenderStyle,
+		TableArt:       s.TableArt,
 		HostUserID:     s.HostUserID,
 		HostPaused:     s.effPaused() || s.AdminPaused,
 		AllowStraddle:   s.Table.AllowStraddle,

@@ -88,6 +88,9 @@ type TableSnapshot struct {
 	// RenderStyle is the owner-chosen table look ("2.5d" | "3d") — every seat at the
 	// table renders in this style; empty falls back to the player's device preference.
 	RenderStyle    string      `json:"render_style,omitempty"`
+	// TableArt is the owner-chosen baked table plate id (see frontend bakedTable.ts);
+	// empty falls back to the default cinematic felt.
+	TableArt       string      `json:"table_art,omitempty"`
 	HostUserID     string      `json:"host_user_id,omitempty"`
 	HostPaused     bool        `json:"host_paused,omitempty"`
 	// Optional table-feature capabilities (#41) so the client only shows controls
@@ -198,6 +201,9 @@ type TableCreateRequest struct {
 	//  - RenderStyle: the owner-chosen table look, "2.5d" (portrait seats) or "3d"
 	//    (GLB character bodies). Applies to EVERY seat at the table (no mixing).
 	RenderStyle string `json:"render_style,omitempty" enum:"2.5d,3d" label:"Table Style"`
+	//  - TableArt: the owner-chosen baked table plate id (frontend bakedTable.ts);
+	//    empty => the default cinematic felt.
+	TableArt string `json:"table_art,omitempty" label:"Table Art"`
 }
 
 // ClubMemberRoleRequest is the club_member_role RPC payload: promote/demote a

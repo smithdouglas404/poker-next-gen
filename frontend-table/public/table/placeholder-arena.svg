@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <!-- PLACEHOLDER baked table plate (Item 2c). Swap for the real red/gold
+       provably-fair arena render (public/table/arena-red.jpg) and nudge the
+       camera / seat ellipse in bakedTable.ts so seats land on the painted chairs.
+       Futuristic in OUR palette: dark slate room, green felt, RED neon rim, gold ring. -->
+  <defs>
+    <radialGradient id="room" cx="50%" cy="34%" r="85%">
+      <stop offset="0%" stop-color="#1a2028"/>
+      <stop offset="55%" stop-color="#0e1218"/>
+      <stop offset="100%" stop-color="#05070c"/>
+    </radialGradient>
+    <radialGradient id="felt" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#1c7d4e"/>
+      <stop offset="60%" stop-color="#0f5f39"/>
+      <stop offset="100%" stop-color="#053821"/>
+    </radialGradient>
+    <linearGradient id="rail" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#20262e"/>
+      <stop offset="100%" stop-color="#0d1116"/>
+    </linearGradient>
+    <filter id="redglow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="14" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- server-room backdrop -->
+  <rect width="1920" height="1080" fill="url(#room)"/>
+  <g opacity="0.18" fill="#1fa85a">
+    <rect x="60" y="120" width="16" height="520"/><rect x="96" y="120" width="16" height="520"/>
+    <rect x="1786" y="120" width="16" height="520"/><rect x="1822" y="120" width="16" height="520"/>
+  </g>
+  <g opacity="0.10" fill="#e01e2b">
+    <rect x="140" y="160" width="10" height="440"/><rect x="1770" y="160" width="10" height="440"/>
+  </g>
+
+  <!-- gunmetal outer rail -->
+  <ellipse cx="960" cy="600" rx="760" ry="392" fill="url(#rail)"/>
+  <!-- red neon rim (signature brand glow) -->
+  <ellipse cx="960" cy="600" rx="720" ry="360" fill="none" stroke="#ff2d3f" stroke-width="7" filter="url(#redglow)" opacity="0.95"/>
+  <!-- felt -->
+  <ellipse cx="960" cy="600" rx="700" ry="344" fill="url(#felt)"/>
+  <!-- gold inner ring -->
+  <ellipse cx="960" cy="600" rx="560" ry="270" fill="none" stroke="#f5c518" stroke-width="3" opacity="0.7"/>
+  <!-- holo diamond club-mark -->
+  <text x="960" y="560" text-anchor="middle" font-family="sans-serif" font-size="120" fill="#f5c518" opacity="0.10">&#9670;</text>
+
+  <!-- faint empty seat markers (10) — for eyeballing anchors only -->
+  <g fill="none" stroke="#5b6472" stroke-width="3" opacity="0.35">
+    <circle cx="960" cy="960" r="34"/>
+    <circle cx="560" cy="905" r="30"/><circle cx="285" cy="720" r="28"/>
+    <circle cx="220" cy="500" r="27"/><circle cx="430" cy="320" r="26"/>
+    <circle cx="760" cy="250" r="26"/><circle cx="1160" cy="250" r="26"/>
+    <circle cx="1490" cy="320" r="26"/><circle cx="1700" cy="500" r="27"/>
+    <circle cx="1635" cy="720" r="28"/>
+  </g>
+
+  <text x="960" y="1050" text-anchor="middle" font-family="sans-serif" font-size="20"
+        fill="#c2c8d0" opacity="0.5" letter-spacing="6">PLACEHOLDER — SWAP arena-red.jpg</text>
+</svg>

@@ -29,7 +29,8 @@ export const DEFAULT_SMALL_BLIND_CENTS = 100;
 export const DEFAULT_BIG_BLIND_CENTS = 200;
 export const DEFAULT_MAX_SEATS = 6;
 export const MIN_SEATS = 2;
-export const MAX_SEATS = 9;
+// Physical seat cap — must match backend protocol.MaxSeats (opcodes.go:39). 10-max.
+export const MAX_SEATS = 10;
 
 export interface CardView {
   code: string;
@@ -80,6 +81,8 @@ export interface TableSnapshot {
   variant?: string;
   /** Owner-chosen table look: "2.5d" | "3d". Absent => per-device renderMode. */
   render_style?: string;
+  /** Owner-chosen baked table plate id (bakedTable.ts). Absent => cinematic felt. */
+  table_art?: string;
   host_user_id?: string;
   host_paused?: boolean;
 }

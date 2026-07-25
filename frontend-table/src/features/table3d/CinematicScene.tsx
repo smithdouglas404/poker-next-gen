@@ -17,6 +17,7 @@ import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 
 import { cardBackTexture, cardFaceTexture, feltTexture } from "@/app/proof/textures";
 import { avatarSrc } from "@/features/table/avatars";
+import type { BakedConfig } from "@/features/table/bakedTable";
 
 const GLB_URL = "/models/house.glb";
 
@@ -81,6 +82,16 @@ export interface CinematicSceneProps {
   /** Hero hole cards for the intrinsic bottom HUD (null hides them). */
   heroHole: [string, string] | null;
   mode: AvatarMode;
+  /**
+   * Baked photoreal backdrop (Item 2c). When set, the scene composites over a
+   * pre-rendered empty table plate: the plate is a CSS background behind the
+   * transparent Canvas, the cinematic felt/rail/fog/environment are replaced by a
+   * shadow-catcher + minimal art-matched key light, and the Canvas uses the plate's
+   * own camera + seat ellipse so avatars land on the painted chairs. Omitted =>
+   * the default cinematic R3F felt (legacy/default tables). Both render_style modes
+   * (2.5D portraits / 3D GLB) render over the same plate.
+   */
+  backdrop?: BakedConfig;
   /** Seat-ring divisor: seats sit on `index / maxSeats` around the ellipse. */
   maxSeats: number;
   /** Whether the chip pot is present (hidden on an empty idle table). */
@@ -118,9 +129,14 @@ export interface CinematicSceneProps {
 // Ellipse the seats sit on (matches the proof exactly).
 const SX = 4.95;
 const SZ = 3.2;
+// Active seat ellipse for the current scene. The cinematic felt uses the default
+// (SX/SZ); a baked plate overrides it (set synchronously at the top of Scene, before
+// any seatPoint() call) so seats project onto the painted chairs. There is exactly
+// one live table Canvas mounted at a time, so a module-level value is safe here.
+let ACTIVE_ELLIPSE = { sx: SX, sz: SZ, y: 0.12 };
 function seatPoint(index: number, total: number): [number, number, number] {
   const a = (index / total) * Math.PI * 2 + Math.PI / 2;
-  return [Math.cos(a) * SX, 0.12, Math.sin(a) * SZ];
+  return [Math.cos(a) * ACTIVE_ELLIPSE.sx, ACTIVE_ELLIPSE.y, Math.sin(a) * ACTIVE_ELLIPSE.sz];
 }
 
 /* ---------------- table geometry ---------------- */
@@ -731,7 +747,7 @@ function GlbFigure({ seat, total }: { seat: SceneSeat; total: number }) {
 
 /* ---------------- scene ---------------- */
 
-function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, potMinor, winnerSeat, winNonce, feltControls }: {
+function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, potMinor, winnerSeat, winNonce, feltControls, backdrop }: {
   seats: SceneSeat[];
   board: string[];
   mode: AvatarMode;
@@ -743,7 +759,16 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
   winnerSeat: number;
   winNonce: number;
   feltControls?: FeltControls;
+  backdrop?: BakedConfig;
 }) {
+  // Set the active seat ellipse BEFORE any seatPoint() call this render. A baked
+  // plate supplies its own ellipse so seats land on the painted chairs; the
+  // cinematic felt keeps the contract default (SX/SZ).
+  ACTIVE_ELLIPSE = backdrop
+    ? { sx: backdrop.ellipse.sx, sz: backdrop.ellipse.sz, y: backdrop.ellipse.y }
+    : { sx: SX, sz: SZ, y: 0.12 };
+
+  const baked = !!backdrop;
   const winTarget = useMemo<[number, number, number] | null>(() => {
     if (winnerSeat < 0) return null;
     const p = seatPoint(winnerSeat, maxSeats);
@@ -751,23 +776,43 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
   }, [winnerSeat, maxSeats]);
   return (
     <>
-      <color attach="background" args={["#05070c"]} />
-      <fog attach="fog" args={["#05070c", 12, 26]} />
+      {baked ? (
+        // Baked photoreal branch: the plate (CSS background, behind the transparent
+        // Canvas) provides the felt/rail/room/lighting look. We add only a minimal
+        // art-matched key light + a shadow-catcher so GLB figures drop a real shadow
+        // onto the flat art. No fog / color background / Environment (those would
+        // veil the plate). The cinematic contract camera/rig is untouched — this is a
+        // separate opt-in path (CLAUDE.md non-negotiable #1: real geometry + shadow,
+        // not a div faking 3D).
+        <>
+          <ambientLight intensity={0.55} color="#c9d3e0" />
+          <spotLight position={[0, 9.5, 2.5]} angle={0.7} penumbra={0.9} intensity={2.2} color="#fff4d8" castShadow shadow-mapSize={[1024, 1024]} />
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+            <planeGeometry args={[backdrop.shadowCatcher?.size ?? 16, backdrop.shadowCatcher?.size ?? 16]} />
+            <shadowMaterial transparent opacity={backdrop.shadowCatcher?.opacity ?? 0.34} />
+          </mesh>
+        </>
+      ) : (
+        <>
+          <color attach="background" args={["#05070c"]} />
+          <fog attach="fog" args={["#05070c", 12, 26]} />
 
-      <ambientLight intensity={0.35} color="#6a86b8" />
-      <hemisphereLight intensity={0.45} color="#2a4d78" groundColor="#08170f" />
-      <spotLight position={[0, 9.5, 2.5]} angle={0.62} penumbra={0.9} intensity={2.6} color="#fff4d8" castShadow shadow-mapSize={[1024, 1024]} />
-      <pointLight position={[-7.5, 3.2, -3]} intensity={2.2} decay={0} color="#ff2d3f" />
-      <pointLight position={[7.5, 3.2, -2]} intensity={2.0} decay={0} color="#ffcf6a" />
-      <pointLight position={[0, 2.4, -7.5]} intensity={1.3} decay={0} color="#c8102e" />
+          <ambientLight intensity={0.35} color="#6a86b8" />
+          <hemisphereLight intensity={0.45} color="#2a4d78" groundColor="#08170f" />
+          <spotLight position={[0, 9.5, 2.5]} angle={0.62} penumbra={0.9} intensity={2.6} color="#fff4d8" castShadow shadow-mapSize={[1024, 1024]} />
+          <pointLight position={[-7.5, 3.2, -3]} intensity={2.2} decay={0} color="#ff2d3f" />
+          <pointLight position={[7.5, 3.2, -2]} intensity={2.0} decay={0} color="#ffcf6a" />
+          <pointLight position={[0, 2.4, -7.5]} intensity={1.3} decay={0} color="#c8102e" />
 
-      <Environment resolution={128}>
-        <Lightformer intensity={1.4} form="rect" position={[0, 6, 1]} scale={[9, 4, 1]} color="#ffffff" />
-        <Lightformer intensity={2.2} form="rect" position={[-6, 2, -3]} scale={[3, 6, 1]} color="#ff2d3f" />
-        <Lightformer intensity={2.0} form="rect" position={[6, 2, -3]} scale={[3, 6, 1]} color="#ffcf6a" />
-      </Environment>
+          <Environment resolution={128}>
+            <Lightformer intensity={1.4} form="rect" position={[0, 6, 1]} scale={[9, 4, 1]} color="#ffffff" />
+            <Lightformer intensity={2.2} form="rect" position={[-6, 2, -3]} scale={[3, 6, 1]} color="#ff2d3f" />
+            <Lightformer intensity={2.0} form="rect" position={[6, 2, -3]} scale={[3, 6, 1]} color="#ffcf6a" />
+          </Environment>
 
-      <TableBody />
+          <TableBody />
+        </>
+      )}
       <Board board={board} />
       {showPot && <Pot potMinor={potMinor} />}
       <ChipSweep target={winTarget} nonce={winNonce} />
@@ -810,11 +855,17 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
       {/* On-felt sit-out toggle + change-seat markers. */}
       {feltControls && <FeltControlsLayer ctl={feltControls} total={maxSeats} />}
 
-      <ContactShadows position={[0, 0.01, 0]} opacity={0.5} scale={16} blur={2.4} far={5} resolution={512} color="#000000" />
+      {/* Baked plates already carry their own ground contact + vignette in the art;
+          the shadow-catcher handles live GLB shadows, so skip ContactShadows there. */}
+      {!baked && (
+        <ContactShadows position={[0, 0.01, 0]} opacity={0.5} scale={16} blur={2.4} far={5} resolution={512} color="#000000" />
+      )}
 
       <EffectComposer>
-        <Bloom intensity={0.55} luminanceThreshold={0.55} luminanceSmoothing={0.2} mipmapBlur />
-        <Vignette eskil={false} offset={0.28} darkness={0.82} />
+        {[
+          <Bloom key="bloom" intensity={baked ? 0.35 : 0.55} luminanceThreshold={baked ? 0.7 : 0.55} luminanceSmoothing={0.2} mipmapBlur />,
+          ...(baked ? [] : [<Vignette key="vignette" eskil={false} offset={0.28} darkness={0.82} />]),
+        ]}
       </EffectComposer>
     </>
   );
@@ -931,32 +982,36 @@ export function CinematicScene({
   winNonce = 0,
   announce,
   feltControls,
+  backdrop,
   children,
   overlay,
 }: CinematicSceneProps) {
+  // Baked plate: show the empty table image behind the transparent Canvas (cover,
+  // centered) and give the Canvas the plate's art-matched camera. Cinematic (default):
+  // the red/gold radial room gradient + the contract camera [0,6.9,7.9] fov 42.
+  const wrapperBg = backdrop
+    ? `#05070c url(${backdrop.imageUrl}) center / cover no-repeat`
+    : "radial-gradient(1200px 700px at 20% 0%, rgba(255,45,63,0.10), transparent 60%)," +
+      "radial-gradient(1000px 600px at 85% 20%, rgba(200,16,46,0.10), transparent 60%)," +
+      "radial-gradient(900px 500px at 50% 100%, rgba(233,196,106,0.08), transparent 60%)," +
+      "linear-gradient(180deg,#04060a,#070b12 60%,#04060a)";
+  const cameraCfg = backdrop
+    ? { position: backdrop.camera.position, fov: backdrop.camera.fov }
+    : { position: [0, 6.9, 7.9] as [number, number, number], fov: 42 };
   return (
-    <div
-      className="relative h-screen w-screen overflow-hidden"
-      style={{
-        background:
-          "radial-gradient(1200px 700px at 20% 0%, rgba(255,45,63,0.10), transparent 60%)," +
-          "radial-gradient(1000px 600px at 85% 20%, rgba(200,16,46,0.10), transparent 60%)," +
-          "radial-gradient(900px 500px at 50% 100%, rgba(233,196,106,0.08), transparent 60%)," +
-          "linear-gradient(180deg,#04060a,#070b12 60%,#04060a)",
-      }}
-    >
+    <div className="relative h-screen w-screen overflow-hidden" style={{ background: wrapperBg }}>
       <Canvas
         shadows
         dpr={[1, 2]}
         gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
-        camera={{ position: [0, 6.9, 7.9], fov: 42 }}
+        camera={cameraCfg}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           gl.toneMappingExposure = 1.15;
         }}
       >
         <Suspense fallback={null}>
-          <Scene seats={seats} board={board} mode={mode} maxSeats={maxSeats} showPot={showPot} handLive={handLive} dealNonce={dealNonce} potMinor={potMinor} winnerSeat={winnerSeat} winNonce={winNonce} feltControls={feltControls} />
+          <Scene seats={seats} board={board} mode={mode} maxSeats={maxSeats} showPot={showPot} handLive={handLive} dealNonce={dealNonce} potMinor={potMinor} winnerSeat={winnerSeat} winNonce={winNonce} feltControls={feltControls} backdrop={backdrop} />
         </Suspense>
       </Canvas>
       {children ?? <SceneHud potLabel={potLabel} heroHole={heroHole} announce={announce} />}

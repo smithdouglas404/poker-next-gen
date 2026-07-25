@@ -12,6 +12,7 @@ import { useSearchParams } from "next/navigation";
 
 import { formatCents, useGame } from "@/features/game/GameProvider";
 import { useRenderMode, type RenderMode } from "@/features/table/renderMode";
+import { bakedPlate } from "@/features/table/bakedTable";
 import { avatarDef } from "@/features/table/avatars";
 import { heroSeatIndex } from "@/features/table/syncGameToCanvas";
 import { DEFAULT_MAX_SEATS, MAX_SEATS, MIN_SEATS } from "@/features/game/protocol";
@@ -244,6 +245,7 @@ export default function LiveCinematicTable() {
       winNonce={scene.winNonce}
       announce={scene.announce}
       feltControls={feltControls}
+      backdrop={bakedPlate(snapshot?.table_art)}
       overlay={<TableAdminOverlay demo={demo} />}
     />
   );
