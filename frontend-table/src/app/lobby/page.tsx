@@ -165,6 +165,15 @@ function LobbyContent() {
         lockedHint: "Only Club Owners can sponsor Public Games",
       },
       {
+        key: "playmoney",
+        title: "Play Money",
+        subtitle: "Free to Play",
+        blurb: "Jump in free — low stakes, open seating, no KYC to sit. The friction-free way to learn the tables and warm up.",
+        cta: "Play for Free",
+        accent: "green",
+        scene: "lounge",
+      },
+      {
         key: "tournament",
         title: "Tournament",
         blurb: "Compete against the best. Multi-table events, big prize pools. Climb the leaderboard to become a legend.",
@@ -232,11 +241,13 @@ function LobbyContent() {
               ? "Private Table Setup"
               : view === "public"
                 ? "Public Game Setup"
-                : view === "tournament"
-                  ? "Tournaments"
-                  : view === "browse"
-                    ? "Classic Public Game Browser"
-                    : "Game Mode Selection"}
+                : view === "playmoney"
+                  ? "Free Play Setup"
+                  : view === "tournament"
+                    ? "Tournaments"
+                    : view === "browse"
+                      ? "Classic Public Game Browser"
+                      : "Game Mode Selection"}
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-neutral-400">
             {view === "select"
@@ -245,9 +256,11 @@ function LobbyContent() {
                 ? "Configure every detail of your table, then deal in your invited guests."
                 : view === "public"
                   ? "Sponsor a club-branded open game for the community."
-                  : view === "browse"
-                    ? "Browse every live public game — filter by stakes and game type, then take a seat."
-                    : "Multi-table events with escalating blinds and real prize pools."}
+                  : view === "playmoney"
+                    ? "Spin up a free, low-stakes open table — no deposit, no KYC to sit."
+                    : view === "browse"
+                      ? "Browse every live public game — filter by stakes and game type, then take a seat."
+                      : "Multi-table events with escalating blinds and real prize pools."}
           </p>
         </div>
 
@@ -374,7 +387,7 @@ function LobbyContent() {
         )}
 
         {/* ---- private / public setup ---- */}
-        {(view === "private" || view === "public") && (
+        {(view === "private" || view === "public" || view === "playmoney") && (
           <>
             {view === "public" && !canSponsor ? (
               <div className={cn(GLASS_PANEL, "space-y-4 border-gold/25 bg-gold/[0.04] p-6")}>

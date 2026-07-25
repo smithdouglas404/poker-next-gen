@@ -61,28 +61,34 @@ export function PrivateTableSetup({
   sponsorClubs,
   onBack,
 }: {
-  mode: "private" | "public";
+  mode: "private" | "public" | "playmoney";
   sponsorClubs?: ClubLite[];
   onBack: () => void;
 }) {
   const { connected, joinRoom, findMatch, matchmakerSearching, profile } = useGame();
 
   const isPublic = mode === "public";
+  // Play money = a low-stakes, no-KYC-to-sit, open table — the friction-free
+  // onboarding funnel. Same table_create path; the platform relaxes gates when
+  // real money is off. Honest framing: casual low stakes, not a separate currency.
+  const isPlayMoney = mode === "playmoney";
 
-  const [name, setName] = useState("");
+  const [name, setName] = useState(isPlayMoney ? "Free Play Table" : "");
   const [variant, setVariant] = useState<Variant>("holdem");
-  const [blindIdx, setBlindIdx] = useState(1);
+  const [blindIdx, setBlindIdx] = useState(isPlayMoney ? 0 : 1);
   const [customBlinds, setCustomBlinds] = useState(false);
   const [sbDollars, setSbDollars] = useState(1);
   const [bbDollars, setBbDollars] = useState(2);
-  const [buyInDollars, setBuyInDollars] = useState(500);
+  const [buyInDollars, setBuyInDollars] = useState(isPlayMoney ? 20 : 500);
   const [seats, setSeats] = useState(6);
   const [bots, setBots] = useState(0);
   const [durationMins, setDurationMins] = useState(0);
   const [spectators, setSpectators] = useState(true);
 
   // ---- Advanced Table Access Configuration (detailed_8 master) ----
-  const [accessType, setAccessType] = useState<AccessType>(isPublic ? "public" : "invite");
+  const [accessType, setAccessType] = useState<AccessType>(
+    isPublic || isPlayMoney ? "public" : "invite",
+  );
   const [joinCode, setJoinCode] = useState("");
   const [minPlayers, setMinPlayers] = useState(2);
   const [decisionSecs, setDecisionSecs] = useState(15);
@@ -238,6 +244,13 @@ export function PrivateTableSetup({
         {error && (
           <div className="rounded-xl border border-red-500/30 bg-red-950/20 p-3 text-sm text-red-200">
             {error}
+          </div>
+        )}
+
+        {isPlayMoney && (
+          <div className="rounded-xl border border-green/30 bg-green/[0.06] p-3 text-sm text-[#bff5d3]">
+            <span className="font-bold uppercase tracking-wider text-green">🎮 Free play</span> — low
+            stakes, open seating, no KYC required to sit. The friction-free way to learn the tables.
           </div>
         )}
 

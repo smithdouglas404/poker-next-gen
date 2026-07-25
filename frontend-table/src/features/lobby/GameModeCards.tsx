@@ -31,7 +31,7 @@ const ACCENT: Record<Accent, { ring: string; text: string; glow: string; dot: st
 };
 
 export interface ModeCardDef {
-  key: "private" | "public" | "tournament";
+  key: "private" | "public" | "playmoney" | "tournament";
   title: string;
   subtitle?: string;
   blurb: string;

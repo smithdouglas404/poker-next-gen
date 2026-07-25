@@ -2,7 +2,7 @@
 // clear no-backend fallback (guest/offline) — it is always visibly labeled as
 // demo in the UI and never presented as live server state.
 
-export type LobbyView = "select" | "private" | "public" | "tournament" | "browse";
+export type LobbyView = "select" | "private" | "public" | "playmoney" | "tournament" | "browse";
 
 export interface MeRoles {
   platform_admin?: boolean;
