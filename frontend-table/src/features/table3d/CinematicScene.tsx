@@ -338,7 +338,7 @@ function backTexture(): THREE.Texture {
 
 // Face-down card — the real rendered card-back texture on the top face (the hero's
 // own cards are the DOM overlay; opponents/deck show this back).
-function CardBack({ w = 0.275, h = 0.366 }: { w?: number; h?: number }) {
+function CardBack({ w = 0.275, h = 0.464 }: { w?: number; h?: number }) {
   const mats = useMemo(() => {
     const back = backTexture();
     const edge = new THREE.MeshStandardMaterial({ color: "#e8ecf0", roughness: 0.5 });
@@ -383,7 +383,7 @@ function Deck({ nonce }: { nonce: number }) {
   for (let i = 0; i < 9; i++) {
     cards.push(
       <mesh key={i} position={[0, i * 0.016, 0]} castShadow>
-        <boxGeometry args={[0.275, 0.016, 0.366]} />
+        <boxGeometry args={[0.275, 0.016, 0.464]} />
         <meshStandardMaterial color="#eef2f6" roughness={0.5} />
       </mesh>,
     );
@@ -423,7 +423,7 @@ function HoleFace({ code }: { code: string }) {
   return (
     <group ref={ref}>
       <mesh castShadow material={mats}>
-        <boxGeometry args={[0.275, 0.016, 0.366]} />
+        <boxGeometry args={[0.275, 0.016, 0.464]} />
       </mesh>
     </group>
   );
@@ -488,7 +488,7 @@ function BoardCard({ code, x, delay }: { code: string; x: number; delay: number 
   return (
     <group ref={ref}>
       <mesh castShadow material={mats}>
-        <boxGeometry args={[0.473, 0.022, 0.641]} />
+        <boxGeometry args={[0.473, 0.022, 0.813]} />
       </mesh>
     </group>
   );

@@ -254,7 +254,7 @@ export default function CinematicTable({ mode, plate }: { mode: AvatarMode; plat
       potLabel={POT_LABEL}
       heroHole={PROOF_HERO_HOLE}
       mode={mode}
-      maxSeats={backdrop?.seats ?? PROOF_SEATS.length}
+      maxSeats={backdrop?.seats ?? 10} // spec: ten seats; unoccupied render VACANT
       backdrop={backdrop}
     >
       <HudOverlay mode={mode} />
