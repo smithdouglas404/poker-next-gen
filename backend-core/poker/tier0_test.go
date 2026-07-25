@@ -13,11 +13,11 @@ func TestHeadsUpButtonIsSmallBlind(t *testing.T) {
 	tbl := NewTable()
 	tbl.Seats[0] = &Seat{Index: 0, UserID: "u0", Status: SeatSeated, Stack: 10000}
 	tbl.Seats[1] = &Seat{Index: 1, UserID: "u1", Status: SeatSeated, Stack: 10000}
-	tbl.ButtonSeat = 0
 
-	sb, bb := tbl.blindSeats(2)
-	if sb != 0 {
-		t.Fatalf("heads-up SB seat = %d, want 0 (the button posts the small blind)", sb)
+	// First hand (no anchor): button = first active seat = 0; it posts the SB.
+	btn, sb, bb, _ := tbl.assignButtonAndBlinds(tbl.activeSeats())
+	if btn != 0 || sb != 0 {
+		t.Fatalf("heads-up button/SB = %d/%d, want 0/0 (the button posts the small blind)", btn, sb)
 	}
 	if bb != 1 {
 		t.Fatalf("heads-up BB seat = %d, want 1 (the non-button seat)", bb)
@@ -31,11 +31,11 @@ func TestThreeHandedBlindsUnchanged(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		tbl.Seats[i] = &Seat{Index: i, UserID: "u", Status: SeatSeated, Stack: 10000}
 	}
-	tbl.ButtonSeat = 0
 
-	sb, bb := tbl.blindSeats(3)
-	if sb != 1 || bb != 2 {
-		t.Fatalf("3-handed blinds sb=%d bb=%d, want sb=1 bb=2", sb, bb)
+	// First hand (no anchor): button = seat 0, SB = 1, BB = 2 (unchanged rule).
+	btn, sb, bb, _ := tbl.assignButtonAndBlinds(tbl.activeSeats())
+	if btn != 0 || sb != 1 || bb != 2 {
+		t.Fatalf("3-handed btn=%d sb=%d bb=%d, want 0/1/2", btn, sb, bb)
 	}
 }
 

@@ -774,11 +774,19 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			if _, ok := s.TimeBank[userID]; !ok {
 				s.TimeBank[userID] = s.timeBankGrant() // one-time grant per player
 			}
-			// If a hand is already in progress, the new player sits out until it
-			// finishes (folded = excluded from the current pot/showdown). The next
-			// ResetBetweenHands restores them to Seated so they are dealt in.
-			if s.Phase != poker.PhaseWaiting && s.Table.Seats[req.Seat] != nil {
-				s.Table.Seats[req.Seat].Status = poker.SeatFolded
+			// No "buying the button": a player who joins after the game has started
+			// owes a post (dead SB + live BB) before being dealt in, unless the big
+			// blind naturally reaches their seat. They may elect to post immediately
+			// (PostNow). On a fresh table (HandNo == 0) everyone is dealt in for free
+			// on the first hand. If a hand is live they also sit out the current one.
+			if s.Table.HandNo > 0 {
+				if seat := s.Table.Seats[req.Seat]; seat != nil {
+					seat.OwesPost = true
+					seat.PostNow = req.PostNow
+					if s.Phase != poker.PhaseWaiting {
+						seat.Status = poker.SeatFolded
+					}
+				}
 			}
 			_ = seatReg.Register(ctx, userID, matchKey)
 			// Guest reconciliation (P7): a GUEST (no registered account) sitting at

@@ -9,6 +9,10 @@ type SitDownRequest struct {
 	// (funded global wallet) or "club" (club-issued balance). Empty => club
 	// balance at a club table, global wallet at a non-club table (the old default).
 	Wallet string `json:"wallet,omitempty"`
+	// PostNow: when joining a game already in progress, post the blinds immediately
+	// (a dead small blind + a live big blind) to be dealt in on the next hand,
+	// rather than waiting for the big blind to reach the seat. False => wait.
+	PostNow bool `json:"post_now,omitempty"`
 }
 
 type ActionRequest struct {

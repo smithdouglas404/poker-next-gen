@@ -46,6 +46,15 @@ type Seat struct {
 	Status           SeatStatus
 	LastAction       string
 	IsBot            bool
+	// Cash-game blind-correctness state (persists across hands, so it must NOT be a
+	// SeatStatus — ResetBetweenHands rewrites Status every hand). SittingOut: in the
+	// seat but out of the game. OwesPost: joined/returned after the game started and
+	// must post (dead SB + live BB) to be dealt before their natural big blind — the
+	// "no buying the button" rule. PostNow: the player elected to post immediately on
+	// the next hand rather than wait for the big blind (consumed in StartHand).
+	SittingOut bool
+	OwesPost   bool
+	PostNow    bool
 }
 
 type Street string
@@ -84,6 +93,13 @@ type Table struct {
 	// -1 when the hand was checked down. Drives the showdown show-order (the last
 	// aggressor must show first; else the first active seat left of the button).
 	LastAggressorSeat int
+	// SBSeat / BBSeat are THIS hand's small- and big-blind seat indices (-1 = none/
+	// dead). Persisted as the anchors for the forward-moving big blind: next hand's
+	// small blind is this hand's BB seat and next hand's button is this hand's SB
+	// seat, which lets the button land on an emptied seat (dead button) and the
+	// small blind be skipped (dead SB) — standard cash-game rules.
+	SBSeat int
+	BBSeat int
 	ActedThisRound map[int]bool
 	SeatCap        int    // configured active seats (2..MaxSeats); 0 => default 6
 	Variant        string // "holdem" | "plo"; empty => holdem
@@ -125,6 +141,8 @@ func NewTable() *Table {
 		SeatCap:          6,
 		Variant:          VariantHoldem,
 		StraddleSeat:     -1,
+		SBSeat:           -1,
+		BBSeat:           -1,
 		RunItTwiceBoards: 2,
 	}
 }
@@ -283,44 +301,72 @@ func (t *Table) StartHand(sb, bb int64) error {
 	t.ActedThisRound = map[int]bool{}
 	t.LastAggressorSeat = -1 // reset show-order tracking each hand
 
-	// Find button with at least 2 seated
-	seated := t.seatedIndices()
-	if len(seated) < 2 {
-		t.Street = StreetWaiting
-		return nil
-	}
-	if t.ButtonSeat == 0 && t.HandNo == 1 {
-		t.ButtonSeat = seated[0]
-	} else {
-		t.ButtonSeat = t.nextSeated(t.ButtonSeat)
+	// Need at least 2 ACTIVE seats (seated with chips, not sitting out, not owing a
+	// post) to start a hand. Sitting-out / owing players are held out until they
+	// return / post.
+	active := t.activeSeats()
+	if len(active) < 2 {
+		// Too few active players to continue the current game. If enough players are
+		// nonetheless present and willing (chips, not sitting out) — e.g. a fresh
+		// table where everyone would otherwise "owe" a post — a NEW game forms:
+		// clear owed-posts and start blinds fresh. Otherwise wait.
+		ready := t.readySeats()
+		if len(ready) < 2 {
+			t.Street = StreetWaiting
+			return nil
+		}
+		for _, idx := range ready {
+			t.Seats[idx].OwesPost = false
+			t.Seats[idx].PostNow = false
+		}
+		t.SBSeat, t.BBSeat = -1, -1 // fresh anchors → first-hand blind assignment
+		active = t.activeSeats()
 	}
 
-	// Deal hole cards (2 for Hold'em, 4 for PLO).
+	// Determine the button and blinds up front (forward-moving big blind, honoring
+	// dead button + dead small blind) so we know who is in the hand before dealing.
+	btn, sbSeat, bbSeat, deadSB := t.assignButtonAndBlinds(active)
+	t.ButtonSeat = btn // may point at an emptied seat (dead button) — that's allowed
+
+	occupied := t.seatedIndices()
+	in := t.dealtIn(active, bbSeat)
+
+	// Deal hole cards (2 for Hold'em, 4 for PLO) to the IN-HAND seats. Everyone else
+	// is HELD OUT: marked folded with no cards, so they're excluded from action, the
+	// pot and showdown, and re-evaluated next hand until they post — the "no buying
+	// the button" rule. The held-out flags (SittingOut/OwesPost) persist across
+	// ResetBetweenHands, so a held-out player stays out until they actually post.
 	n := t.holeCount()
-	for _, idx := range seated {
+	for _, idx := range occupied {
 		s := t.Seats[idx]
-		hole := make([]Card, n)
-		for i := 0; i < n; i++ {
-			hole[i] = t.draw()
-		}
-		t.HoleCards[s.UserID] = hole
-		s.Status = SeatSeated
 		s.Bet = 0
 		s.LastAction = ""
+		if in[idx] {
+			hole := make([]Card, n)
+			for i := 0; i < n; i++ {
+				hole[i] = t.draw()
+			}
+			t.HoleCards[s.UserID] = hole
+			s.Status = SeatSeated
+		} else {
+			s.Status = SeatFolded
+		}
 	}
 
 	// Reset per-hand feature state before choosing the opening structure.
 	t.StraddleSeat = -1
 	t.RunItTwice = false
 
-	// Bomb pot: every seated player antes, preflop betting is skipped, and the
+	// Bomb pot: every IN-HAND player antes, preflop betting is skipped, and the
 	// hand deals straight to the flop. Takes precedence over blinds/straddle.
 	if t.AllowBombPot && t.BombPotRequested {
 		ante := t.bombAnte(bb)
 		t.BombPotRequested = false
 		if ante > 0 {
-			for _, idx := range seated {
-				t.postAnte(idx, ante)
+			for _, idx := range occupied {
+				if in[idx] {
+					t.postAnte(idx, ante)
+				}
 			}
 			// Deal the flop immediately; there is no preflop betting round.
 			t.Board = append(t.Board, t.draw(), t.draw(), t.draw())
@@ -330,21 +376,38 @@ func (t *Table) StartHand(sb, bb int64) error {
 			t.ActedThisRound = map[int]bool{}
 			// Post-flop action opens on the first active seat left of the button.
 			t.ActionSeat = t.nextActiveSeat(t.ButtonSeat)
+			t.SBSeat, t.BBSeat = sbSeat, bbSeat
 			return nil
 		}
 	}
 
-	// Post blinds. blindSeats encodes the heads-up special case (button is the SB).
-	sbSeat, bbSeat := t.blindSeats(len(seated))
-	t.postBlind(sbSeat, sb, "SB")
-	t.postBlind(bbSeat, bb, "BB")
+	// Post blinds. A DEAD small blind (its seat is empty / sitting out / owing) means
+	// no small blind is posted this hand. The big blind is always posted; when the
+	// BB seat owes a blind, forcePostBB satisfies that debt with no penalty.
+	if !deadSB && sbSeat != bbSeat {
+		t.postBlind(sbSeat, sb, "SB")
+	}
+	t.forcePostBB(bbSeat, bb)
+
+	// Players who elected to post on entry (PostNow) pay a dead SB + a live BB now
+	// and are in (already dealt above). The BB seat is handled by forcePostBB above.
+	for _, idx := range occupied {
+		s := t.Seats[idx]
+		if idx != bbSeat && s.Status == SeatSeated && s.OwesPost && s.PostNow {
+			t.postReturn(idx, sb, bb)
+		}
+	}
+
 	t.ActionSeat = t.nextActiveSeat(bbSeat)
+
+	// Persist the blind anchors for next hand's forward-moving big blind.
+	t.SBSeat, t.BBSeat = sbSeat, bbSeat
 
 	// Optional voluntary straddle: UTG posts 2x BB and betting reopens from the
 	// straddle (the straddler retains the option to act last preflop, exactly as
 	// the big blind does — postBlind does not mark the seat as having acted).
 	if t.AllowStraddle && t.StraddleRequested {
-		utg := t.nextSeated(bbSeat)
+		utg := t.nextActiveSeat(bbSeat)
 		su := t.Seats[utg]
 		straddle := 2 * bb
 		if utg != bbSeat && utg != sbSeat && su != nil && su.Stack >= straddle {
@@ -439,17 +502,151 @@ func (t *Table) nextSeated(from int) int {
 	return from
 }
 
-// blindSeats returns the small-blind and big-blind seat indices for the current
-// button and seating. Heads-up (2 players) is the special case per standard
-// no-limit rules: the BUTTON posts the small blind (and acts first pre-flop);
-// the non-button seat posts the big blind. 3+ handed, the SB is the seat left of
-// the button and the BB is the seat left of the SB.
-func (t *Table) blindSeats(seatedCount int) (sbSeat, bbSeat int) {
-	if seatedCount == 2 {
-		return t.ButtonSeat, t.nextSeated(t.ButtonSeat)
+// active reports whether a seat is eligible to be dealt into a new hand: seated
+// with chips, not sitting out, and not owing a post. Blind/button SELECTION uses
+// this (and its walkers below); in-hand ACTION order still uses nextActiveSeat.
+func (t *Table) active(idx int) bool {
+	s := t.Seats[idx]
+	return s != nil && s.Status == SeatSeated && s.Stack > 0 && !s.SittingOut && !s.OwesPost
+}
+
+// activeSeats returns the ascending indices of all active seats.
+func (t *Table) activeSeats() []int {
+	out := []int{}
+	for i := 0; i < MaxSeats; i++ {
+		if t.active(i) {
+			out = append(out, i)
+		}
 	}
-	sb := t.nextSeated(t.ButtonSeat)
-	return sb, t.nextSeated(sb)
+	return out
+}
+
+// readySeats returns seats that COULD play (seated, chips, not sitting out),
+// including those that currently owe a post. Used to detect a newly-forming game
+// where every player would otherwise be held out.
+func (t *Table) readySeats() []int {
+	out := []int{}
+	for i := 0; i < MaxSeats; i++ {
+		s := t.Seats[i]
+		if s != nil && s.Status == SeatSeated && s.Stack > 0 && !s.SittingOut {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
+// nextEligible returns the first active seat clockwise from `from`.
+func (t *Table) nextEligible(from int) int {
+	for i := 1; i <= MaxSeats; i++ {
+		idx := (from + i) % MaxSeats
+		if t.active(idx) {
+			return idx
+		}
+	}
+	return from
+}
+
+// nextBBSeat returns the first seat clockwise from `from` that can POST the big
+// blind. Unlike active(), this INCLUDES a seat that owes a post: when the moving
+// big blind reaches such a player it is their natural big blind, which forces the
+// post and clears the debt with no dead-blind penalty.
+func (t *Table) nextBBSeat(from int) int {
+	for i := 1; i <= MaxSeats; i++ {
+		idx := (from + i) % MaxSeats
+		s := t.Seats[idx]
+		if s != nil && s.Stack > 0 && !s.SittingOut {
+			return idx
+		}
+	}
+	return from
+}
+
+// postsSB reports whether a seat actually posts the small blind (a dead/empty/
+// sitting-out/owing seat does not → dead small blind, no SB that hand).
+func (t *Table) postsSB(idx int) bool { return t.active(idx) }
+
+// assignButtonAndBlinds derives this hand's button, small-blind and big-blind
+// seats using the forward-moving big blind. active is the pre-dealt active set
+// (len >= 2). Heads-up is the special case (button posts the small blind); the
+// first hand (no anchor yet) mirrors the historical button = first active seat;
+// thereafter the blinds are pinned from last hand's anchors so the button can be
+// dead (its seat emptied) and the small blind can be dead (its seat can't post).
+func (t *Table) assignButtonAndBlinds(active []int) (btn, sbSeat, bbSeat int, deadSB bool) {
+	if len(active) == 2 {
+		// Heads-up: the button posts the small blind and acts first pre-flop.
+		// Alternate the button each hand off the anchor (last BB becomes button/SB).
+		if t.BBSeat >= 0 && (t.Seats[t.BBSeat] != nil) {
+			btn = t.BBSeat
+		} else {
+			btn = active[0]
+		}
+		if !t.active(btn) {
+			btn = active[0]
+		}
+		other := active[0]
+		if other == btn {
+			other = active[1]
+		}
+		return btn, btn, other, false
+	}
+	if t.BBSeat < 0 {
+		// First hand: button = first active seat (parity with the historical rule).
+		btn = active[0]
+		sbSeat = t.nextEligible(btn)
+		bbSeat = t.nextEligible(sbSeat)
+		return btn, sbSeat, bbSeat, false
+	}
+	// Moving big blind with a pinned (possibly dead) button and small blind.
+	sbSeat = t.BBSeat            // last hand's BB seat; may be empty/sitting-out/owing → dead SB
+	btn = t.SBSeat              // last hand's SB seat; may be empty → dead button
+	bbSeat = t.nextBBSeat(t.BBSeat) // advance exactly one live seat
+	deadSB = !t.postsSB(sbSeat)
+	return btn, sbSeat, bbSeat, deadSB
+}
+
+// dealtIn returns the set of seats that are IN this hand: the active players, the
+// big blind (whose forced post covers any owed blind), and anyone who elected to
+// post on entry. Everyone else is held out (dealt no cards).
+func (t *Table) dealtIn(active []int, bbSeat int) map[int]bool {
+	in := map[int]bool{}
+	for _, idx := range active {
+		in[idx] = true
+	}
+	in[bbSeat] = true
+	for i := 0; i < MaxSeats; i++ {
+		s := t.Seats[i]
+		if s != nil && s.OwesPost && s.PostNow && s.Stack > 0 && !s.SittingOut {
+			in[i] = true
+		}
+	}
+	return in
+}
+
+// forcePostBB posts the big blind and clears any owed-post / sitting-out flags:
+// the natural big blind satisfies the blind obligation with no dead-blind penalty.
+func (t *Table) forcePostBB(seat int, bb int64) {
+	s := t.Seats[seat]
+	if s == nil {
+		return
+	}
+	s.OwesPost = false
+	s.SittingOut = false
+	t.postBlind(seat, bb, "BB")
+}
+
+// postReturn is the entry posting for a player who elected to post immediately: a
+// dead small blind forfeited to the pot (no live Bet) plus a live big blind, after
+// which they are in and their owed-post is cleared.
+func (t *Table) postReturn(seat int, sb, bb int64) {
+	s := t.Seats[seat]
+	if s == nil {
+		return
+	}
+	t.postAnte(seat, sb) // dead SB → pot, sets no Bet (same mechanic as an ante)
+	t.postBlind(seat, bb, "BB")
+	s.OwesPost = false
+	s.PostNow = false
+	s.SittingOut = false
 }
 
 func (t *Table) nextActiveSeat(from int) int {
