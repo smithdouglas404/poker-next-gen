@@ -11,8 +11,9 @@ function ProofInner() {
   const sp = useSearchParams();
   const screen = sp.get("screen") ?? "table";
   const mode = (sp.get("mode") as "2d" | "3d" | "mix") ?? "2d";
+  const plate = sp.get("plate") ?? undefined; // baked-plate id (e.g. "arena-red")
   if (screen === "club") return <ClubDashboard />;
-  return <CinematicTable mode={mode} />;
+  return <CinematicTable mode={mode} plate={plate} />;
 }
 
 export default function ProofPage() {

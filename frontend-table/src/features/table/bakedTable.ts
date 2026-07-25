@@ -24,6 +24,10 @@ export interface BakedConfig {
   ellipse: { sx: number; sz: number; y: number };
   /** Ground shadow-catcher size + darkness (GLB castShadow drops onto the flat art). */
   shadowCatcher?: { size: number; opacity: number };
+  /** Number of seat frames PAINTED on the plate. The seat ring divides by this so
+   *  seatPoint() lands one seat per painted chair (a live table's max_seats should
+   *  match). Omitted => caller's seat count. */
+  seats?: number;
 }
 
 export interface BakedPlate extends BakedConfig {
@@ -38,25 +42,26 @@ const DEFAULT_CAMERA = { position: [0, 6.9, 7.9] as [number, number, number], fo
 const DEFAULT_ELLIPSE = { sx: 4.95, sz: 3.2, y: 0.12 };
 
 export const BAKED_PLATES: Record<string, BakedPlate> = {
-  // On-brand red/gold arena (the user's generated plate). SWAP imageUrl to
-  // "/table/arena-red.jpg" once the file is committed under public/table/, then
-  // nudge camera/ellipse so the 9 seats land on the painted chairs.
+  // Red/gold arena (the user's committed plate, 1024×1024, 10 painted seat frames).
+  // camera/ellipse are tuned so seatPoint() lands the 10 seats on the painted chairs.
   "arena-red": {
     id: "arena-red",
     label: "Provably-Fair Arena — Red/Gold",
-    imageUrl: "/table/placeholder-arena.svg", // TODO: /table/arena-red.jpg
-    camera: DEFAULT_CAMERA,
-    ellipse: DEFAULT_ELLIPSE,
+    imageUrl: "/table/2d-arenared.jpg",
+    camera: { position: [0, 6.6, 8.1], fov: 40 },
+    ellipse: { sx: 5.15, sz: 3.75, y: 0.12 },
     shadowCatcher: { size: 16, opacity: 0.34 },
+    seats: 10,
   },
-  // Cyan variant (verification-accent teal). Same table, cyan rim.
+  // Cyan variant (verification-accent teal). Same table geometry, cyan rim.
   "arena-cyan": {
     id: "arena-cyan",
     label: "Provably-Fair Arena — Cyan",
-    imageUrl: "/table/placeholder-arena.svg", // TODO: /table/arena-cyan.jpg
-    camera: DEFAULT_CAMERA,
-    ellipse: DEFAULT_ELLIPSE,
+    imageUrl: "/table/arena-2d.jpg",
+    camera: { position: [0, 6.6, 8.1], fov: 40 },
+    ellipse: { sx: 5.15, sz: 3.75, y: 0.12 },
     shadowCatcher: { size: 16, opacity: 0.34 },
+    seats: 10,
   },
 };
 

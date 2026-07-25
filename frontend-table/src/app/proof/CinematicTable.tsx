@@ -4,6 +4,7 @@ import { useMemo } from "react";
 
 import { GLASS_PANEL } from "@/features/ui/tokens";
 import { CinematicScene, type AvatarMode, type SceneSeat } from "@/features/table3d/CinematicScene";
+import { bakedPlate } from "@/features/table/bakedTable";
 import { PROOF_SEATS, PROOF_BOARD, PROOF_HERO_HOLE, POT_LABEL, type ProofSeat } from "./proofData";
 
 /* ---------------- proof data -> scene props ---------------- */
@@ -162,8 +163,9 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
 
 /* ---------------- root ---------------- */
 
-export default function CinematicTable({ mode }: { mode: AvatarMode }) {
+export default function CinematicTable({ mode, plate }: { mode: AvatarMode; plate?: string }) {
   const seats = useMemo(() => PROOF_SEATS.map(toSceneSeat), []);
+  const backdrop = bakedPlate(plate);
   return (
     <CinematicScene
       seats={seats}
@@ -171,7 +173,8 @@ export default function CinematicTable({ mode }: { mode: AvatarMode }) {
       potLabel={POT_LABEL}
       heroHole={PROOF_HERO_HOLE}
       mode={mode}
-      maxSeats={PROOF_SEATS.length}
+      maxSeats={backdrop?.seats ?? PROOF_SEATS.length}
+      backdrop={backdrop}
     >
       <HudOverlay mode={mode} />
     </CinematicScene>
