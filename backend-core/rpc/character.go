@@ -134,15 +134,29 @@ func CharacterGenerationStatus(ctx context.Context, logger runtime.Logger, db *s
 			// Rigging unavailable → mint the base model.
 			return mintCharacter(ctx, db, gens, g, userID, task.ModelURL, task.PreviewURL), nil
 		}
-		// Rig stage done → mint the rigged GLB (fall back to base on empty).
+		// Rig done → attach a preset idle animation (best effort) so the character
+		// actually moves at the table; the rigged model is the fallback.
+		if g.Stage == "rig" {
+			rigged := task.ModelURL
+			if rigged == "" {
+				rigged = g.BaseModelURL
+			}
+			if rtTask, rerr := integrations.CreateRetargetTask(ctx, g.TripoTask); rerr == nil && rtTask != "" {
+				_ = gens.AdvanceToRetarget(ctx, g.ID, rigged, rtTask)
+				out, _ := json.Marshal(map[string]interface{}{"status": "running", "progress": 80})
+				return string(out), nil
+			}
+			return mintCharacter(ctx, db, gens, g, userID, rigged, task.PreviewURL), nil
+		}
+		// Retarget done → mint the animated GLB (fall back to rigged/base on empty).
 		modelURL := task.ModelURL
 		if modelURL == "" {
 			modelURL = g.BaseModelURL
 		}
 		return mintCharacter(ctx, db, gens, g, userID, modelURL, task.PreviewURL), nil
 	case "failed", "cancelled", "unknown", "expired":
-		// If the rig stage failed but we have a base model, mint that instead.
-		if g.Stage == "rig" && g.BaseModelURL != "" {
+		// If the rig/retarget stage failed but we have an earlier model, mint that.
+		if (g.Stage == "rig" || g.Stage == "retarget") && g.BaseModelURL != "" {
 			return mintCharacter(ctx, db, gens, g, userID, g.BaseModelURL, ""), nil
 		}
 		_ = gens.Fail(ctx, g.ID)

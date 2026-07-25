@@ -10,9 +10,9 @@
 // [0,6.9,7.9] fov 42) are the binding contract in CLAUDE.md — do not "improve".
 
 import * as THREE from "three";
-import { Suspense, useMemo, useRef, type ReactNode } from "react";
+import { Suspense, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Environment, Lightformer, Html, useGLTF, Clone, ContactShadows } from "@react-three/drei";
+import { Environment, Lightformer, Html, useGLTF, useAnimations, Clone, ContactShadows } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 
 import { cardFaceTexture, feltTexture } from "@/app/proof/textures";
@@ -572,14 +572,26 @@ function GlbFigure({ seat, total }: { seat: SceneSeat; total: number }) {
   // reads as a full seated body (torso + lap at the felt) rather than a bust.
   const fx = p[0] * 1.14;
   const fz = p[2] * 1.14;
-  // Procedural "life": a gentle breathing bob + sway that works even on the static
-  // Tripo meshes (which ship no skeletal clips). It intensifies on the player's
-  // turn and pops on a win, and freezes when folded. Staggered per seat.
   const figureRef = useRef<THREE.Group>(null);
   const seed = seat.index * 1.7;
+  // Real skeletal animation: models rigged + retargeted by Tripo (animate_rig →
+  // animate_retarget, preset idle) ship an animation clip — play it. Models with no
+  // clip (older/base meshes) fall back to the procedural bob below.
+  const { actions, names } = useAnimations(gltf.animations, figureRef);
+  const hasClip = names.length > 0;
+  useEffect(() => {
+    if (!hasClip) return;
+    const a = actions[names[0]];
+    a?.reset().fadeIn(0.3).play();
+    return () => {
+      a?.fadeOut(0.2);
+    };
+  }, [actions, names, hasClip]);
+  // Procedural "life" fallback for clip-less meshes: a gentle breathing bob + sway,
+  // intensifying on the player's turn and popping on a win, frozen when folded.
   useFrame((state) => {
     const g = figureRef.current;
-    if (!g) return;
+    if (!g || hasClip) return; // a real clip owns the transform when present
     const t = state.clock.getElapsedTime();
     const active = seat.state === "active";
     const winner = seat.state === "winner";

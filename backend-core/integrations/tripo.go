@@ -104,6 +104,38 @@ func CreateRigTask(ctx context.Context, originalTaskID string) (string, error) {
 	return out.Data.TaskID, nil
 }
 
+// CreateRetargetTask attaches a preset idle animation to a RIGGED model so the
+// character actually moves at the table (a subtle breathing idle loop), returning
+// the retarget task id. Best-effort: callers fall back to the rigged/base model on
+// error. `rigTaskID` is the successful animate_rig task's id.
+func CreateRetargetTask(ctx context.Context, rigTaskID string) (string, error) {
+	body, _ := json.Marshal(map[string]interface{}{
+		"type":                  "animate_retarget",
+		"original_model_task_id": rigTaskID,
+		"animation":             "preset:idle",
+		"out_format":            "glb",
+	})
+	raw, status, err := tripoDo(ctx, http.MethodPost, "/task", body)
+	if err != nil {
+		return "", err
+	}
+	if status >= 300 {
+		return "", fmt.Errorf("tripo retarget task http %d: %s", status, string(raw))
+	}
+	var out struct {
+		Data struct {
+			TaskID string `json:"task_id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return "", err
+	}
+	if out.Data.TaskID == "" {
+		return "", fmt.Errorf("tripo retarget task: no task id")
+	}
+	return out.Data.TaskID, nil
+}
+
 // TripoTask is the subset of a task we act on.
 type TripoTask struct {
 	Status   string // queued | running | success | failed | ...

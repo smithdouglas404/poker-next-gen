@@ -60,6 +60,15 @@ func (s *GenerationStore) AdvanceToRig(ctx context.Context, id, baseModelURL, ri
 	return err
 }
 
+// AdvanceToRetarget moves a rigged job into the animation-retarget stage, keeping
+// the rigged model as the fallback if the retarget fails.
+func (s *GenerationStore) AdvanceToRetarget(ctx context.Context, id, riggedModelURL, retargetTaskID string) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE poker_generation SET stage='retarget', base_model_url=$2, tripo_task_id=$3, updated_at=NOW()
+		WHERE id=$1`, id, riggedModelURL, retargetTaskID)
+	return err
+}
+
 // Complete marks the job successful and records the minted cosmetic id.
 func (s *GenerationStore) Complete(ctx context.Context, id, cosmeticID string) error {
 	_, err := s.db.ExecContext(ctx,
