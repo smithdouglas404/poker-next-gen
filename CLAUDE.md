@@ -154,6 +154,26 @@ wiring over `*.railway.internal`. Docs: `docs/RAILWAY.md`.
 
 Do **not** add per-service `railway.json` — Railway IaC owns the project.
 
+**Deploys are git-push driven.** Each service in `.railway/railway.ts` uses
+`source: github(REPO, { rootDirectory, watchPatterns })`, so Railway is connected
+to the GitHub repo and **auto-pulls + rebuilds + redeploys the changed service on
+every push to the deploy branch (`main`)**. Pushing IS deploying — `railway config
+apply` is only needed when the service topology or env wiring itself changes, not
+for ordinary code changes. New/changed **secrets** are the one thing a push can't
+carry — those are set in the Railway dashboard.
+
+**Auth & identity are live (keys in the Railway env, not the repo).**
+- **Clerk** is the required identity for members: `clerkMiddleware` gates every
+  non-public route (`frontend-table/middleware.ts`), and the Clerk session is
+  verified server-side (JWKS/RS256) and bridged to a Nakama session
+  (`rpc/clerk.go` + `ClerkNakamaBridge`). Guests (no Clerk) may reach only the
+  table-code path + `/table`.
+- **Didit KYC/AML** enforces once `DIDIT_API_KEY` is set (it is): `requireVerified`
+  only bypasses in the keys-unset branch, and every money path
+  (`rpc/deposit.go`, `rpc/withdrawal.go`) calls `requireRealMoney()` +
+  `guardJurisdiction()` + `requireVerified(…kyc_aml…)` together — money cannot
+  move without real-money on AND jurisdiction AND KYC.
+
 ## Optional local Docker (legacy)
 
 `docker compose up --build` boot order: `postgres` → `engine-math` →
@@ -184,3 +204,39 @@ cd engine-math && cargo build && cargo test
 
 These structs carry `json` and `db` tags and are the canonical persistence
 schema referenced by RPCs registered in `backend-core/main.go`.
+
+## Player & integrity surfaces (recent)
+
+Retention/engagement and operator/integrity features layered on the existing
+engine — most are pure surfacing of RPCs that already existed:
+
+- **GTO Trainer** (`/trainer`, `features/trainer/`): solo card-picker calling the
+  existing solver RPCs (`hand_rank`, `equity_estimate`, `gto_advise`, `gto_solve`,
+  `coaching_tip`) with `live:false`/`stakes:false` so the anti-RTA guard allows
+  practice. No new backend.
+- **Hand replayer** (`features/hands/HandReplayer.tsx`, from `/hands`): animated
+  step-through reconstructed from the audit chain (`audit_list`). No new backend.
+- **Showdown provably-fair CTA** (`features/game/ShowdownVerifyCTA.tsx`) + **spectator
+  railbird** (`features/game/SpectatorBar.tsx`): surface `audit_verify_hand` and the
+  already-supported non-seated watch + rail chat. No new backend.
+- **Daily missions widget** (`features/dashboard/DailyMissionsWidget.tsx`): surfaces
+  the existing missions backend (`missions_list`/`mission_claim`) on the dashboard.
+- **Play-money / free-play** lobby entry (`PrivateTableSetup` `mode="playmoney"`):
+  low-stakes, no-KYC-to-sit onboarding via the existing `table_create` (gates relax
+  when `REAL_MONEY_ENABLED` is off). Honest framing: casual low stakes, not a
+  separate currency.
+- **Guest table reconciliation** (`store/guest_session.go`, `rpc/guest_session.go` →
+  `guest_sessions_pending`/`guest_session_reconcile`): a guest (no email, non-Clerk)
+  who sits at a club's private/coded table is recorded under the operator's table
+  limit and reconciled from the ledger. Owner-Hub `GuestSessions` queue.
+- **Automated collusion detection** (`antibot/collusion.go`, `rpc` `collusion_scan`):
+  scores candidate pairs (chip-dump / soft-play / shared-device) from
+  `poker_hand_stats` and writes to the existing `poker_collusion_flag` review queue
+  (AntiCheat → Collusion → "Run scan"). Flags use status `open`.
+- **Recurring club nights** (`store/clubschedule.go`, `rpc` `club_schedule_create`/
+  `club_schedule_list`/`club_night_launch_now`): operators save a table template and
+  launch it on demand (auto-fire at the scheduled time is a follow-up). Owner-Hub
+  `ClubNights`.
+
+Guest vs registered detection idiom (backend): `isGuest` = account with no email
+AND custom id not prefixed `clerk:` (see `match/holdem/handler.go`).
