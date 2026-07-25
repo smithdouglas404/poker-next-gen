@@ -2424,8 +2424,39 @@ func broadcastActionRequired(ctx context.Context, db *sql.DB, dispatcher runtime
 }
 
 func broadcastShowdownFromResult(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, winnerGroups [][]int, res poker.ShowdownResult, pot int64) error {
+	// Show-order + muck (integrity): at a REAL showdown, winners must show to
+	// claim, and the first-to-show (last aggressor on the final street, or the
+	// first active seat left of the button if checked down) must also show.
+	// Everyone else MAY MUCK — their hole cards are NOT revealed. Previously every
+	// player's hand leaked to all clients; now losers keep theirs hidden. An
+	// uncontested pot (all others folded) is taken down with no show at all.
+	shown := map[string]bool{}
+	contenders := 0
+	for _, seat := range s.Table.Seats {
+		if seat != nil && seat.UserID != "" && seat.Status != poker.SeatFolded && seat.Status != poker.SeatEmpty {
+			contenders++
+		}
+	}
+	if contenders >= 2 {
+		markShown := func(seatIdx int) {
+			if seatIdx >= 0 && seatIdx < len(s.Table.Seats) {
+				if seat := s.Table.Seats[seatIdx]; seat != nil && seat.UserID != "" {
+					shown[seat.UserID] = true
+				}
+			}
+		}
+		markShown(s.Table.FirstToShowSeat())
+		for _, group := range winnerGroups {
+			for _, seatIdx := range group {
+				markShown(seatIdx)
+			}
+		}
+	}
 	reveal := map[string][]protocol.CardView{}
 	for userID, cards := range s.Table.HoleCards {
+		if !shown[userID] {
+			continue // mucked — not revealed to the table
+		}
 		views := make([]protocol.CardView, len(cards))
 		for i, c := range cards {
 			views[i] = protocol.CardView{Code: c.Code(), FaceUp: true}

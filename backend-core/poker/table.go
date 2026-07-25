@@ -80,6 +80,10 @@ type Table struct {
 	ButtonSeat  int
 	ActionSeat  int
 	HandNo      int
+	// LastAggressorSeat is the seat of the last aggressive bet/raise in the hand;
+	// -1 when the hand was checked down. Drives the showdown show-order (the last
+	// aggressor must show first; else the first active seat left of the button).
+	LastAggressorSeat int
 	ActedThisRound map[int]bool
 	SeatCap        int    // configured active seats (2..MaxSeats); 0 => default 6
 	Variant        string // "holdem" | "plo"; empty => holdem
@@ -277,6 +281,7 @@ func (t *Table) StartHand(sb, bb int64) error {
 	t.MinRaise = bb
 	t.Street = StreetPreflop
 	t.ActedThisRound = map[int]bool{}
+	t.LastAggressorSeat = -1 // reset show-order tracking each hand
 
 	// Find button with at least 2 seated
 	seated := t.seatedIndices()
@@ -446,6 +451,16 @@ func (t *Table) nextActiveSeat(from int) int {
 	return -1
 }
 
+// FirstToShowSeat returns the seat that must show first at showdown: the last
+// aggressor on the final betting round, or — when the hand was checked down —
+// the first active seat to the left of the button. Returns -1 if none.
+func (t *Table) FirstToShowSeat() int {
+	if t.LastAggressorSeat >= 0 {
+		return t.LastAggressorSeat
+	}
+	return t.nextActiveSeat(t.ButtonSeat)
+}
+
 func (t *Table) activeCount() int {
 	n := 0
 	for _, s := range t.Seats {
@@ -513,6 +528,7 @@ func (t *Table) ApplyAction(seat int, action string, amount int64) error {
 		if amount > t.CurrentBet {
 			t.MinRaise = amount - t.CurrentBet
 			t.CurrentBet = amount
+			t.LastAggressorSeat = seat // last aggressor — shows first at showdown
 		}
 		s.LastAction = action
 		if s.Stack == 0 {
