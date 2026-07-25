@@ -128,9 +128,9 @@ export interface CinematicSceneProps {
 
 // The cinematic table is a STADIUM (racetrack) oval: straight long sides with
 // semicircular ends — matching the approved concept art, not a stretched circle.
-const STAD_L = 1.3; // half-length of the straight side (X)
-const FELT_R = 2.85; // felt end radius (Z half-depth)
-const SEAT_R = 3.15; // seat ring end radius (on the rail)
+const STAD_L = 1.9; // half-length of the straight side (X)
+const FELT_R = 2.7; // felt end radius (Z half-depth)
+const SEAT_R = 3.05; // seat ring end radius (on the rail)
 const SX = 4.62; // legacy ellipse (baked plates only)
 const SZ = 3.82;
 // Active seat path for the current scene. Cinematic felt uses the stadium; a baked
@@ -156,7 +156,7 @@ function stadiumPoint(u: number, L: number, R: number, y: number): [number, numb
 }
 // Side-middle seats sit at the stadium's widest point; clamp X so their DOM
 // tiles stay fully on screen (the table geometry may bleed — tiles may not).
-const SEAT_XMAX = 3.3;
+const SEAT_XMAX = 3.45;
 function seatPoint(index: number, total: number): [number, number, number] {
   const e = ACTIVE_ELLIPSE;
   if (e.stadiumL != null) {
@@ -205,7 +205,7 @@ function TableBody() {
     const goldG = new THREE.ShapeGeometry(stadiumRing(STAD_L, FELT_R - 0.26, FELT_R - 0.32), 48);
     const rimG = new THREE.ShapeGeometry(stadiumRing(STAD_L, FELT_R + 0.10, FELT_R + 0.03), 48);
     const railG = new THREE.ExtrudeGeometry(stadiumRing(STAD_L, FELT_R + 0.44, FELT_R + 0.12), {
-      depth: 0.14, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.05, bevelSegments: 3, curveSegments: 48,
+      depth: 0.22, bevelEnabled: true, bevelThickness: 0.07, bevelSize: 0.07, bevelSegments: 3, curveSegments: 48,
     });
     const stripeG = new THREE.ShapeGeometry(stadiumRing(STAD_L, FELT_R + 0.31, FELT_R + 0.28), 48);
     const underG = new THREE.ExtrudeGeometry(stadiumShape(STAD_L, FELT_R + 0.52), {
@@ -215,6 +215,12 @@ function TableBody() {
   }, []);
   return (
     <group>
+      {/* floor — grounds the table in a room instead of a void */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.62, 0]} receiveShadow>
+        <planeGeometry args={[60, 60]} />
+        <meshStandardMaterial color="#0b0e14" metalness={0.6} roughness={0.35} />
+      </mesh>
+
       {/* underbody */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.05, 0]} geometry={g.underG}>
         <meshStandardMaterial color="#0a0d12" metalness={0.3} roughness={0.7} />
@@ -240,7 +246,7 @@ function TableBody() {
         <meshStandardMaterial color="#171b22" metalness={0.95} roughness={0.32} />
       </mesh>
       {/* gold pinstripe on the rail */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.27, 0]} geometry={g.stripeG}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.38, 0]} geometry={g.stripeG}>
         <meshStandardMaterial color="#e9c46a" emissive="#6b501a" emissiveIntensity={0.35} metalness={1} roughness={0.3} side={THREE.DoubleSide} />
       </mesh>
     </group>
@@ -473,7 +479,7 @@ function ChipStack({
   position,
   color,
   count,
-  radius = 0.16,
+  radius = 0.21,
 }: {
   position: [number, number, number];
   color: string;
@@ -483,8 +489,8 @@ function ChipStack({
   const chips = [];
   for (let i = 0; i < count; i++) {
     chips.push(
-      <mesh key={i} position={[0, i * 0.026, 0]} castShadow>
-        <cylinderGeometry args={[radius, radius, 0.024, 32]} />
+      <mesh key={i} position={[0, i * 0.034, 0]} castShadow>
+        <cylinderGeometry args={[radius, radius, 0.032, 32]} />
         <meshStandardMaterial color={color} metalness={0.25} roughness={0.5} />
       </mesh>,
     );
@@ -1068,7 +1074,7 @@ export function CinematicScene({
       "linear-gradient(180deg,#04060a,#070b12 60%,#04060a)";
   const cameraCfg = backdrop
     ? { position: backdrop.camera.position, fov: backdrop.camera.fov }
-    : { position: [0, 8.6, 7.4] as [number, number, number], fov: 42 };
+    : { position: [0, 7.2, 10.6] as [number, number, number], fov: 40 };
   return (
     <div className="relative h-screen w-screen overflow-hidden" style={{ background: wrapperBg }}>
       <Canvas

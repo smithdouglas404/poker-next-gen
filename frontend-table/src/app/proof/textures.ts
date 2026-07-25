@@ -119,9 +119,6 @@ export function feltTexture(): THREE.CanvasTexture {
   ctx.font = "bold 150px Georgia, serif";
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText("♦", 0, -6);
-  ctx.globalAlpha = 0.5;
-  ctx.font = "bold 34px 'Space Grotesk', Arial, sans-serif";
-  ctx.fillText("HIGH ROLLERS", 0, 150);
   ctx.restore();
 
   const tex = new THREE.CanvasTexture(c);
