@@ -10,6 +10,7 @@ import type {
   ClubAnnouncement,
   ClubChatMessage,
   ClubStats,
+  CreditRequest,
   JoinRequest,
   OwnerClub,
   OwnerClubDetail,
@@ -75,6 +76,19 @@ export const ownerApi = {
       // sending `amount` did not bind and bypassed validation.
       balance: amountCents,
       currency: "USD",
+    }),
+
+  /** Over-limit buy-in credit requests (#63): owner review queue + decision. */
+  creditRequestsPending: (clubId: string) =>
+    call<{ requests: CreditRequest[] }>("credit_requests_pending", { club_id: clubId }),
+  creditRequestReview: (id: string, approve: boolean) =>
+    call<{ ok: boolean; status: string }>("credit_request_review", { id, approve }),
+  /** A player raises an over-limit credit request at a club. */
+  creditRequestCreate: (clubId: string, amountCents: number, reason: string) =>
+    call<{ ok: boolean; id: string }>("credit_request_create", {
+      club_id: clubId,
+      amount_minor: amountCents,
+      reason,
     }),
 
   /** Grant an owner/manager/agent seat with an equity split (club_owner_add). */

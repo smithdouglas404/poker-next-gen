@@ -3,6 +3,17 @@
 // field a control reads is a real server field. Kept independent of the sibling
 // clubs feature so this hub is self-contained within owner/.
 
+export interface CreditRequest {
+  id: string;
+  club_id: string;
+  user_id: string;
+  username: string;
+  amount_minor: number;
+  reason: string;
+  status: string;
+  created_at: string;
+}
+
 export interface OwnerClub {
   id: string;
   name: string;

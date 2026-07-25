@@ -12,6 +12,7 @@ import { Financials, type FinancialsPeriod } from "./Financials";
 import { GlobalSettings } from "./GlobalSettings";
 import { GuestGate } from "./GuestGate";
 import { MemberAnalytics } from "./MemberAnalytics";
+import { CreditRequests } from "./CreditRequests";
 import { MemberManagement } from "./MemberManagement";
 import { OperatorsEquity } from "./OperatorsEquity";
 import { Overview } from "./Overview";
@@ -566,6 +567,9 @@ export function OwnerHub() {
             onAllocate={onAllocate}
             onReview={onReview}
           />
+          <div className="mt-6">
+            <CreditRequests clubId={club?.id} canManage={canManage} />
+          </div>
           <QuickStats data={emptyQuick} />
         </div>
       )}

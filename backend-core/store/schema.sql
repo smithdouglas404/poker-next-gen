@@ -1195,3 +1195,21 @@ CREATE TABLE IF NOT EXISTS poker_ledger_entry (
 );
 CREATE INDEX IF NOT EXISTS idx_poker_ledger_entry_acct ON poker_ledger_entry(account, id DESC);
 CREATE INDEX IF NOT EXISTS idx_poker_ledger_entry_txn ON poker_ledger_entry(txn_id);
+
+-- Over-limit buy-in credit requests (#63): a player asks a club owner to extend
+-- credit beyond their allocated balance. Approval allocates the amount to the
+-- player's club balance (poker_player_balance) via the same owner-gated path.
+CREATE TABLE IF NOT EXISTS poker_credit_request (
+    id           TEXT PRIMARY KEY,
+    club_id      TEXT NOT NULL,
+    user_id      TEXT NOT NULL,
+    username     TEXT NOT NULL DEFAULT '',
+    amount_minor BIGINT NOT NULL DEFAULT 0,
+    reason       TEXT NOT NULL DEFAULT '',
+    status       TEXT NOT NULL DEFAULT 'pending',  -- pending | approved | denied
+    reviewed_by  TEXT NOT NULL DEFAULT '',
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    reviewed_at  TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_poker_credit_request_club ON poker_credit_request(club_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_poker_credit_request_user ON poker_credit_request(user_id, created_at DESC);
