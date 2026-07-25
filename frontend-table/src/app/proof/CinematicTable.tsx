@@ -45,9 +45,9 @@ function HeroCard({ code }: { code: string }) {
   const glyph = suit === "h" ? "♥" : suit === "s" ? "♠" : suit === "d" ? "♦" : "♣";
   const color = suit === "h" ? "#e5484d" : suit === "s" ? "#101317" : suit === "d" ? "#2f6bff" : "#1fa85a";
   return (
-    <div className="relative flex h-[86px] w-[62px] flex-col justify-between rounded-lg bg-white p-1.5 shadow-lg" style={{ boxShadow: "0 6px 20px rgba(0,0,0,0.5), 0 0 18px rgba(224,30,43,0.25)" }}>
-      <span className="text-lg font-bold leading-none" style={{ color }}>{rank}{glyph}</span>
-      <span className="self-end text-2xl leading-none" style={{ color }}>{glyph}</span>
+    <div className="relative flex h-[112px] w-[80px] flex-col justify-between rounded-xl bg-white p-2 shadow-lg" style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.55), 0 0 22px rgba(224,30,43,0.28)" }}>
+      <span className="text-2xl font-bold leading-none" style={{ color }}>{rank}{glyph}</span>
+      <span className="self-end text-3xl leading-none" style={{ color }}>{glyph}</span>
       <span className="sr-only">{red}</span>
     </div>
   );
@@ -90,19 +90,6 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
         ))}
       </div>
 
-      {/* bottom-right player analytics */}
-      <div className={`absolute bottom-5 right-5 ${GLASS_PANEL} px-4 py-3`} style={{ width: 200 }}>
-        <div className="mb-2 flex items-center gap-1.5 text-[11px] uppercase tracking-[0.2em] text-white/50">Player Analytics</div>
-        {[["Neon Viper", 68, "#e01e2b"], ["Shadow King", 41, "#e9c46a"], ["Void Witch", 92, "#ff3b46"]].map(([n, pct, c]) => (
-          <div key={n as string} className="mb-2">
-            <div className="mb-0.5 flex justify-between text-[11px]"><span className="text-white/70">{n}</span><span className="text-white/50">{pct}% VPIP</span></div>
-            <div className="h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
-              <div className="h-1.5 rounded-full" style={{ width: `${pct}%`, background: c as string, boxShadow: `0 0 8px ${c}` }} />
-            </div>
-          </div>
-        ))}
-      </div>
-
       {/* pot label */}
       <div className="absolute left-1/2 top-[56%] -translate-x-1/2 text-center">
         <div className="text-[11px] uppercase tracking-[0.3em] text-white/45">Pot</div>
@@ -111,7 +98,17 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
 
       {/* action bar */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
-        <div className="mb-2 flex items-end justify-center gap-2">
+        {/* "you know what you have" — hero's current made hand (A♥A♦ on an A♠
+            board = trip aces). Live table will read this from the engine hand rank. */}
+        <div className="mb-2 flex justify-center">
+          <div
+            className="rounded-full border border-gold/60 px-4 py-1 font-display text-[13px] font-bold uppercase tracking-[0.18em] text-gold"
+            style={{ background: "rgba(8,10,14,0.82)", backdropFilter: "blur(8px)", boxShadow: "0 0 18px rgba(233,196,106,0.35), inset 0 0 10px rgba(0,0,0,0.4)" }}
+          >
+            Trip Aces
+          </div>
+        </div>
+        <div className="mb-2 flex items-end justify-center gap-2.5">
           {PROOF_HERO_HOLE.map((c) => <HeroCard key={c} code={c} />)}
         </div>
 
