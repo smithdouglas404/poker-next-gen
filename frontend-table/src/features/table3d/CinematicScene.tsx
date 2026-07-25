@@ -356,7 +356,7 @@ function backTexture(): THREE.Texture {
 
 // Face-down card — the real rendered card-back texture on the top face (the hero's
 // own cards are the DOM overlay; opponents/deck show this back).
-function CardBack({ w = 0.275, h = 0.464 }: { w?: number; h?: number }) {
+function CardBack({ w = 0.38, h = 0.64 }: { w?: number; h?: number }) {
   const mats = useMemo(() => {
     const back = backTexture();
     const edge = new THREE.MeshStandardMaterial({ color: "#e8ecf0", roughness: 0.5 });
@@ -506,18 +506,18 @@ function BoardCard({ code, x, delay }: { code: string; x: number; delay: number 
   return (
     <group ref={ref}>
       <mesh castShadow material={mats}>
-        <boxGeometry args={[0.473, 0.022, 0.813]} />
+        <boxGeometry args={[0.66, 0.028, 1.13]} />
       </mesh>
     </group>
   );
 }
 
 function Board({ board }: { board: string[] }) {
-  const start = -((board.length - 1) / 2) * 0.534; // 62px card + 8px gap (spec §5)
+  const start = -((board.length - 1) / 2) * 0.75; // spec ratio held, scaled to target
   return (
     <group>
       {board.map((c, i) => (
-        <BoardCard key={`${c}-${i}`} code={c} x={start + i * 0.534} delay={i * 130} />
+        <BoardCard key={`${c}-${i}`} code={c} x={start + i * 0.75} delay={i * 130} />
       ))}
     </group>
   );
@@ -528,8 +528,8 @@ function Board({ board }: { board: string[] }) {
 // Real casino chip per spec §4.3: 39mm diameter x 3.3mm thick, stacked at a
 // 0.0033m vertical offset. 1 world unit = 0.2458 m, so radius 0.0793u,
 // thickness/offset 0.0134u.
-const CHIP_R = 0.0793;
-const CHIP_T = 0.0134;
+const CHIP_R = 0.20;
+const CHIP_T = 0.052;
 function ChipStack({
   position,
   color,
@@ -561,14 +561,14 @@ const POT_POS: [number, number, number] = [0, 0.05, 0.5];
 // still reads as a neat pot, not an oversized tower.
 function Pot({ potMinor }: { potMinor: number }) {
   // Multiplier vs the baseline counts; ~1 at a mid pot, up to ~2.4 at a big one.
-  const m = Math.max(0.5, Math.min(2.4, (potMinor || 0) / 60000));
+  const m = Math.max(1.4, Math.min(3.2, (potMinor || 0) / 40000));
   const c = (base: number) => Math.max(1, Math.round(base * m));
   return (
     <group position={POT_POS}>
-      <ChipStack position={[-0.42, 0, 0]} color="#c9302c" count={c(8)} />
-      <ChipStack position={[-0.14, 0, 0.10]} color="#1f2937" count={c(12)} />
-      <ChipStack position={[0.14, 0, 0]} color="#2f6bff" count={c(6)} />
-      <ChipStack position={[0.42, 0, -0.10]} color="#e9c46a" count={c(10)} />
+      <ChipStack position={[-0.98, 0, 0]} color="#c9302c" count={c(8)} />
+      <ChipStack position={[-0.33, 0, 0.10]} color="#1f2937" count={c(12)} />
+      <ChipStack position={[0.33, 0, 0]} color="#2f6bff" count={c(6)} />
+      <ChipStack position={[0.98, 0, -0.10]} color="#e9c46a" count={c(10)} />
       <ChipStack position={[0.0, 0, -0.24]} color="#1fa85a" count={c(6)} />
     </group>
   );
@@ -1262,7 +1262,7 @@ export function CinematicScene({
       "linear-gradient(180deg,#04060a,#070b12 60%,#04060a)";
   const cameraCfg = backdrop
     ? { position: backdrop.camera.position, fov: backdrop.camera.fov }
-    : { position: [0, 13.8, 6.6] as [number, number, number], fov: 44 };
+    : { position: [0, 8.75, 4.19] as [number, number, number], fov: 44 };
   return (
     <div className="relative h-screen w-screen overflow-hidden" style={{ background: wrapperBg }}>
       <Canvas
