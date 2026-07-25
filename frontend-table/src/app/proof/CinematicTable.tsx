@@ -45,9 +45,9 @@ function HeroCard({ code }: { code: string }) {
   const glyph = suit === "h" ? "♥" : suit === "s" ? "♠" : suit === "d" ? "♦" : "♣";
   const color = suit === "h" ? "#e5484d" : suit === "s" ? "#101317" : suit === "d" ? "#2f6bff" : "#1fa85a";
   return (
-    <div className="relative flex h-[112px] w-[80px] flex-col justify-between rounded-xl bg-white p-2 shadow-lg" style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.55), 0 0 22px rgba(224,30,43,0.28)" }}>
-      <span className="text-2xl font-bold leading-none" style={{ color }}>{rank}{glyph}</span>
-      <span className="self-end text-3xl leading-none" style={{ color }}>{glyph}</span>
+    <div className="relative flex h-[100px] w-[72px] flex-col justify-between rounded-lg bg-white p-1.5 shadow-lg" style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.55), 0 0 22px rgba(224,30,43,0.28)" }}>
+      <span className="text-xl font-bold leading-none" style={{ color }}>{rank}{glyph}</span>
+      <span className="self-end text-2xl leading-none" style={{ color }}>{glyph}</span>
       <span className="sr-only">{red}</span>
     </div>
   );
@@ -57,15 +57,69 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
   const badge = mode === "2d" ? "2.5D · HRC Portrait Avatars" : mode === "3d" ? "3D · GLB Avatars (Tripo pipeline)" : "Mixed · Tripo 3D + HRC portraits";
   return (
     <div className="pointer-events-none absolute inset-0 select-none">
-      {/* top-left table info */}
-      <div className={`absolute left-5 top-5 ${GLASS_PANEL} px-4 py-3`} style={{ minWidth: 190 }}>
-        <div className="text-[11px] uppercase tracking-[0.25em]" style={{ color: "#ff2d3f" }}>High Rollers Main</div>
-        <div className="mt-0.5 text-sm font-semibold text-white">$5 / $10 · No-Limit Hold&apos;em</div>
-        <div className="mt-1 flex items-center gap-2 text-[11px] text-white/60">
-          <span>Round: <span className="text-white/90">River</span></span>
-          <span>·</span>
-          <span>Hand #12,847</span>
+      {/* ---- Hand-history timeline log (top-left) — 1920x1080 spec ----
+           260x310 panel, rgba(15,23,42,.65) + blur, 1px cyan border, r12
+           2px cyan rail 24px from left, 10px nodes, 14px cyan phase titles */}
+      <div
+        style={{
+          position: "absolute", left: 20, top: 20, width: 260, height: 310, borderRadius: 12,
+          background: "rgba(15,23,42,0.65)", backdropFilter: "blur(10px)",
+          border: "1px solid rgba(77,238,234,0.45)", overflow: "hidden", padding: "12px 10px 10px 0",
+        }}
+      >
+        {/* vertical timeline rail */}
+        <div style={{ position: "absolute", left: 24, top: 16, bottom: 24, width: 2,
+          background: "#1CB5C9", boxShadow: "0 0 8px rgba(28,181,201,0.8)" }} />
+        <div style={{ position: "relative", height: "100%", overflow: "hidden" }}>
+          <div style={{ position: "relative", paddingLeft: 34, marginBottom: 12 }}>
+            <div style={{ position: "absolute", left: 19, top: 4, width: 10, height: 10, borderRadius: "50%",
+              background: "#1CB5C9", boxShadow: "0 0 8px rgba(28,181,201,0.9)" }} />
+            <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.06em", color: "#4DEEEA" }}>PRE-FLOP</div>
+            <div style={{ fontSize: 12, color: "#FFFFFF", lineHeight: 1.5 }}>
+              Player 1: <b>RAISE</b> $550<span style={{ color: "#94A3B8" }}> (Pot $600)</span>
+            </div>
+            <div style={{ fontSize: 12, color: "#FFFFFF", lineHeight: 1.5 }}>
+              Player 3: <b>CALL</b> $550<span style={{ color: "#94A3B8" }}> (Pot $1,150)</span>
+            </div>
+            <div style={{ fontSize: 12, color: "#FFFFFF", lineHeight: 1.5 }}>
+              Player 5: <b>FOLD</b>
+            </div>
+          </div>
+          <div style={{ position: "relative", paddingLeft: 34, marginBottom: 12 }}>
+            <div style={{ position: "absolute", left: 19, top: 4, width: 10, height: 10, borderRadius: "50%",
+              background: "#1CB5C9", boxShadow: "0 0 8px rgba(28,181,201,0.9)" }} />
+            <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.06em", color: "#4DEEEA" }}>FLOP</div>
+            <div style={{ fontSize: 12, color: "#FFFFFF", lineHeight: 1.5 }}>
+              Player 1: <b>BET</b> $400<span style={{ color: "#94A3B8" }}> (Pot $1,550)</span>
+            </div>
+            <div style={{ fontSize: 12, color: "#FFFFFF", lineHeight: 1.5 }}>
+              Player 3: <b>CALL</b> $400<span style={{ color: "#94A3B8" }}> (Pot $1,950)</span>
+            </div>
+          </div>
+          <div style={{ position: "relative", paddingLeft: 34, marginBottom: 12 }}>
+            <div style={{ position: "absolute", left: 19, top: 4, width: 10, height: 10, borderRadius: "50%",
+              background: "#1CB5C9", boxShadow: "0 0 8px rgba(28,181,201,0.9)" }} />
+            <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.06em", color: "#4DEEEA" }}>TURN</div>
+            <div style={{ fontSize: 12, color: "#FFFFFF", lineHeight: 1.5 }}>
+              Player 1: <b>CHECK</b><span style={{ color: "#94A3B8" }}> (Pot $1,950)</span>
+            </div>
+            <div style={{ fontSize: 12, color: "#FFFFFF", lineHeight: 1.5 }}>
+              Player 3: <b>BET</b> $800<span style={{ color: "#94A3B8" }}> (Pot $2,750)</span>
+            </div>
+          </div>
+          <div style={{ position: "relative", paddingLeft: 34, marginBottom: 12 }}>
+            <div style={{ position: "absolute", left: 19, top: 4, width: 10, height: 10, borderRadius: "50%",
+              background: "#1CB5C9", boxShadow: "0 0 8px rgba(28,181,201,0.9)" }} />
+            <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.06em", color: "#4DEEEA" }}>SHOWDOWN</div>
+            <div style={{ fontSize: 12, color: "#FFFFFF", lineHeight: 1.5 }}>
+              Player 1: <b>WINS</b> $5,250<span style={{ color: "#94A3B8" }}> (Aces full of Kings)</span>
+            </div>
+          </div>
         </div>
+        {/* bottom indicator arrow 12x10 */}
+        <div style={{ position: "absolute", left: 19, bottom: 8, width: 0, height: 0,
+          borderLeft: "6px solid transparent", borderRight: "6px solid transparent",
+          borderTop: "10px solid #1CB5C9" }} />
       </div>
 
       {/* top-right chat */}
@@ -96,28 +150,12 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
         <div className="text-xl font-bold" style={{ color: "#ffe6a3", textShadow: "0 0 16px rgba(233,196,106,0.6)" }}>{POT_LABEL}</div>
       </div>
 
-      {/* action bar */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
-        {/* pre-action toggles */}
-        <div className="mb-2 flex justify-center gap-2">
-          {[["Check / Fold", true], ["Call Any", false], ["Fold to Any", false]].map(([label, on]) => (
-            <div
-              key={label as string}
-              className="rounded-full px-3 py-1 text-[11px] font-semibold"
-              style={
-                on
-                  ? { background: "rgba(224,30,43,0.16)", border: "1px solid #e01e2b", color: "#ffd9dc" }
-                  : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.6)" }
-              }
-            >
-              {label}
-            </div>
-          ))}
-        </div>
-
-        {/* made-hand readout — sits with the cards BELOW the table, so the
-            hero's seat photo stays level with every other seat on the rail */}
-        <div className="relative z-10 mb-1.5 flex justify-center">
+      {/* ---- Hero action control panel — built to the 1920x1080 spec ----
+           panel 540x180 r12 | cards 72x100 fanned -5/+5 peeking 45px above
+           buttons 115x44 gap 10 | slider track 440x4, thumb 16x16 cyan     */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2" style={{ width: 540 }}>
+        {/* made-hand readout */}
+        <div className="mb-1.5 flex justify-center">
           <div
             className="rounded-full border border-gold/60 px-4 py-1 font-display text-[13px] font-bold uppercase tracking-[0.18em] text-gold"
             style={{ background: "rgba(8,10,14,0.88)", backdropFilter: "blur(8px)", boxShadow: "0 0 18px rgba(233,196,106,0.35)" }}
@@ -125,29 +163,51 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
             Trip Aces
           </div>
         </div>
-        {/* hero hole cards tucked INTO the action panel (reference composition:
-            cards ride the panel top, they never float over the hero's face) */}
-        <div className="relative z-10 -mb-10 flex items-end justify-center gap-2.5">
-          {PROOF_HERO_HOLE.map((c) => <HeroCard key={c} code={c} />)}
+
+        {/* hero hole cards — peek 45px out of the top of the panel */}
+        <div className="relative z-10 flex items-end justify-center gap-1" style={{ marginBottom: -45 }}>
+          {PROOF_HERO_HOLE.map((c, i) => (
+            <div key={c} style={{ transform: `rotate(${i === 0 ? -5 : 5}deg)` }}>
+              <HeroCard code={c} />
+            </div>
+          ))}
         </div>
 
-        <div className={`${GLASS_PANEL} px-3 pb-2.5 pt-12`} style={{ boxShadow: "0 10px 40px rgba(0,0,0,0.55)" }}>
-          <div className="flex items-center gap-2">
-            <button className="rounded-lg px-5 py-2.5 text-sm font-bold text-white" style={{ background: "linear-gradient(180deg,#b33,#7a1f1f)", border: "1px solid #d9534f" }}>FOLD</button>
-            <button className="rounded-lg px-5 py-2.5 text-sm font-bold" style={{ background: "linear-gradient(180deg,#0e5c33,#0a3320)", border: "1px solid #22c55e", color: "#8ef0b0" }}>CALL <span className="opacity-80">$4,000</span></button>
-            <button className="rounded-lg px-6 py-2.5 text-sm font-bold text-black" style={{ background: "linear-gradient(180deg,#f3e2ad,#d4af37 55%,#9a7b2c)", border: "1px solid #f3e2ad" }}>RAISE TO <span>$12,000</span></button>
-            <button className="rounded-lg px-5 py-2.5 text-sm font-bold" style={{ background: "rgba(60,10,14,0.6)", border: "1px solid #ff3b46", color: "#ff9aa0" }}>ALL-IN</button>
+        <div
+          className="relative"
+          style={{
+            width: 540, height: 180, borderRadius: 12, paddingTop: 52,
+            background: "rgba(17,21,30,0.94)", border: "1px solid rgba(255,255,255,0.10)",
+            boxShadow: "0 10px 40px rgba(0,0,0,0.55)",
+          }}
+        >
+          {/* collapse chevron 24x24 r4 */}
+          <div
+            style={{ position: "absolute", top: 10, right: 10, width: 24, height: 24, borderRadius: 4,
+              background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "rgba(255,255,255,0.65)" }}
+          >⌄</div>
+
+          {/* action buttons — 115x44, 10px gap, spec colours */}
+          <div className="flex justify-center" style={{ gap: 10 }}>
+            <button style={{ width: 115, height: 44, borderRadius: 8, background: "#A82424", color: "#fff",
+              fontWeight: 700, fontSize: 14, border: "none", boxShadow: "inset 0 -2px 6px rgba(0,0,0,0.35)" }}>FOLD</button>
+            <button style={{ width: 115, height: 44, borderRadius: 8, background: "#1CB5C9", color: "#0b1524",
+              fontWeight: 700, fontSize: 14, border: "none" }}>CHECK</button>
+            <button style={{ width: 115, height: 44, borderRadius: 8, color: "#0b1524", fontWeight: 700, fontSize: 14,
+              border: "none", background: "linear-gradient(180deg,#E8B84B,#C28E1E)" }}>RAISE</button>
+            <button style={{ width: 115, height: 44, borderRadius: 8, background: "#E51932", color: "#fff",
+              fontWeight: 700, fontSize: 14, border: "none", boxShadow: "0 0 18px rgba(229,25,50,0.65)" }}>ALL-IN</button>
           </div>
 
-          {/* raise slider + presets */}
-          <div className="mt-2.5 flex items-center gap-3">
-            <div className="flex gap-1.5">
-              {["Min", "½ Pot", "⅔ Pot", "Pot", "Max"].map((p, i) => (
-                <div key={p} className="rounded-md px-2.5 py-1 text-[11px] font-semibold" style={i === 2 ? { background: "linear-gradient(180deg,#f3e2ad,#d4af37)", color: "#3a2c07" } : { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)" }}>{p}</div>
-              ))}
+          {/* bet slider — track 440x4, thumb 16x16 cyan */}
+          <div className="mt-4 flex items-center justify-center gap-3">
+            <div style={{ position: "relative", width: 440, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.16)" }}>
+              <div style={{ position: "absolute", left: 0, top: 0, height: 4, width: "62%", borderRadius: 2, background: "#1CB5C9" }} />
+              <div style={{ position: "absolute", left: "62%", top: -6, width: 16, height: 16, marginLeft: -8, borderRadius: "50%",
+                background: "#1CB5C9", boxShadow: "0 0 10px rgba(28,181,201,0.8)" }} />
             </div>
-            <input type="range" min={0} max={100} defaultValue={44} className="h-1.5 flex-1 accent-amber-400" readOnly />
-            <div className="rounded-md px-3 py-1 text-sm font-bold" style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(212,175,55,0.5)", color: "#ffe6a3", minWidth: 84, textAlign: "center" }}>$12,000</div>
+            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>Bet</span>
           </div>
         </div>
       </div>

@@ -126,11 +126,24 @@ export interface CinematicSceneProps {
   overlay?: ReactNode;
 }
 
-// The cinematic table is a STADIUM (racetrack) oval: straight long sides with
-// semicircular ends — matching the approved concept art, not a stretched circle.
-const STAD_L = 1.9; // half-length of the straight side (X)
-const FELT_R = 2.7; // felt end radius (Z half-depth)
-const SEAT_R = 3.05; // seat ring end radius (on the rail)
+// The cinematic table is a STADIUM (racetrack) oval built to REAL casino spec.
+//
+// Physical 10-person full-ring table:
+//   length 96in (2.44m) x width 46in (~1.17m) x height 30in (0.76m), 4in rail.
+// Screen blueprint @1920x1080 (the design target):
+//   outer frame 1450 x 660 px  (2.2 : 1)
+//   inner felt  1300 x  550 px (felt = ~85% of the table)
+//   end arc radius 275 px  == half the felt depth, so the ends are true semicircles
+// => felt straight run = 1300 - 2*275 = 750 px, i.e. half-length 375 px.
+//
+// Scene scale is anchored on the felt: 275 blueprint px == 2.1 world units, so
+// 1 unit = 0.2457 m and every dimension below is the spec converted, not eyeballed.
+const PX = 2.1 / 275; // world units per blueprint pixel
+const STAD_L = 375 * PX; // 2.864 — half-length of the STRAIGHT run (> end radius)
+const FELT_R = 275 * PX; // 2.100 — felt end-cap radius (= blueprint corner radius)
+const RAIL_W = 55 * PX; //  0.420 — rail thickness (the 4in armrest)
+const TABLE_H = 3.09; // 30in floor-to-rail at this scale (0.76m / 0.2457)
+const SEAT_R = FELT_R + RAIL_W + 0.05; // seats sit just outside the rail
 const SX = 4.62; // legacy ellipse (baked plates only)
 const SZ = 3.82;
 // Active seat path for the current scene. Cinematic felt uses the stadium; a baked
@@ -156,7 +169,47 @@ function stadiumPoint(u: number, L: number, R: number, y: number): [number, numb
 }
 // Side-middle seats sit at the stadium's widest point; clamp X so their DOM
 // tiles stay fully on screen (the table geometry may bleed — tiles may not).
-const SEAT_XMAX = 3.45;
+const SEAT_XMAX = 6.0;
+
+/* ------- 2D UI layout spec (design canvas 1920x1080, origin = table centre) -------
+ * Seat coordinates and component sizes are the design team's spec, used verbatim.
+ * Positions are expressed as a fraction of the 1920x1080 canvas so they scale to
+ * any viewport while holding the exact specified proportions. y is +up in the spec
+ * (screen y is +down), so it is negated when converted to CSS `top`.
+ */
+const CANVAS_W = 1920;
+const CANVAS_H = 1080;
+/** The ten seat anchors, clockwise from bottom-centre-left (index 0 = hero). */
+const SEAT_UI: { x: number; y: number }[] = [
+  { x: -180, y: -320 }, // hero (bottom centre-left)
+  { x: 180, y: -320 },
+  { x: 520, y: -220 },
+  { x: 680, y: 0 },
+  { x: 520, y: 220 },
+  { x: 180, y: 290 },
+  { x: -180, y: 290 },
+  { x: -520, y: 220 },
+  { x: -680, y: 0 },
+  { x: -520, y: -220 },
+];
+/** Component sizes, straight from the spec. */
+const UI = {
+  frameW: 110, frameH: 130, // avatar frame
+  photo: 80,                // profile image / wireframe icon
+  badgeW: 140, badgeH: 70,  // name + stack container
+  tagW: 90, tagH: 28,       // action label ("CALL", "FOLD", ...)
+  tagFont: 13,              // 12-14px bold all-caps
+};
+/** Spec coordinate -> CSS percentage of the design canvas. */
+function seatUIStyle(i: number): React.CSSProperties {
+  const p = SEAT_UI[i % SEAT_UI.length];
+  return {
+    position: "absolute",
+    left: `${50 + (p.x / CANVAS_W) * 100}%`,
+    top: `${50 - (p.y / CANVAS_H) * 100}%`,
+    transform: "translate(-50%, -50%)",
+  };
+}
 function seatPoint(index: number, total: number): [number, number, number] {
   const e = ACTIVE_ELLIPSE;
   if (e.stadiumL != null) {
@@ -202,27 +255,29 @@ function TableBody() {
   const g = useMemo(() => {
     const feltG = new THREE.ShapeGeometry(stadiumShape(STAD_L, FELT_R), 48);
     remapUVs(feltG, 2 * (STAD_L + FELT_R), 2 * FELT_R);
-    const goldG = new THREE.ShapeGeometry(stadiumRing(STAD_L, FELT_R - 0.26, FELT_R - 0.32), 48);
-    const rimG = new THREE.ShapeGeometry(stadiumRing(STAD_L, FELT_R + 0.10, FELT_R + 0.03), 48);
-    const railG = new THREE.ExtrudeGeometry(stadiumRing(STAD_L, FELT_R + 0.44, FELT_R + 0.12), {
+    const goldG = new THREE.ShapeGeometry(stadiumRing(STAD_L, FELT_R - 0.20, FELT_R - 0.25), 48);
+    const rimG = new THREE.ShapeGeometry(stadiumRing(STAD_L, FELT_R + 0.04, FELT_R), 48);
+    // Rail = the 4in armrest, spanning the felt edge out to FELT_R + RAIL_W.
+    const railG = new THREE.ExtrudeGeometry(stadiumRing(STAD_L, FELT_R + RAIL_W, FELT_R + 0.04), {
       depth: 0.22, bevelEnabled: true, bevelThickness: 0.07, bevelSize: 0.07, bevelSegments: 3, curveSegments: 48,
     });
-    const stripeG = new THREE.ShapeGeometry(stadiumRing(STAD_L, FELT_R + 0.31, FELT_R + 0.28), 48);
-    const underG = new THREE.ExtrudeGeometry(stadiumShape(STAD_L, FELT_R + 0.52), {
-      depth: 0.95, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.06, bevelSegments: 2, curveSegments: 48,
+    const stripeG = new THREE.ShapeGeometry(stadiumRing(STAD_L, FELT_R + RAIL_W * 0.66, FELT_R + RAIL_W * 0.56), 48);
+    // Body drops the full 30in from just under the felt to the floor.
+    const underG = new THREE.ExtrudeGeometry(stadiumShape(STAD_L, FELT_R + RAIL_W), {
+      depth: TABLE_H, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.06, bevelSegments: 2, curveSegments: 48,
     });
     return { feltG, goldG, rimG, railG, stripeG, underG };
   }, []);
   return (
     <group>
       {/* floor — grounds the table in a room instead of a void */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.62, 0]} receiveShadow>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -TABLE_H, 0]} receiveShadow>
         <planeGeometry args={[60, 60]} />
         <meshStandardMaterial color="#0b0e14" metalness={0.6} roughness={0.35} />
       </mesh>
 
       {/* underbody */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.05, 0]} geometry={g.underG}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} geometry={g.underG}>
         <meshStandardMaterial color="#0a0d12" metalness={0.3} roughness={0.7} />
       </mesh>
 
@@ -246,7 +301,7 @@ function TableBody() {
         <meshStandardMaterial color="#171b22" metalness={0.95} roughness={0.32} />
       </mesh>
       {/* gold pinstripe on the rail */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.38, 0]} geometry={g.stripeG}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.30, 0]} geometry={g.stripeG}>
         <meshStandardMaterial color="#e9c46a" emissive="#6b501a" emissiveIntensity={0.35} metalness={1} roughness={0.3} side={THREE.DoubleSide} />
       </mesh>
     </group>
@@ -306,7 +361,7 @@ function backTexture(): THREE.Texture {
 
 // Face-down card — the real rendered card-back texture on the top face (the hero's
 // own cards are the DOM overlay; opponents/deck show this back).
-function CardBack({ w = 0.44, h = 0.62 }: { w?: number; h?: number }) {
+function CardBack({ w = 0.282, h = 0.401 }: { w?: number; h?: number }) {
   const mats = useMemo(() => {
     const back = backTexture();
     const edge = new THREE.MeshStandardMaterial({ color: "#e8ecf0", roughness: 0.5 });
@@ -351,7 +406,7 @@ function Deck({ nonce }: { nonce: number }) {
   for (let i = 0; i < 9; i++) {
     cards.push(
       <mesh key={i} position={[0, i * 0.02, 0]} castShadow>
-        <boxGeometry args={[0.44, 0.02, 0.62]} />
+        <boxGeometry args={[0.282, 0.016, 0.401]} />
         <meshStandardMaterial color="#eef2f6" roughness={0.5} />
       </mesh>,
     );
@@ -391,7 +446,7 @@ function HoleFace({ code }: { code: string }) {
   return (
     <group ref={ref}>
       <mesh castShadow material={mats}>
-        <boxGeometry args={[0.44, 0.02, 0.62]} />
+        <boxGeometry args={[0.282, 0.016, 0.401]} />
       </mesh>
     </group>
   );
@@ -412,17 +467,17 @@ function SeatHoleCards({ seat, total }: { seat: SceneSeat; total: number }) {
   const bx = p[0] * base;
   const bz = p[2] * base;
   const yaw = Math.atan2(-p[0], -p[2]);
-  const ref0 = useDealIn([bx - perpX * 0.13, 0.055, bz - perpZ * 0.13], seat.index * 100);
-  const ref1 = useDealIn([bx + perpX * 0.13, 0.055, bz + perpZ * 0.13], seat.index * 100 + 55);
+  const ref0 = useDealIn([bx - perpX * 0.104, 0.055, bz - perpZ * 0.104], seat.index * 100);
+  const ref1 = useDealIn([bx + perpX * 0.104, 0.055, bz + perpZ * 0.104], seat.index * 100 + 55);
   const reveal = seat.revealHole;
   if (reveal) {
     // Revealed at showdown: face-up cards at the same fanned positions.
     return (
       <>
-        <group position={[bx - perpX * 0.13, 0.055, bz - perpZ * 0.13]} rotation={[0, yaw + 0.12, 0]}>
+        <group position={[bx - perpX * 0.104, 0.055, bz - perpZ * 0.104]} rotation={[0, yaw + 0.12, 0]}>
           <HoleFace code={reveal[0]} />
         </group>
-        <group position={[bx + perpX * 0.13, 0.055, bz + perpZ * 0.13]} rotation={[0, yaw - 0.12, 0]}>
+        <group position={[bx + perpX * 0.104, 0.055, bz + perpZ * 0.104]} rotation={[0, yaw - 0.12, 0]}>
           <HoleFace code={reveal[1]} />
         </group>
       </>
@@ -456,18 +511,18 @@ function BoardCard({ code, x, delay }: { code: string; x: number; delay: number 
   return (
     <group ref={ref}>
       <mesh castShadow material={mats}>
-        <boxGeometry args={[0.66, 0.03, 0.92]} />
+        <boxGeometry args={[0.416, 0.022, 0.582]} />
       </mesh>
     </group>
   );
 }
 
 function Board({ board }: { board: string[] }) {
-  const start = -((board.length - 1) / 2) * 0.86;
+  const start = -((board.length - 1) / 2) * 0.475; // 56px card + 8px gap
   return (
     <group>
       {board.map((c, i) => (
-        <BoardCard key={`${c}-${i}`} code={c} x={start + i * 0.86} delay={i * 130} />
+        <BoardCard key={`${c}-${i}`} code={c} x={start + i * 0.475} delay={i * 130} />
       ))}
     </group>
   );
@@ -822,6 +877,109 @@ function GlbFigure({ seat, total }: { seat: SceneSeat; total: number }) {
   );
 }
 
+/* ---------------- 2D seat layer (spec coordinates) ---------------- */
+
+/** One seat tile: 110x130 frame, 80x80 photo, 140x70 badge, 90x28 action tag. */
+function SeatTile({ seat, index }: { seat?: SceneSeat; index: number }) {
+  const vacant = !seat;
+  const ring = seat ? seat.ringColor : "#5b6472";
+  const glow =
+    seat?.state === "active" ? "rgba(243,193,75,0.75)"
+      : seat?.state === "allin" ? "rgba(255,59,70,0.7)"
+        : "rgba(91,100,114,0.45)";
+  const src = seat?.avatar ? avatarSrc(seat.avatar) : undefined;
+  const anim =
+    seat?.state === "winner" ? "seatWinPulse 0.9s ease-out"
+      : seat?.state === "active" ? "seatTurnBob 1.6s ease-in-out infinite"
+        : seat?.state === "folded" ? "none"
+          : "seatIdleFloat 4s ease-in-out infinite";
+  const tone = seat?.action && {
+    fold: { bg: "rgba(60,20,24,0.9)", bd: "#c9302c", fg: "#ff9aa0" },
+    call: { bg: "rgba(8,40,22,0.9)", bd: "#22c55e", fg: "#8ef0b0" },
+    raise: { bg: "rgba(44,34,8,0.92)", bd: "#e9c46a", fg: "#ffe6a3" },
+    allin: { bg: "rgba(60,10,14,0.95)", bd: "#ff3b46", fg: "#ff7a82" },
+  }[seat.action.tone];
+  return (
+    <div style={seatUIStyle(index)} className="flex flex-col items-center">
+      {/* action tag (90x28) sits above the frame */}
+      {seat?.action && tone && (
+        <div
+          style={{
+            width: UI.tagW, height: UI.tagH, marginBottom: 4, borderRadius: 6,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: UI.tagFont, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase",
+            background: tone.bg, border: `1px solid ${tone.bd}`, color: tone.fg,
+            boxShadow: `0 0 12px ${tone.bd}55`, whiteSpace: "nowrap",
+          }}
+        >
+          {seat.action.label}{seat.action.amount ? ` ${seat.action.amount}` : ""}
+        </div>
+      )}
+
+      {/* avatar frame 110x130 — identical box whether seated or VACANT */}
+      <div
+        style={{
+          width: UI.frameW, height: UI.frameH, borderRadius: 12,
+          border: `2px solid ${ring}`, background: "rgba(11,14,19,0.92)",
+          boxShadow: vacant ? "none" : `0 0 26px ${glow}, 0 0 0 2px rgba(212,175,55,0.28)`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          opacity: seat?.state === "folded" ? 0.55 : 1,
+          animation: vacant ? "none" : anim,
+          animationDelay: `${(index % 6) * 0.35}s`,
+          position: "relative",
+        }}
+      >
+        {vacant ? (
+          <div className="flex flex-col items-center" style={{ color: "#7f8794" }}>
+            <div style={{ width: UI.photo, height: UI.photo, borderRadius: 10, border: `2px dashed #5b6472`,
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30 }}>♟</div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", marginTop: 6 }}>VACANT</div>
+          </div>
+        ) : (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={src} alt="" width={UI.photo} height={UI.photo}
+              style={{ width: UI.photo, height: UI.photo, objectFit: "cover", borderRadius: 10, display: "block" }} />
+            {seat.isButton && (
+              <div style={{ position: "absolute", right: -8, bottom: -8, width: 24, height: 24, borderRadius: "50%",
+                background: "linear-gradient(180deg,#ffffff,#d8d8d8)", color: "#231b00", fontWeight: 900, fontSize: 11,
+                display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid rgba(0,0,0,0.4)" }}>D</div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* badge 140x70 — name + stack */}
+      {!vacant && (
+        <div
+          style={{
+            width: UI.badgeW, minHeight: 40, marginTop: 6, borderRadius: 8, padding: "4px 8px",
+            background: "rgba(8,10,14,0.86)", border: "1px solid rgba(255,255,255,0.12)",
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+            opacity: seat.state === "folded" ? 0.6 : 1,
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", lineHeight: 1.15 }}>{seat.name}</div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: "#f3c14b", lineHeight: 1.2 }}>{seat.stack}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** All ten seat anchors, rendered flat over the canvas at the spec coordinates. */
+function SeatLayer2D({ seats, maxSeats }: { seats: SceneSeat[]; maxSeats: number }) {
+  const bySeat = new Map(seats.map((s) => [s.index, s]));
+  const n = Math.min(maxSeats, SEAT_UI.length);
+  return (
+    <div className="pointer-events-none absolute inset-0 select-none" style={{ zIndex: 12 }}>
+      {Array.from({ length: n }, (_, i) => (
+        <SeatTile key={i} index={i} seat={bySeat.get(i)} />
+      ))}
+    </div>
+  );
+}
+
 /* ---------------- scene ---------------- */
 
 function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, potMinor, winnerSeat, winNonce, feltControls, backdrop }: {
@@ -911,13 +1069,13 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
 
       {seats.map((s) => {
         const is3d = mode === "3d" || (mode === "mix" && s.use3d);
+        // 2.5D portraits are drawn by SeatLayer2D at the spec screen coordinates;
+        // only true 3D seats need an in-scene figure.
         return is3d ? (
           <Suspense key={s.index} fallback={null}>
             <GlbFigure seat={s} total={maxSeats} />
           </Suspense>
-        ) : (
-          <SeatPortrait2D key={s.index} seat={s} total={maxSeats} />
-        );
+        ) : null;
       })}
 
       {/* Per-seat committed bets as physical chips on the felt (real geometry). */}
@@ -1074,7 +1232,7 @@ export function CinematicScene({
       "linear-gradient(180deg,#04060a,#070b12 60%,#04060a)";
   const cameraCfg = backdrop
     ? { position: backdrop.camera.position, fov: backdrop.camera.fov }
-    : { position: [0, 7.2, 10.6] as [number, number, number], fov: 40 };
+    : { position: [0, 9.0, 7.0] as [number, number, number], fov: 40 };
   return (
     <div className="relative h-screen w-screen overflow-hidden" style={{ background: wrapperBg }}>
       <Canvas
@@ -1091,6 +1249,7 @@ export function CinematicScene({
           <Scene seats={seats} board={board} mode={mode} maxSeats={maxSeats} showPot={showPot} handLive={handLive} dealNonce={dealNonce} potMinor={potMinor} winnerSeat={winnerSeat} winNonce={winNonce} feltControls={feltControls} backdrop={backdrop} />
         </Suspense>
       </Canvas>
+      {mode !== "3d" && <SeatLayer2D seats={seats} maxSeats={maxSeats} />}
       {children ?? <SceneHud potLabel={potLabel} heroHole={heroHole} announce={announce} />}
       {overlay}
     </div>
