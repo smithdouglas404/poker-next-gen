@@ -15,7 +15,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { Environment, Lightformer, Html, useGLTF, useAnimations, Clone, ContactShadows } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 
-import { cardFaceTexture, feltTexture } from "@/app/proof/textures";
+import { cardBackTexture, cardFaceTexture, feltTexture } from "@/app/proof/textures";
 import { avatarSrc } from "@/features/table/avatars";
 
 const GLB_URL = "/models/house.glb";
@@ -179,32 +179,44 @@ function useDealIn(target: [number, number, number], delayMs: number, flip = fal
     }
     const DUR = 420;
     const k = Math.min(1, local / DUR);
-    const e = 1 - Math.pow(1 - k, 3); // easeOutCubic
+    // easeOutBack — a snappy settle that slightly overshoots then lands (matches
+    // the reference's back.out feel), applied to position; scale stays smooth.
+    const c1 = 1.70158;
+    const c3 = c1 + 1;
+    const e = 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2);
+    const es = 1 - Math.pow(1 - k, 3); // easeOutCubic for scale/flip
     g.position.set(
       DECK_POS[0] + (target[0] - DECK_POS[0]) * e,
-      DECK_POS[1] + (target[1] - DECK_POS[1]) * e + Math.sin(k * Math.PI) * 0.25, // slight arc
+      DECK_POS[1] + (target[1] - DECK_POS[1]) * es + Math.sin(k * Math.PI) * 0.25, // slight arc
       DECK_POS[2] + (target[2] - DECK_POS[2]) * e,
     );
-    if (flip) g.rotation.x = -Math.PI / 2 * (1 - e);
-    g.scale.setScalar(0.86 + 0.14 * e);
+    if (flip) g.rotation.x = -Math.PI / 2 * (1 - es);
+    g.scale.setScalar(0.86 + 0.14 * es);
   });
   return ref;
 }
 
-// Face-down card back — GGPoker dark-red with a gold rim. Used for the deck and
-// every opponent's hole cards (the hero's real cards are the DOM overlay).
+// One shared GGPoker card-back texture (dark-red + gold border + diamond lattice)
+// for every face-down card and the deck top — a real rendered card back, not a
+// flat color. Cached so we don't rebuild the canvas per card.
+let _backTex: THREE.Texture | null = null;
+function backTexture(): THREE.Texture {
+  return (_backTex ??= cardBackTexture());
+}
+
+// Face-down card — the real rendered card-back texture on the top face (the hero's
+// own cards are the DOM overlay; opponents/deck show this back).
 function CardBack({ w = 0.44, h = 0.62 }: { w?: number; h?: number }) {
+  const mats = useMemo(() => {
+    const back = backTexture();
+    const edge = new THREE.MeshStandardMaterial({ color: "#e8ecf0", roughness: 0.5 });
+    const top = new THREE.MeshStandardMaterial({ map: back, roughness: 0.46 });
+    return [edge, edge, top, edge, edge, edge];
+  }, []);
   return (
-    <group>
-      <mesh castShadow>
-        <boxGeometry args={[w, 0.02, h]} />
-        <meshStandardMaterial color="#6f1420" metalness={0.2} roughness={0.5} />
-      </mesh>
-      <mesh position={[0, 0.011, 0]}>
-        <boxGeometry args={[w * 0.82, 0.006, h * 0.86]} />
-        <meshStandardMaterial color="#e9c46a" emissive="#8a6a1e" emissiveIntensity={0.35} metalness={0.9} roughness={0.35} />
-      </mesh>
-    </group>
+    <mesh castShadow material={mats}>
+      <boxGeometry args={[w, 0.02, h]} />
+    </mesh>
   );
 }
 
@@ -235,18 +247,22 @@ function Deck({ nonce }: { nonce: number }) {
     g.rotation.z = Math.sin(k * Math.PI * 3) * 0.22;
     g.position.set(DECK_POS[0], DECK_POS[1] + Math.sin(k * Math.PI) * 0.14, DECK_POS[2]);
   });
-  const chips = [];
-  for (let i = 0; i < 10; i++) {
-    chips.push(
+  const cards = [];
+  for (let i = 0; i < 9; i++) {
+    cards.push(
       <mesh key={i} position={[0, i * 0.02, 0]} castShadow>
         <boxGeometry args={[0.44, 0.02, 0.62]} />
-        <meshStandardMaterial color={i === 9 ? "#6f1420" : "#f4f6f8"} roughness={0.5} />
+        <meshStandardMaterial color="#eef2f6" roughness={0.5} />
       </mesh>,
     );
   }
   return (
     <group ref={ref} position={DECK_POS} rotation={[0, -0.3, 0]}>
-      {chips}
+      {cards}
+      {/* real card-back texture on the top of the deck */}
+      <group position={[0, 9 * 0.02, 0]}>
+        <CardBack />
+      </group>
     </group>
   );
 }
