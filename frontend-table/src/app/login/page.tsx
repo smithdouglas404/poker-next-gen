@@ -79,8 +79,15 @@ export default function LoginPage() {
     }
   };
 
+  // Google / 3rd-party OAuth is handled by Clerk (clerk.com). Route to the Clerk
+  // sign-in page; on success ClerkNakamaBridge trades the Clerk session for a
+  // Nakama session. No-op message only if Clerk isn't configured on this build.
   const googleLogin = async () => {
-    setError("Configure NEXT_PUBLIC_GOOGLE_CLIENT_ID and Google Sign-In SDK for OAuth in production.");
+    if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+      setError("Social sign-in isn't configured on this deployment yet.");
+      return;
+    }
+    router.push("/sign-in");
   };
 
   if (step === "avatar") {

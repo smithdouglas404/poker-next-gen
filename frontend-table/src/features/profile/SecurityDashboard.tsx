@@ -199,17 +199,24 @@ export function SecurityDashboard({ notify }: { notify: (msg: string, kind?: "ok
           </Link>
         </div>
 
-        {/* Linked social accounts */}
+        {/* Linked social accounts — managed by Clerk (Google/Facebook/etc.).
+            Linking/unlinking happens in Clerk's secure account UI. */}
         <p className="mt-5 text-[11px] uppercase tracking-[0.2em] text-neutral-500">Linked Social Accounts</p>
-        <div className="mt-2 flex gap-2">
+        <div className="mt-2 flex items-center gap-2">
           {[
             { id: "google", label: "G", bg: "bg-white text-black" },
             { id: "facebook", label: "f", bg: "bg-[#1877f2] text-white" },
           ].map((s) => (
-            <span key={s.id} className={cn("flex h-9 w-9 items-center justify-center rounded-full font-display text-sm font-bold", s.bg)}>
+            <span key={s.id} className={cn("flex h-9 w-9 items-center justify-center rounded-full font-display text-sm font-bold opacity-70", s.bg)}>
               {s.label}
             </span>
           ))}
+          <Link
+            href="/sign-in"
+            className="ml-1 rounded-lg border border-white/15 px-3 py-1.5 text-xs font-semibold text-neutral-200 transition hover:border-white/30 hover:text-white"
+          >
+            Manage social logins →
+          </Link>
         </div>
 
         {/* Preferences */}
