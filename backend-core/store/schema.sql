@@ -1234,3 +1234,23 @@ CREATE TABLE IF NOT EXISTS poker_guest_session (
 );
 CREATE INDEX IF NOT EXISTS idx_poker_guest_session_club ON poker_guest_session(club_id, status, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_poker_guest_session_user ON poker_guest_session(user_id, created_at DESC);
+
+-- Recurring "club night" templates: a saved table config + weekday/time an
+-- operator intends to run it. Launched on demand via club_night_launch_now
+-- (auto-firing at the scheduled time is a follow-up needing a poller/cron).
+CREATE TABLE IF NOT EXISTS poker_club_schedule (
+    id          TEXT PRIMARY KEY,
+    club_id     TEXT NOT NULL,
+    name        TEXT NOT NULL DEFAULT '',
+    small_blind BIGINT NOT NULL DEFAULT 100,
+    big_blind   BIGINT NOT NULL DEFAULT 200,
+    buy_in      BIGINT NOT NULL DEFAULT 100000,
+    max_seats   INT NOT NULL DEFAULT 6,
+    variant     TEXT NOT NULL DEFAULT 'holdem',
+    weekday     INT NOT NULL DEFAULT 0,        -- 0=Sun … 6=Sat
+    time_of_day TEXT NOT NULL DEFAULT '20:00', -- HH:MM, operator-local
+    enabled     BOOLEAN NOT NULL DEFAULT TRUE,
+    created_by  TEXT NOT NULL DEFAULT '',
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_poker_club_schedule_club ON poker_club_schedule(club_id, created_at DESC);

@@ -28,6 +28,21 @@ export interface GuestSession {
   created_at: string;
 }
 
+export interface ClubSchedule {
+  id: string;
+  club_id: string;
+  name: string;
+  small_blind: number;
+  big_blind: number;
+  buy_in: number;
+  max_seats: number;
+  variant: string;
+  weekday: number;
+  time_of_day: string;
+  enabled: boolean;
+  created_at: string;
+}
+
 export interface OwnerClub {
   id: string;
   name: string;

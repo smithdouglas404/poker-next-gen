@@ -89,6 +89,24 @@ export const ownerApi = {
     call<{ sessions: import("./types").GuestSession[] }>("guest_sessions_pending", { club_id: clubId }),
   guestSessionReconcile: (id: string) =>
     call<{ ok: boolean; net_minor: number }>("guest_session_reconcile", { id }),
+
+  /** Recurring club-night scheduler (P9): list / create templates + launch one now. */
+  clubScheduleList: (clubId: string) =>
+    call<{ schedules: import("./types").ClubSchedule[] }>("club_schedule_list", { club_id: clubId }),
+  clubScheduleCreate: (s: {
+    club_id: string;
+    name: string;
+    small_blind: number;
+    big_blind: number;
+    buy_in: number;
+    max_seats: number;
+    variant: string;
+    weekday: number;
+    time_of_day: string;
+    enabled: boolean;
+  }) => call<{ ok: boolean; id: string }>("club_schedule_create", s),
+  clubNightLaunchNow: (id: string) =>
+    call<{ ok: boolean; match_id: string; code: string }>("club_night_launch_now", { id }),
   /** A player raises an over-limit credit request at a club. */
   creditRequestCreate: (clubId: string, amountCents: number, reason: string) =>
     call<{ ok: boolean; id: string }>("credit_request_create", {

@@ -229,6 +229,9 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"club_announcement_create": rpc.ClubAnnouncementCreate,
 		"club_event_list":          rpc.ClubEventList,
 		"club_event_create":        rpc.ClubEventCreate,
+		"club_schedule_list":       rpc.ClubScheduleList,
+		"club_schedule_create":     rpc.ClubScheduleCreate,
+		"club_night_launch_now":    rpc.ClubNightLaunchNow,
 		"club_chat_send":           rpc.ClubChatSend,
 		"club_chat_list":           rpc.ClubChatList,
 		// Economy (wallet buckets / shop / dye / wardrobe / NFT)
