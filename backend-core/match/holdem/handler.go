@@ -633,7 +633,8 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 		// betting phase.
 		if !s.Phase.AllowsPlayerActions() &&
 			msg.GetOpCode() != protocol.OpSitDown && msg.GetOpCode() != protocol.OpStandUp &&
-			msg.GetOpCode() != protocol.OpChatSend &&
+			msg.GetOpCode() != protocol.OpChatSend && msg.GetOpCode() != protocol.OpMoveSeat &&
+			msg.GetOpCode() != protocol.OpSitOut &&
 			msg.GetOpCode() != protocol.OpPostStraddle && msg.GetOpCode() != protocol.OpRunItTwice {
 			sendError(dispatcher, presence, "hand_busy", "showdown in progress")
 			continue
@@ -663,6 +664,21 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 					buyIn = s.maxBuyIn()
 				}
 				buyIn = poker.ClampBuyIn(buyIn)
+			}
+			// Anti-ratholing (#33): a player returning to THIS cash table within the
+			// window must buy in for at least the stack they left with — they can't
+			// leave big and re-buy short to lock in a win. The required floor overrides
+			// the table max upward (they earned those chips). Enforced, not just
+			// flagged; the seat-session's Ratholed flag remains as an operator record.
+			if s.TournamentID == "" {
+				if prev, _ := store.NewSeatSessionStore(db).LastClosedAtTable(ctx, matchIDForAudit(s), userID); prev != nil && prev.LeftAt != nil {
+					if time.Since(*prev.LeftAt) < ratholeWindowSecs*time.Second && buyIn < prev.StackAtLeaveMinor {
+						sendError(dispatcher, presence, "rathole", fmt.Sprintf(
+							"you left this table with $%d.%02d in the last %d minutes — you must return with at least that",
+							prev.StackAtLeaveMinor/100, prev.StackAtLeaveMinor%100, ratholeWindowSecs/60))
+						continue
+					}
+				}
 			}
 			// Universal wallet limit (#83): cap the total chips one player may bring
 			// to this table. Clamp the buy-in down to the remaining headroom; reject
@@ -848,6 +864,59 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			}
 			_ = store.NewActiveSeatStore(db).Unregister(ctx, userID, matchIDForAudit(s))
 			dispatcher.MatchLabelUpdate(buildLabel(s))
+			broadcastSnapshot(ctx, db, dispatcher, s, nil)
+
+		case protocol.OpMoveSeat:
+			// Player self-move to an EMPTY seat, chip-conserving (keeps the exact
+			// stack — not a re-buy). Only between hands, and never mid-hand while the
+			// mover holds live cards. Tracking maps (wallet/session/buy-in) follow the
+			// seat so the seat-session and cash-out wallet stay correct.
+			var req protocol.MoveSeatRequest
+			if err := json.Unmarshal(msg.GetData(), &req); err != nil {
+				continue
+			}
+			if s.Phase != poker.PhaseWaiting || s.Table.Street != poker.StreetWaiting {
+				sendError(dispatcher, presence, "in_hand", "you can only change seats between hands")
+				continue
+			}
+			from := seatForUser(s, userID)
+			if from < 0 {
+				continue
+			}
+			if req.ToSeat < 0 || req.ToSeat >= poker.MaxSeats || s.Table.Seats[req.ToSeat] != nil {
+				sendError(dispatcher, presence, "seat_taken", "that seat isn't open")
+				continue
+			}
+			if err := s.Table.MoveSeat(from, req.ToSeat); err != nil {
+				sendError(dispatcher, presence, "move_failed", err.Error())
+				continue
+			}
+			moveSeatTracking(s, from, req.ToSeat)
+			dispatcher.MatchLabelUpdate(buildLabel(s))
+			broadcastSnapshot(ctx, db, dispatcher, s, nil)
+
+		case protocol.OpSitOut:
+			// Toggle sitting-out in place (keeps the seat + chips). Sitting out holds
+			// the player out of the next hand; coming back owes a post (must post or
+			// wait for the big blind) per the blind-correctness rules. Takes effect at
+			// the next hand — a live hand plays out normally.
+			var req protocol.SitOutRequest
+			if err := json.Unmarshal(msg.GetData(), &req); err != nil {
+				continue
+			}
+			seatIdx := seatForUser(s, userID)
+			if seatIdx < 0 {
+				continue
+			}
+			seat := s.Table.Seats[seatIdx]
+			if req.SitOut {
+				seat.SittingOut = true
+			} else {
+				seat.SittingOut = false
+				if s.Table.HandNo > 0 {
+					seat.OwesPost = true // returning player must post or wait for the BB
+				}
+			}
 			broadcastSnapshot(ctx, db, dispatcher, s, nil)
 
 		case protocol.OpChatSend:
@@ -1671,12 +1740,8 @@ func handleHostAction(ctx context.Context, db *sql.DB, dispatcher runtime.MatchD
 			from := seatIdxSeat(s, req.Seat)
 			if from != nil && !from.IsBot && req.ToSeat >= 0 && req.ToSeat < poker.MaxSeats && s.Table.Seats[req.ToSeat] == nil {
 				name := from.Username
-				wallet := s.SeatWallet[req.Seat]
 				if err := s.Table.MoveSeat(req.Seat, req.ToSeat); err == nil {
-					delete(s.SeatWallet, req.Seat)
-					if wallet != "" {
-						s.SeatWallet[req.ToSeat] = wallet
-					}
+					moveSeatTracking(s, req.Seat, req.ToSeat)
 					narrate(dispatcher, s, fmt.Sprintf("Host moved %s to seat %d.", name, req.ToSeat+1))
 				}
 			}
@@ -2269,6 +2334,29 @@ func closeSeatSession(ctx context.Context, db *sql.DB, s *MatchState, seatIdx in
 	delete(s.SeatHands, seatIdx)
 }
 
+// moveSeatTracking relocates every per-seat, index-keyed tracking entry (wallet
+// source, open seat-session, cumulative buy-in, hands played) from one seat index
+// to another when a player changes seats, so cash-out and hit-and-run records stay
+// attached to the mover.
+func moveSeatTracking(s *MatchState, from, to int) {
+	if v, ok := s.SeatWallet[from]; ok {
+		s.SeatWallet[to] = v
+		delete(s.SeatWallet, from)
+	}
+	if v, ok := s.SeatSessionID[from]; ok {
+		s.SeatSessionID[to] = v
+		delete(s.SeatSessionID, from)
+	}
+	if v, ok := s.SeatBuyIn[from]; ok {
+		s.SeatBuyIn[to] = v
+		delete(s.SeatBuyIn, from)
+	}
+	if v, ok := s.SeatHands[from]; ok {
+		s.SeatHands[to] = v
+		delete(s.SeatHands, from)
+	}
+}
+
 func reportTournamentBusts(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *MatchState) {
 	if s.TournamentID == "" {
 		return
@@ -2431,6 +2519,8 @@ func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) 
 				IsBot:      seat.IsBot,
 				ModelURL:   equippedModelURL(ctx, db, seat.UserID, seat.IsBot),
 				Bet:        seat.Bet,
+				SittingOut: seat.SittingOut,
+				OwesPost:   seat.OwesPost,
 			}
 		}
 	}

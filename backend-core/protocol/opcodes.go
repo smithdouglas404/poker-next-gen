@@ -11,6 +11,8 @@ const (
 	OpPostStraddle    int64 = 7 // voluntary straddle: arm a 2x BB UTG post for the next hand
 	OpRunItTwice      int64 = 8 // agreement vote to run the board multiple times when all-in
 	OpInsuranceAccept int64 = 9 // accept a previously offered all-in insurance policy
+	OpMoveSeat        int64 = 10 // player self-move to an empty seat (between hands, chip-conserving)
+	OpSitOut          int64 = 11 // player toggle: sit out in place / I'm back (kept seat)
 )
 
 // Server → client match op codes.

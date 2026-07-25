@@ -30,6 +30,8 @@ import {
   OpSessionKey,
   OpShowdown,
   OpSitDown,
+  OpMoveSeat,
+  OpSitOut,
   OpSnapshot,
   OpStandUp,
   OpStartHand,
@@ -80,6 +82,8 @@ interface GameContextValue extends GameState {
   roomCode: string | null;
   sitDown: (seat: number, buyIn?: number, wallet?: "global" | "club") => Promise<void>;
   standUp: () => Promise<void>;
+  moveSeat: (toSeat: number) => Promise<void>;
+  sitOut: (on: boolean) => Promise<void>;
   startHand: () => Promise<void>;
   sendAction: (type: string, amount: number) => Promise<void>;
   hostAction: (payload: Record<string, unknown>) => Promise<void>;
@@ -384,6 +388,22 @@ export function GameProvider({ children }: { children: ReactNode }) {
     [sendMatch, buyInCents, pushLog, refreshWallet],
   );
 
+  const moveSeat = useCallback(
+    async (toSeat: number) => {
+      await sendMatch(OpMoveSeat, { to_seat: toSeat });
+      pushLog(`Moving to seat ${toSeat + 1}`, "action");
+    },
+    [sendMatch, pushLog],
+  );
+
+  const sitOut = useCallback(
+    async (on: boolean) => {
+      await sendMatch(OpSitOut, { sit_out: on });
+      pushLog(on ? "Sitting out" : "I'm back", "action");
+    },
+    [sendMatch, pushLog],
+  );
+
   const standUp = useCallback(async () => {
     await sendMatch(OpStandUp, {});
     setHoleCards([]);
@@ -517,6 +537,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       roomCode,
       sitDown,
       standUp,
+      moveSeat,
+      sitOut,
       startHand,
       sendAction,
       hostAction,
@@ -553,6 +575,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       roomCode,
       sitDown,
       standUp,
+      moveSeat,
+      sitOut,
       startHand,
       sendAction,
       hostAction,

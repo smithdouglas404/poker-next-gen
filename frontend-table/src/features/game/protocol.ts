@@ -4,6 +4,8 @@ export const OpAction = 3;
 export const OpStartHand = 4;
 export const OpChatSend = 5;
 export const OpHostAction = 6;
+export const OpMoveSeat = 10;
+export const OpSitOut = 11;
 
 export const OpChat = 111;
 export const OpSessionKey = 112;
@@ -48,6 +50,10 @@ export interface SeatView {
   model_url?: string;
   /** Chips committed on the current street (in front of the seat). */
   bet?: number;
+  /** Sitting out in place (kept seat, not dealt in). */
+  sitting_out?: boolean;
+  /** Owes a post to return before their natural big blind. */
+  owes_post?: boolean;
 }
 
 export interface TableSnapshot {

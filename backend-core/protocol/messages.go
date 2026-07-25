@@ -15,6 +15,17 @@ type SitDownRequest struct {
 	PostNow bool `json:"post_now,omitempty"`
 }
 
+// MoveSeatRequest asks to relocate the caller to an empty seat (player self-move,
+// between hands, chip-conserving).
+type MoveSeatRequest struct {
+	ToSeat int `json:"to_seat"`
+}
+
+// SitOutRequest toggles the caller sitting out in place (keeps their seat + chips).
+type SitOutRequest struct {
+	SitOut bool `json:"sit_out"`
+}
+
 type ActionRequest struct {
 	Type   string `json:"type"`
 	Amount int64  `json:"amount"`
@@ -42,6 +53,10 @@ type SeatView struct {
 	// Bet is the player's contribution on the current street (chips in front of
 	// the seat), 0 when they haven't acted this street.
 	Bet      int64  `json:"bet,omitempty"`
+	// SittingOut: the player kept their seat but is out of the game (not dealt in);
+	// OwesPost: they must post to return before their natural big blind.
+	SittingOut bool `json:"sitting_out,omitempty"`
+	OwesPost   bool `json:"owes_post,omitempty"`
 }
 
 type PotView struct {

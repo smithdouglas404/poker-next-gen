@@ -28,6 +28,8 @@ export function RoomPanel() {
     snapshot,
     findMatch,
     standUp,
+    sitOut,
+    moveSeat,
     listTables,
     openTables,
     matchmakerSearching,
@@ -54,7 +56,12 @@ export function RoomPanel() {
 
   const seatCap = snapshot?.max_seats ?? snapshot?.seats.length ?? maxSeats;
   const seated = snapshot?.seats.filter((s) => s.status !== "empty").length ?? 0;
-  const heroSeated = snapshot?.seats.some((s) => s.is_hero && s.status !== "empty") ?? false;
+  const heroSeat = snapshot?.seats.find((s) => s.is_hero && s.status !== "empty");
+  const heroSeated = !!heroSeat;
+  const heroSittingOut = heroSeat?.sitting_out ?? false;
+  // Player self-move (chip-conserving) is allowed between hands only.
+  const canMove = heroSeated && (snapshot?.phase ?? "waiting") === "waiting";
+  const emptySeatIdx = snapshot?.seats.filter((s) => s.status === "empty").map((s) => s.index) ?? [];
 
   const blindsValid = smallBlind >= 1 && bigBlind >= smallBlind;
   const seatsValid = seats >= MIN_SEATS && seats <= MAX_SEATS;
@@ -330,6 +337,35 @@ export function RoomPanel() {
               >
                 + Add Bot
               </Button>
+              {heroSeated && (
+                <Button
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => run(() => sitOut(!heroSittingOut))}
+                  className="w-full border-gold/40 text-gold hover:bg-gold/10"
+                >
+                  {heroSittingOut ? "I'm Back" : "Sit Out Next Hand"}
+                </Button>
+              )}
+              {canMove && emptySeatIdx.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase tracking-wider text-neutral-500">
+                    Change seat (keeps your stack)
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {emptySeatIdx.map((idx) => (
+                      <button
+                        key={idx}
+                        disabled={busy}
+                        onClick={() => run(() => moveSeat(idx))}
+                        className="rounded-md border border-white/15 px-2 py-1 text-xs text-neutral-200 hover:border-gold/40 hover:text-gold disabled:opacity-50"
+                      >
+                        → Seat {idx + 1}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {heroSeated && (
                 <Button
                   variant="danger"
