@@ -39,6 +39,8 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"credit_request_create":       rpc.CreditRequestCreate,
 		"credit_requests_pending":     rpc.CreditRequestsPending,
 		"credit_request_review":       rpc.CreditRequestReview,
+		"guest_sessions_pending":      rpc.GuestSessionsPending,
+		"guest_session_reconcile":     rpc.GuestSessionReconcile,
 		"sidebet_offer":               rpc.SidebetOffer,
 		"sidebet_accept":              rpc.SidebetAccept,
 		"sidebet_cancel":              rpc.SidebetCancel,

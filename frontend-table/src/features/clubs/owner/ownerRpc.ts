@@ -83,6 +83,12 @@ export const ownerApi = {
     call<{ requests: CreditRequest[] }>("credit_requests_pending", { club_id: clubId }),
   creditRequestReview: (id: string, approve: boolean) =>
     call<{ ok: boolean; status: string }>("credit_request_review", { id, approve }),
+
+  /** Guest table reconciliation (P7): list a club's open guest sessions + settle one. */
+  guestSessionsPending: (clubId: string) =>
+    call<{ sessions: import("./types").GuestSession[] }>("guest_sessions_pending", { club_id: clubId }),
+  guestSessionReconcile: (id: string) =>
+    call<{ ok: boolean; net_minor: number }>("guest_session_reconcile", { id }),
   /** A player raises an over-limit credit request at a club. */
   creditRequestCreate: (clubId: string, amountCents: number, reason: string) =>
     call<{ ok: boolean; id: string }>("credit_request_create", {

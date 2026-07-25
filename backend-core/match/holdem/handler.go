@@ -741,6 +741,20 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				s.Table.Seats[req.Seat].Status = poker.SeatFolded
 			}
 			_ = seatReg.Register(ctx, userID, matchKey)
+			// Guest reconciliation (P7): a GUEST (no registered account) sitting at
+			// a club's private/coded table is recorded so the operator can reconcile
+			// their position later. They play under the operator's per-table limit
+			// (WalletLimitCents); their net is read from the ledger at settle time.
+			if s.ClubID != "" && s.AccessType != "public" && isGuest(ctx, nk, userID) {
+				_, _ = store.NewGuestSessionStore(db).Create(ctx, &store.GuestSession{
+					ClubID:     s.ClubID,
+					MatchID:    matchKey,
+					UserID:     userID,
+					Username:   username,
+					LimitMinor: s.WalletLimitCents,
+					BuyInMinor: buyIn,
+				})
+			}
 			dispatcher.MatchLabelUpdate(buildLabel(s))
 			broadcastSnapshot(ctx, db, dispatcher, s, nil)
 
@@ -1943,6 +1957,21 @@ func processTournamentEliminations(ctx context.Context, db *sql.DB, s *MatchStat
 
 // equippedAvatarID reads the player's currently-equipped avatar from their
 // account metadata (the same key profile_meta_set writes). Returns "" for bots,
+// isGuest reports whether a user is an unregistered guest (device-only auth): no
+// email identity AND not a Clerk-linked account. Best-effort — on any error we
+// treat the user as non-guest so a guest session is never over-recorded. Mirrors
+// the account-type checks in rpc/recovery.go and rpc/security.go.
+func isGuest(ctx context.Context, nk runtime.NakamaModule, userID string) bool {
+	if userID == "" {
+		return false
+	}
+	acct, err := nk.AccountGetId(ctx, userID)
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(acct.GetEmail()) == "" && !strings.HasPrefix(acct.GetCustomId(), "clerk:")
+}
+
 // guests without a pick, or on any error — attribution is best-effort and must
 // never break a hand.
 func equippedAvatarID(ctx context.Context, nk runtime.NakamaModule, userID string) string {

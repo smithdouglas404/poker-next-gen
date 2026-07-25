@@ -1213,3 +1213,24 @@ CREATE TABLE IF NOT EXISTS poker_credit_request (
 );
 CREATE INDEX IF NOT EXISTS idx_poker_credit_request_club ON poker_credit_request(club_id, status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_poker_credit_request_user ON poker_credit_request(user_id, created_at DESC);
+
+-- Guest table sessions: when a GUEST (no registered account) sits at a club's
+-- private/coded table, they play under the operator's per-table limit and are
+-- tracked here until the club operator reconciles their position. The net at
+-- settle time comes from the double-entry ledger (account "user:<guest>").
+CREATE TABLE IF NOT EXISTS poker_guest_session (
+    id            TEXT PRIMARY KEY,
+    club_id       TEXT NOT NULL,
+    match_id      TEXT NOT NULL DEFAULT '',
+    user_id       TEXT NOT NULL,
+    username      TEXT NOT NULL DEFAULT '',
+    limit_minor   BIGINT NOT NULL DEFAULT 0,
+    buy_in_minor  BIGINT NOT NULL DEFAULT 0,
+    status        TEXT NOT NULL DEFAULT 'open',  -- open | reconciled
+    net_minor     BIGINT NOT NULL DEFAULT 0,
+    reconciled_by TEXT NOT NULL DEFAULT '',
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    reconciled_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_poker_guest_session_club ON poker_guest_session(club_id, status, created_at ASC);
+CREATE INDEX IF NOT EXISTS idx_poker_guest_session_user ON poker_guest_session(user_id, created_at DESC);

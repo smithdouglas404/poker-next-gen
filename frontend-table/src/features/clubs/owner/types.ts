@@ -14,6 +14,20 @@ export interface CreditRequest {
   created_at: string;
 }
 
+export interface GuestSession {
+  id: string;
+  club_id: string;
+  match_id: string;
+  user_id: string;
+  username: string;
+  limit_minor: number;
+  buy_in_minor: number;
+  status: string;
+  net_minor: number;
+  ledger_net_minor: number;
+  created_at: string;
+}
+
 export interface OwnerClub {
   id: string;
   name: string;
