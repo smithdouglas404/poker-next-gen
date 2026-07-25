@@ -126,58 +126,122 @@ export interface CinematicSceneProps {
   overlay?: ReactNode;
 }
 
-// Ellipse the seats sit on (matches the proof exactly).
-const SX = 4.62;
+// The cinematic table is a STADIUM (racetrack) oval: straight long sides with
+// semicircular ends — matching the approved concept art, not a stretched circle.
+const STAD_L = 1.3; // half-length of the straight side (X)
+const FELT_R = 2.85; // felt end radius (Z half-depth)
+const SEAT_R = 3.15; // seat ring end radius (on the rail)
+const SX = 4.62; // legacy ellipse (baked plates only)
 const SZ = 3.82;
-// Active seat ellipse for the current scene. The cinematic felt uses the default
-// (SX/SZ); a baked plate overrides it (set synchronously at the top of Scene, before
-// any seatPoint() call) so seats project onto the painted chairs. There is exactly
-// one live table Canvas mounted at a time, so a module-level value is safe here.
-let ACTIVE_ELLIPSE = { sx: SX, sz: SZ, y: 0.12 };
+// Active seat path for the current scene. Cinematic felt uses the stadium; a baked
+// plate overrides with its own ELLIPSE so seats project onto the painted chairs.
+// There is exactly one live table Canvas mounted at a time, so module-level is safe.
+let ACTIVE_ELLIPSE: { sx: number; sz: number; y: number; stadiumL?: number } = {
+  sx: SX, sz: SEAT_R, y: 0.12, stadiumL: STAD_L,
+};
+// Walk the stadium perimeter: u=0 at bottom-center (hero), increasing clockwise.
+function stadiumPoint(u: number, L: number, R: number, y: number): [number, number, number] {
+  const P = 4 * L + 2 * Math.PI * R;
+  let d = (((u % 1) + 1) % 1) * P;
+  const arc = Math.PI * R;
+  if (d < L) return [d, y, R]; // bottom straight, center -> right
+  d -= L;
+  if (d < arc) { const t = d / R; return [L + Math.sin(t) * R, y, Math.cos(t) * R]; } // right end
+  d -= arc;
+  if (d < 2 * L) return [L - d, y, -R]; // top straight, right -> left
+  d -= 2 * L;
+  if (d < arc) { const t = d / R; return [-L - Math.sin(t) * R, y, -Math.cos(t) * R]; } // left end
+  d -= arc;
+  return [-L + d, y, R]; // bottom straight, left -> center
+}
+// Side-middle seats sit at the stadium's widest point; clamp X so their DOM
+// tiles stay fully on screen (the table geometry may bleed — tiles may not).
+const SEAT_XMAX = 3.3;
 function seatPoint(index: number, total: number): [number, number, number] {
+  const e = ACTIVE_ELLIPSE;
+  if (e.stadiumL != null) {
+    const pt = stadiumPoint(index / total, e.stadiumL, e.sz, e.y);
+    pt[0] = Math.sign(pt[0]) * Math.min(Math.abs(pt[0]), SEAT_XMAX);
+    return pt;
+  }
   const a = (index / total) * Math.PI * 2 + Math.PI / 2;
-  return [Math.cos(a) * ACTIVE_ELLIPSE.sx, ACTIVE_ELLIPSE.y, Math.sin(a) * ACTIVE_ELLIPSE.sz];
+  return [Math.cos(a) * e.sx, e.y, Math.sin(a) * e.sz];
+}
+// Stadium outline / ring shapes for the table build.
+function stadiumOutline(L: number, R: number, into?: THREE.Path): THREE.Path {
+  const s = into ?? new THREE.Shape();
+  s.moveTo(-L, -R);
+  s.lineTo(L, -R);
+  s.absarc(L, 0, R, -Math.PI / 2, Math.PI / 2, false);
+  s.lineTo(-L, R);
+  s.absarc(-L, 0, R, Math.PI / 2, (3 * Math.PI) / 2, false);
+  return s;
+}
+function stadiumShape(L: number, R: number): THREE.Shape {
+  return stadiumOutline(L, R) as THREE.Shape;
+}
+function stadiumRing(L: number, outerR: number, innerR: number): THREE.Shape {
+  const shape = stadiumShape(L, outerR);
+  shape.holes.push(stadiumOutline(L, innerR, new THREE.Path()));
+  return shape;
+}
+// ShapeGeometry UVs come out in shape-space; remap to 0..1 so textures fit.
+function remapUVs(g: THREE.BufferGeometry, w: number, h: number) {
+  const pos = g.attributes.position;
+  const uv = g.attributes.uv as THREE.BufferAttribute;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i) / w + 0.5, pos.getY(i) / h + 0.5);
+  uv.needsUpdate = true;
 }
 
 /* ---------------- table geometry ---------------- */
 
 function TableBody() {
   const felt = useMemo(() => feltTexture(), []);
+  // Stadium geometries (racetrack oval): felt, gold inner ring, red neon rim,
+  // raised gunmetal rail, gold pinstripe, underbody. All from the same outline.
+  const g = useMemo(() => {
+    const feltG = new THREE.ShapeGeometry(stadiumShape(STAD_L, FELT_R), 48);
+    remapUVs(feltG, 2 * (STAD_L + FELT_R), 2 * FELT_R);
+    const goldG = new THREE.ShapeGeometry(stadiumRing(STAD_L, FELT_R - 0.26, FELT_R - 0.32), 48);
+    const rimG = new THREE.ShapeGeometry(stadiumRing(STAD_L, FELT_R + 0.10, FELT_R + 0.03), 48);
+    const railG = new THREE.ExtrudeGeometry(stadiumRing(STAD_L, FELT_R + 0.44, FELT_R + 0.12), {
+      depth: 0.14, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.05, bevelSegments: 3, curveSegments: 48,
+    });
+    const stripeG = new THREE.ShapeGeometry(stadiumRing(STAD_L, FELT_R + 0.31, FELT_R + 0.28), 48);
+    const underG = new THREE.ExtrudeGeometry(stadiumShape(STAD_L, FELT_R + 0.52), {
+      depth: 0.95, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.06, bevelSegments: 2, curveSegments: 48,
+    });
+    return { feltG, goldG, rimG, railG, stripeG, underG };
+  }, []);
   return (
     <group>
       {/* underbody */}
-      <mesh position={[0, -0.55, 0]} scale={[5.6, 1, 4.75]}>
-        <cylinderGeometry args={[1, 1.04, 1.05, 96]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.05, 0]} geometry={g.underG}>
         <meshStandardMaterial color="#0a0d12" metalness={0.3} roughness={0.7} />
       </mesh>
 
       {/* felt top */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} scale={[5.1, 4.15, 1]} receiveShadow>
-        <circleGeometry args={[1, 128]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} geometry={g.feltG} receiveShadow>
         <meshStandardMaterial map={felt} roughness={0.92} metalness={0.02} />
       </mesh>
 
       {/* gold inner ring (flat) */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.035, 0]} scale={[5.1, 4.15, 1]}>
-        <ringGeometry args={[0.9, 0.94, 128]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.035, 0]} geometry={g.goldG}>
         <meshStandardMaterial color="#f1cf6b" emissive="#8a6a1e" emissiveIntensity={0.5} metalness={1} roughness={0.28} side={THREE.DoubleSide} />
       </mesh>
 
       {/* red neon rim at felt edge (GGPoker brand glow) */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]} scale={[5.3, 4.35, 1]}>
-        <ringGeometry args={[0.985, 1.0, 160]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]} geometry={g.rimG}>
         <meshBasicMaterial color="#ff2d3f" side={THREE.DoubleSide} toneMapped={false} />
       </mesh>
 
-      {/* gunmetal outer rail */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.08, 0]} scale={[5.37, 4.42, 1]}>
-        <torusGeometry args={[1, 0.052, 24, 160]} />
+      {/* gunmetal outer rail (raised, beveled) */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} geometry={g.railG} castShadow receiveShadow>
         <meshStandardMaterial color="#171b22" metalness={0.95} roughness={0.32} />
       </mesh>
       {/* gold pinstripe on the rail */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.115, 0]} scale={[5.25, 4.3, 1]}>
-        <torusGeometry args={[1, 0.012, 16, 160]} />
-        <meshStandardMaterial color="#e9c46a" emissive="#6b501a" emissiveIntensity={0.35} metalness={1} roughness={0.3} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.27, 0]} geometry={g.stripeG}>
+        <meshStandardMaterial color="#e9c46a" emissive="#6b501a" emissiveIntensity={0.35} metalness={1} roughness={0.3} side={THREE.DoubleSide} />
       </mesh>
     </group>
   );
@@ -627,15 +691,8 @@ function SeatPortrait2D({ seat, total }: { seat: SceneSeat; total: number }) {
   // Portrait diameter (px). Enlarged so the character reads as the hero of the
   // seat (the 2.5D avatar is the headline art, not a thumbnail).
   const SIZE = 148;
-  // Hero (scene seat 0, bottom-center) shares its screen strip with the DOM hero
-  // cards + action panel, so shift the hero tile left of the action cluster (the
-  // classic poker-client hero position) — cards/panel own bottom-center, the
-  // character's face is never covered.
-  const isHero = seat.index === 0;
-  const anchorX = isHero ? p[0] - 1.55 : p[0];
-  const anchorY = isHero ? 0.6 : 0.42;
   return (
-    <Html position={[anchorX, anchorY, p[2]]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
+    <Html position={[p[0], 0.42, p[2]]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
       <div className="flex flex-col items-center">
         <div style={{ position: "relative", opacity: seat.state === "folded" ? 0.55 : 1, animation: anim, animationDelay: `${(seat.index % 6) * 0.35}s` }}>
           {/* Rounded-SQUARE portrait tile (per the approved reference art) — a
@@ -780,7 +837,7 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
   // cinematic felt keeps the contract default (SX/SZ).
   ACTIVE_ELLIPSE = backdrop
     ? { sx: backdrop.ellipse.sx, sz: backdrop.ellipse.sz, y: backdrop.ellipse.y }
-    : { sx: SX, sz: SZ, y: 0.12 };
+    : { sx: SX, sz: SEAT_R, y: 0.12, stadiumL: STAD_L };
 
   const baked = !!backdrop;
   const winTarget = useMemo<[number, number, number] | null>(() => {

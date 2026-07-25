@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { GLASS_PANEL } from "@/features/ui/tokens";
 import { CinematicScene, type AvatarMode, type SceneSeat } from "@/features/table3d/CinematicScene";
 import { bakedPlate } from "@/features/table/bakedTable";
+import { avatarSrc } from "@/features/table/avatars";
 import { PROOF_SEATS, PROOF_BOARD, PROOF_HERO_HOLE, POT_LABEL, type ProofSeat } from "./proofData";
 
 /* ---------------- proof data -> scene props ---------------- */
@@ -115,15 +116,23 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
           ))}
         </div>
 
-        {/* "you know what you have" — hero's current made hand (A♥A♦ on an A♠
-            board = trip aces), riding directly above the cards. Live table will
-            read this from the engine hand rank. */}
-        <div className="relative z-10 mb-1.5 flex justify-center">
-          <div
-            className="rounded-full border border-gold/60 px-4 py-1 font-display text-[13px] font-bold uppercase tracking-[0.18em] text-gold"
-            style={{ background: "rgba(8,10,14,0.82)", backdropFilter: "blur(8px)", boxShadow: "0 0 18px rgba(233,196,106,0.35), inset 0 0 10px rgba(0,0,0,0.4)" }}
-          >
-            Trip Aces
+        {/* Hero identity cluster — reference composition: tile top-center with
+            grayed card-backs peeking behind, seat badge on the tile edge, then a
+            plate showing the made hand + stack. Live table reads the hand from
+            the engine hand rank. */}
+        <div className="relative z-10 mb-2 flex flex-col items-center">
+          <div className="relative">
+            <div style={{ position: "absolute", right: -30, top: -16, width: 44, height: 62, background: "#565d66", borderRadius: 6, transform: "rotate(16deg)", border: "1px solid #3f454d", boxShadow: "0 4px 10px rgba(0,0,0,0.45)" }} />
+            <div style={{ position: "absolute", right: -10, top: -24, width: 44, height: 62, background: "#6b7280", borderRadius: 6, transform: "rotate(6deg)", border: "1px solid #3f454d", boxShadow: "0 4px 10px rgba(0,0,0,0.45)" }} />
+            <div style={{ position: "relative", width: 116, height: 116, borderRadius: 14, overflow: "hidden", border: "3px solid #f3c14b", boxShadow: "0 0 30px rgba(243,193,75,0.55), 0 0 0 2px rgba(212,175,55,0.35)" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={avatarSrc("cyber-samurai")} alt="" width={116} height={116} style={{ objectFit: "cover", display: "block" }} />
+            </div>
+            <div style={{ position: "absolute", left: "50%", bottom: -11, transform: "translateX(-50%)", width: 24, height: 24, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, background: "#101317", color: "#f3c14b", border: "1.5px solid #f3c14b", boxShadow: "0 0 10px rgba(243,193,75,0.5)", zIndex: 2 }}>A</div>
+          </div>
+          <div className="mt-3 rounded-lg border border-gold/50 px-4 py-1 text-center" style={{ background: "rgba(8,10,14,0.88)", backdropFilter: "blur(8px)", boxShadow: "0 0 16px rgba(233,196,106,0.25)" }}>
+            <div className="font-display text-[13px] font-bold uppercase tracking-[0.16em] text-gold">Trip Aces</div>
+            <div className="text-[12px] font-bold text-white/90">$24,500</div>
           </div>
         </div>
         {/* hero hole cards tucked INTO the action panel (reference composition:
@@ -164,7 +173,9 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
 /* ---------------- root ---------------- */
 
 export default function CinematicTable({ mode, plate }: { mode: AvatarMode; plate?: string }) {
-  const seats = useMemo(() => PROOF_SEATS.map(toSceneSeat), []);
+  // Hero (seat 0) renders as the DOM identity cluster in the HUD column — not a
+  // 3D-anchored seat — so the scene draws only the opponents.
+  const seats = useMemo(() => PROOF_SEATS.filter((s) => s.index !== 0).map(toSceneSeat), []);
   const backdrop = bakedPlate(plate);
   return (
     <CinematicScene
