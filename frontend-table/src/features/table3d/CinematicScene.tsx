@@ -15,7 +15,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { Environment, Lightformer, Html, useTexture, useGLTF, useAnimations, Clone, ContactShadows } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 
-import { cardBackTexture, cardFaceTexture, feltTexture } from "@/app/proof/textures";
+import { cardBackArt, cardFaceArt, feltTexture } from "@/app/proof/textures";
 import { avatarSrc } from "@/features/table/avatars";
 import type { BakedConfig } from "@/features/table/bakedTable";
 
@@ -342,7 +342,7 @@ function useDealIn(target: [number, number, number], delayMs: number, flip = fal
 // flat color. Cached so we don't rebuild the canvas per card.
 let _backTex: THREE.Texture | null = null;
 function backTexture(): THREE.Texture {
-  return (_backTex ??= cardBackTexture());
+  return (_backTex ??= cardBackArt());
 }
 
 // Face-down card — the real rendered card-back texture on the top face (the hero's
@@ -411,7 +411,7 @@ function Deck({ nonce }: { nonce: number }) {
 // A small face-up hole card (revealed at showdown) — four-color face on top, flips
 // up from face-down over ~0.5s on first mount.
 function HoleFace({ code }: { code: string }) {
-  const face = useMemo(() => cardFaceTexture(code), [code]);
+  const face = useMemo(() => cardFaceArt(code), [code]);
   const mats = useMemo(() => {
     const white = new THREE.MeshStandardMaterial({ color: "#f4f6f8", roughness: 0.5 });
     const top = new THREE.MeshStandardMaterial({ map: face, roughness: 0.42, emissive: new THREE.Color("#ffffff"), emissiveMap: face, emissiveIntensity: 0.16 });
@@ -486,7 +486,7 @@ function SeatHoleCards({ seat, total }: { seat: SceneSeat; total: number }) {
 }
 
 function BoardCard({ code, x, delay }: { code: string; x: number; delay: number }) {
-  const face = useMemo(() => cardFaceTexture(code), [code]);
+  const face = useMemo(() => cardFaceArt(code), [code]);
   const mats = useMemo(() => {
     const white = new THREE.MeshStandardMaterial({ color: "#f4f6f8", roughness: 0.5 });
     const top = new THREE.MeshStandardMaterial({ map: face, roughness: 0.42, emissive: new THREE.Color("#ffffff"), emissiveMap: face, emissiveIntensity: 0.14 });
@@ -537,13 +537,58 @@ function ChipStack({
   const chips = [];
   for (let i = 0; i < count; i++) {
     chips.push(
-      <mesh key={i} position={[0, i * 0.034, 0]} castShadow>
-        <cylinderGeometry args={[radius, radius, 0.032, 32]} />
-        <meshStandardMaterial color={color} metalness={0.25} roughness={0.5} />
-      </mesh>,
+      <group key={i} position={[0, i * 0.034, 0]}>
+        <mesh castShadow>
+          <cylinderGeometry args={[radius, radius, 0.032, 32]} />
+          <meshStandardMaterial color={color} metalness={0.25} roughness={0.5} />
+        </mesh>
+        {/* Edge stripes — HRC draws 8 evenly spaced ticks around the rim, which is
+            what stops a stack reading as a pile of plain discs. Thin boxes let
+            them into the real geometry instead of faking them in a texture. */}
+        {EDGE_STRIPE_ANGLES.map((a) => (
+          <mesh key={a} position={[Math.cos(a) * radius * 0.94, 0, Math.sin(a) * radius * 0.94]} rotation={[0, -a, 0]}>
+            <boxGeometry args={[radius * 0.16, 0.034, radius * 0.34]} />
+            <meshStandardMaterial color="#f4f6f8" metalness={0.1} roughness={0.55} />
+          </mesh>
+        ))}
+      </group>,
     );
   }
   return <group position={position}>{chips}</group>;
+}
+
+// 8 evenly spaced rim ticks, matching HRC's PotChip.
+const EDGE_STRIPE_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315].map((d) => (d * Math.PI) / 180);
+
+// Casino denominations, highest first — HRC's getPotChipStacks() colour set. A pot is
+// broken into real denominations rather than fixed decorative stacks, so the pile's
+// composition actually reflects the money on the table.
+// NOTE the unit: the pot label formats `potMinor` as whole dollars (16400 -> $16,400),
+// so these thresholds are dollars, not cents. Using cents here made a $16,400 pot
+// render as three single chips.
+const CHIP_DENOMS: { value: number; color: string }[] = [
+  { value: 500, color: "#e9c46a" }, // gold
+  { value: 100, color: "#1f2937" }, // black
+  { value: 50, color: "#c9302c" },  // red
+  { value: 25, color: "#2f6bff" },  // blue
+  { value: 10, color: "#1fa85a" },  // green
+];
+
+/** Split a pot (minor units) into up to 4 denomination stacks, biggest first. */
+function potChipStacks(potMinor: number): { color: string; count: number }[] {
+  let rest = Math.max(0, potMinor);
+  const out: { color: string; count: number }[] = [];
+  for (const d of CHIP_DENOMS) {
+    if (rest < d.value) continue;
+    const count = Math.min(9, Math.floor(rest / d.value));
+    if (count <= 0) continue;
+    out.push({ color: d.color, count });
+    rest -= count * d.value;
+    if (out.length === 4) break;
+  }
+  // A non-empty pot must always show something, even below the smallest denom.
+  if (!out.length && potMinor > 0) out.push({ color: "#1fa85a", count: 2 });
+  return out;
 }
 
 // Where the central pot sits (chips + the DOM pot label ride here).
@@ -553,16 +598,23 @@ const POT_POS: [number, number, number] = [0, 0.43, 0.55];
 // heights now SCALE with the pot value (bigger pot → taller stacks), clamped so it
 // still reads as a neat pot, not an oversized tower.
 function Pot({ potMinor }: { potMinor: number }) {
-  // Multiplier vs the baseline counts; ~1 at a mid pot, up to ~2.4 at a big one.
-  const m = Math.max(0.6, Math.min(1.8, (potMinor || 0) / 60000));
-  const c = (base: number) => Math.max(1, Math.round(base * m));
+  // Real denominations rather than five fixed decorative stacks: the pile's colours
+  // and heights now derive from the actual pot, so it reads as counted money.
+  const stacks = useMemo(() => potChipStacks(potMinor || 0), [potMinor]);
+  if (!stacks.length) return null;
+  // Lay the stacks out in a tight cluster, centred on the pot point.
+  const spread = 0.19;
+  const x0 = -((stacks.length - 1) / 2) * spread;
   return (
     <group position={POT_POS}>
-      <ChipStack position={[-0.26, 0, 0]} color="#c9302c" count={c(8)} />
-      <ChipStack position={[-0.09, 0, 0.10]} color="#1f2937" count={c(12)} />
-      <ChipStack position={[0.09, 0, 0]} color="#2f6bff" count={c(6)} />
-      <ChipStack position={[0.26, 0, -0.10]} color="#e9c46a" count={c(10)} />
-      <ChipStack position={[0.0, 0, -0.15]} color="#1fa85a" count={c(6)} />
+      {stacks.map((s, i) => (
+        <ChipStack
+          key={`${s.color}-${i}`}
+          position={[x0 + i * spread, 0, i % 2 === 0 ? 0.06 : -0.06]}
+          color={s.color}
+          count={s.count}
+        />
+      ))}
     </group>
   );
 }
@@ -970,15 +1022,34 @@ function SeatTile({ seat, index }: { seat?: SceneSeat; index: number }) {
 /** Seat tiles anchored to their real 3D seat points (drei <Html>), so the crisp
  *  DOM text rides the perspective camera instead of being pinned to flat pixels.
  *  Vacant seats render the same frame until someone takes the seat. */
+/** Depth ramp for seat tiles, ported from HRC's TABLE_SEATS `scale` column: the hero
+ *  renders full size and the far seats shrink to 0.83. drei <Html> is screen-space, so
+ *  it does NOT foreshorten on its own — and under a top-down plate camera there is no
+ *  perspective to foreshorten anyway. This ramp IS the depth cue; without it all ten
+ *  tiles render identically and the ring reads flat. */
+const SEAT_SCALE_NEAR = 1.0;
+const SEAT_SCALE_FAR = 0.83;
+function seatDepthScale(index: number, total: number): number {
+  const e = ACTIVE_ELLIPSE;
+  const z = seatPoint(index, total)[2];
+  const near = e.sz ? (z / e.sz + 1) / 2 : 1; // 1 at the hero, 0 at the far rail
+  return SEAT_SCALE_FAR + (SEAT_SCALE_NEAR - SEAT_SCALE_FAR) * Math.max(0, Math.min(1, near));
+}
+
 function SeatLayer3D({ seats, maxSeats }: { seats: SceneSeat[]; maxSeats: number }) {
   const bySeat = new Map(seats.map((s) => [s.index, s]));
   return (
     <>
       {Array.from({ length: maxSeats }, (_, i) => {
         const p = seatPoint(i, maxSeats);
+        const s = seatDepthScale(i, maxSeats);
         return (
           <Html key={i} position={[p[0], 0.42, p[2]]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
-            <SeatTile index={i} seat={bySeat.get(i)} />
+            {/* Nearer seats also stack above farther ones, so an overlap resolves the
+                way depth implies rather than by DOM order. */}
+            <div style={{ transform: `scale(${s.toFixed(3)})`, zIndex: Math.round(s * 1000) }}>
+              <SeatTile index={i} seat={bySeat.get(i)} />
+            </div>
           </Html>
         );
       })}

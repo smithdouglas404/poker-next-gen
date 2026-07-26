@@ -5,6 +5,39 @@ const SUIT_GLYPH: Record<string, string> = { s: "♠", h: "♥", d: "♦", c: "�
 // Four-color deck.
 const SUIT_COLOR: Record<string, string> = { s: "#101317", h: "#e5484d", d: "#2f6bff", c: "#1fa85a" };
 
+// ── Real deck art (HRC's SVG deck, rasterised to /public/cards by scripts/make-deck.mjs).
+// The canvas builders below stay as the fallback: they need no network fetch, so they
+// still back the audit/replay surfaces and any code the art doesn't cover.
+const SUIT_NAME: Record<string, string> = { s: "spades", h: "hearts", d: "diamonds", c: "clubs" };
+const _texLoader = new THREE.TextureLoader();
+const _faceArt = new Map<string, THREE.Texture>();
+let _backArt: THREE.Texture | null = null;
+
+/** Card FACE from the real deck art. Cached per code — 52 textures at most. */
+export function cardFaceArt(code: string): THREE.Texture {
+  const key = code.toLowerCase();
+  const hit = _faceArt.get(key);
+  if (hit) return hit;
+  // Our codes are rank+suit-letter ("As", "Td"); the art is "{RANK}_{suitname}.png"
+  // with the ten spelled out.
+  const rank = code.slice(0, -1).toUpperCase().replace(/^T$/, "10");
+  const suit = SUIT_NAME[code.slice(-1).toLowerCase()] ?? "spades";
+  const tex = _texLoader.load(`/cards/${rank}_${suit}.png`);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  _faceArt.set(key, tex);
+  return tex;
+}
+
+/** Card BACK from the real deck art. */
+export function cardBackArt(): THREE.Texture {
+  if (_backArt) return _backArt;
+  _backArt = _texLoader.load("/cardbacks/cardback_royal.webp");
+  _backArt.colorSpace = THREE.SRGBColorSpace;
+  _backArt.anisotropy = 8;
+  return _backArt;
+}
+
 function rounded(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
