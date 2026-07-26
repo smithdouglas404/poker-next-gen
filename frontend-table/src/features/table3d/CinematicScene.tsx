@@ -12,7 +12,7 @@
 import * as THREE from "three";
 import { Suspense, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Environment, Lightformer, Html, useGLTF, useAnimations, Clone, ContactShadows } from "@react-three/drei";
+import { Environment, Lightformer, Html, useTexture, useGLTF, useAnimations, Clone, ContactShadows } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 
 import { cardBackTexture, cardFaceTexture, feltTexture } from "@/app/proof/textures";
@@ -253,7 +253,14 @@ function TableModel() {
 }
 
 function TableBody() {
-  const felt = useMemo(() => feltTexture(), []);
+  // Felt PBR set from the design team's asset pack — albedo + normal + roughness,
+  // replacing the procedurally drawn canvas texture.
+  const [feltAlbedo, feltNormal, feltRough] = useTexture([
+    "/table/pbr/felt_albedo_4096.png",
+    "/table/pbr/felt_normal_4096.png",
+    "/table/pbr/felt_roughness_4096.png",
+  ]);
+  const felt = feltAlbedo;
   // Stadium geometries (racetrack oval): felt, gold inner ring, red neon rim,
   // raised gunmetal rail, gold pinstripe, underbody. All from the same outline.
   const g = useMemo(() => {
@@ -290,7 +297,7 @@ function TableBody() {
 
       {/* felt top */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} geometry={g.feltG} receiveShadow>
-        <meshStandardMaterial map={felt} bumpMap={felt} bumpScale={0.035} roughness={0.9} metalness={0.03} />
+        <meshStandardMaterial map={feltAlbedo} normalMap={feltNormal} roughnessMap={feltRough} roughness={1} metalness={0.02} />
       </mesh>
 
       {/* gold inner ring (flat) */}
@@ -1078,7 +1085,7 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
             <Lightformer intensity={2.0} form="rect" position={[6, 2, -3]} scale={[3, 6, 1]} color="#4DEEEA" />
           </Environment>
 
-          <Suspense fallback={<TableBody />}><TableModel /></Suspense>
+          <TableBody />
         </>
       )}
       <Board board={board} />
@@ -1304,4 +1311,3 @@ export function CinematicScene({
 }
 
 useGLTF.preload(GLB_URL);
-useGLTF.preload(TABLE_GLB);
