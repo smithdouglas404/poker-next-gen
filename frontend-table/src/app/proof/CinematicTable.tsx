@@ -93,7 +93,7 @@ function HandHistoryDrawer() {
         {open && (
           <motion.div
             initial={{ opacity: 0, x: -12, height: 0 }}
-            animate={{ opacity: 1, x: 0, height: 210 }}
+            animate={{ opacity: 1, x: 0, height: 236 }}
             exit={{ opacity: 0, x: -12, height: 0 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
             style={{

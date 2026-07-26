@@ -1,7 +1,9 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { Button } from "@/features/ui";
 import { GLASS_PANEL, GLASS_PANEL_HOVER, cn } from "@/features/ui/tokens";
+import { LIFT, SPRINGS } from "@/features/ui/motion";
 
 import { priceLabel } from "./membershipRpc";
 import { accentFor, keyLimits } from "./tierMeta";
@@ -47,7 +49,14 @@ export function TierCard({
             : "Upgrade";
 
   return (
-    <div
+    // `layout` makes the card SLIDE to its new size/position when the month/year toggle
+    // reflows the grid, instead of snapping — the FLIP animation that reads as physical.
+    // LIFT gives it weight on hover/press. Both animate transform only, so this composites
+    // on the GPU with no layout or paint.
+    <motion.div
+      layout
+      transition={SPRINGS.smooth}
+      {...LIFT}
       className={cn(
         GLASS_PANEL,
         GLASS_PANEL_HOVER,
@@ -125,6 +134,6 @@ export function TierCard({
       >
         {ctaLabel}
       </Button>
-    </div>
+    </motion.div>
   );
 }

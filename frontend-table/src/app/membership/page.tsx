@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+
+import { POP, RISE, STAGGER, STAGGER_ITEM } from "@/features/ui/motion";
 
 import { TierCard } from "@/features/membership/TierCard";
 import { membershipApi } from "@/features/membership/membershipRpc";
@@ -183,7 +186,10 @@ export default function MembershipPage() {
 
       <main className="mx-auto max-w-6xl space-y-8 px-6 py-10">
         {/* Current status hero */}
-        <section
+        <motion.section
+          variants={RISE}
+          initial="hidden"
+          animate="show"
           className={cn(GLASS_PANEL, "relative overflow-hidden p-6")}
           style={{ boxShadow: `inset 0 0 60px ${accent.glow}` }}
         >
@@ -255,11 +261,18 @@ export default function MembershipPage() {
               </div>
             )}
           </div>
-        </section>
+        </motion.section>
 
         {/* Identity gate — only shown when a provider is live and caller isn't fully verified */}
+        <AnimatePresence>
         {showIdentityGate && (
-          <section className={cn(GLASS_PANEL, "border-gold/25 p-5")}>
+          <motion.section
+            variants={POP}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            className={cn(GLASS_PANEL, "border-gold/25 p-5")}
+          >
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <p className={HEADING_SM}>Identity verification</p>
@@ -294,8 +307,9 @@ export default function MembershipPage() {
             {kyc?.status === "rejected" && kyc.rejection_reason && (
               <p className="mt-3 text-xs text-red-300">Last review: {kyc.rejection_reason}</p>
             )}
-          </section>
+          </motion.section>
         )}
+        </AnimatePresence>
 
         {/* Interval toggle */}
         <div className="flex items-center justify-between gap-4">
@@ -326,10 +340,18 @@ export default function MembershipPage() {
             Loading membership…
           </div>
         ) : (
-          <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
+          // Cards enter in sequence rather than all at once, and `layout` on the parent
+          // lets the grid reflow smoothly when the interval toggle changes card heights.
+          <motion.section
+            layout
+            variants={STAGGER}
+            initial="hidden"
+            animate="show"
+            className="grid gap-4 md:grid-cols-3 xl:grid-cols-5"
+          >
             {tiers.map((tier) => (
+              <motion.div key={tier.id} variants={STAGGER_ITEM} layout>
               <TierCard
-                key={tier.id}
                 tier={tier}
                 interval={interval}
                 isCurrent={tier.id === currentTier}
@@ -343,8 +365,9 @@ export default function MembershipPage() {
                 }
                 onSelect={() => void upgrade(tier.id)}
               />
+              </motion.div>
             ))}
-          </section>
+          </motion.section>
         )}
 
         <p className="pb-4 text-center text-[11px] text-neutral-600">
