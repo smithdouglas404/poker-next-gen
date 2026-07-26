@@ -22,11 +22,22 @@ import { GameUIProvider } from "./lib/game-ui-context";
 import { adaptSnapshot } from "./adapter";
 import { useSceneSync } from "./useSceneSync";
 import { avatarSrc } from "@/features/table/avatars";
+import { DEMO_HOLE, DEMO_SNAPSHOT } from "@/features/table3d/demoSnapshot";
 
 export type HrcRenderStyle = "2.5d" | "3d";
 
-export default function HrcTable({ override }: { override?: HrcRenderStyle }) {
-  const { snapshot, holeCards } = useGame();
+export default function HrcTable({
+  override,
+  demo = false,
+}: {
+  override?: HrcRenderStyle;
+  /** Preview against DEMO_SNAPSHOT instead of the live match, same as
+   *  LiveCinematicTable's ?demo=1 — lets the renderers be reviewed without a table. */
+  demo?: boolean;
+}) {
+  const live = useGame();
+  const snapshot = demo ? DEMO_SNAPSHOT : live.snapshot;
+  const holeCards = demo ? DEMO_HOLE : live.holeCards;
 
   // Keep the 3D store in step regardless of which branch renders, so toggling mid-hand
   // does not show a stale table for a frame.
