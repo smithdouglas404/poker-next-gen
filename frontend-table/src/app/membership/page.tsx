@@ -9,6 +9,7 @@ import { POP, RISE, STAGGER, STAGGER_ITEM } from "@/features/ui/motion";
 import { TierCard } from "@/features/membership/TierCard";
 import { membershipApi } from "@/features/membership/membershipRpc";
 import { accentFor } from "@/features/membership/tierMeta";
+import { PREVIEW_TIERS } from "@/features/membership/previewTiers";
 import type {
   BillingInterval,
   KycState,
@@ -41,6 +42,9 @@ export default function MembershipPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    const preview =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("preview") === "1";
     try {
       const [t, s, k, v] = await Promise.all([
         membershipApi.tiers(),
@@ -48,13 +52,19 @@ export default function MembershipPage() {
         membershipApi.kycStatus(),
         membershipApi.meVerification(),
       ]);
-      setTiers(t.tiers ?? []);
+      // ?preview=1 falls back to the catalog mirrored from billing/tiers.go so the
+      // screen is reviewable without a live Nakama. The live list always wins.
+      const live = t.tiers ?? [];
+      setTiers(live.length > 0 || !preview ? live : PREVIEW_TIERS);
       setOrder(t.order ?? []);
       setStatus(s);
       setKyc(k.kyc ?? null);
       setVerification(v);
     } catch (e) {
-      notify(e instanceof Error ? e.message : "Failed to load membership", "err");
+      // With no backend the whole Promise.all rejects, so the preview fallback has to
+      // live here too — not just on the success path.
+      if (preview) setTiers(PREVIEW_TIERS);
+      else notify(e instanceof Error ? e.message : "Failed to load membership", "err");
     } finally {
       setLoading(false);
     }
