@@ -403,7 +403,7 @@ function Deck({ nonce }: { nonce: number }) {
   for (let i = 0; i < 9; i++) {
     cards.push(
       <mesh key={i} position={[0, i * 0.016, 0]} castShadow>
-        <boxGeometry args={[0.2675, 0.012, 0.3745]} />
+        <boxGeometry args={[0.413, 0.012, 0.6195]} />
         <meshStandardMaterial color="#eef2f6" roughness={0.5} />
       </mesh>,
     );
@@ -443,7 +443,7 @@ function HoleFace({ code }: { code: string }) {
   return (
     <group ref={ref}>
       <mesh castShadow material={mats}>
-        <boxGeometry args={[0.2675, 0.012, 0.3745]} />
+        <boxGeometry args={[0.413, 0.012, 0.6195]} />
       </mesh>
     </group>
   );
@@ -508,18 +508,19 @@ function BoardCard({ code, x, delay }: { code: string; x: number; delay: number 
   return (
     <group ref={ref}>
       <mesh castShadow material={mats}>
-        <boxGeometry args={[0.324, 0.011, 0.451]} />
+        <boxGeometry args={[0.578, 0.011, 0.867]} />
       </mesh>
     </group>
   );
 }
 
 function Board({ board }: { board: string[] }) {
-  const start = -((board.length - 1) / 2) * 0.371; // 56px card + 8px gap on a 1300px felt
+  // HRC pitch: card + gap-2 (8px) = 1.114 card widths -> 0.578 * 1.114.
+  const start = -((board.length - 1) / 2) * 0.644;
   return (
     <group>
       {board.map((c, i) => (
-        <BoardCard key={`${c}-${i}`} code={c} x={start + i * 0.371} delay={i * 130} />
+        <BoardCard key={`${c}-${i}`} code={c} x={start + i * 0.644} delay={i * 130} />
       ))}
     </group>
   );
