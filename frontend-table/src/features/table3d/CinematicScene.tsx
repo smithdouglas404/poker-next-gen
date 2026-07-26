@@ -561,15 +561,15 @@ const POT_POS: [number, number, number] = [0, 0.05, 0.5];
 // still reads as a neat pot, not an oversized tower.
 function Pot({ potMinor }: { potMinor: number }) {
   // Multiplier vs the baseline counts; ~1 at a mid pot, up to ~2.4 at a big one.
-  const m = Math.max(1.4, Math.min(3.2, (potMinor || 0) / 40000));
+  const m = Math.max(0.6, Math.min(1.8, (potMinor || 0) / 60000));
   const c = (base: number) => Math.max(1, Math.round(base * m));
   return (
     <group position={POT_POS}>
-      <ChipStack position={[-0.98, 0, 0]} color="#c9302c" count={c(8)} />
-      <ChipStack position={[-0.33, 0, 0.10]} color="#1f2937" count={c(12)} />
-      <ChipStack position={[0.33, 0, 0]} color="#2f6bff" count={c(6)} />
-      <ChipStack position={[0.98, 0, -0.10]} color="#e9c46a" count={c(10)} />
-      <ChipStack position={[0.0, 0, -0.24]} color="#1fa85a" count={c(6)} />
+      <ChipStack position={[-0.26, 0, 0]} color="#c9302c" count={c(8)} />
+      <ChipStack position={[-0.09, 0, 0.10]} color="#1f2937" count={c(12)} />
+      <ChipStack position={[0.09, 0, 0]} color="#2f6bff" count={c(6)} />
+      <ChipStack position={[0.26, 0, -0.10]} color="#e9c46a" count={c(10)} />
+      <ChipStack position={[0.0, 0, -0.15]} color="#1fa85a" count={c(6)} />
     </group>
   );
 }
@@ -1262,7 +1262,7 @@ export function CinematicScene({
       "linear-gradient(180deg,#04060a,#070b12 60%,#04060a)";
   const cameraCfg = backdrop
     ? { position: backdrop.camera.position, fov: backdrop.camera.fov }
-    : { position: [0, 8.75, 4.19] as [number, number, number], fov: 44 };
+    : { position: [0, 6.35, 4.6] as [number, number, number], fov: 44 };
   return (
     <div className="relative h-screen w-screen overflow-hidden" style={{ background: wrapperBg }}>
       <Canvas
