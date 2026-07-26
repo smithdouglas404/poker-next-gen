@@ -79,6 +79,31 @@ export const BAKED_PLATES: Record<string, BakedPlate> = {
     shadowCatcher: { size: 16, opacity: 0.34 },
     seats: 10,
   },
+  // Hero table — the isolated table render (gunmetal rail w/ armrests, cyan neon rim,
+  // green circuit felt + spade mark). Built by `scripts/make-hero-plate.mjs`, which
+  // finds the table's true bounds and centres it on the app background so the black
+  // surround blends away. Unlike the arena plates this has NO painted seats, so the
+  // ring is free — and no room, so the side margins stay clear for the HUD panels.
+  //
+  // Derivation, from the plate's measured 956x1048 table bounds at 1920x1080:
+  //   camera [0,10,3.2] => 72.3 deg elevation, distance 10.5, fov 40
+  //   visible half-height at origin 10.5*tan(20) = 3.82 u, half-width x1.778 = 6.79 u
+  //   table X = 6.79 * 478/960          = 3.38 u
+  //   table Z = 3.82 * 524/540 / sin(72.3) = 3.89 u   (portrait: Z > X, correct)
+  // Seats ride ~0.45 u outside that. `y` is lifted so the ring projects up onto the
+  // rail rather than the floor, since the art's table top sits above frame centre.
+  "hero-table": {
+    id: "hero-table",
+    label: "Hero Table — Cyan Neon",
+    imageUrl: "/table/hero-table-16x9.png",
+    // FILL dropped 0.97 -> 0.85 so the seat tiles clear the top/bottom edges, which
+    // shrank the art by 0.876 about centre; camera pushed back 1/0.876 = 1.141x to
+    // shrink the projection identically, so the ring keeps hugging the rail.
+    camera: { position: [0, 11.41, 3.65], fov: 40 },
+    ellipse: { sx: 3.83, sz: 4.0, y: 1.6 },
+    shadowCatcher: { size: 14, opacity: 0.3 },
+    seats: 10,
+  },
 };
 
 /** Ordered list for the owner "Choose a table" picker. */

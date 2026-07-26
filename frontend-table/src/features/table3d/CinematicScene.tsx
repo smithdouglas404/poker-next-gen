@@ -1089,7 +1089,7 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
           (drei <Html transform> rotates the DOM into the felt plane). */}
       {feltText && (
         <Html transform rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.44, -1.15]}
-          zIndexRange={[5, 0]} style={{ pointerEvents: "none" }} distanceFactor={6}>
+          zIndexRange={[5, 0]} style={{ pointerEvents: "none" }} distanceFactor={3.2}>
           <div style={{ width: 380, height: 50, textAlign: "center", textShadow: "0 1px 4px rgba(0,0,0,0.7)" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#E2F1F1", lineHeight: "18px" }}>{feltText[0]}</div>
             <div style={{ fontSize: 12, color: "#C8E6C9", lineHeight: "18px" }}>{feltText[1]}</div>
