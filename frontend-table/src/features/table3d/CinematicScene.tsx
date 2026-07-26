@@ -141,11 +141,11 @@ export interface CinematicSceneProps {
 // Scene scale is anchored on the felt: 275 blueprint px == 2.1 world units, so
 // 1 unit = 0.2457 m and every dimension below is the spec converted, not eyeballed.
 const PX = 2.1 / 275; // world units per blueprint pixel
-const STAD_L = 375 * PX; // 2.864 — half-length of the STRAIGHT run (> end radius)
-const FELT_R = 298 * PX; // 2.276 — felt end-cap radius; sets table width to 44in (spec 41-48in)
+const STAD_L = 3.55 - 1.70; // reference: X radius 3.55, Z radius 1.70 // 2.864 — half-length of the STRAIGHT run (> end radius)
+const FELT_R = 1.70; // 2.276 — felt end-cap radius; sets table width to 44in (spec 41-48in)
 const RAIL_W = 55 * PX; //  0.420 — rail thickness (the 4in armrest)
 const TABLE_H = 3.09; // 30in floor-to-rail at this scale (0.76m / 0.2457)
-const SEAT_R = FELT_R + RAIL_W + 0.05; // seats sit just outside the rail
+const SEAT_R = 1.70; // reference implementation // seats sit just outside the rail
 const SX = 4.62; // legacy ellipse (baked plates only)
 const SZ = 3.82;
 // Active seat path for the current scene. Cinematic felt uses the stadium; a baked
@@ -202,7 +202,7 @@ function seatPoint(index: number, total: number): [number, number, number] {
     // Phase 0.75 puts index 0 at the near short end; direction is negative.
     const pt = stadiumPoint(SEAT_PHASE + index / total, e.stadiumL, e.sz, e.y);
     // PORTRAIT: yaw the ring 90 deg so the long run lies along Z (into the screen).
-    return [pt[2] * WIDTH_SCALE, pt[1], -pt[0]];
+    return [pt[0] * WIDTH_SCALE, pt[1], pt[2]];
   }
   const a = (index / total) * Math.PI * 2 + Math.PI / 2;
   return [Math.cos(a) * e.sx, e.y, Math.sin(a) * e.sz];
@@ -283,7 +283,7 @@ function TableBody() {
   return (
     // PORTRAIT orientation: the stadium is authored with its straight run along X,
     // so the body is yawed 90 deg to lay that run along Z (into the screen).
-    <group rotation={[0, Math.PI / 2, 0]} scale={[1, 1, WIDTH_SCALE]}>
+    <group>
       {/* floor — grounds the table in a room instead of a void */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -TABLE_H, 0]} receiveShadow>
         <planeGeometry args={[60, 60]} />
@@ -1075,8 +1075,8 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
           <ambientLight intensity={0.55} color="#7fd8e0" />
           <hemisphereLight intensity={0.6} color="#1CB5C9" groundColor="#0A231C" />
           <spotLight position={[0, 12, 0]} angle={0.62} penumbra={0.7} intensity={13.0} color="#eafcff" castShadow shadow-mapSize={[2048, 2048]} />
-          <pointLight position={[-7.5, 3.2, -3]} intensity={2.2} decay={0} color="#1CB5C9" />
-          <pointLight position={[7.5, 3.2, -2]} intensity={2.0} decay={0} color="#4DEEEA" />
+          <pointLight position={[-5, 3, -3]} intensity={35} distance={12} color="#9224ff" />
+          <pointLight position={[5, 3, -2]} intensity={26} distance={12} color="#18e7ff" />
           <pointLight position={[0, 2.4, -7.5]} intensity={1.3} decay={0} color="#0A231C" />
 
           <Environment resolution={128}>
@@ -1287,7 +1287,7 @@ export function CinematicScene({
     : "#05070c url(/table/casino_bg_4096x2048.png) center / cover no-repeat";
   const cameraCfg = backdrop
     ? { position: backdrop.camera.position, fov: backdrop.camera.fov }
-    : { position: [0, 6.35, 4.6] as [number, number, number], fov: 44 };
+    : { position: [0, 7.4, 7.5] as [number, number, number], fov: 42 };
   return (
     <div className="relative h-screen w-screen overflow-hidden" style={{ background: wrapperBg }}>
       <Canvas
