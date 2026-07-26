@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 
 import { GLASS_PANEL } from "@/features/ui/tokens";
 import { CinematicScene, type AvatarMode, type SceneSeat } from "@/features/table3d/CinematicScene";
@@ -54,74 +55,119 @@ function HeroCard({ code }: { code: string }) {
   );
 }
 
+// Hand-history log. HRC ships this as a DRAWER (components/poker/HandHistoryDrawer.tsx),
+// not a pinned panel, and that turns out to matter: this box is fixed-pixel at
+// left:20 top:20, so it owns screen x 20-280, while the 3D-projected left-hand seats
+// land around x 63-203 - entirely inside that band. Once the seat tiles grew to
+// 160x189 they slid underneath it. Collapsed by default, it cannot cover a player.
+function HandHistoryDrawer() {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  return (
+    <div style={{ position: "absolute", left: 20, top: 20, pointerEvents: "auto" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        style={{
+          display: "flex", alignItems: "center", gap: 6, height: 28, padding: "0 10px",
+          borderRadius: 999, border: "1px solid #2AC6D0", background: "rgba(15,23,42,0.72)",
+          backdropFilter: "blur(10px)", color: "#4DEEEA", fontSize: 11, fontWeight: 700,
+          letterSpacing: "0.16em", textTransform: "uppercase", cursor: "pointer",
+        }}
+      >
+        <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#1CB5C9",
+          boxShadow: "0 0 8px rgba(28,181,201,0.9)" }} />
+        Hand History
+        <span style={{ opacity: 0.7 }}>{open ? "\u2039" : "\u203a"}</span>
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, x: -12, height: 0 }}
+            animate={{ opacity: 1, x: 0, height: 260 }}
+            exit={{ opacity: 0, x: -12, height: 0 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            style={{
+              marginTop: 8, width: 220, borderRadius: 12,
+              background: "rgba(15,23,42,0.72)", backdropFilter: "blur(10px)",
+              border: "1px solid #2AC6D0", overflow: "hidden", padding: "10px 8px 8px 0",
+              position: "relative", fontSize: 11,
+            }}
+          >
+          {/* vertical timeline rail */}
+          <div style={{ position: "absolute", left: 20, top: 12, bottom: 18, width: 2,
+            background: "#1CB5C9", boxShadow: "0 0 8px rgba(28,181,201,0.8)" }} />
+          <div style={{ position: "relative", height: "100%", overflow: "hidden" }}>
+            <div style={{ position: "relative", paddingLeft: 30, marginBottom: 9 }}>
+              <div style={{ position: "absolute", left: 15, top: 3, width: 9, height: 9, borderRadius: "50%",
+                background: "#1CB5C9", boxShadow: "0 0 8px rgba(28,181,201,0.9)" }} />
+              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: "#4DEEEA" }}>PRE-FLOP</div>
+              <div style={{ fontSize: 11, color: "#FFFFFF", lineHeight: 1.35 }}>
+                Player 1: <b>RAISE</b> $550<span style={{ color: "#94A3B8" }}> (Pot $600)</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#FFFFFF", lineHeight: 1.35 }}>
+                Player 3: <b>CALL</b> $550<span style={{ color: "#94A3B8" }}> (Pot $1,150)</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#FFFFFF", lineHeight: 1.35 }}>
+                Player 5: <b>FOLD</b>
+              </div>
+            </div>
+            <div style={{ position: "relative", paddingLeft: 30, marginBottom: 9 }}>
+              <div style={{ position: "absolute", left: 15, top: 3, width: 9, height: 9, borderRadius: "50%",
+                background: "#1CB5C9", boxShadow: "0 0 8px rgba(28,181,201,0.9)" }} />
+              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: "#4DEEEA" }}>FLOP</div>
+              <div style={{ fontSize: 11, color: "#FFFFFF", lineHeight: 1.35 }}>
+                Player 1: <b>BET</b> $400<span style={{ color: "#94A3B8" }}> (Pot $1,550)</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#FFFFFF", lineHeight: 1.35 }}>
+                Player 3: <b>CALL</b> $400<span style={{ color: "#94A3B8" }}> (Pot $1,950)</span>
+              </div>
+            </div>
+            <div style={{ position: "relative", paddingLeft: 30, marginBottom: 9 }}>
+              <div style={{ position: "absolute", left: 15, top: 3, width: 9, height: 9, borderRadius: "50%",
+                background: "#1CB5C9", boxShadow: "0 0 8px rgba(28,181,201,0.9)" }} />
+              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: "#4DEEEA" }}>TURN</div>
+              <div style={{ fontSize: 11, color: "#FFFFFF", lineHeight: 1.35 }}>
+                Player 1: <b>CHECK</b><span style={{ color: "#94A3B8" }}> (Pot $1,950)</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#FFFFFF", lineHeight: 1.35 }}>
+                Player 3: <b>BET</b> $800<span style={{ color: "#94A3B8" }}> (Pot $2,750)</span>
+              </div>
+            </div>
+            <div style={{ position: "relative", paddingLeft: 30, marginBottom: 9 }}>
+              <div style={{ position: "absolute", left: 15, top: 3, width: 9, height: 9, borderRadius: "50%",
+                background: "#1CB5C9", boxShadow: "0 0 8px rgba(28,181,201,0.9)" }} />
+              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: "#4DEEEA" }}>SHOWDOWN</div>
+              <div style={{ fontSize: 11, color: "#FFFFFF", lineHeight: 1.35 }}>
+                Player 1: <b>WINS</b> $5,250<span style={{ color: "#94A3B8" }}> (Aces full of Kings)</span>
+              </div>
+            </div>
+          </div>
+          {/* bottom indicator arrow 12x10 */}
+          <div style={{ position: "absolute", left: 15, bottom: 6, width: 0, height: 0,
+            borderLeft: "6px solid transparent", borderRight: "6px solid transparent",
+            borderTop: "10px solid #1CB5C9" }} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function HudOverlay({ mode }: { mode: AvatarMode }) {
   const badge = mode === "2d" ? "2.5D · HRC Portrait Avatars" : mode === "3d" ? "3D · GLB Avatars (Tripo pipeline)" : "Mixed · Tripo 3D + HRC portraits";
   return (
     <div className="pointer-events-none absolute inset-0 select-none">
-      {/* ---- Hand-history timeline log (top-left) — 1920x1080 spec ----
-           260x310 panel, rgba(15,23,42,.65) + blur, 1px cyan border, r12
-           2px cyan rail 24px from left, 10px nodes, 14px cyan phase titles */}
-      <div
-        style={{
-          position: "absolute", left: 20, top: 20, width: 260, height: 310, borderRadius: 12,
-          background: "rgba(15,23,42,0.65)", backdropFilter: "blur(10px)",
-          border: "1px solid #2AC6D0", overflow: "hidden", padding: "12px 10px 10px 0",
-        }}
-      >
-        {/* vertical timeline rail */}
-        <div style={{ position: "absolute", left: 24, top: 16, bottom: 24, width: 2,
-          background: "#1CB5C9", boxShadow: "0 0 8px rgba(28,181,201,0.8)" }} />
-        <div style={{ position: "relative", height: "100%", overflow: "hidden" }}>
-          <div style={{ position: "relative", paddingLeft: 34, marginBottom: 12 }}>
-            <div style={{ position: "absolute", left: 19, top: 4, width: 10, height: 10, borderRadius: "50%",
-              background: "#1CB5C9", boxShadow: "0 0 8px rgba(28,181,201,0.9)" }} />
-            <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.06em", color: "#4DEEEA" }}>PRE-FLOP</div>
-            <div style={{ fontSize: 12, color: "#FFFFFF", lineHeight: 1.5 }}>
-              Player 1: <b>RAISE</b> $550<span style={{ color: "#94A3B8" }}> (Pot $600)</span>
-            </div>
-            <div style={{ fontSize: 12, color: "#FFFFFF", lineHeight: 1.5 }}>
-              Player 3: <b>CALL</b> $550<span style={{ color: "#94A3B8" }}> (Pot $1,150)</span>
-            </div>
-            <div style={{ fontSize: 12, color: "#FFFFFF", lineHeight: 1.5 }}>
-              Player 5: <b>FOLD</b>
-            </div>
-          </div>
-          <div style={{ position: "relative", paddingLeft: 34, marginBottom: 12 }}>
-            <div style={{ position: "absolute", left: 19, top: 4, width: 10, height: 10, borderRadius: "50%",
-              background: "#1CB5C9", boxShadow: "0 0 8px rgba(28,181,201,0.9)" }} />
-            <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.06em", color: "#4DEEEA" }}>FLOP</div>
-            <div style={{ fontSize: 12, color: "#FFFFFF", lineHeight: 1.5 }}>
-              Player 1: <b>BET</b> $400<span style={{ color: "#94A3B8" }}> (Pot $1,550)</span>
-            </div>
-            <div style={{ fontSize: 12, color: "#FFFFFF", lineHeight: 1.5 }}>
-              Player 3: <b>CALL</b> $400<span style={{ color: "#94A3B8" }}> (Pot $1,950)</span>
-            </div>
-          </div>
-          <div style={{ position: "relative", paddingLeft: 34, marginBottom: 12 }}>
-            <div style={{ position: "absolute", left: 19, top: 4, width: 10, height: 10, borderRadius: "50%",
-              background: "#1CB5C9", boxShadow: "0 0 8px rgba(28,181,201,0.9)" }} />
-            <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.06em", color: "#4DEEEA" }}>TURN</div>
-            <div style={{ fontSize: 12, color: "#FFFFFF", lineHeight: 1.5 }}>
-              Player 1: <b>CHECK</b><span style={{ color: "#94A3B8" }}> (Pot $1,950)</span>
-            </div>
-            <div style={{ fontSize: 12, color: "#FFFFFF", lineHeight: 1.5 }}>
-              Player 3: <b>BET</b> $800<span style={{ color: "#94A3B8" }}> (Pot $2,750)</span>
-            </div>
-          </div>
-          <div style={{ position: "relative", paddingLeft: 34, marginBottom: 12 }}>
-            <div style={{ position: "absolute", left: 19, top: 4, width: 10, height: 10, borderRadius: "50%",
-              background: "#1CB5C9", boxShadow: "0 0 8px rgba(28,181,201,0.9)" }} />
-            <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.06em", color: "#4DEEEA" }}>SHOWDOWN</div>
-            <div style={{ fontSize: 12, color: "#FFFFFF", lineHeight: 1.5 }}>
-              Player 1: <b>WINS</b> $5,250<span style={{ color: "#94A3B8" }}> (Aces full of Kings)</span>
-            </div>
-          </div>
-        </div>
-        {/* bottom indicator arrow 12x10 */}
-        <div style={{ position: "absolute", left: 19, bottom: 8, width: 0, height: 0,
-          borderLeft: "6px solid transparent", borderRight: "6px solid transparent",
-          borderTop: "10px solid #1CB5C9" }} />
-      </div>
+      <HandHistoryDrawer />
 
       
       
