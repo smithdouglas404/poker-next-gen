@@ -123,74 +123,13 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
           borderTop: "10px solid #1CB5C9" }} />
       </div>
 
-      {/* ---- Top-right overlay: EXPORT / REPLAY HAND stacked above the
-           blockchain verification panel (layout zone 1c) ---- */}
-      <div style={{ position: "absolute", right: 20, top: 20, width: 280, display: "flex", flexDirection: "column", gap: 10 }}>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button style={{ flex: 1, height: 44, borderRadius: 8, border: "1px solid rgba(233,196,106,0.55)",
-            background: "linear-gradient(180deg,#E8B84B,#C28E1E)", color: "#241a05", fontWeight: 800, fontSize: 13,
-            letterSpacing: "0.06em" }}>EXPORT</button>
-          <button style={{ flex: 1.35, height: 44, borderRadius: 8, border: "1px solid rgba(28,181,201,0.6)",
-            background: "rgba(28,181,201,0.16)", color: "#9beaf5", fontWeight: 800, fontSize: 13,
-            letterSpacing: "0.06em" }}>▶ REPLAY HAND</button>
-        </div>
-        <div style={{ borderRadius: 12, border: "1px solid #2AC6D0", background: "rgba(15,23,42,0.65)",
-          backdropFilter: "blur(10px)", padding: "12px 14px" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", color: "#4DEEEA" }}>BLOCKCHAIN HASH</div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#E2F1F1", marginTop: 4, fontFamily: "ui-monospace, monospace" }}>
-            0x6c7c…d9a2c4b1
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
-            <span style={{ color: "#22c55e", fontSize: 15 }}>✓</span>
-            <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.08em", color: "#22c55e" }}>VERIFIED</span>
-          </div>
-          <div style={{ marginTop: 10, height: 34, borderRadius: 8, border: "1px solid rgba(233,196,106,0.5)",
-            background: "rgba(233,196,106,0.12)", color: "#f5d98a", fontSize: 12, fontWeight: 700,
-            display: "flex", alignItems: "center", justifyContent: "center", letterSpacing: "0.05em" }}>
-            🔗 VIEW ON BLOCKCHAIN
-          </div>
-        </div>
-      </div>
-
-      {/* ---- Bottom-left: Tournament Stats, 280x220 (layout zone 3a) ---- */}
-      <div style={{ position: "absolute", left: 20, bottom: 20, width: 280, height: 220, borderRadius: 12,
-        background: "rgba(15,23,42,0.65)", backdropFilter: "blur(10px)",
-        border: "1px solid #2AC6D0", padding: "12px 14px", overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-          <span style={{ color: "#f5c518" }}>🏆</span>
-          <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", color: "#E2F1F1" }}>Tournament Stats</span>
-        </div>
-        <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 6 }}>High Rollers Main · $50/$100</div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0" }}>
-            <span style={{ color: "#94A3B8" }}>Live Stack</span>
-            <span style={{ color: "#E2F1F1", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>$45,000</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0" }}>
-            <span style={{ color: "#94A3B8" }}>Pot Stack</span>
-            <span style={{ color: "#E2F1F1", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>10</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0" }}>
-            <span style={{ color: "#94A3B8" }}>Live Chip Stack</span>
-            <span style={{ color: "#E2F1F1", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>$45,000</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0" }}>
-            <span style={{ color: "#94A3B8" }}>Current Bet</span>
-            <span style={{ color: "#E2F1F1", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>$600</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0" }}>
-            <span style={{ color: "#94A3B8" }}>Bet Guarantee</span>
-            <span style={{ color: "#E2F1F1", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>$500</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0" }}>
-            <span style={{ color: "#94A3B8" }}>Commission</span>
-            <span style={{ color: "#E2F1F1", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>$900</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0" }}>
-            <span style={{ color: "#94A3B8" }}>Prize Bank</span>
-            <span style={{ color: "#E2F1F1", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>1.85</span>
-          </div>
-      </div>
-
+      
+      
+      {/* Tournament Stats (bottom-left), the blockchain verification panel (top-right)
+          and Player Analytics (bottom-right) were pinned open here as permanent
+          furniture, which crowded the felt. They belong behind the player profile menu
+          — HRC gates its equivalents the same way (ProvablyFairPanel sits behind
+          showProvablyFair rather than always-on). Removed from the table surface. */}
       {/* ---- Main pot label box, 85x45 (APPROVED spec) ---- */}
       <div style={{ position: "absolute", left: "50%", top: "58%", transform: "translate(-50%,-50%)",
         width: 85, height: 45, borderRadius: 8, background: "rgba(15,23,42,0.72)",
@@ -262,40 +201,7 @@ function HudOverlay({ mode }: { mode: AvatarMode }) {
         </div>
       </div>
 
-      {/* ---- Bottom-right: Player Analytics / Chat, 280x220 (layout zone 3c) ---- */}
-      <div style={{ position: "absolute", right: 20, bottom: 20, width: 280, height: 220, borderRadius: 12,
-        background: "rgba(15,23,42,0.65)", backdropFilter: "blur(10px)",
-        border: "1px solid #2AC6D0", padding: "12px 14px", display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-          <span style={{ color: "#4DEEEA" }}>📊</span>
-          <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", color: "#E2F1F1" }}>Player Analytics</span>
-        </div>
-        {[["Neon Viper", 68], ["Shadow King", 41], ["Void Witch", 92]].map(([n, pct]) => (
-          <div key={n as string} style={{ marginBottom: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
-              <span style={{ color: "#FFFFFF" }}>{n}</span>
-              <span style={{ color: "#94A3B8", fontVariantNumeric: "tabular-nums" }}>{pct}% VPIP</span>
-            </div>
-            <div style={{ height: 5, borderRadius: 3, background: "rgba(255,255,255,0.10)" }}>
-              <div style={{ height: 5, width: `${pct}%`, borderRadius: 3, background: "#1CB5C9",
-                boxShadow: "0 0 8px rgba(28,181,201,0.7)" }} />
-            </div>
           </div>
-        ))}
-        <div style={{ marginTop: "auto", display: "flex", gap: 6 }}>
-          <div style={{ flex: 1, height: 30, borderRadius: 8, background: "rgba(255,255,255,0.05)",
-            border: "1px solid rgba(255,255,255,0.12)", color: "#94A3B8", fontSize: 12,
-            display: "flex", alignItems: "center", padding: "0 10px" }}>Type message…</div>
-          <div style={{ width: 34, height: 30, borderRadius: 8, background: "#1CB5C9", color: "#0b1524",
-            display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800 }}>➤</div>
-        </div>
-      </div>
-
-      {/* mode badge */}
-      <div className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em]" style={{ background: "rgba(8,10,14,0.7)", border: "1px solid rgba(224,30,43,0.4)", color: "#ff2d3f" }}>
-        {badge}
-      </div>
-    </div>
   );
 }
 

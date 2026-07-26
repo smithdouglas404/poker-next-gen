@@ -185,9 +185,12 @@ const WIDTH_SCALE = 1.0;
  */
 /** Component sizes, straight from the spec. */
 const UI = {
-  frameW: 110, frameH: 130,  // avatar frame            (spec §4: 110x130)
-  photo: 80,                 // seated inner portrait   (spec §4: 80x80)
-  vacantInner: 60,           // vacant inner circle     (spec §4: 60x60)
+  // Enlarged 1.45x over the 110x130 / 80x80 spec, on request: with the three side
+  // panels gone the felt has room, and at spec size the portraits read as thumbnails
+  // rather than players. Ratios are preserved so nothing re-composes.
+  frameW: 160, frameH: 189,  // avatar frame            (spec §4 was 110x130)
+  photo: 116,                // seated inner portrait   (spec §4 was 80x80)
+  vacantInner: 87,           // vacant inner circle     (spec §4 was 60x60)
   badgeW: 140, badgeH: 70,   // badge outer container   (spec §4: 140x70)
   tagW: 90, tagH: 28,        // action label tag        (spec §4: 90x28)
   tagFont: 13,               // 12-14px bold all-caps   (spec §4)

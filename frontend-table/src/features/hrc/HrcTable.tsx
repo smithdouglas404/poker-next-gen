@@ -22,6 +22,9 @@ import { GameUIProvider } from "./lib/game-ui-context";
 import { adaptSnapshot } from "./adapter";
 import { useSceneSync } from "./useSceneSync";
 import { avatarSrc } from "@/features/table/avatars";
+import { Seat } from "./components/Seat";
+import { TABLE_SEATS } from "./lib/table-constants";
+import { seatId } from "./adapter";
 import { DEMO_HOLE, DEMO_SNAPSHOT } from "@/features/table3d/demoSnapshot";
 
 export type HrcRenderStyle = "2.5d" | "3d";
@@ -59,6 +62,11 @@ export default function HrcTable({
   // view is a projection of server state or it shows nothing.
   if (!adapted || !snapshot) return null;
 
+  // Map an adapted player id back to its real seat index on the snapshot.
+  const seatIndexOf = (snap: typeof snapshot, id: string): number =>
+    (snap?.seats ?? []).find((s) => seatId(s) === id)?.index ?? 0;
+  const heroSeatIdx = (snapshot.seats ?? []).find((s) => s.is_hero)?.index ?? 0;
+
   const style: HrcRenderStyle = override ?? (snapshot.render_style === "3d" ? "3d" : "2.5d");
 
   return (
@@ -70,7 +78,8 @@ export default function HrcTable({
             activeSeat={snapshot.action_seat}
           />
         ) : (
-          <ImageTable
+          <>
+            <ImageTable
             communityCards={adapted.gameState.communityCards}
             pot={adapted.gameState.pot}
             playerCount={adapted.players.length}
@@ -81,11 +90,51 @@ export default function HrcTable({
             communityFlipped
             dealPhase={adapted.gameState.phase}
             handNumber={adapted.gameState.handNumber}
-            blinds={{
-              small: adapted.gameState.smallBlind ?? 0,
-              big: adapted.gameState.bigBlind ?? 0,
-            }}
-          />
+              blinds={{
+                small: adapted.gameState.smallBlind ?? 0,
+                big: adapted.gameState.bigBlind ?? 0,
+              }}
+            />
+
+            {/* Seat layer. ImageTable draws ONLY the empty slots — its own comment says
+                "Occupied seats rendered by Seat component" — so without this the table
+                renders with no players at all.
+
+                The wrapper geometry must match ImageTable's inner overlay exactly or the
+                percentage coordinates drift off the painted rail. */}
+            <div
+              className="absolute"
+              style={{
+                left: "50%",
+                top: "50%",
+                transform: "translate(-50%, -50%)",
+                width: "92%",
+                aspectRatio: "1408 / 768",
+                maxHeight: "88%",
+                zIndex: 20,
+              }}
+            >
+              {adapted.players.map((player) => {
+                // Rotate so the hero is always at visual seat 0 (bottom centre).
+                // HRC rotates over players.length; we rotate over SEAT index and
+                // maxSeats instead, so players stay at their real seats and a
+                // half-empty table doesn't bunch everyone together.
+                const seatIdx = seatIndexOf(snapshot, player.id);
+                const visual = (seatIdx - heroSeatIdx + adapted.maxSeats) % adapted.maxSeats;
+                const pose = TABLE_SEATS[visual % TABLE_SEATS.length];
+                return (
+                  <Seat
+                    key={player.id}
+                    player={player}
+                    position={{ x: pose.x, y: pose.y }}
+                    isHero={seatIdx === heroSeatIdx}
+                    seatIndex={visual}
+                    perspectiveScale={pose.scale}
+                  />
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
     </GameUIProvider>
