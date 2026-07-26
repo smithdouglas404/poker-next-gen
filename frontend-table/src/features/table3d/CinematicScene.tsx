@@ -525,11 +525,13 @@ function Board({ board }: { board: string[] }) {
 
 /* ---------------- chips ---------------- */
 
-// Real casino chip per spec §4.3: 39mm diameter x 3.3mm thick, stacked at a
-// 0.0033m vertical offset. 1 world unit = 0.2458 m, so radius 0.0793u,
-// thickness/offset 0.0134u.
-const CHIP_R = 0.0793;
-const CHIP_T = 0.0134;
+// Chips are deliberately OVERSIZED, not real-world scale — the mockup wins.
+// This is game UI, not a physics sim: readability and visual weight beat a
+// literal 39mm chip. Sized from the mockup's own proportions — the pot cluster
+// is 180px of a ~790px felt (22.8%), which at our felt width gives a 1.04u
+// cluster, and the chip is the specified flat 3.8:1 disk.
+const CHIP_R = 0.259; // ~123mm "table chip" — reads at game scale
+const CHIP_T = 0.068; // stack offset = 5px overlap on a 10px chip
 function ChipStack({
   position,
   color,
@@ -590,8 +592,8 @@ function SeatStackChips({ seat, total }: { seat: SceneSeat; total: number }) {
   const half = Math.ceil(n / 2);
   return (
     <group position={[cx, 0.05, cz]}>
-      <ChipStack position={[-0.075, 0, 0]} color="#3a4250" count={half} />
-      <ChipStack position={[0.075, 0, 0]} color="#e9c46a" count={n - half} />
+      <ChipStack position={[-0.075, 0, 0]} color="#3a4250" count={half} radius={CHIP_R * 0.75} />
+      <ChipStack position={[0.075, 0, 0]} color="#e9c46a" count={n - half} radius={CHIP_R * 0.75} />
     </group>
   );
 }
@@ -649,7 +651,7 @@ function SeatBetChips({ seat, total }: { seat: SceneSeat; total: number }) {
   const bz = p[2] * 0.56;
   const count = Math.max(1, Math.min(6, Math.round(seat.betMinor / 5000)));
   const color = seat.state === "allin" ? "#ff3b46" : "#e9c46a";
-  return <ChipStack position={[bx, 0.05, bz]} color={color} count={count} />;
+  return <ChipStack position={[bx, 0.05, bz]} color={color} count={count} radius={CHIP_R * 0.75} />;
 }
 
 // A chip continuously arcing from a betting seat toward the pot — the "chips pushed
