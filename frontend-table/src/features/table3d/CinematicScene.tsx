@@ -152,7 +152,7 @@ const SZ = 3.82;
 // plate overrides with its own ELLIPSE so seats project onto the painted chairs.
 // There is exactly one live table Canvas mounted at a time, so module-level is safe.
 let ACTIVE_ELLIPSE: { sx: number; sz: number; y: number; stadiumL?: number } = {
-  sx: 3.55, sz: 1.70, y: 0.44,
+  sx: 3.55, sz: 2.30, y: 0.44,
 };
 // Walk the stadium perimeter: u=0 at bottom-center (hero), increasing clockwise.
 function stadiumPoint(u: number, L: number, R: number, y: number): [number, number, number] {
@@ -497,18 +497,18 @@ function BoardCard({ code, x, delay }: { code: string; x: number; delay: number 
   return (
     <group ref={ref}>
       <mesh castShadow material={mats}>
-        <boxGeometry args={[0.258, 0.011, 0.362]} />
+        <boxGeometry args={[0.324, 0.011, 0.451]} />
       </mesh>
     </group>
   );
 }
 
 function Board({ board }: { board: string[] }) {
-  const start = -((board.length - 1) / 2) * 0.306; // 63.5mm card + 8px-equivalent gap, scaled to target
+  const start = -((board.length - 1) / 2) * 0.371; // 56px card + 8px gap on a 1300px felt
   return (
     <group>
       {board.map((c, i) => (
-        <BoardCard key={`${c}-${i}`} code={c} x={start + i * 0.306} delay={i * 130} />
+        <BoardCard key={`${c}-${i}`} code={c} x={start + i * 0.371} delay={i * 130} />
       ))}
     </group>
   );
@@ -1088,7 +1088,7 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
       {/* Felt information block, laid FLAT on the felt above the community cards
           (drei <Html transform> rotates the DOM into the felt plane). */}
       {feltText && (
-        <Html transform rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.06, -3.15]}
+        <Html transform rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.44, -1.15]}
           zIndexRange={[5, 0]} style={{ pointerEvents: "none" }} distanceFactor={6}>
           <div style={{ width: 380, height: 50, textAlign: "center", textShadow: "0 1px 4px rgba(0,0,0,0.7)" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#E2F1F1", lineHeight: "18px" }}>{feltText[0]}</div>
@@ -1254,7 +1254,10 @@ export function CinematicScene({
     : "#05070c url(/table/casino_bg_4096x2048.png) center / cover no-repeat";
   const cameraCfg = backdrop
     ? { position: backdrop.camera.position, fov: backdrop.camera.fov }
-    : { position: [0, 7.4, 7.5] as [number, number, number], fov: 42 };
+    // Pull in so the table FILLS the frame like the mock (~80% of width) instead of
+    // floating as a small ellipse. Half-length 4.15 u / visible half-width 5.19 u at
+    // distance 7.6; kept at ~45 deg elevation so the rail and felt both read.
+    : { position: [0, 5.4, 5.4] as [number, number, number], fov: 42 };
   return (
     <div className="relative h-screen w-screen overflow-hidden" style={{ background: wrapperBg }}>
       <Canvas

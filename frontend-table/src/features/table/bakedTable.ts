@@ -63,6 +63,22 @@ export const BAKED_PLATES: Record<string, BakedPlate> = {
     shadowCatcher: { size: 16, opacity: 0.34 },
     seats: 10,
   },
+  // Cyan arena RE-FRAMED to 16:9 (`scripts/make-wide-plate.mjs`): the 1024-square art was being
+  // `cover`-fitted into a 16:9 viewport, which blew it up ~1.9x and pushed the painted
+  // seat frames off-screen. The wide plate crops to the table band and pads the sides,
+  // so the whole table + all 10 painted frames sit inside the frame at 66% width.
+  // Re-framing shrank the art by 1.317/1.875 = 0.702 about the screen centre, so the
+  // camera is pushed back by 1/0.702 = 1.424x to shrink the projection identically —
+  // the ellipse is unchanged because the seat ring must scale with the art, not drift.
+  "arena-cyan-wide": {
+    id: "arena-cyan-wide",
+    label: "Provably-Fair Arena — Cyan (wide)",
+    imageUrl: "/table/arena-cyan-16x9.jpg",
+    camera: { position: [0, 9.4, 11.53], fov: 40 },
+    ellipse: { sx: 5.15, sz: 3.75, y: 0.12 },
+    shadowCatcher: { size: 16, opacity: 0.34 },
+    seats: 10,
+  },
 };
 
 /** Ordered list for the owner "Choose a table" picker. */
