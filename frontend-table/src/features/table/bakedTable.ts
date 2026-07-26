@@ -104,6 +104,30 @@ export const BAKED_PLATES: Record<string, BakedPlate> = {
     shadowCatcher: { size: 14, opacity: 0.3 },
     seats: 10,
   },
+  // HRC table — the top-down oval from the HighRollersClub repo
+  // (client/public/images/poker-table-felt.webp), the table that already worked there.
+  // Built by `scripts/make-hrc-plate.mjs`. Green felt, gold rail inlays, cyan rim.
+  //
+  // This is the only asset close to the written spec. Measured:
+  //   art          1408x768 = 1.83:1 landscape
+  //   seat ring    +/-845 x +/-438 px = 1.93:1   (spec says 2.13:1)
+  // vs the hero table's 1.04:1 ring, which is essentially round.
+  //
+  // Being TOP-DOWN is what makes it tractable: with the camera looking straight down
+  // there is no foreshortening, so world X/Z map linearly to screen x/y and the ring
+  // is solved rather than eyeballed. From the plate's 1690x922 placement at (115,79):
+  //   camera [0,12,0.6] fov 40 => h*tan(20) = 4.368 u visible half-height
+  //   sx = 4.368 * 1.778 * 845/960 = 6.83
+  //   sz = 4.368 * 438/540         = 3.54     ratio 1.93:1, matching the art
+  "hrc-table": {
+    id: "hrc-table",
+    label: "HRC Table — Top-Down Oval",
+    imageUrl: "/table/hrc-table-16x9.png",
+    camera: { position: [0, 12, 0.6], fov: 40 },
+    ellipse: { sx: 6.83, sz: 3.54, y: 0.12 },
+    shadowCatcher: { size: 18, opacity: 0.28 },
+    seats: 10,
+  },
 };
 
 /** Ordered list for the owner "Choose a table" picker. */
