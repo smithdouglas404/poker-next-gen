@@ -69,6 +69,14 @@ export interface FeltControls {
   emptySeats: { serverIndex: number; sceneIndex: number }[];
   onSitOut: (on: boolean) => void;
   onMove: (serverIndex: number) => void;
+  /** Take an empty seat. Absent when the viewer can't sit (already seated, or a
+   *  spectator without a buy-in). When present, the whole VACANT tile is the click
+   *  target — previously empty seats rendered but were inert, so a player arriving at
+   *  a table had nothing to click to sit and show their avatar. */
+  onSit?: (serverIndex: number) => void;
+  /** Scene index -> real server seat index. Seats are rotated so the hero sits at
+   *  scene index 0, so the tile's own index is NOT the seat to sit in. */
+  serverIndexFor?: (sceneIndex: number) => number;
 }
 
 export interface CinematicSceneProps {
@@ -928,7 +936,7 @@ function GlbFigure({ seat, total }: { seat: SceneSeat; total: number }) {
 /* ---------------- 2D seat layer (spec coordinates) ---------------- */
 
 /** One seat tile: 110x130 frame, 80x80 photo, 140x70 badge, 90x28 action tag. */
-function SeatTile({ seat, index }: { seat?: SceneSeat; index: number }) {
+function SeatTile({ seat, index, canSit = false }: { seat?: SceneSeat; index: number; canSit?: boolean }) {
   const vacant = !seat;
   const ring = seat ? seat.ringColor : "#5b6472";
   const glow =
@@ -972,9 +980,13 @@ function SeatTile({ seat, index }: { seat?: SceneSeat; index: number }) {
       <div
         style={{
           width: UI.frameW, height: UI.frameH, borderRadius: 12,
-          border: `2px solid ${vacant ? "#2AC6D0" : ring}`, background: "rgba(15,23,42,0.16)",
+          border: `2px solid ${vacant ? (canSit ? "#f5c518" : "#2AC6D0") : ring}`,
+          background: canSit ? "rgba(245,197,24,0.07)" : "rgba(15,23,42,0.16)",
           backdropFilter: "blur(6px)",
-          boxShadow: vacant ? "none" : `0 0 26px ${glow}, 0 0 0 2px rgba(212,175,55,0.28)`,
+          boxShadow: vacant
+            ? (canSit ? "0 0 22px rgba(245,197,24,0.35)" : "none")
+            : `0 0 26px ${glow}, 0 0 0 2px rgba(212,175,55,0.28)`,
+          transition: "border-color 140ms, box-shadow 140ms, background 140ms",
           display: "flex", alignItems: "center", justifyContent: "center",
           opacity: seat?.state === "folded" ? 0.55 : 1,
           animation: vacant ? "none" : anim,
@@ -985,9 +997,11 @@ function SeatTile({ seat, index }: { seat?: SceneSeat; index: number }) {
         {/* APPROVED: folded / inactive players drop to a 60x60 portrait. */}
         {vacant ? (
           <div className="flex flex-col items-center" style={{ color: "#7f8794" }}>
-            <div style={{ width: UI.vacantInner, height: UI.vacantInner, borderRadius: "50%", border: `2px dashed #5b6472`,
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>♟</div>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", marginTop: 8 }}>VACANT</div>
+            <div style={{ width: UI.vacantInner, height: UI.vacantInner, borderRadius: "50%",
+              border: `2px dashed ${canSit ? "#f5c518" : "#5b6472"}`,
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>{canSit ? "+" : "♟"}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", marginTop: 8,
+              color: canSit ? "#f5c518" : undefined }}>{canSit ? "SIT HERE" : "VACANT"}</div>
           </div>
         ) : (
           <>
@@ -1039,19 +1053,57 @@ function seatDepthScale(index: number, total: number): number {
   return SEAT_SCALE_FAR + (SEAT_SCALE_NEAR - SEAT_SCALE_FAR) * Math.max(0, Math.min(1, near));
 }
 
-function SeatLayer3D({ seats, maxSeats }: { seats: SceneSeat[]; maxSeats: number }) {
+function SeatLayer3D({
+  seats,
+  maxSeats,
+  felt,
+}: {
+  seats: SceneSeat[];
+  maxSeats: number;
+  felt?: FeltControls;
+}) {
   const bySeat = new Map(seats.map((s) => [s.index, s]));
   return (
     <>
       {Array.from({ length: maxSeats }, (_, i) => {
         const p = seatPoint(i, maxSeats);
         const s = seatDepthScale(i, maxSeats);
+        const seat = bySeat.get(i);
+        // An empty seat is clickable only when the viewer can actually take it.
+        const canSit = !seat && !!felt?.onSit;
+        const serverIndex = felt?.serverIndexFor?.(i) ?? i;
         return (
-          <Html key={i} position={[p[0], 0.42, p[2]]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
+          <Html
+            key={i}
+            position={[p[0], 0.42, p[2]]}
+            center
+            zIndexRange={[20, 0]}
+            style={{ pointerEvents: canSit ? "auto" : "none" }}
+          >
             {/* Nearer seats also stack above farther ones, so an overlap resolves the
                 way depth implies rather than by DOM order. */}
-            <div style={{ transform: `scale(${s.toFixed(3)})`, zIndex: Math.round(s * 1000) }}>
-              <SeatTile index={i} seat={bySeat.get(i)} />
+            <div
+              style={{
+                transform: `scale(${s.toFixed(3)})`,
+                zIndex: Math.round(s * 1000),
+                cursor: canSit ? "pointer" : undefined,
+              }}
+              role={canSit ? "button" : undefined}
+              tabIndex={canSit ? 0 : undefined}
+              aria-label={canSit ? `Take seat ${serverIndex + 1}` : undefined}
+              onClick={canSit ? () => felt!.onSit!(serverIndex) : undefined}
+              onKeyDown={
+                canSit
+                  ? (e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        felt!.onSit!(serverIndex);
+                      }
+                    }
+                  : undefined
+              }
+            >
+              <SeatTile index={i} seat={seat} canSit={canSit} />
             </div>
           </Html>
         );
@@ -1172,7 +1224,7 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
       )}
 
       {/* Seat tiles anchored in 3D (engineering: avatars are gameplay, not flat HUD). */}
-      {mode !== "3d" && <SeatLayer3D seats={seats} maxSeats={maxSeats} />}
+      {mode !== "3d" && <SeatLayer3D seats={seats} maxSeats={maxSeats} felt={feltControls} />}
 
       {/* Per-seat committed bets as physical chips on the felt (real geometry). */}
       {seats.map((s) => (

@@ -19,10 +19,11 @@ export const DEMO_SNAPSHOT: TableSnapshot = {
     { index: 2, user_id: "ice-queen", username: "Ice Queen", stack: 4_500_000, status: "folded", last_action: "fold" },
     { index: 3, user_id: "shadow-king", username: "Shadow King", stack: 6_130_000, status: "active", last_action: "call" },
     { index: 4, user_id: "void-witch", username: "Void Witch", stack: 2_880_000, status: "all-in", last_action: "all-in" },
-    { index: 5, user_id: "gold-phantom", username: "Gold Phantom", stack: 4_500_000, status: "folded", last_action: "fold" },
+    { index: 5, status: "empty", stack: 0 },
     { index: 6, user_id: "red-wolf", username: "Red Wolf", stack: 4_500_000, status: "active" },
     { index: 7, user_id: "chrome-siren", username: "Chrome Siren", stack: 4_500_000, status: "active", last_action: "call" },
-    { index: 8, user_id: "tech-monk", username: "Tech Monk", stack: 4_500_000, status: "active" },
+    { index: 8, status: "empty", stack: 0 },
+    { index: 9, user_id: "tech-monk", username: "Tech Monk", stack: 4_500_000, status: "active" },
   ],
   board: [
     { code: "As", face_up: true },
@@ -37,7 +38,7 @@ export const DEMO_SNAPSHOT: TableSnapshot = {
   button_seat: 1,
   small_blind: 500,
   big_blind: 1_000,
-  max_seats: 9,
+  max_seats: 10,
   hand_no: 12_847,
 };
 

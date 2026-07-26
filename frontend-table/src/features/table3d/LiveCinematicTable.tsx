@@ -7,7 +7,7 @@
 // ?demo=1 injects a static demo snapshot so the cinematic table renders
 // populated without a live server (headless verification / owner review).
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { formatCents, useGame } from "@/features/game/GameProvider";
@@ -19,6 +19,7 @@ import { DEFAULT_MAX_SEATS, MAX_SEATS, MIN_SEATS } from "@/features/game/protoco
 import type { CardView, SeatView, ShowdownMessage, TableSnapshot } from "@/features/game/protocol";
 import { CinematicScene, type SceneSeat, type FeltControls } from "./CinematicScene";
 import { TableAdminOverlay } from "./TableAdminOverlay";
+import { BuyInDialog } from "@/features/hud/BuyInDialog";
 import { DEMO_HERO_ID, DEMO_HOLE, DEMO_SHOWDOWN, DEMO_SNAPSHOT } from "./demoSnapshot";
 
 function seatState(
@@ -95,6 +96,8 @@ export default function LiveCinematicTable() {
 
   const live = useGame();
   const [deviceMode] = useRenderMode();
+  // Seat the player clicked on an empty tile; opens the existing buy-in dialog.
+  const [buyInSeat, setBuyInSeat] = useState<number | null>(null);
 
   const snapshot = demo ? DEMO_SNAPSHOT : live.snapshot;
 
@@ -214,7 +217,24 @@ export default function LiveCinematicTable() {
     if (demo || !snapshot) return undefined;
     const total = Math.min(MAX_SEATS, Math.max(MIN_SEATS, snapshot.max_seats ?? snapshot.seats.length));
     const heroIdx = heroSeatIndex(snapshot.seats, heroUserId);
-    if (heroIdx < 0) return undefined; // not seated → no controls
+
+    // An UNSEATED viewer used to get no controls at all, which meant the empty seats
+    // rendered as inert "VACANT" tiles — a player arriving at a table had nothing to
+    // click to sit down and show their avatar. They get sit-down only: no sit-out, no
+    // seat-change (both require a seat), and seats are unrotated because the rotation
+    // is anchored on the hero.
+    if (heroIdx < 0) {
+      return {
+        heroSittingOut: false,
+        canMove: false,
+        emptySeats: [],
+        onSitOut: () => {},
+        onMove: () => {},
+        onSit: (idx: number) => setBuyInSeat(idx),
+        serverIndexFor: (sceneIndex: number) => sceneIndex,
+      };
+    }
+
     const heroSeat = snapshot.seats.find((s) => s.index === heroIdx);
     const canMove = (snapshot.phase ?? "waiting") === "waiting";
     const emptySeats = snapshot.seats
@@ -226,27 +246,35 @@ export default function LiveCinematicTable() {
       emptySeats,
       onSitOut: (on: boolean) => void live.sitOut(on),
       onMove: (idx: number) => void live.moveSeat(idx),
+      // Already seated: sitting again is not a thing, so the vacant tiles stay inert
+      // and seat CHANGES keep using the existing "Sit here" pill (gated on canMove).
+      serverIndexFor: (sceneIndex: number) => (sceneIndex + heroIdx) % total,
     };
   })();
 
   return (
-    <CinematicScene
-      seats={scene.seats}
-      board={scene.board}
-      potLabel={scene.potLabel}
-      heroHole={scene.heroHole}
-      mode={mode}
-      maxSeats={scene.maxSeats}
-      showPot={scene.showPot}
-      handLive={scene.handLive}
-      dealNonce={scene.dealNonce}
-      potMinor={scene.potMinor}
-      winnerSeat={scene.winnerSeat}
-      winNonce={scene.winNonce}
-      announce={scene.announce}
-      feltControls={feltControls}
-      backdrop={bakedPlate(snapshot?.table_art)}
-      overlay={<TableAdminOverlay demo={demo} />}
-    />
+    <>
+      {/* Clicking an empty seat opens the existing two-wallet buy-in dialog, which
+          owns the real sitDown() call and the min/max + wallet-balance guards. */}
+      {buyInSeat !== null && <BuyInDialog seat={buyInSeat} onClose={() => setBuyInSeat(null)} />}
+      <CinematicScene
+        seats={scene.seats}
+        board={scene.board}
+        potLabel={scene.potLabel}
+        heroHole={scene.heroHole}
+        mode={mode}
+        maxSeats={scene.maxSeats}
+        showPot={scene.showPot}
+        handLive={scene.handLive}
+        dealNonce={scene.dealNonce}
+        potMinor={scene.potMinor}
+        winnerSeat={scene.winnerSeat}
+        winNonce={scene.winNonce}
+        announce={scene.announce}
+        feltControls={feltControls}
+        backdrop={bakedPlate(snapshot?.table_art)}
+        overlay={<TableAdminOverlay demo={demo} />}
+      />
+    </>
   );
 }
