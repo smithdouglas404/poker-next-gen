@@ -235,6 +235,23 @@ function remapUVs(g: THREE.BufferGeometry, w: number, h: number) {
 
 /* ---------------- table geometry ---------------- */
 
+const TABLE_GLB = "/models/cyber_poker_table.glb";
+// The asset pack is authored in METRES with table length along X. Our scene unit
+// is 0.2374 m, so metres -> units is 4.216x, and a 90-degree yaw lays their +X
+// length along our Z runway (portrait orientation).
+const GLB_SCALE = 10.279 / 2.4384;
+
+/** The design team's real table mesh: rail, cyan accent, pedestal, ten chairs,
+ *  dealer button and sample chips — replaces the procedural stadium. */
+function TableModel() {
+  const { scene } = useGLTF(TABLE_GLB);
+  return (
+    <group rotation={[0, Math.PI / 2, 0]} scale={GLB_SCALE}>
+      <primitive object={scene} />
+    </group>
+  );
+}
+
 function TableBody() {
   const felt = useMemo(() => feltTexture(), []);
   // Stadium geometries (racetrack oval): felt, gold inner ring, red neon rim,
@@ -1061,7 +1078,7 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
             <Lightformer intensity={2.0} form="rect" position={[6, 2, -3]} scale={[3, 6, 1]} color="#4DEEEA" />
           </Environment>
 
-          <TableBody />
+          <Suspense fallback={<TableBody />}><TableModel /></Suspense>
         </>
       )}
       <Board board={board} />
@@ -1256,12 +1273,11 @@ export function CinematicScene({
   // Baked plate: show the empty table image behind the transparent Canvas (cover,
   // centered) and give the Canvas the plate's art-matched camera. Cinematic (default):
   // the red/gold radial room gradient + the contract camera [0,6.9,7.9] fov 42.
+  // Casino room plate from the asset pack sits behind the transparent canvas —
+  // replaces the black void the table used to float in.
   const wrapperBg = backdrop
     ? `#05070c url(${backdrop.imageUrl}) center / cover no-repeat`
-    : "radial-gradient(1200px 700px at 20% 0%, rgba(255,45,63,0.10), transparent 60%)," +
-      "radial-gradient(1000px 600px at 85% 20%, rgba(200,16,46,0.10), transparent 60%)," +
-      "radial-gradient(900px 500px at 50% 100%, rgba(233,196,106,0.08), transparent 60%)," +
-      "linear-gradient(180deg,#04060a,#070b12 60%,#04060a)";
+    : "#05070c url(/table/casino_bg_4096x2048.png) center / cover no-repeat";
   const cameraCfg = backdrop
     ? { position: backdrop.camera.position, fov: backdrop.camera.fov }
     : { position: [0, 6.35, 4.6] as [number, number, number], fov: 44 };
@@ -1288,3 +1304,4 @@ export function CinematicScene({
 }
 
 useGLTF.preload(GLB_URL);
+useGLTF.preload(TABLE_GLB);
