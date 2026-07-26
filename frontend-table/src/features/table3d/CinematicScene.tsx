@@ -152,7 +152,7 @@ const SZ = 3.82;
 // plate overrides with its own ELLIPSE so seats project onto the painted chairs.
 // There is exactly one live table Canvas mounted at a time, so module-level is safe.
 let ACTIVE_ELLIPSE: { sx: number; sz: number; y: number; stadiumL?: number } = {
-  sx: SX, sz: SEAT_R, y: 0.12, stadiumL: STAD_L,
+  sx: 3.55, sz: 1.70, y: 0.33,
 };
 // Walk the stadium perimeter: u=0 at bottom-center (hero), increasing clockwise.
 function stadiumPoint(u: number, L: number, R: number, y: number): [number, number, number] {
@@ -253,75 +253,42 @@ function TableModel() {
 }
 
 function TableBody() {
-  // Felt PBR set from the design team's asset pack — albedo + normal + roughness,
-  // replacing the procedurally drawn canvas texture.
-  const [feltAlbedo, feltNormal, feltRough] = useTexture([
-    "/table/pbr/felt_albedo_4096.png",
-    "/table/pbr/felt_normal_4096.png",
-    "/table/pbr/felt_roughness_4096.png",
-  ]);
-  const felt = feltAlbedo;
-  // Stadium geometries (racetrack oval): felt, gold inner ring, red neon rim,
-  // raised gunmetal rail, gold pinstripe, underbody. All from the same outline.
-  const g = useMemo(() => {
-    const feltG = new THREE.ShapeGeometry(stadiumShape(STAD_L, FELT_R), 48);
-    remapUVs(feltG, 2 * (STAD_L + FELT_R), 2 * FELT_R);
-    const goldG = new THREE.ShapeGeometry(stadiumRing(STAD_L, FELT_R - 0.20, FELT_R - 0.25), 48);
-    const rimG = new THREE.ShapeGeometry(stadiumRing(STAD_L, FELT_R + 0.04, FELT_R), 48);
-    // Rail = the 4in armrest, spanning the felt edge out to FELT_R + RAIL_W.
-    const railG = new THREE.ExtrudeGeometry(stadiumRing(STAD_L, FELT_R + RAIL_W * 1.9, FELT_R + 0.04), {
-      depth: 0.34, bevelEnabled: true, bevelThickness: 0.07, bevelSize: 0.07, bevelSegments: 3, curveSegments: 48,
-    });
-    const stripeG = new THREE.ShapeGeometry(stadiumRing(STAD_L, FELT_R + RAIL_W * 0.66, FELT_R + RAIL_W * 0.56), 48);
-    // Body drops the full 30in from just under the felt to the floor.
-    const underG = new THREE.ExtrudeGeometry(stadiumShape(STAD_L, FELT_R + RAIL_W), {
-      depth: TABLE_H, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.06, bevelSegments: 2, curveSegments: 48,
-    });
-    const neonG = new THREE.ShapeGeometry(stadiumRing(STAD_L, FELT_R + RAIL_W * 1.95, FELT_R + RAIL_W * 1.62), 48);
-    return { feltG, goldG, rimG, railG, stripeG, underG, neonG };
-  }, []);
+  // TRUE OVAL, ported from the reference implementation: four scaled capsules
+  // (rail / felt / cyan rim / inner felt). A capsule squashed on Y gives a real
+  // rounded oval — the flat extruded outline used before never read as one.
+  const felt = useMemo(() => new THREE.MeshStandardMaterial({ color: "#0b6a3b", roughness: 0.86, metalness: 0 }), []);
+  const rail = useMemo(() => new THREE.MeshStandardMaterial({ color: "#1a252d", roughness: 0.28, metalness: 0.8 }), []);
+  const cyan = useMemo(() => new THREE.MeshStandardMaterial({ color: "#66fbff", emissive: "#17dce7", emissiveIntensity: 4, roughness: 0.2 }), []);
   return (
-    // PORTRAIT orientation: the stadium is authored with its straight run along X,
-    // so the body is yawed 90 deg to lay that run along Z (into the screen).
     <group>
       {/* floor — grounds the table in a room instead of a void */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -TABLE_H, 0]} receiveShadow>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.2, 0]} receiveShadow>
         <planeGeometry args={[60, 60]} />
-        <meshStandardMaterial color="#0b0e14" metalness={0.6} roughness={0.35} />
+        <meshStandardMaterial color="#080d14" roughness={0.95} metalness={0.05} />
       </mesh>
 
-      {/* underbody */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -(TABLE_H + 0.08), 0]} geometry={g.underG}>
-        <meshStandardMaterial color="#0A231C" metalness={0.3} roughness={0.7} />
+      {/* outer metallic rail */}
+      <mesh receiveShadow scale={[4.15, 0.18, 2.1]}>
+        <capsuleGeometry args={[1, 2.1, 16, 48]} />
+        <primitive object={rail} attach="material" />
       </mesh>
 
-      {/* felt top */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} geometry={g.feltG} receiveShadow>
-        <meshStandardMaterial map={feltAlbedo} normalMap={feltNormal} roughnessMap={feltRough} roughness={1} metalness={0.02} />
+      {/* felt bed */}
+      <mesh receiveShadow position={[0, 0.17, 0]} scale={[3.72, 0.12, 1.74]}>
+        <capsuleGeometry args={[1, 2.15, 16, 48]} />
+        <primitive object={felt} attach="material" />
       </mesh>
 
-      {/* gold inner ring (flat) */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.035, 0]} geometry={g.goldG}>
-        <meshStandardMaterial color="#4DEEEA" emissive="#0f6b73" emissiveIntensity={0.55} metalness={1} roughness={0.28} side={THREE.DoubleSide} />
+      {/* glowing cyan rim */}
+      <mesh position={[0, 0.28, 0]} scale={[3.88, 0.035, 1.91]}>
+        <capsuleGeometry args={[1, 2.12, 16, 48]} />
+        <primitive object={cyan} attach="material" />
       </mesh>
 
-      {/* red neon rim at felt edge (GGPoker brand glow) */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]} geometry={g.rimG}>
-        <meshBasicMaterial color="#1CB5C9" side={THREE.DoubleSide} toneMapped={false} />
-      </mesh>
-
-      {/* gunmetal outer rail (raised, beveled) */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} geometry={g.railG} castShadow receiveShadow>
-        <meshStandardMaterial color="#1E2638" metalness={1} roughness={0.18} envMapIntensity={1.6} />
-      </mesh>
-      {/* glowing cyan neon tube wrapping the rail — real emissive geometry */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.30, 0]} geometry={g.neonG}>
-        <meshBasicMaterial color="#4DEEEA" toneMapped={false} side={THREE.DoubleSide} />
-      </mesh>
-
-      {/* gold pinstripe on the rail */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.30, 0]} geometry={g.stripeG}>
-        <meshStandardMaterial color="#1CB5C9" emissive="#0b5a63" emissiveIntensity={0.4} metalness={1} roughness={0.3} side={THREE.DoubleSide} />
+      {/* inner felt surface */}
+      <mesh position={[0, 0.29, 0]} scale={[3.77, 0.04, 1.79]} receiveShadow>
+        <capsuleGeometry args={[1, 2.1, 16, 48]} />
+        <meshStandardMaterial color="#0b6a3b" roughness={0.86} />
       </mesh>
     </group>
   );
@@ -526,7 +493,7 @@ function BoardCard({ code, x, delay }: { code: string; x: number; delay: number 
     // BoxGeometry face order: px, nx, py, ny, pz, nz  (py = top)
     return [white, white, top, white, white, white];
   }, [face]);
-  const ref = useDealIn([x, 0.075, -1.9], delay, true);
+  const ref = useDealIn([x, 0.35, -0.55], delay, true);
   return (
     <group ref={ref}>
       <mesh castShadow material={mats}>
@@ -580,7 +547,7 @@ function ChipStack({
 }
 
 // Where the central pot sits (chips + the DOM pot label ride here).
-const POT_POS: [number, number, number] = [0, 0.05, 0.5];
+const POT_POS: [number, number, number] = [0, 0.34, 0.55];
 
 // Central pot pile — a tight cluster of colored stacks just below the board whose
 // heights now SCALE with the pot value (bigger pot → taller stacks), clamped so it
@@ -1041,7 +1008,7 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
   // cinematic felt keeps the contract default (SX/SZ).
   ACTIVE_ELLIPSE = backdrop
     ? { sx: backdrop.ellipse.sx, sz: backdrop.ellipse.sz, y: backdrop.ellipse.y }
-    : { sx: SX, sz: SEAT_R, y: 0.12, stadiumL: STAD_L };
+    : { sx: 3.55, sz: 1.70, y: 0.33 };
 
   const baked = !!backdrop;
   const winTarget = useMemo<[number, number, number] | null>(() => {
