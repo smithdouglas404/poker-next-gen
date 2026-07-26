@@ -1,7 +1,8 @@
 <!--
   Generated from a full read of the three design archives on `main`
   (Archive.zip / Archive 2.zip / Archive 3.zip) — 41 mockup screens, each opened
-  at full size. Regenerate by re-reading the archives, not by editing summaries.
+  at full size, plus a source read of HighRollersClub itself.
+  Regenerate by re-reading the sources, not by editing summaries.
 -->
 
 # HRC Design-Archive Parity Review — where they are deeper, and where we are
@@ -211,10 +212,78 @@ Ranked by distance from the design, not by effort:
 3. **Table setup presentation** — the fields exist; the screen doesn't say who sponsors it or why
    Public is locked. Add the scheduling window.
 4. **Avatar render progress** — jobs run with no progress UI.
+5. **No canvas-free table renderer.** HRC's `ImageTable` (pre-rendered plate + %-coordinate DOM
+   overlay + CSS `rotateX` chips, zero WebGL) is what lets their Tournament Center and Public Table
+   Browser show a dozen tables at once. Our only table renderer is an R3F canvas, which cannot be
+   gridded. This blocks several of the gaps above rather than being cosmetic. See Deliverable 6.
 
 Everything else is at or above the design.
 
 ---
+
+---
+
+## Finding: how HRC gets a "3D" look without WebGL
+
+> ### 🚫 OUR LIVE TABLE IS NOT CHANGING
+>
+> `features/table3d/CinematicScene.tsx` and `LiveCinematicTable.tsx` are **out of scope for this
+> deliverable and every deliverable in this plan.** The R3F cinematic table, its camera, felt,
+> lighting, bloom, seat ring, card and chip geometry are finished and correct. Nothing below
+> touches them.
+>
+> This matters because the finding immediately below is easy to misread as "HRC ships DOM, so we
+> should too." That is **not** the conclusion. The conclusion is that a thumbnail grid needs a
+> renderer that is not a canvas, and we do not have one.
+
+You said HRC used different tech for the screens that look 3D. Verified in their source — they did,
+and it is not WebGL.
+
+**What they actually do** (`client/src/components/poker/ImageTable.tsx`, `lib/table-constants.ts`):
+
+1. **A pre-rendered image IS the table.** `ImageTable.tsx:164` renders
+   `<img src="/images/poker-table-felt.webp">`. The perspective, felt, rail and lighting are baked
+   into the artwork — nothing is computed at runtime.
+2. **Percentage-coordinate overlays with a hand-tuned scale ramp.** `TABLE_SEATS` is ten
+   `{x, y, scale}` entries in % of the image box, `scale` falling from `1.0` at the hero seat to
+   `0.83` at 12 o'clock. That single number is the entire foreshortening effect — far seats are
+   drawn smaller. `DEALER_POSITIONS` is a second such table.
+3. **CSS `rotateX` on flat SVG for the chips.** Each chip is an `<svg>` circle with
+   `transform: rotateX(55deg)` and `marginBottom: -29` so they overlap into a stack. Flat vector art
+   tilted by CSS reads as a 3D chip stack.
+4. **framer-motion** for the movement on top.
+
+**Zero WebGL outside the live table** — confirmed: no `three` / `@react-three` import anywhere in
+their `pages/` or `components/`, except the table's own `scene/` and two overlay files.
+
+**And they went further than I first thought.** `pages/Game.tsx:1278-1292` is a three-way branch for
+the *actual playing surface*: a Flutter iframe, `PokerSceneCanvas` (R3F), or `ImageTable`. The
+default is `ImageTable` — `getTableRenderer()` at `Game.tsx:14-19` returns `"2d"` unless localStorage
+says otherwise, and R3F sits behind a 2D/3D toggle at `Game.tsx:1062`. So HRC's shipped default
+table is DOM + CSS 3D, with WebGL as opt-in.
+
+**We are not copying that.** Our R3F table is better and it is done — see the box above. The useful
+part of this finding is narrower: HRC needed a non-canvas renderer, built one, and that is what makes
+their multi-table screens possible. We need the same component for the same reason, and for nothing
+else.
+
+**Why this matters, and it is not a style preference.** The mockups that need it are the ones showing
+*many tables at once* — Tournament Center (`dpts_1`, ~12 thumbnails), Club Overview (`dpts_5`),
+Public Table Browser (`dpts_7`, ~12), Public Lobby (`dpts_20`). You cannot put twelve live WebGL
+canvases in a grid. Our cinematic R3F table is the right tool for the **one** live table and the
+wrong tool for a thumbnail grid. That is the actual reason HRC built `ImageTable` alongside their
+`scene/`.
+
+**This does not violate CLAUDE.md non-negotiable #1.** That rule forbids "gradient divs or
+box-shadows pretending to be a 3D table" *for the live table*, and it already sanctions the baked
+plate as "an explicit opt-in PHOTOREAL render… not a gradient-div faking the 3D felt". A
+pre-rendered plate is real 3D art. The live cinematic table stays R3F — this is strictly for
+thumbnails and multi-table views.
+
+**What we already have:** `features/table/bakedTable.ts` (plate config with camera + seat ellipse)
+and the plate art in `public/table/`, including HRC's own `public/images/poker-table-felt.webp`,
+already vendored. What is missing is the canvas-free renderer — ours composites an R3F `<Canvas>`
+over the plate, which is exactly what a grid cannot afford.
 
 ---
 
@@ -226,6 +295,8 @@ Everything else is at or above the design.
    `detailed_private_table_setup_*`.
 4. Each compared against the actual implementation by reading the corresponding source file, not by
    recollection. Where this document says "we already send X", it was checked in the payload.
+5. The rendering finding was taken from HighRollersClub's own source (`components/poker/ImageTable.tsx`,
+   `lib/table-constants.ts`, `pages/Game.tsx`), not from the mockups.
 
 ## Known limits of this review
 
