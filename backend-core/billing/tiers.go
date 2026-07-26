@@ -13,6 +13,10 @@ var TierOrder = []string{"free", "bronze", "silver", "gold", "platinum"}
 //     disambiguated by tier; callers should treat platinum as unlimited.
 //   - TournamentBuyInMaxCents: 0 = freerolls only (free) or unlimited (gold+).
 //   - ClubCreateLimit / ClubMemberLimit: 0 = cannot create, -1 = unlimited.
+//   - TableSponsor: may stand up a table at all. Every table on the platform is
+//     sponsored by a club, and only a paying member with this capability can open
+//     one. Free tier is false, which is what makes hosting a paid feature rather
+//     than something any account can do.
 type TierDef struct {
 	ID                      string   `json:"id"`
 	Name                    string   `json:"name"`
@@ -27,6 +31,7 @@ type TierDef struct {
 	DailyBonusChips         int64    `json:"daily_bonus_chips"`
 	ClubCreateLimit         int      `json:"club_create_limit"`
 	ClubMemberLimit         int      `json:"club_member_limit"`
+	TableSponsor            bool     `json:"table_sponsor"`
 	MultiTableLimit         int      `json:"multi_table_limit"`
 	MarketplaceFeeBps       int      `json:"marketplace_fee_bps"`
 	Benefits                []string `json:"benefits"`
@@ -38,7 +43,7 @@ var Tiers = []TierDef{
 		ID: "free", Name: "Free", MonthlyPriceCents: 0, AnnualPriceCents: 0,
 		KYCLevel: "email", DepositLimitDailyCents: 0, WithdrawLimitWeeklyCents: 0,
 		MaxBigBlindCents: 0, TournamentBuyInMaxCents: 0, RakebackPercent: 0,
-		DailyBonusChips: 500, ClubCreateLimit: 0, ClubMemberLimit: 0,
+		DailyBonusChips: 500, ClubCreateLimit: 0, ClubMemberLimit: 0, TableSponsor: false,
 		MultiTableLimit: 1, MarketplaceFeeBps: 290,
 		Benefits: []string{
 			"Play-chip tables only",
@@ -53,7 +58,7 @@ var Tiers = []TierDef{
 		ID: "bronze", Name: "Bronze", MonthlyPriceCents: 499, AnnualPriceCents: 4799,
 		KYCLevel: "basic", DepositLimitDailyCents: 20000, WithdrawLimitWeeklyCents: 50000,
 		MaxBigBlindCents: 1000, TournamentBuyInMaxCents: 2500, RakebackPercent: 0,
-		DailyBonusChips: 1000, ClubCreateLimit: 1, ClubMemberLimit: 25,
+		DailyBonusChips: 1000, ClubCreateLimit: 1, ClubMemberLimit: 25, TableSponsor: true,
 		MultiTableLimit: 1, MarketplaceFeeBps: 290,
 		Benefits: []string{
 			"Real-money micro stakes (up to 5/10)",
@@ -68,7 +73,7 @@ var Tiers = []TierDef{
 		ID: "silver", Name: "Silver", MonthlyPriceCents: 1499, AnnualPriceCents: 14399,
 		KYCLevel: "standard", DepositLimitDailyCents: 100000, WithdrawLimitWeeklyCents: 250000,
 		MaxBigBlindCents: 5000, TournamentBuyInMaxCents: 20000, RakebackPercent: 10,
-		DailyBonusChips: 2500, ClubCreateLimit: 3, ClubMemberLimit: 100,
+		DailyBonusChips: 2500, ClubCreateLimit: 3, ClubMemberLimit: 100, TableSponsor: true,
 		MultiTableLimit: 4, MarketplaceFeeBps: 290,
 		Benefits: []string{
 			"Mid stakes (up to 25/50)",
@@ -85,7 +90,7 @@ var Tiers = []TierDef{
 		ID: "gold", Name: "Gold", MonthlyPriceCents: 2999, AnnualPriceCents: 28799,
 		KYCLevel: "full", DepositLimitDailyCents: 500000, WithdrawLimitWeeklyCents: 1000000,
 		MaxBigBlindCents: 40000, TournamentBuyInMaxCents: 0, RakebackPercent: 20,
-		DailyBonusChips: 5000, ClubCreateLimit: 5, ClubMemberLimit: 500,
+		DailyBonusChips: 5000, ClubCreateLimit: 5, ClubMemberLimit: 500, TableSponsor: true,
 		MultiTableLimit: 4, MarketplaceFeeBps: 290,
 		Benefits: []string{
 			"High stakes (up to 200/400)",
@@ -101,7 +106,7 @@ var Tiers = []TierDef{
 		ID: "platinum", Name: "Platinum", MonthlyPriceCents: 7999, AnnualPriceCents: 76799,
 		KYCLevel: "enhanced", DepositLimitDailyCents: 2500000, WithdrawLimitWeeklyCents: 5000000,
 		MaxBigBlindCents: 0, TournamentBuyInMaxCents: 0, RakebackPercent: 30,
-		DailyBonusChips: 10000, ClubCreateLimit: -1, ClubMemberLimit: -1,
+		DailyBonusChips: 10000, ClubCreateLimit: -1, ClubMemberLimit: -1, TableSponsor: true,
 		MultiTableLimit: 8, MarketplaceFeeBps: 200,
 		Benefits: []string{
 			"Unlimited stakes",
@@ -181,6 +186,13 @@ func CanCreateClub(id string, owned int) bool {
 		return true
 	}
 	return owned < limit
+}
+
+// CanSponsorTable reports whether a member on `tier` may stand up a table.
+// Every table belongs to a club and is sponsored by a paying member; the free
+// tier can join and play but cannot open one.
+func CanSponsorTable(id string) bool {
+	return GetTierDef(id).TableSponsor
 }
 
 // ClubMemberCap returns the member limit for a club owned by `tier`

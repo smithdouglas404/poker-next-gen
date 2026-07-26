@@ -128,13 +128,28 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 	actionSecs := clampSecs(req.ActionSecs)
 	timeBankSecs := clampSecs(req.TimeBankSecs)
 
-	// Club-bound table: buy-ins draw the player's club-allocated balance (union
-	// model) and pots are raked to the club. Only a club owner/configurer may
-	// stand one up, so a random member can't spin tables on someone's club.
-	if req.ClubID != "" {
-		if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
-			return "", err
-		}
+	// EVERY table belongs to a club, and a paying member sponsors it.
+	//
+	// This used to read `if req.ClubID != ""`, so the guard only fired when a club
+	// was volunteered — omit the field and anyone, including an unregistered guest,
+	// could stand up a table outside any club. Two things follow from the product
+	// model and are now enforced together:
+	//
+	//   1. Club required. Buy-ins draw the player's club-allocated balance and pots
+	//      rake to the club, so a table with no club has no ledger to settle into.
+	//   2. Sponsor capability required. Hosting is a paid feature; the free tier can
+	//      join and play but cannot open a table.
+	//
+	// Both are checked server-side because the UI hiding the button is not a
+	// boundary — this RPC is reachable directly.
+	if req.ClubID == "" {
+		return "", runtime.NewError("every table must be hosted by a club — pick a club to sponsor it", 3)
+	}
+	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+		return "", err
+	}
+	if tier := store.SubscriptionTier(ctx, db, hostUserID); !billing.CanSponsorTable(tier) {
+		return "", runtime.NewError("hosting a table requires a paid membership — upgrade to sponsor tables", 7)
 	}
 
 	matchID, err := nk.MatchCreate(ctx, protocol.MatchModule, map[string]interface{}{
