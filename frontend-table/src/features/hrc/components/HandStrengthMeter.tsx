@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { getHandStrength } from "@/lib/hand-evaluator";
-import { CardType } from "@/lib/poker-types";
+import { getHandStrength } from "@/features/hrc/lib/hand-evaluator";
+import { CardType } from "@/features/hrc/lib/poker-types";
 import { TrendingUp } from "lucide-react";
 
 interface HandStrengthMeterProps {

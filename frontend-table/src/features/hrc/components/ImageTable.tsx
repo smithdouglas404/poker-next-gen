@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "./Card";
-import type { CardType } from "@/lib/poker-types";
-import type { Player } from "@/lib/poker-types";
-import { TABLE_SEATS, DEALER_POSITIONS } from "@/lib/table-constants";
-import { useGameUI } from "@/lib/game-ui-context";
-import { useAnimatedCounter } from "@/hooks/useAnimatedCounter";
+import type { CardType } from "@/features/hrc/lib/poker-types";
+import type { Player } from "@/features/hrc/lib/poker-types";
+import { TABLE_SEATS, DEALER_POSITIONS } from "@/features/hrc/lib/table-constants";
+import { useGameUI } from "@/features/hrc/lib/game-ui-context";
+import { useAnimatedCounter } from "@/features/hrc/hooks/useAnimatedCounter";
 
 
 interface ImageTableProps {

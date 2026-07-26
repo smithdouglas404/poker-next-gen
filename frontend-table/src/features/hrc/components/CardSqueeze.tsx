@@ -2,7 +2,7 @@
 import { useState, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Card } from "./Card";
-import type { CardType } from "@/lib/poker-types";
+import type { CardType } from "@/features/hrc/lib/poker-types";
 
 interface CardSqueezeProps {
   cards: [CardType, CardType];

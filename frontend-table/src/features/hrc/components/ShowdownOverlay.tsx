@@ -1,10 +1,10 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, Sparkles, Crown } from "lucide-react";
-import { PlayerResult } from "@/lib/hand-evaluator";
-import { Player } from "@/lib/poker-types";
+import { PlayerResult } from "@/features/hrc/lib/hand-evaluator";
+import { Player } from "@/features/hrc/lib/poker-types";
 import { Card } from "./Card";
 import { useEffect, useRef } from "react";
-import { useSoundEngine } from "@/lib/sound-context";
+import { useSoundEngine } from "@/features/hrc/lib/sound-context";
 import confetti from "canvas-confetti";
 
 interface ShowdownOverlayProps {

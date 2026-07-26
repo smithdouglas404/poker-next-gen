@@ -1,20 +1,20 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/utils";
-import { Player } from "@/lib/poker-types";
+import { cn } from "@/features/hrc/lib/utils";
+import { Player } from "@/features/hrc/lib/poker-types";
 import { EmoteBubble } from "./EmoteSystem";
 import { TauntBubble } from "./TauntSystem";
-import { useSoundEngine } from "@/lib/sound-context";
-import { useGameUI } from "@/lib/game-ui-context";
+import { useSoundEngine } from "@/features/hrc/lib/sound-context";
+import { useGameUI } from "@/features/hrc/lib/game-ui-context";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { triggerChipFlight } from "./ChipAnimation";
 import { AvatarStatusRing } from "./AvatarStatusRing";
 import { TimerRing } from "./TimerRing";
 import { VideoThumbnail } from "./VideoOverlay";
-import { useTimerCountdown } from "@/hooks/useTimerCountdown";
-import { useAnimatedCounter } from "@/hooks/useAnimatedCounter";
+import { useTimerCountdown } from "@/features/hrc/hooks/useTimerCountdown";
+import { useAnimatedCounter } from "@/features/hrc/hooks/useAnimatedCounter";
 import { StickyNote } from "lucide-react";
 import { AVATAR_OPTIONS, type AvatarOption } from "./AvatarSelect";
-import type { OpponentHudStats } from "@/lib/useOpponentStats";
+import type { OpponentHudStats } from "@/features/hrc/lib/useOpponentStats";
 
 // ─── Player Note Popover ────────────────────────────────────────────────────
 const NOTE_COLORS = ["gray", "red", "yellow", "green", "blue", "purple"] as const;

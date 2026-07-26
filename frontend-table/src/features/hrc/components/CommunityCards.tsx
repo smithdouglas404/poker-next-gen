@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "./Card";
-import { CardType } from "@/lib/poker-types";
-import { useSoundEngine } from "@/lib/sound-context";
+import { CardType } from "@/features/hrc/lib/poker-types";
+import { useSoundEngine } from "@/features/hrc/lib/sound-context";
 import { useState, useEffect, useRef } from "react";
 
 interface CommunityCardsProps {

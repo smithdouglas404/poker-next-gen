@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Megaphone, Lock, Crown, Sparkles } from "lucide-react";
-import { wsClient } from "@/lib/ws-client";
+import { wsClient } from "@/features/hrc/lib/ws-client";
 
 // ─── Taunt Definitions ─────────────────────────────────────────────────────
 

@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
-import { cn } from "@/lib/utils";
-import { CardType, Suit } from "@/lib/poker-types";
-import { useGameUI } from "@/lib/game-ui-context";
-import { useSoundEngine } from "@/lib/sound-context";
+import { cn } from "@/features/hrc/lib/utils";
+import { CardType, Suit } from "@/features/hrc/lib/poker-types";
+import { useGameUI } from "@/features/hrc/lib/game-ui-context";
+import { useSoundEngine } from "@/features/hrc/lib/sound-context";
 
 interface CardProps {
   card?: CardType;

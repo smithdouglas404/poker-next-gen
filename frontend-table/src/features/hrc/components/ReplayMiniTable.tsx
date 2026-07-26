@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { ReplaySnapshot } from "@/hooks/useHandReplayState";
-import { TABLE_SEATS } from "@/lib/table-constants";
+import { TABLE_SEATS } from "@/features/hrc/lib/table-constants";
 import { Coins } from "lucide-react";
 
 const SUIT_SYMBOLS: Record<string, string> = {

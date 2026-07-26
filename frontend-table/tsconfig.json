@@ -23,6 +23,20 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "// hrc note": "src/features/hrc is the HighRollersClub table ported in verbatim. It is excluded from the typecheck until its data-layer adapter lands (it still imports @/lib/ws-client, @/lib/multiplayer-engine and @/lib/game-ui-context from that repo). Nothing imports it yet, so Next never builds it. Remove this exclude once the adapter resolves those three.",
-  "exclude": ["node_modules", "src/features/hrc/**"]
+  "// hrc note": "src/features/hrc is the HighRollersClub table, ported verbatim. The core table (ImageTable/Seat/Card + adapter + HrcTable) now typechecks and is NOT excluded. Only the six components still bound to HRC's own data layer are — they need @/lib/ws-client, @/lib/multiplayer-engine, @/lib/commentary-engine, @/lib/video-manager, @/hooks/useHandReplayState and @/components/ui/slider. Port those and drop the entries.",
+  "exclude": [
+    "node_modules",
+    "src/features/hrc/components/ChatPanel.tsx",
+    "src/features/hrc/components/EmoteSystem.tsx",
+    "src/features/hrc/components/HandHistoryDrawer.tsx",
+    "src/features/hrc/components/ProvablyFairPanel.tsx",
+    "src/features/hrc/components/ShowdownOverlay.tsx",
+    "src/features/hrc/components/TauntSystem.tsx",
+    "src/features/hrc/components/CommentaryOverlay.tsx",
+    "src/features/hrc/components/VideoOverlay.tsx",
+    "src/features/hrc/components/ReplayTimeline.tsx",
+    "src/features/hrc/components/ReplayMiniTable.tsx",
+    "src/features/hrc/components/RunItMultiple.tsx",
+    "src/features/hrc/components/Controls.tsx"
+  ]
 }

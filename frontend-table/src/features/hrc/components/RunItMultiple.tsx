@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "./Card";
-import type { CardType } from "@/lib/poker-types";
+import type { CardType } from "@/features/hrc/lib/poker-types";
 
 // Vote panel
 interface RunItVotePanelProps {

@@ -1,7 +1,7 @@
 // Video Overlay — camera/mic controls, recording, and video thumbnail at seats
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Video, VideoOff, Mic, MicOff, Camera, Circle } from "lucide-react";
-import { videoManager } from "@/lib/video-manager";
+import { videoManager } from "@/features/hrc/lib/video-manager";
 
 // Video thumbnail rendered on player seats — fills the full avatar area when active
 interface VideoThumbnailProps {

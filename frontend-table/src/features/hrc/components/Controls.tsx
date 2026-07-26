@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect, useRef, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Slider } from "@/components/ui/slider";
-import { useSoundEngine } from "@/lib/sound-context";
-import { useGameUI } from "@/lib/game-ui-context";
+import { useSoundEngine } from "@/features/hrc/lib/sound-context";
+import { useGameUI } from "@/features/hrc/lib/game-ui-context";
 import { Minus, Plus } from "lucide-react";
 
 interface ControlsProps {

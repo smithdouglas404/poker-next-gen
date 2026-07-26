@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { wsClient } from "@/lib/ws-client";
+import { wsClient } from "@/features/hrc/lib/ws-client";
 import { MessageSquare, Send, X, ChevronRight, Mic } from "lucide-react";
 
 interface ChatMessage {
