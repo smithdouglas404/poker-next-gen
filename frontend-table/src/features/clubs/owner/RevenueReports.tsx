@@ -12,6 +12,7 @@ import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
 import { Donut } from "../charts";
 import { OwnerPageShell } from "./OwnerPageShell";
+import { FailedState } from "@/features/ui/EmptyState";
 import { useOwnedClub } from "./useOwnedClub";
 import {
   DEMO_FINANCIALS,
@@ -138,9 +139,9 @@ export function RevenueReports() {
   const [rakeTotal, setRakeTotal] = useState(0);
   const [houseBalance, setHouseBalance] = useState(0);
   const [fin, setFin] = useState<AdminFinancials | null>(null);
-  const [log, setLog] = useState(DEMO_REVENUE_LOG);
+  const [log, setLog] = useState<typeof DEMO_REVENUE_LOG>([]);
   const [tourneyFees, setTourneyFees] = useState<number | null>(null);
-  const [demoData, setDemoData] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   const load = useCallback(async (clubId: string, p: Period) => {
     const [reportRes, ledgerRes, finRes, tourneyRes] = await Promise.allSettled([
@@ -160,9 +161,10 @@ export function RevenueReports() {
       setSeries(reportRes.value.series ?? []);
       setRakeTotal(reportRes.value.total_rake ?? 0);
     } else {
-      const d = demoRakeReport(p);
-      setSeries(d.series);
-      setRakeTotal(d.total_rake);
+      // No rake report: an empty chart, not a synthetic one. A revenue curve is a
+      // claim about what the club earned.
+      setSeries([]);
+      setRakeTotal(0);
     }
     if (ledgerRes.status === "fulfilled") {
       anyLive = true;
@@ -183,14 +185,17 @@ export function RevenueReports() {
       anyLive = true;
       setFin(finRes.value.financials);
     } else {
-      setFin(DEMO_FINANCIALS);
+      // Blank the financial card rather than substituting a modelled one. An
+      // operator reading rake, float and net profit needs those to be their
+      // books or visibly absent — never a plausible-looking stand-in.
+      setFin(null);
     }
-    setDemoData(!anyLive);
+    setFailed(!anyLive);
   }, []);
 
   useEffect(() => {
     if (owned.loading) return;
-    if (owned.demo || !owned.club) {
+    if (owned.demo) {
       const d = demoRakeReport(period);
       setSeries(d.series);
       setRakeTotal(d.total_rake);
@@ -198,21 +203,34 @@ export function RevenueReports() {
       setHouseBalance(DEMO_FINANCIALS.wallet_float_cents);
       setLog(DEMO_REVENUE_LOG);
       setTourneyFees(null);
-      setDemoData(true);
+      return;
+    }
+    if (!owned.club) {
+      // Reached the server; the caller configures no club, so there are no books.
+      setSeries([]);
+      setRakeTotal(0);
+      setFin(null);
+      setHouseBalance(0);
+      setLog([]);
+      setTourneyFees(null);
       return;
     }
     void load(owned.club.id, period);
   }, [owned.loading, owned.demo, owned.club, period, load]);
 
-  const demo = owned.demo || demoData;
+  const demo = owned.demo;
 
   // Derived KPIs. Tournament fees come from the real club_tournament_fees RPC
   // (entry fee × registrations); only when that is unavailable (guest/offline)
   // do we fall back to a modelled 25%-of-rake estimate. Net profit = rake +
   // tournament fees − withdrawals paid (deposits are float, not revenue).
   const rakeCollected = fin?.rake_collected_cents ?? rakeTotal;
-  const feesModelled = tourneyFees === null;
-  const tournamentFees = feesModelled ? Math.round(rakeCollected * 0.25) : (tourneyFees ?? 0);
+  // Tournament fee revenue is entries × fee, from club_tournament_fees. When that
+  // RPC is unavailable this used to display 25% of rake labelled "estimated" — a
+  // number the club never earned, sitting in a revenue KPI and rolled into Total
+  // Revenue and Net Profit. Unknown now reads as zero and says "unavailable".
+  const feesUnavailable = tourneyFees === null;
+  const tournamentFees = tourneyFees ?? 0;
   const totalRevenue = rakeCollected + tournamentFees;
   const netProfit = Math.max(0, totalRevenue - (fin?.withdrawals_paid_cents ?? 0));
 
@@ -230,6 +248,14 @@ export function RevenueReports() {
       subtitle="Club revenue, rake and tournament performance."
       demo={demo}
     >
+      {failed && !demo && (
+        <FailedState
+          className="mb-5"
+          message="Couldn't reach the revenue service. Figures are left blank rather than modelled."
+          onRetry={() => owned.club && void load(owned.club.id, period)}
+        />
+      )}
+
       {/* Period selector */}
       <div className="mb-5 flex flex-wrap gap-2">
         {PERIODS.map((p) => (
@@ -254,7 +280,7 @@ export function RevenueReports() {
         <Kpi label="Total Revenue" value={usd(totalRevenue)} spark={seriesVals} color="#f5c518" />
         <Kpi label="Net Profit" value={usd(netProfit)} spark={seriesVals.map((v) => v * 0.7)} color="#22c55e" />
         <Kpi label="Rake Collected" value={usd(rakeCollected)} spark={seriesVals.map((v) => v * 0.6)} color="#e01e2b" />
-        <Kpi label="Tournament Fees" value={usd(tournamentFees)} spark={seriesVals.map((v, i) => v * (0.2 + (i % 5) * 0.05))} color="#f5c518" sub={feesModelled ? "estimated" : "entries × fee"} />
+        <Kpi label="Tournament Fees" value={usd(tournamentFees)} spark={seriesVals.map((v, i) => v * (0.2 + (i % 5) * 0.05))} color="#f5c518" sub={feesUnavailable ? "unavailable" : "entries × fee"} />
       </div>
 
       {/* Trend + donut */}

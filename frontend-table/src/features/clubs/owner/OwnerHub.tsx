@@ -36,6 +36,8 @@ import {
   demoRakeReport,
   totalBankrollCents,
 } from "./demoData";
+import { demoRequested } from "@/features/ui/demoMode";
+import { FailedState } from "@/features/ui/EmptyState";
 import { compact, ownerApi, usdCompact } from "./ownerRpc";
 import { EmptyState, SectionTitle } from "./ui";
 import type {
@@ -64,6 +66,9 @@ interface Toast {
 export function OwnerHub() {
   const [mode, setMode] = useState<Mode>("loading");
   const [demo, setDemo] = useState(false);
+  // Distinct from "you run no club": the server was unreachable, so we say that
+  // rather than showing an operator numbers we cannot stand behind.
+  const [loadFailed, setLoadFailed] = useState(false);
   const [forceBrowse, setForceBrowse] = useState(false);
 
   const [club, setClub] = useState<OwnerClubExt | null>(null);
@@ -150,16 +155,28 @@ export function OwnerHub() {
   }, []);
 
   // Bootstrap: find a club the caller owns/configures, else guest.
+  //
+  // An unreachable server used to load the fabricated hub — a fictional club with
+  // a 12-strong roster and $184M of balances, indistinguishable from live figures.
+  // Now the showcase dataset loads ONLY when the URL asks (`?demo=1`); a real
+  // failure shows the guest/empty state instead of inventing an operator's books.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      if (demoRequested()) {
+        if (!cancelled) loadDemo();
+        return;
+      }
+
       let list: OwnerClub[] = [];
       try {
         const data = await ownerApi.list();
         list = data.clubs ?? [];
       } catch {
-        // Fully offline / no session → demo hub.
-        if (!cancelled) loadDemo();
+        if (!cancelled) {
+          setLoadFailed(true);
+          setMode("guest");
+        }
         return;
       }
 
@@ -438,6 +455,19 @@ export function OwnerHub() {
     );
   }
 
+  // Server unreachable. Say so plainly and offer a retry — never dress the failure
+  // up as an operator's real books.
+  if (loadFailed && !forceBrowse) {
+    return (
+      <div className="mx-auto max-w-[1000px] px-4 py-16">
+        <FailedState
+          message="We couldn't reach the club service, so nothing is shown here. Your club's figures are never estimated."
+          onRetry={() => window.location.reload()}
+        />
+      </div>
+    );
+  }
+
   if (mode === "guest" || forceBrowse) {
     return (
       <div>
@@ -463,16 +493,19 @@ export function OwnerHub() {
   const memberCount = quick?.member_count ?? roster.length;
   const active7d = quick?.stats?.active_7d ?? onlineCount;
   const rakeTotalCents = (report?.total_rake ?? 0) || houseBalance;
+  // No hands played yet means no average pot. It used to borrow the last value
+  // from the fabricated series, which showed an operator a pot size for a club
+  // that had never dealt a hand.
   const avgPotCents =
     quick?.stats && quick.stats.hands > 0 && quick.stats.chips_won > 0
       ? Math.max(1000, Math.round(quick.stats.chips_won / quick.stats.hands))
-      : DEMO_OVERVIEW_SPARKS.potCents[DEMO_OVERVIEW_SPARKS.potCents.length - 1];
+      : 0;
 
   // Real trend series from club_analytics_series (zero-filled 30-day window).
-  // Sparklines/charts read stored data; the two cards with no per-day source
-  // (Active Tables, Average Pot) fall back to a neutral baseline while their
-  // headline value stays real — see the Sparkbars empty-array fallback.
-  const liveSeries = !demo && series?.series?.length ? series.series : null;
+  // With no series, the sparklines render empty rather than borrowing a shape —
+  // a chart is a claim about history, and an invented one is the worst kind.
+  const liveSeries = series?.series?.length ? series.series : null;
+  const EMPTY_SPARKS = { members: [], tables: [], volumeCents: [], potCents: [], rakeCents: [] };
   const overviewSparks = liveSeries
     ? {
         members: liveSeries.map((p) => p.members_cumulative),
@@ -481,7 +514,9 @@ export function OwnerHub() {
         potCents: [],
         rakeCents: liveSeries.map((p) => p.rake_cents),
       }
-    : DEMO_OVERVIEW_SPARKS;
+    : demo
+      ? DEMO_OVERVIEW_SPARKS
+      : EMPTY_SPARKS;
   const memberAnalytics = liveSeries
     ? {
         months: liveSeries.map((p) => p.label),
@@ -490,7 +525,9 @@ export function OwnerHub() {
         newPlayers: series?.new_total ?? 0,
         returningPlayers: series?.returning_total ?? 0,
       }
-    : DEMO_ANALYTICS;
+    : demo
+      ? DEMO_ANALYTICS
+      : { months: [], activeMembers: [], tableVolumeCents: [], newPlayers: 0, returningPlayers: 0 };
 
   const cards: StatCard[] = [
     { label: "Total Stakes", value: usdCompact(bankroll), sub: "Across all club tables", accent: "gold" },

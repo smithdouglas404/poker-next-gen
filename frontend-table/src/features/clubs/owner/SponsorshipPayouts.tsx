@@ -12,6 +12,7 @@ import { Button, Field, Input } from "@/features/ui";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
 import { OwnerPageShell, Toast, useToast } from "./OwnerPageShell";
+import { FailedState } from "@/features/ui/EmptyState";
 import { useOwnedClub } from "./useOwnedClub";
 import {
   DEMO_PAYOUTS,
@@ -45,7 +46,7 @@ export function SponsorshipPayouts() {
   const owned = useOwnedClub();
   const { toast, notify } = useToast();
   const [payouts, setPayouts] = useState<Settlement[]>([]);
-  const [demoData, setDemoData] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [wallet, setWallet] = useState("");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
@@ -55,10 +56,13 @@ export function SponsorshipPayouts() {
     try {
       const res = await screensApi.sponsorshipList("", 100);
       setPayouts(res.payouts ?? []);
-      setDemoData(false);
+      setFailed(false);
     } catch {
-      setPayouts(DEMO_PAYOUTS);
-      setDemoData(true);
+      // These are real money movements to sponsors. A failed fetch shows an error,
+      // never a stand-in ledger — an operator must not read a $9,000,000 payout row
+      // that did not happen.
+      setPayouts([]);
+      setFailed(true);
     }
   }, []);
 
@@ -66,13 +70,13 @@ export function SponsorshipPayouts() {
     if (owned.loading) return;
     if (owned.demo) {
       setPayouts(DEMO_PAYOUTS);
-      setDemoData(true);
       return;
     }
     void load();
   }, [owned.loading, owned.demo, load]);
 
-  const demo = owned.demo || demoData;
+  // `owned.demo` is now true only under an explicit `?demo=1`.
+  const demo = owned.demo;
 
   const totalPaid = useMemo(
     () =>
@@ -143,6 +147,14 @@ export function SponsorshipPayouts() {
       demo={demo}
     >
       <Toast toast={toast} />
+
+      {failed && (
+        <FailedState
+          className="mb-4"
+          message="Couldn't reach the payout ledger. Totals are left blank rather than estimated."
+          onRetry={() => void load()}
+        />
+      )}
 
       {/* KPIs */}
       <div className="grid gap-4 sm:grid-cols-2">

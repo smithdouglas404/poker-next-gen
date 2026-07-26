@@ -96,16 +96,13 @@ function LobbyContent() {
       try {
         const data = await callSessionRpc("tournament_list", {});
         const list = normalizeTournaments(data);
-        if (list.length > 0) {
-          setTournaments(list);
-          setTourneyDemo(false);
-        } else {
-          setTournaments(DEMO_TOURNAMENTS);
-          setTourneyDemo(true);
-        }
+        // No live events, or an unreachable server: an empty teaser. The lobby
+        // must never advertise a tournament a player cannot actually enter.
+        setTournaments(list);
+        setTourneyDemo(false);
       } catch {
-        setTournaments(DEMO_TOURNAMENTS);
-        setTourneyDemo(true);
+        setTournaments([]);
+        setTourneyDemo(false);
       }
     })();
   }, []);

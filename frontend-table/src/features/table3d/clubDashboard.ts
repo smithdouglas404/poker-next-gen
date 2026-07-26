@@ -13,6 +13,7 @@
 // DEMO data so the screen reads like the owner's master without ever presenting
 // fabricated numbers as live (rule #2).
 
+import { demoRequested } from "@/features/ui/demoMode";
 import { useCallback, useEffect, useState } from "react";
 
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
@@ -188,7 +189,8 @@ export function useClubDashboard(demo: boolean): {
         activity,
       });
     } catch {
-      setData(DEMO_DASHBOARD);
+      // Club stats are money and headcount. Unreachable means null, not a mock-up.
+      setData(demoRequested() ? DEMO_DASHBOARD : null);
     } finally {
       setLoading(false);
     }

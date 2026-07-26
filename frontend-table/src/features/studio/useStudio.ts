@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { demoRequested } from "@/features/ui/demoMode";
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import {
   DEMO_CATALOG,
@@ -94,8 +95,21 @@ export function useStudio(): StudioApi {
         loadouts: lo.loadouts ?? [],
       }));
     } catch {
-      // Backend unreachable (guest / offline) — fall back to labeled demo data.
-      loadDemo();
+      // Backend unreachable. The showcase inventory is opt-in only (`?demo=1`) —
+      // otherwise the studio reports the failure rather than listing cosmetics the
+      // player does not own and cannot equip.
+      if (demoRequested()) {
+        loadDemo();
+      } else {
+        setState((s) => ({
+          ...s,
+          online: false,
+          inventory: [],
+          catalog: [],
+          loadouts: [],
+          error: "Couldn't reach the cosmetics service.",
+        }));
+      }
     }
   }, [loadDemo]);
 

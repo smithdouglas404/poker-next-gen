@@ -96,6 +96,8 @@ export default function TournamentsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focus, setFocus] = useState<FocusState>({ leaders: [], levels: [] });
   const [demo, setDemo] = useState(false);
+  // Unreachable server, as distinct from "no events scheduled".
+  const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -118,7 +120,11 @@ export default function TournamentsPage() {
     try {
       const live = await listTournaments();
       if (live.length === 0) {
-        loadDemo();
+        // No scheduled events is a real answer. Inventing a card for "The Obsidian
+        // Invitational" sends a player to register for something that isn't there.
+        setDemo(false);
+        setTournaments([]);
+        setSelectedId(null);
         return;
       }
       const enriched = live.map((t, i) => enrich(t, i));
@@ -133,11 +139,15 @@ export default function TournamentsPage() {
       });
       setCounts(map);
     } catch {
-      loadDemo();
+      // Unreachable server: show the failure, not a schedule.
+      setDemo(false);
+      setTournaments([]);
+      setSelectedId(null);
+      setFailed(true);
     } finally {
       setLoading(false);
     }
-  }, [loadDemo]);
+  }, []);
 
   useEffect(() => {
     void load();

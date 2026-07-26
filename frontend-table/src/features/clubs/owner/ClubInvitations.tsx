@@ -76,31 +76,38 @@ export function ClubInvitations() {
   const [bulk, setBulk] = useState("");
   const [showBulk, setShowBulk] = useState(false);
   const [invites, setInvites] = useState<ClubInvitation[]>([]);
-  const [demoData, setDemoData] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async (clubId: string) => {
     try {
       const res = await screensApi.invites(clubId);
       setInvites(res.requests?.filter((r) => r.type === "invite") ?? []);
-      setDemoData(false);
+      setFailed(false);
     } catch {
-      setInvites(DEMO_INVITES);
-      setDemoData(true);
+      // An empty invite list and an unreachable server are different facts. Showing
+      // fabricated invitations would have an operator chasing people who were never
+      // invited.
+      setInvites([]);
+      setFailed(true);
     }
   }, []);
 
   useEffect(() => {
     if (owned.loading) return;
-    if (owned.demo || !owned.club) {
+    if (owned.demo) {
       setInvites(DEMO_INVITES);
-      setDemoData(true);
+      return;
+    }
+    if (!owned.club) {
+      // Reached the server; the caller configures no club. Nothing to invite into.
+      setInvites([]);
       return;
     }
     void load(owned.club.id);
   }, [owned.loading, owned.demo, owned.club, load]);
 
-  const demo = owned.demo || demoData;
+  const demo = owned.demo;
   const creditCents = useMemo(() => Math.round((parseFloat(creditStr) || 0) * 100), [creditStr]);
   const previewCode = useMemo(() => inviteCode(recipient || "new-member"), [recipient]);
 

@@ -52,12 +52,14 @@ export default function CheckoutPage() {
         if (cancelled) return;
         const owned = new Set((inv.inventory ?? []).map((c) => c.id));
         const built = cartFromCatalog(cat.cosmetics ?? [], owned);
-        setCart(built);
-        setDemoMode(built === DEMO_CART || (cat.cosmetics ?? []).length === 0);
+        setCart(built === DEMO_CART ? [] : built);
+        setDemoMode(false);
       } catch {
+        // A checkout screen showing items the player never added, at prices the
+        // server never quoted, is the worst place for stand-in data.
         if (cancelled) return;
-        setCart(DEMO_CART);
-        setDemoMode(true);
+        setCart([]);
+        setDemoMode(false);
       } finally {
         if (!cancelled) setLoading(false);
       }
