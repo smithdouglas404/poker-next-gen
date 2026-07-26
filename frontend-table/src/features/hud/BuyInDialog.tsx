@@ -116,10 +116,27 @@ export function BuyInDialog({
         </div>
 
         {overLimit && (
-          <p className="mt-3 rounded-lg border border-gold/30 bg-gold/[0.06] px-3 py-2 text-xs text-gold">
-            That&apos;s {formatCents(amount - walletBalance)} over your {walletLabel(wallet).toLowerCase()} balance. Lower
-            the amount to buy in now — buying in above your balance needs admin approval, which isn&apos;t available yet.
-          </p>
+          <div className="mt-3 rounded-lg border border-gold/30 bg-gold/[0.06] px-3 py-2 text-xs text-gold">
+            <p>
+              That&apos;s {formatCents(amount - walletBalance)} over your{" "}
+              {walletLabel(wallet).toLowerCase()} balance. Lower the amount to buy in now — buying
+              in above your balance needs admin approval, which isn&apos;t available yet.
+            </p>
+            {/* Running short used to be a dead end: no way to add money without
+                abandoning the table. Club-issued balances can only be topped up by
+                the operator, so the deposit path is offered for the global wallet
+                only. Opens in a new tab so the seat is not lost. */}
+            {wallet === "global" && (
+              <a
+                href="/profile?tab=wallet"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-block font-bold underline underline-offset-2 hover:text-gold-lite"
+              >
+                Add funds to your wallet →
+              </a>
+            )}
+          </div>
         )}
 
         <div className="mt-5 flex gap-3">

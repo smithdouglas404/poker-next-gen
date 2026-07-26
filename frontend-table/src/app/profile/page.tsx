@@ -1,23 +1,37 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 import { AnalyticsPanel } from "@/features/profile/AnalyticsPanel";
+import { AvatarPanel } from "@/features/profile/AvatarPanel";
 import { LeaderboardPanel } from "@/features/profile/LeaderboardPanel";
 import { ProfileOverview } from "@/features/profile/ProfileOverview";
 import { SecurityDashboard } from "@/features/profile/SecurityDashboard";
 import { SecurityPanel } from "@/features/profile/SecurityPanel";
+import { VerificationPanel } from "@/features/profile/VerificationPanel";
+import { WalletPanel } from "@/features/profile/WalletPanel";
 import { money, profileApi, type Profile } from "@/features/profile/profileRpc";
-import { GLASS_PANEL, HEADING_SM, cn } from "@/features/ui/tokens";
+import { BTN_GOLD, GLASS_PANEL, HEADING_SM, cn } from "@/features/ui/tokens";
 
-type Tab = "overview" | "analytics" | "leaderboard" | "security";
+type Tab =
+  | "overview"
+  | "wallet"
+  | "avatar"
+  | "analytics"
+  | "leaderboard"
+  | "verification"
+  | "security";
 type Toast = { msg: string; kind: "ok" | "err" };
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
+  { id: "wallet", label: "Wallet" },
+  { id: "avatar", label: "Avatar" },
   { id: "analytics", label: "Analytics" },
   { id: "leaderboard", label: "Leaderboard" },
+  { id: "verification", label: "Verification" },
   { id: "security", label: "Security" },
 ];
 
@@ -28,9 +42,17 @@ function initials(name: string): string {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
-export default function ProfilePage() {
+/** Opens on a named tab when linked to, e.g. /profile?tab=wallet from the table's
+ *  buy-in dialog when a player is short. Unknown values fall back to Overview. */
+function tabFromQuery(raw: string | null): Tab {
+  const t = (raw ?? "").toLowerCase();
+  return TABS.some((x) => x.id === t) ? (t as Tab) : "overview";
+}
+
+function ProfileBody() {
+  const search = useSearchParams();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<Tab>(() => tabFromQuery(search.get("tab")));
   const [toast, setToast] = useState<Toast | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -57,10 +79,16 @@ export default function ProfilePage() {
     switch (tab) {
       case "overview":
         return <ProfileOverview notify={notify} />;
+      case "wallet":
+        return <WalletPanel notify={notify} />;
+      case "avatar":
+        return <AvatarPanel notify={notify} />;
       case "analytics":
         return <AnalyticsPanel notify={notify} />;
       case "leaderboard":
         return <LeaderboardPanel meUserId={profile?.user_id ?? null} notify={notify} />;
+      case "verification":
+        return <VerificationPanel notify={notify} />;
       case "security":
         return (
           <div className="space-y-8">
@@ -113,11 +141,23 @@ export default function ProfilePage() {
               {profile ? profile.user_id : "—"}
             </p>
           </div>
-          <div className="sm:text-right">
-            <p className="text-[11px] uppercase tracking-[0.2em] text-neutral-400">Wallet</p>
-            <p className="font-display text-2xl font-bold text-gold">
-              {profile ? money(profile.balance_cents) : "—"}
-            </p>
+          {/* Balance and the way to top it up, on EVERY tab. Adding money used to
+              mean leaving the profile for a separate /wallet route; the button
+              drops the player straight onto the Wallet tab's real deposit panel. */}
+          <div className="flex items-center gap-4 sm:flex-col sm:items-end sm:gap-2">
+            <div className="sm:text-right">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-neutral-400">Wallet</p>
+              <p className="font-display text-2xl font-bold text-gold">
+                {profile ? money(profile.balance_cents) : "—"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setTab("wallet")}
+              className={cn(BTN_GOLD, "shrink-0 rounded-lg px-4 py-2 text-sm")}
+            >
+              + Add funds
+            </button>
           </div>
         </header>
 
@@ -144,5 +184,14 @@ export default function ProfilePage() {
         <div className="mt-6">{body}</div>
       </div>
     </main>
+  );
+}
+
+// useSearchParams needs a Suspense boundary for static prerendering.
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-background" />}>
+      <ProfileBody />
+    </Suspense>
   );
 }
