@@ -356,7 +356,7 @@ function backTexture(): THREE.Texture {
 
 // Face-down card — the real rendered card-back texture on the top face (the hero's
 // own cards are the DOM overlay; opponents/deck show this back).
-function CardBack({ w = 0.38, h = 0.64 }: { w?: number; h?: number }) {
+function CardBack({ w = 0.2675, h = 0.3745 }: { w?: number; h?: number }) {
   const mats = useMemo(() => {
     const back = backTexture();
     const edge = new THREE.MeshStandardMaterial({ color: "#e8ecf0", roughness: 0.5 });
@@ -401,7 +401,7 @@ function Deck({ nonce }: { nonce: number }) {
   for (let i = 0; i < 9; i++) {
     cards.push(
       <mesh key={i} position={[0, i * 0.016, 0]} castShadow>
-        <boxGeometry args={[0.275, 0.016, 0.464]} />
+        <boxGeometry args={[0.2675, 0.012, 0.3745]} />
         <meshStandardMaterial color="#eef2f6" roughness={0.5} />
       </mesh>,
     );
@@ -441,7 +441,7 @@ function HoleFace({ code }: { code: string }) {
   return (
     <group ref={ref}>
       <mesh castShadow material={mats}>
-        <boxGeometry args={[0.275, 0.016, 0.464]} />
+        <boxGeometry args={[0.2675, 0.012, 0.3745]} />
       </mesh>
     </group>
   );
@@ -462,17 +462,17 @@ function SeatHoleCards({ seat, total }: { seat: SceneSeat; total: number }) {
   const bx = p[0] * base;
   const bz = p[2] * base;
   const yaw = Math.atan2(-p[0], -p[2]);
-  const ref0 = useDealIn([bx - perpX * 0.104, 0.055, bz - perpZ * 0.104], seat.index * 100);
-  const ref1 = useDealIn([bx + perpX * 0.104, 0.055, bz + perpZ * 0.104], seat.index * 100 + 55);
+  const ref0 = useDealIn([bx - perpX * 0.095, 0.055, bz - perpZ * 0.095], seat.index * 100);
+  const ref1 = useDealIn([bx + perpX * 0.095, 0.055, bz + perpZ * 0.095], seat.index * 100 + 55);
   const reveal = seat.revealHole;
   if (reveal) {
     // Revealed at showdown: face-up cards at the same fanned positions.
     return (
       <>
-        <group position={[bx - perpX * 0.104, 0.055, bz - perpZ * 0.104]} rotation={[0, yaw + 0.12, 0]}>
+        <group position={[bx - perpX * 0.095, 0.055, bz - perpZ * 0.095]} rotation={[0, yaw + 0.12, 0]}>
           <HoleFace code={reveal[0]} />
         </group>
-        <group position={[bx + perpX * 0.104, 0.055, bz + perpZ * 0.104]} rotation={[0, yaw - 0.12, 0]}>
+        <group position={[bx + perpX * 0.095, 0.055, bz + perpZ * 0.095]} rotation={[0, yaw - 0.12, 0]}>
           <HoleFace code={reveal[1]} />
         </group>
       </>
@@ -481,12 +481,12 @@ function SeatHoleCards({ seat, total }: { seat: SceneSeat; total: number }) {
   return (
     <>
       <group ref={ref0}>
-        <group rotation={[0, yaw + 0.12, 0]}>
+        <group rotation={[-0.21, yaw + 0.12, 0]}>
           <CardBack />
         </group>
       </group>
       <group ref={ref1}>
-        <group rotation={[0, yaw - 0.12, 0]}>
+        <group rotation={[-0.21, yaw - 0.12, 0]}>
           <CardBack />
         </group>
       </group>
@@ -506,18 +506,18 @@ function BoardCard({ code, x, delay }: { code: string; x: number; delay: number 
   return (
     <group ref={ref}>
       <mesh castShadow material={mats}>
-        <boxGeometry args={[0.66, 0.028, 1.13]} />
+        <boxGeometry args={[0.258, 0.011, 0.362]} />
       </mesh>
     </group>
   );
 }
 
 function Board({ board }: { board: string[] }) {
-  const start = -((board.length - 1) / 2) * 0.75; // spec ratio held, scaled to target
+  const start = -((board.length - 1) / 2) * 0.306; // 63.5mm card + 8px-equivalent gap, scaled to target
   return (
     <group>
       {board.map((c, i) => (
-        <BoardCard key={`${c}-${i}`} code={c} x={start + i * 0.75} delay={i * 130} />
+        <BoardCard key={`${c}-${i}`} code={c} x={start + i * 0.306} delay={i * 130} />
       ))}
     </group>
   );
