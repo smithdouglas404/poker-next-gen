@@ -23,5 +23,6 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "// hrc note": "src/features/hrc is the HighRollersClub table ported in verbatim. It is excluded from the typecheck until its data-layer adapter lands (it still imports @/lib/ws-client, @/lib/multiplayer-engine and @/lib/game-ui-context from that repo). Nothing imports it yet, so Next never builds it. Remove this exclude once the adapter resolves those three.",
+  "exclude": ["node_modules", "src/features/hrc/**"]
 }

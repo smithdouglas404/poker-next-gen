@@ -185,13 +185,13 @@ const WIDTH_SCALE = 1.0;
  */
 /** Component sizes, straight from the spec. */
 const UI = {
-  frameW: 110, frameH: 130,  // avatar frame (spec §5)
-  photo: 76,                 // seated inner portrait  (spec §5: 76x76)
-  vacantInner: 60,           // vacant inner circle     (spec §5: 60x60)
-  badgeW: 80, badgeH: 42,    // player stack badge      (spec §5: 80x42)
-  tagW: 64, tagH: 36,        // bet action badge        (spec §5: 64x36)
-  tagFont: 12,
-  dealerW: 44, dealerH: 24,  // dealer button           (spec §5: 44x24)
+  frameW: 110, frameH: 130,  // avatar frame            (spec §4: 110x130)
+  photo: 80,                 // seated inner portrait   (spec §4: 80x80)
+  vacantInner: 60,           // vacant inner circle     (spec §4: 60x60)
+  badgeW: 140, badgeH: 70,   // badge outer container   (spec §4: 140x70)
+  tagW: 90, tagH: 28,        // action label tag        (spec §4: 90x28)
+  tagFont: 13,               // 12-14px bold all-caps   (spec §4)
+  dealerW: 44, dealerH: 24,  // dealer button           (spec §4: 44x24)
 };
 function seatPoint(index: number, total: number): [number, number, number] {
   const e = ACTIVE_ELLIPSE;
