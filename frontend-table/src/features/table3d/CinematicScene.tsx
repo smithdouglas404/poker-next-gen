@@ -142,7 +142,7 @@ export interface CinematicSceneProps {
 // 1 unit = 0.2457 m and every dimension below is the spec converted, not eyeballed.
 const PX = 2.1 / 275; // world units per blueprint pixel
 const STAD_L = 375 * PX; // 2.864 — half-length of the STRAIGHT run (> end radius)
-const FELT_R = 275 * PX; // 2.100 — felt end-cap radius (= blueprint corner radius)
+const FELT_R = 298 * PX; // 2.276 — felt end-cap radius; sets table width to 44in (spec 41-48in)
 const RAIL_W = 55 * PX; //  0.420 — rail thickness (the 4in armrest)
 const TABLE_H = 3.09; // 30in floor-to-rail at this scale (0.76m / 0.2457)
 const SEAT_R = FELT_R + RAIL_W + 0.05; // seats sit just outside the rail
@@ -175,7 +175,7 @@ const SEAT_XMAX = 6.0;
 /** Ring phase that places seat 1 (hero) at the near curve. */
 const SEAT_PHASE = 0.75;
 /** Horizontal scale on world X — widens the table so the front edge fills the frame. */
-const WIDTH_SCALE = 1.60;
+const WIDTH_SCALE = 1.0;
 
 /* ------- Component size spec (design canvas 1920x1080) -------
  * Sizes are the design team's spec, used verbatim. POSITIONS are NOT pinned to
@@ -528,8 +528,8 @@ function Board({ board }: { board: string[] }) {
 // Real casino chip per spec §4.3: 39mm diameter x 3.3mm thick, stacked at a
 // 0.0033m vertical offset. 1 world unit = 0.2458 m, so radius 0.0793u,
 // thickness/offset 0.0134u.
-const CHIP_R = 0.20;
-const CHIP_T = 0.052;
+const CHIP_R = 0.0793;
+const CHIP_T = 0.0134;
 function ChipStack({
   position,
   color,
