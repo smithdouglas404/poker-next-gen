@@ -152,7 +152,7 @@ const SZ = 3.82;
 // plate overrides with its own ELLIPSE so seats project onto the painted chairs.
 // There is exactly one live table Canvas mounted at a time, so module-level is safe.
 let ACTIVE_ELLIPSE: { sx: number; sz: number; y: number; stadiumL?: number } = {
-  sx: 3.55, sz: 1.70, y: 0.33,
+  sx: 3.55, sz: 1.70, y: 0.44,
 };
 // Walk the stadium perimeter: u=0 at bottom-center (hero), increasing clockwise.
 function stadiumPoint(u: number, L: number, R: number, y: number): [number, number, number] {
@@ -297,7 +297,7 @@ function TableBody() {
 /* ---------------- cards ---------------- */
 
 // Where the deck sits (dealer's right, off the board). Cards deal-in FROM here.
-const DECK_POS: [number, number, number] = [2.95, 0.09, -0.15];
+const DECK_POS: [number, number, number] = [2.95, 0.43, -0.15];
 
 // useDealIn animates a group from the deck to `target`, easing out over ~0.42s
 // after `delayMs`, so a freshly-mounted card flies to its slot. `flip` also turns
@@ -493,7 +493,7 @@ function BoardCard({ code, x, delay }: { code: string; x: number; delay: number 
     // BoxGeometry face order: px, nx, py, ny, pz, nz  (py = top)
     return [white, white, top, white, white, white];
   }, [face]);
-  const ref = useDealIn([x, 0.35, -0.55], delay, true);
+  const ref = useDealIn([x, 0.43, -0.55], delay, true);
   return (
     <group ref={ref}>
       <mesh castShadow material={mats}>
@@ -547,7 +547,7 @@ function ChipStack({
 }
 
 // Where the central pot sits (chips + the DOM pot label ride here).
-const POT_POS: [number, number, number] = [0, 0.34, 0.55];
+const POT_POS: [number, number, number] = [0, 0.43, 0.55];
 
 // Central pot pile — a tight cluster of colored stacks just below the board whose
 // heights now SCALE with the pot value (bigger pot → taller stacks), clamped so it
@@ -1008,7 +1008,7 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, pot
   // cinematic felt keeps the contract default (SX/SZ).
   ACTIVE_ELLIPSE = backdrop
     ? { sx: backdrop.ellipse.sx, sz: backdrop.ellipse.sz, y: backdrop.ellipse.y }
-    : { sx: 3.55, sz: 1.70, y: 0.33 };
+    : { sx: 3.55, sz: 1.70, y: 0.44 };
 
   const baked = !!backdrop;
   const winTarget = useMemo<[number, number, number] | null>(() => {
