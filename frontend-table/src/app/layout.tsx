@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Space_Grotesk, Manrope } from "next/font/google";
 import "./globals.css";
 import { SiteFooter } from "@/features/nav/SiteFooter";
+import { AppShell } from "@/features/nav/AppShell";
 import { AgeGate } from "@/features/nav/AgeGate";
 import { Providers } from "./providers";
 
@@ -32,7 +33,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${displayFont.variable} ${bodyFont.variable} antialiased`}>
         <Providers>
-          {children}
+          <AppShell>{children}</AppShell>
           <SiteFooter />
           <AgeGate />
         </Providers>

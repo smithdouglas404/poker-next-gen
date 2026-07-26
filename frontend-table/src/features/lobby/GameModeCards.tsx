@@ -50,7 +50,9 @@ export function GameModeCards({
   onSelect: (key: ModeCardDef["key"]) => void;
 }) {
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
+    // Four modes (Private / Public / Play money / Tournament) in a 3-column grid left
+    // one card stranded on its own row. Two-up on tablet, four across on desktop.
+    <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
       {cards.map((c) => (
         <ModeCard key={c.key} def={c} onSelect={() => onSelect(c.key)} />
       ))}

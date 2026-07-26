@@ -18,7 +18,7 @@ import type {
   TierDef,
 } from "@/features/membership/types";
 import { Button } from "@/features/ui";
-import { GLASS_PANEL, HEADING_LG, HEADING_SM, cn } from "@/features/ui/tokens";
+import { BTN_GOLD, GLASS_PANEL, HEADING_LG, HEADING_SM, cn } from "@/features/ui/tokens";
 
 type Toast = { msg: string; kind: "ok" | "err" };
 
@@ -360,7 +360,9 @@ export default function MembershipPage() {
             className="grid gap-4 md:grid-cols-3 xl:grid-cols-5"
           >
             {tiers.map((tier) => (
-              <motion.div key={tier.id} variants={STAGGER_ITEM} layout>
+              // h-full + position-only layout so every card in the row ends at the same
+              // height; a full `layout` would pin an explicit measured height instead.
+              <motion.div key={tier.id} variants={STAGGER_ITEM} layout="position" className="h-full">
               <TierCard
                 tier={tier}
                 interval={interval}
@@ -379,6 +381,26 @@ export default function MembershipPage() {
             ))}
           </motion.section>
         )}
+
+        {/* The way OUT of this page. Previously a visitor who wasn't a member had no
+            next step here at all — the tier grid was a dead end. Signed-out visitors get
+            the Clerk sign-up; signed-in members who still need identity get the real
+            verification flow (/kyc), which is what actually unlocks Gold and Platinum. */}
+        <div className={cn(GLASS_PANEL, "flex flex-wrap items-center justify-between gap-4 p-5")}>
+          <div className="min-w-0">
+            <h3 className={HEADING_LG}>{amlVerified ? "You're verified" : "Unlock the higher tiers"}</h3>
+            <p className="mt-1 text-[13px] text-neutral-400">
+              {amlVerified
+                ? "Identity checks are complete — every tier above is available to you."
+                : "Gold and Platinum require identity verification before real-money play. It takes a few minutes."}
+            </p>
+          </div>
+          {!amlVerified && (
+            <Link href="/kyc" className={cn(BTN_GOLD, "shrink-0 rounded-lg px-5 py-2.5 text-sm")}>
+              Complete verification
+            </Link>
+          )}
+        </div>
 
         <p className="pb-4 text-center text-[11px] text-neutral-600">
           Plans renew automatically. Payments are processed securely via Stripe; your tier activates

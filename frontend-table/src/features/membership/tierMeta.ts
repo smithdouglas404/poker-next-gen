@@ -16,6 +16,13 @@ export interface TierAccent {
   glow: string;
   /** Short marketing eyebrow. */
   tagline: string;
+  /**
+   * Faint top-down wash that gives each tier its own body colour, so the ladder
+   * is readable at a glance instead of five identical slabs separated only by
+   * price. Kept under ~7% alpha over `--surface`, so the card is still a GGPoker
+   * slate panel — this tints it, it does not repaint it.
+   */
+  wash: string;
 }
 
 export const TIER_ACCENT: Record<string, TierAccent> = {
@@ -25,6 +32,7 @@ export const TIER_ACCENT: Record<string, TierAccent> = {
     text: "text-neutral-200",
     glow: "rgba(255,255,255,0.10)",
     tagline: "Play chips",
+    wash: "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0) 55%)",
   },
   bronze: {
     ring: "ring-amber-700/60",
@@ -32,6 +40,7 @@ export const TIER_ACCENT: Record<string, TierAccent> = {
     text: "text-amber-500",
     glow: "rgba(180,120,60,0.22)",
     tagline: "Micro stakes",
+    wash: "linear-gradient(180deg, rgba(180,120,60,0.16), rgba(180,120,60,0) 55%)",
   },
   silver: {
     ring: "ring-slate-300/50",
@@ -39,6 +48,7 @@ export const TIER_ACCENT: Record<string, TierAccent> = {
     text: "text-slate-200",
     glow: "rgba(203,213,225,0.20)",
     tagline: "Mid stakes",
+    wash: "linear-gradient(180deg, rgba(203,213,225,0.10), rgba(203,213,225,0) 55%)",
   },
   gold: {
     ring: "ring-gold/70",
@@ -46,6 +56,7 @@ export const TIER_ACCENT: Record<string, TierAccent> = {
     text: "text-gold",
     glow: "rgba(212,175,55,0.28)",
     tagline: "High stakes",
+    wash: "linear-gradient(180deg, rgba(245,197,24,0.14), rgba(245,197,24,0) 55%)",
   },
   platinum: {
     ring: "ring-cyan/60",
@@ -53,6 +64,7 @@ export const TIER_ACCENT: Record<string, TierAccent> = {
     text: "text-cyan",
     glow: "rgba(129,236,255,0.24)",
     tagline: "Unlimited",
+    wash: "linear-gradient(180deg, rgba(74,158,176,0.14), rgba(74,158,176,0) 55%)",
   },
 };
 
