@@ -53,6 +53,7 @@ because an inert control is indistinguishable from a working one until someone d
 | `dpts_17` Prize Pool & Settlement | missing entirely | About half of it, inline in `OwnerCenter` | The payout table rendered one row per prize BAND showing the band's whole share, so a 6th–9th band at 600bps read as if each finisher collected 6% when each actually collects 1.5% — 4× overstated, on the screen whose only job is "what does each place get". |
 | `_25` Avatar render progress | missing — jobs exist, no progress UI | A full progress UI | It was fabricated. Stage names ("Anatomy Synthesis", "Armor Forging") are not steps this generator performs, and the "engine telemetry" beneath them — mesh throughput in GHz, neural lighting at "6000%" — was arithmetic on one progress number. The real stage (`model`/`rig`/`retarget`) sat in the database and was never returned. |
 | `comprehensive_tournament_setup` | builder missing 8 fields | 4 tabs, summary rail, break schedule, editable ladders | The entire Rules tab was dead: an "Enabled" `<span>` and two `<Select>`s with `defaultValue` and no handler. `guaranteedPrize`, `lateReg` and `regCloseAt` were collected and never sent. "Admin Fee %" was not an admin fee — it read and wrote the flat entry fee. |
+| `_22` Purchase Successful | missing entirely | The whole modal, wired to the settled results | The checkout opens it when **any** cart line settles. A two-item cart with one failure reported "Purchase Successful!", showed only the item that worked, and discarded the failure — the player was charged for one, told everything was fine, and never learned which item had failed. |
 | `dpts_1` Tournament Center | no Drafts, no alerts rail | **Drafts tab and the Tournament Alerts + Global Club Chat rail both exist** (VERIFIED by render) | Only the table thumbnails are genuinely absent, and those are deferred table-render work. |
 | `dpts_8` Table setup | "data model already at parity"; missing start/end, Game Sponsor header, Public tooltip | Game Sponsor section and the Public tooltip both existed | Three of the nine fields this doc credited us with "sending" had **no field on `TableCreateRequest`**, so `json.Unmarshal` discarded them on arrival. `operating_hours` was a bare boolean read by nothing. `auto_away_on_timeout` is read by the match handler but was only ever sent by the tournament director — at a cash table the toggle did nothing. |
 
@@ -236,7 +237,7 @@ cannot drift. `auto_away_below` now holds dealing while the table is under-full 
 | `_23` AI Customizer — prompt + **prompt-assistance chips**, premium-locked toggles with padlock, render preview | ◐ studio has prompt; no preset chips, no locked-toggle treatment |
 | `_25` **Render progress** — per-stage bars (Anatomy 72% / Armor 50% / Lighting 70%) each with a thumbnail, overall 72% | ✅ **DONE**. Not missing — the UI existed and was fabricating its content (invented stage names, "6000%" telemetry). Now reports the real pipeline (`model` → `rig` → `retarget`) with done/running/waiting states. NOTE: the mockup's Anatomy/Armor/Lighting are not steps our generator performs, so ours names the real ones instead. |
 | `_19` Premium Exclusive — Mythic / 1-of-1 cards with **360° badge**, gold/ETH pricing | ◐ `PremiumMarket` exists; 360° badge is decorative |
-| `_22` Purchase Successful — celebration, View in Wardrobe / Back to Market | ✗ missing |
+| `_22` Purchase Successful — celebration, View in Wardrobe / Back to Market | ✅ **DONE**. Not missing — `PurchaseSuccessModal` existed complete, with confetti, hero item, both exits and a `prefers-reduced-motion` gate. The defect was what it claimed: the checkout opens it when **any** line settles, so a partial failure showed an unqualified "Purchase Successful!", listed only the item that worked, and never set `error`. Now names the failed lines and says the total covers only what settled. |
 | `_18` Premium Upgrade — perk list, monthly/yearly, Upgrade to Premium | ✅ membership covers it |
 
 ### Player account — 5 mockups · ✅ mostly
@@ -275,8 +276,7 @@ sound/chips/shuffling session (owner's instruction, 2026-07-26):
   announcement list; pointing it at club announcements is a one-file change in
   `features/table3d/overlays/`
 
-Plus a short tail of genuinely-small gaps: `_22` purchase-success screen, `_29`/`_30`/`_23`
-avatar-studio depth.
+Plus a short tail of genuinely-small gaps: `_29`/`_30`/`_23` avatar-studio depth.
 
 ### What the original verdict got wrong
 
