@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { cn } from "@/features/ui/tokens";
+import { demoRequested } from "@/features/ui/demoMode";
 import {
   blindLevelAdd,
   blindLevels,
@@ -118,6 +119,13 @@ export default function TournamentsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      // `?demo=1` is an explicit, opt-in showcase of the operator surfaces with a
+      // sample schedule — never a fallback for a real server that is empty or
+      // down. Those two cases keep showing the honest empty / failed state.
+      if (demoRequested()) {
+        loadDemo();
+        return;
+      }
       const live = await listTournaments();
       if (live.length === 0) {
         // No scheduled events is a real answer. Inventing a card for "The Obsidian
@@ -147,7 +155,7 @@ export default function TournamentsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadDemo]);
 
   useEffect(() => {
     void load();
@@ -359,6 +367,13 @@ export default function TournamentsPage() {
             {demo && (
               <span className="rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-gold">
                 Demo · Offline
+              </span>
+            )}
+            {/* An unreachable server is NOT "no events scheduled" — say which it
+                is, so an empty schedule is never read as an outage or vice versa. */}
+            {failed && !demo && (
+              <span className="rounded-full border border-brand/40 bg-brand/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-brand">
+                Schedule unavailable
               </span>
             )}
             <Link href="/hub" className="text-sm text-muted transition-colors hover:text-foreground">

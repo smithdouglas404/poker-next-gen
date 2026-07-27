@@ -8,8 +8,9 @@ import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
 import { tournamentBalance } from "./api";
 import { KpiTile, Tag } from "./atoms";
-import { bps, dollars } from "./format";
-import type { EnrichedTournament, OwnerBucket, Prize, TournamentAnalytics } from "./types";
+import { dollars } from "./format";
+import { PayoutSettlement } from "./PayoutSettlement";
+import type { EnrichedTournament, OwnerBucket, TournamentAnalytics } from "./types";
 
 const BUCKET_STATUS: Record<OwnerBucket, (t: EnrichedTournament) => boolean> = {
   live: (t) => t.status === "running",
@@ -69,123 +70,6 @@ function buildAlerts(
   return alerts.slice(0, 4);
 }
 
-const ORDINAL = ["", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "10th"];
-function ordinal(n: number): string {
-  return ORDINAL[n] ?? `${n}th`;
-}
-
-/** Payout table with percentage + chip value + paid state, mirroring the
- *  analytics master (1st tier highlighted, checkmarks once a tier is settled). */
-function PayoutTable({
-  prizes,
-  poolMinor,
-  paidFromRank,
-}: {
-  prizes: Prize[];
-  poolMinor: number;
-  paidFromRank: number; // ranks at or below the field but >= this are settled
-}) {
-  if (prizes.length === 0) {
-    return <p className="text-sm text-neutral-500">No payout ladder defined.</p>;
-  }
-  const sorted = [...prizes].sort((a, b) => a.rank_from - b.rank_from);
-  return (
-    <div>
-      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-500">
-        <span>Rank</span>
-        <span className="text-right">%</span>
-        <span className="text-right">Chip Value</span>
-        <span className="text-right">Paid</span>
-      </div>
-      <ul className="space-y-1">
-        {sorted.map((p, i) => {
-          const share = (poolMinor * p.payout_bps) / 10000;
-          const label = p.rank_from === p.rank_to ? ordinal(p.rank_from) : `${ordinal(p.rank_from)}–${ordinal(p.rank_to)}`;
-          const paid = p.rank_from >= paidFromRank;
-          const first = p.rank_from === 1;
-          return (
-            <li
-              key={i}
-              className={cn(
-                "grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-4 rounded-lg border px-3 text-sm",
-                first
-                  ? "border-gold/45 bg-gold/[0.07] py-2.5 shadow-[0_0_18px_rgba(245,197,24,0.12)]"
-                  : "border-white/5 bg-white/[0.02] py-2",
-              )}
-            >
-              <span className={cn("flex items-center gap-2 font-semibold", first ? "text-gold" : "text-white")}>
-                {first && <span aria-hidden>👑</span>}
-                {label}
-              </span>
-              <span className={cn("text-right tabular-nums", first ? "text-gold" : "text-neutral-400")}>
-                {bps(p.payout_bps)}
-              </span>
-              <span className={cn("text-right font-display font-bold tabular-nums", first ? "text-gold" : "text-green")}>
-                {dollars(share, { compact: true })}
-              </span>
-              <span className="text-right text-green">{paid ? "✓" : <span className="text-neutral-700">—</span>}</span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-/** Donut chart of payout distribution (top tiers by basis points). */
-function PayoutDonut({ prizes }: { prizes: Prize[] }) {
-  const sorted = [...prizes].sort((a, b) => a.rank_from - b.rank_from).slice(0, 6);
-  const total = sorted.reduce((s, p) => s + p.payout_bps, 0) || 1;
-  const palette = ["#f5c518", "#e0b528", "#22c55e", "#15803d", "#2a9d8f", "#d4af37"];
-  const r = 42;
-  const c = 2 * Math.PI * r;
-  let offset = 0;
-  return (
-    <div className="flex flex-col items-center">
-      <svg viewBox="0 0 110 110" className="h-40 w-40 -rotate-90">
-        <circle cx="55" cy="55" r={r} fill="none" stroke="#1f232a" strokeWidth="16" />
-        {sorted.map((p, i) => {
-          const frac = p.payout_bps / total;
-          const len = frac * c;
-          const seg = (
-            <circle
-              key={i}
-              cx="55"
-              cy="55"
-              r={r}
-              fill="none"
-              stroke={palette[i % palette.length]}
-              strokeWidth="16"
-              strokeDasharray={`${len} ${c - len}`}
-              strokeDashoffset={-offset}
-            />
-          );
-          offset += len;
-          return seg;
-        })}
-      </svg>
-      <div className="mt-3 grid w-full grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
-        {sorted.map((p, i) => (
-          <span key={i} className="flex items-center gap-1.5 text-neutral-400">
-            <span className="h-2 w-2 rounded-full" style={{ background: palette[i % palette.length] }} />
-            {ordinal(p.rank_from)}
-            <span className="ml-auto tabular-nums text-neutral-300">{bps(p.payout_bps)}</span>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function FinancialCell({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="px-3 text-center">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-500">{label}</p>
-      <p className="mt-1 font-display text-xl font-bold tabular-nums text-white">{value}</p>
-      <p className="text-[9px] uppercase tracking-[0.2em] text-neutral-600">chips</p>
-    </div>
-  );
-}
 
 /** Operator club chat rail, wired to the real club_chat_send / club_chat_list
  *  RPCs against the operator's club (resolved from me_roles). Falls back to a
@@ -321,7 +205,9 @@ export function OwnerCenter({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<TournamentAnalytics | null>(null);
   const [loading, setLoading] = useState(false);
-  const [finalizing, setFinalizing] = useState(false);
+  // Bumped to force an analytics refetch — settlement changes the snapshot, so
+  // finalizing has to re-read rather than keep showing the pre-settlement view.
+  const [analyticsNonce, setAnalyticsNonce] = useState(0);
   const [starting, setStarting] = useState(false);
   // Balancing-rule config (balancing_rule_set).
   const [seatDiff, setSeatDiff] = useState(1);
@@ -365,7 +251,7 @@ export function OwnerCenter({
     return () => {
       cancelled = true;
     };
-  }, [selectedId, loadAnalytics]);
+  }, [selectedId, loadAnalytics, analyticsNonce]);
 
   // Portfolio KPIs across ALL tournaments.
   const liveCount = tournaments.filter((t) => t.status === "running").length;
@@ -375,7 +261,6 @@ export function OwnerCenter({
 
   const alerts = useMemo(() => buildAlerts(tournaments, reg), [tournaments, reg]);
   const selected = tournaments.find((t) => t.id === selectedId) ?? null;
-  const selectedPoolMinor = selected ? reg(selected.id) * selected.buy_in_minor : 0;
 
   return (
     <div className="space-y-6">
@@ -499,250 +384,140 @@ export function OwnerCenter({
             </div>
           </div>
 
-          {/* Selected analytics */}
+          {/* Selected tournament — settlement + operator controls */}
           {selected && (
             <div className={cn(GLASS_PANEL, "p-5")}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500">
-                    Analytics
-                  </p>
-                  <h3 className="font-display text-lg font-bold text-white">{selected.name}</h3>
+              {/* The payout / finalize surface (HRC `dpts_17`). It owns the
+                  financial overview, payout ladder, distribution, progress,
+                  summary, Export and Finalize — this panel keeps only the
+                  operator controls that are not part of settlement. */}
+              <PayoutSettlement
+                tournament={selected}
+                analytics={analytics}
+                loading={loading}
+                disabled={demo}
+                onFinalize={onFinalize}
+                onReload={() => setAnalyticsNonce((n) => n + 1)}
+              />
+
+              {/* Finishers */}
+              {(analytics?.finishers?.length ?? 0) > 0 && (
+                  <div className="mt-5">
+                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500">
+                      Finishers
+                    </p>
+                    <ul className="space-y-1.5">
+                      {analytics!.finishers!.map((f, i) => (
+                        <li
+                          key={i}
+                          className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2 text-sm"
+                        >
+                          <span className="font-medium text-white">{f.username ?? "Anon"}</span>
+                          <span className="font-display font-bold text-neutral-400">
+                            #{f.finish_place ?? "?"}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Operator controls. Settlement (Export / Finalize) lives
+                    in PayoutSettlement above; these are the run-time
+                    director actions. */}
+                <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    disabled={balancing || demo || selected.status !== "running"}
+                    title={
+                      selected.status === "running"
+                        ? "Rebalance and merge tables now"
+                        : "Available while the tournament is running"
+                    }
+                    onClick={async () => {
+                      setBalancing(true);
+                      setBalanceMsg(null);
+                      try {
+                        await tournamentBalance(selected.id);
+                        setBalanceMsg("Balancing requested — the director is rebalancing tables.");
+                      } catch (e) {
+                        setBalanceMsg(e instanceof Error ? e.message : "Balance failed.");
+                      } finally {
+                        setBalancing(false);
+                      }
+                    }}
+                  >
+                    {balancing ? "Balancing…" : "⚖ Balance / Merge Tables"}
+                  </Button>
+                  {selected.status === "registering" && (
+                    <Button
+                      variant="primary"
+                      size="lg"
+                      disabled={starting || demo}
+                      title="Seat entrants and launch the tables (needs ≥1 blind level and prizes summing to 100%)."
+                      onClick={async () => {
+                        setStarting(true);
+                        try {
+                          await onStart(selected.id);
+                        } finally {
+                          setStarting(false);
+                        }
+                      }}
+                    >
+                      {starting ? "Starting…" : "▶ Start Tournament"}
+                    </Button>
+                  )}
+                  {balanceMsg && (
+                    <p className="text-xs text-neutral-400 sm:col-span-2">{balanceMsg}</p>
+                  )}
                 </div>
-                {loading && <span className="text-[11px] text-neutral-500">Loading…</span>}
-              </div>
 
-              {analytics && (
-                <>
-                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <MiniStat label="Entrants" value={String(analytics.entrants ?? reg(selected.id))} />
-                    <MiniStat label="Players Left" value={String(analytics.players_left ?? "—")} />
-                    <MiniStat
-                      label="Total Fees"
-                      value={dollars(analytics.total_fees_minor ?? 0, { compact: true })}
-                      tone="gold"
-                    />
-                    <MiniStat
-                      label="Progress"
-                      value={`${Math.round(analytics.progress_pct ?? 0)}%`}
-                      tone="cyan"
-                    />
+                {/* Multi-table balancing rule (balancing_rule_set) */}
+                <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+                    Table Balancing Rule
+                  </p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                    <label className="block">
+                      <span className="mb-1 block text-[10px] uppercase tracking-wider text-neutral-500">Max seat gap</span>
+                      <input type="number" min={1} max={9} value={seatDiff}
+                        onChange={(e) => setSeatDiff(Number(e.target.value))}
+                        className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none" />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-[10px] uppercase tracking-wider text-neutral-500">Break table at/below</span>
+                      <input type="number" min={1} max={9} value={breakAt}
+                        onChange={(e) => setBreakAt(Number(e.target.value))}
+                        className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none" />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-[10px] uppercase tracking-wider text-neutral-500">Strategy</span>
+                      <select value={strategy} onChange={(e) => setStrategy(e.target.value as "balanced" | "random")}
+                        className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none">
+                        <option value="balanced">balanced</option>
+                        <option value="random">random</option>
+                      </select>
+                    </label>
                   </div>
-
-                  {/* progress bar */}
-                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/5">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-[#0a7d43] to-[#22c55e] transition-all"
-                      style={{ width: `${Math.min(100, Math.max(0, analytics.progress_pct ?? 0))}%` }}
-                    />
-                  </div>
-
-                  {(() => {
-                    const poolMinor = analytics.prize_pool_minor ?? selectedPoolMinor;
-                    const buyInsMinor = (analytics.entrants ?? reg(selected.id)) * (analytics.buy_in_minor ?? selected.buy_in_minor);
-                    const rebuysMinor = analytics.rebuys_minor ?? 0;
-                    const rakeMinor = analytics.rake_minor ?? analytics.total_fees_minor ?? 0;
-                    const netPoolMinor = poolMinor || Math.max(0, buyInsMinor + rebuysMinor - rakeMinor);
-                    const finished = selected.status === "finished";
-                    const paidFromRank = finished ? 1 : (analytics.players_left ?? 0) + 1;
-                    return (
-                      <>
-                        {/* Financial Overview */}
-                        <div className="mt-5 rounded-xl border border-gold/20 bg-black/20 py-3">
-                          <p className="mb-2 text-center font-display text-xs font-bold uppercase tracking-[0.2em] text-gold">
-                            Financial Overview
-                          </p>
-                          <div className="grid grid-cols-2 divide-white/10 sm:grid-cols-4 sm:divide-x">
-                            <FinancialCell label="Total Buy-ins" value={compactChips(buyInsMinor)} />
-                            <FinancialCell label="Re-buys / Add-ons" value={compactChips(rebuysMinor)} />
-                            <FinancialCell label="Club Rake" value={compactChips(rakeMinor)} />
-                            <FinancialCell label="Net Prize Pool" value={compactChips(netPoolMinor)} />
-                          </div>
-                        </div>
-
-                        <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_240px]">
-                          {/* Payout table */}
-                          <div>
-                            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500">
-                              Payout Table
-                            </p>
-                            <PayoutTable
-                              prizes={analytics.prizes ?? []}
-                              poolMinor={netPoolMinor}
-                              paidFromRank={paidFromRank}
-                            />
-                          </div>
-                          {/* Distribution + summary */}
-                          <div className="space-y-5">
-                            <div>
-                              <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500">
-                                Payout Distribution
-                              </p>
-                              {(analytics.prizes?.length ?? 0) > 0 ? (
-                                <PayoutDonut prizes={analytics.prizes ?? []} />
-                              ) : (
-                                <p className="text-center text-xs text-neutral-500">No ladder yet.</p>
-                              )}
-                            </div>
-                            <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-                              <p className="font-display text-xs font-bold uppercase tracking-[0.2em] text-gold">
-                                Tournament Summary
-                              </p>
-                              <dl className="mt-3 space-y-2 text-sm">
-                                <SummaryLine label="Start Date" value={fmtDate(selected.scheduled_at)} />
-                                <SummaryLine
-                                  label="Total Hands"
-                                  value={(analytics.hands_played ?? 0).toLocaleString()}
-                                />
-                                <SummaryLine
-                                  label="Avg Stack"
-                                  value={`${(analytics.avg_stack ?? selected.starting_stack).toLocaleString()} chips`}
-                                />
-                                <SummaryLine label="Players Left" value={String(analytics.players_left ?? "—")} />
-                              </dl>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Finishers */}
-                        {(analytics.finishers?.length ?? 0) > 0 && (
-                          <div className="mt-5">
-                            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500">
-                              Finishers
-                            </p>
-                            <ul className="space-y-1.5">
-                              {analytics.finishers!.map((f, i) => (
-                                <li
-                                  key={i}
-                                  className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2 text-sm"
-                                >
-                                  <span className="font-medium text-white">{f.username ?? "Anon"}</span>
-                                  <span className="font-display font-bold text-neutral-400">
-                                    #{f.finish_place ?? "?"}
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {/* Actions */}
-                        <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                          <Button
-                            variant="outline"
-                            size="lg"
-                            disabled={balancing || demo || selected.status !== "running"}
-                            title={
-                              selected.status === "running"
-                                ? "Rebalance and merge tables now"
-                                : "Available while the tournament is running"
-                            }
-                            onClick={async () => {
-                              setBalancing(true);
-                              setBalanceMsg(null);
-                              try {
-                                await tournamentBalance(selected.id);
-                                setBalanceMsg("Balancing requested — the director is rebalancing tables.");
-                              } catch (e) {
-                                setBalanceMsg(e instanceof Error ? e.message : "Balance failed.");
-                              } finally {
-                                setBalancing(false);
-                              }
-                            }}
-                          >
-                            {balancing ? "Balancing…" : "⚖ Balance / Merge Tables"}
-                          </Button>
-                          <Button variant="outline" size="lg" onClick={() => exportReport(analytics, selected)}>
-                            Export Report
-                          </Button>
-                          {balanceMsg && (
-                            <p className="text-xs text-neutral-400 sm:col-span-2">{balanceMsg}</p>
-                          )}
-                          {selected.status === "registering" && (
-                            <Button
-                              variant="primary"
-                              size="lg"
-                              disabled={starting || demo}
-                              title="Seat entrants and launch the tables (needs ≥1 blind level and prizes summing to 100%)."
-                              onClick={async () => {
-                                setStarting(true);
-                                try {
-                                  await onStart(selected.id);
-                                } finally {
-                                  setStarting(false);
-                                }
-                              }}
-                            >
-                              {starting ? "Starting…" : "▶ Start Tournament"}
-                            </Button>
-                          )}
-                          <Button
-                            variant="primary"
-                            size="lg"
-                            disabled={finalizing || finished}
-                            onClick={async () => {
-                              setFinalizing(true);
-                              try {
-                                await onFinalize(selected.id);
-                              } finally {
-                                setFinalizing(false);
-                              }
-                            }}
-                          >
-                            {finished ? "Finalized ✓" : finalizing ? "Finalizing…" : "♛ Finalize Tournament"}
-                          </Button>
-                        </div>
-
-                        {/* Multi-table balancing rule (balancing_rule_set) */}
-                        <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-4">
-                          <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-                            Table Balancing Rule
-                          </p>
-                          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                            <label className="block">
-                              <span className="mb-1 block text-[10px] uppercase tracking-wider text-neutral-500">Max seat gap</span>
-                              <input type="number" min={1} max={9} value={seatDiff}
-                                onChange={(e) => setSeatDiff(Number(e.target.value))}
-                                className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none" />
-                            </label>
-                            <label className="block">
-                              <span className="mb-1 block text-[10px] uppercase tracking-wider text-neutral-500">Break table at/below</span>
-                              <input type="number" min={1} max={9} value={breakAt}
-                                onChange={(e) => setBreakAt(Number(e.target.value))}
-                                className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none" />
-                            </label>
-                            <label className="block">
-                              <span className="mb-1 block text-[10px] uppercase tracking-wider text-neutral-500">Strategy</span>
-                              <select value={strategy} onChange={(e) => setStrategy(e.target.value as "balanced" | "random")}
-                                className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none">
-                                <option value="balanced">balanced</option>
-                                <option value="random">random</option>
-                              </select>
-                            </label>
-                          </div>
-                          <button
-                            type="button"
-                            disabled={demo}
-                            onClick={async () => {
-                              setRuleMsg(null);
-                              try {
-                                await onSetBalancingRule(selected.id, seatDiff, breakAt, strategy);
-                                setRuleMsg("Balancing rule saved.");
-                              } catch (e) {
-                                setRuleMsg(e instanceof Error ? e.message : "Save failed.");
-                              }
-                            }}
-                            className="mt-3 rounded-lg border border-gold/40 bg-gold/10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gold transition hover:bg-gold/15 disabled:opacity-40"
-                          >
-                            Save balancing rule
-                          </button>
-                          {ruleMsg && <p className="mt-2 text-[11px] text-neutral-400">{ruleMsg}</p>}
-                        </div>
-                      </>
-                    );
-                  })()}
-                </>
-              )}
+                  <button
+                    type="button"
+                    disabled={demo}
+                    onClick={async () => {
+                      setRuleMsg(null);
+                      try {
+                        await onSetBalancingRule(selected.id, seatDiff, breakAt, strategy);
+                        setRuleMsg("Balancing rule saved.");
+                      } catch (e) {
+                        setRuleMsg(e instanceof Error ? e.message : "Save failed.");
+                      }
+                    }}
+                    className="mt-3 rounded-lg border border-gold/40 bg-gold/10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gold transition hover:bg-gold/15 disabled:opacity-40"
+                  >
+                    Save balancing rule
+                  </button>
+                  {ruleMsg && <p className="mt-2 text-[11px] text-neutral-400">{ruleMsg}</p>}
+                </div>
             </div>
           )}
         </div>
@@ -797,66 +572,6 @@ export function OwnerCenter({
           )}
         </aside>
       </div>
-    </div>
-  );
-}
-
-/** Chips shown big & compact: minor units → whole-chip compact figure. */
-function compactChips(minor: number): string {
-  const v = Math.round(minor / 100);
-  if (Math.abs(v) >= 1_000_000) return `${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`;
-  return v.toLocaleString();
-}
-
-function fmtDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "TBD";
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
-
-function SummaryLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <dt className="text-neutral-500">{label}</dt>
-      <dd className="font-semibold tabular-nums text-white">{value}</dd>
-    </div>
-  );
-}
-
-/** Export the analytics snapshot as a downloaded JSON report (client-side). */
-function exportReport(a: TournamentAnalytics, t: EnrichedTournament) {
-  if (typeof window === "undefined") return;
-  const blob = new Blob([JSON.stringify({ ...a, name: t.name }, null, 2)], {
-    type: "application/json",
-  });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${t.name.replace(/\s+/g, "_").toLowerCase()}_report.json`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-function MiniStat({
-  label,
-  value,
-  tone = "default",
-}: {
-  label: string;
-  value: string;
-  tone?: "default" | "cyan" | "gold";
-}) {
-  return (
-    <div className="rounded-xl border border-white/5 bg-black/20 px-3 py-2.5">
-      <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-neutral-500">{label}</p>
-      <p
-        className={cn(
-          "mt-1 font-display text-lg font-bold tabular-nums",
-          tone === "cyan" ? "text-green" : tone === "gold" ? "text-gold" : "text-white",
-        )}
-      >
-        {value}
-      </p>
     </div>
   );
 }

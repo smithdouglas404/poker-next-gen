@@ -222,7 +222,11 @@ export function demoAnalytics(id: string): TournamentAnalytics {
   const t = DEMO_TOURNAMENTS.find((x) => x.id === id) ?? DEMO_TOURNAMENTS[0];
   const entrants = DEMO_REGISTERED[id] ?? 24;
   const left = t.status === "running" ? Math.max(1, Math.floor(entrants * 0.35)) : entrants;
-  const pool = entrants * t.buy_in_minor;
+  // Entry fees are the club's rake and come OUT of the pool — a showcase that
+  // charges rake and still pays out the full buy-in total is showing money that
+  // does not balance, which is exactly what the settlement screen exists to catch.
+  const fees = entrants * (t.fee_minor ?? 0);
+  const pool = Math.max(0, entrants * t.buy_in_minor - fees);
   return {
     tournament_id: t.id,
     name: t.name,
@@ -237,9 +241,8 @@ export function demoAnalytics(id: string): TournamentAnalytics {
     buy_in_minor: t.buy_in_minor,
     fee_minor: t.fee_minor ?? 0,
     prize_pool_minor: pool,
-    total_fees_minor: entrants * (t.fee_minor ?? 0),
-    rebuys_minor: Math.round(pool * 0.12),
-    rake_minor: entrants * (t.fee_minor ?? 0),
+    total_fees_minor: fees,
+    rake_minor: fees,
     hands_played: t.status === "registering" ? 0 : 2_450 - left * 8,
     avg_stack: left > 0 ? Math.round((entrants * t.starting_stack) / left) : t.starting_stack,
     prizes: DEMO_PRIZES,
