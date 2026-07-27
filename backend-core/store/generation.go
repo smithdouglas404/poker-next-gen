@@ -76,10 +76,25 @@ func (s *GenerationStore) Complete(ctx context.Context, id, cosmeticID string) e
 	return err
 }
 
-func (s *GenerationStore) Fail(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx,
-		`UPDATE poker_generation SET status='failed', updated_at=NOW() WHERE id=$1`, id)
-	return err
+// Fail marks a generation failed and reports whether THIS call performed the
+// transition.
+//
+// The bool is what makes a refund safe. Status is polled by the client, so two
+// polls can reach the failure branch at once; refunding on every call that
+// "failed" the job would credit the fee twice. Only the caller that actually
+// moved the row out of a running state pays the refund.
+func (s *GenerationStore) Fail(ctx context.Context, id string) (bool, error) {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE poker_generation SET status='failed', updated_at=NOW()
+		 WHERE id=$1 AND status NOT IN ('failed','success')`, id)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return n == 1, nil
 }
 
 func (s *GenerationStore) List(ctx context.Context, userID string, limit int) ([]Generation, error) {

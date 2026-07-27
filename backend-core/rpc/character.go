@@ -71,7 +71,7 @@ func CharacterGenerate(ctx context.Context, logger runtime.Logger, db *sql.DB, n
 	taskID, err := integrations.CreateTextToModel(ctx, req.Prompt)
 	if err != nil {
 		logger.Error("tripo create task: %v", err)
-		_ = gens.Fail(ctx, genID)
+		_, _ = gens.Fail(ctx, genID)
 		if fee > 0 {
 			_ = store.NewWalletStore(db).Credit(ctx, userID, fee, "character_generate_refund")
 		}
@@ -123,7 +123,7 @@ func CharacterGenerationStatus(ctx context.Context, logger runtime.Logger, db *s
 		// Base model done → try to auto-rig it (best effort) so it animates.
 		if g.Stage == "model" {
 			if task.ModelURL == "" {
-				_ = gens.Fail(ctx, g.ID)
+				refundGeneration(ctx, logger, db, gens, g)
 				return generationResult(&store.Generation{ID: g.ID, Status: "failed"}), nil
 			}
 			if rigTask, rerr := integrations.CreateRigTask(ctx, g.TripoTask); rerr == nil && rigTask != "" {
@@ -131,7 +131,7 @@ func CharacterGenerationStatus(ctx context.Context, logger runtime.Logger, db *s
 				return runningStatus("rig", 60), nil
 			}
 			// Rigging unavailable → mint the base model.
-			return mintCharacter(ctx, db, gens, g, userID, task.ModelURL, task.PreviewURL), nil
+			return mintCharacter(ctx, logger, db, gens, g, userID, task.ModelURL, task.PreviewURL), nil
 		}
 		// Rig done → attach a preset idle animation (best effort) so the character
 		// actually moves at the table; the rigged model is the fallback.
@@ -144,20 +144,20 @@ func CharacterGenerationStatus(ctx context.Context, logger runtime.Logger, db *s
 				_ = gens.AdvanceToRetarget(ctx, g.ID, rigged, rtTask)
 				return runningStatus("retarget", 80), nil
 			}
-			return mintCharacter(ctx, db, gens, g, userID, rigged, task.PreviewURL), nil
+			return mintCharacter(ctx, logger, db, gens, g, userID, rigged, task.PreviewURL), nil
 		}
 		// Retarget done → mint the animated GLB (fall back to rigged/base on empty).
 		modelURL := task.ModelURL
 		if modelURL == "" {
 			modelURL = g.BaseModelURL
 		}
-		return mintCharacter(ctx, db, gens, g, userID, modelURL, task.PreviewURL), nil
+		return mintCharacter(ctx, logger, db, gens, g, userID, modelURL, task.PreviewURL), nil
 	case "failed", "cancelled", "unknown", "expired":
 		// If the rig/retarget stage failed but we have an earlier model, mint that.
 		if (g.Stage == "rig" || g.Stage == "retarget") && g.BaseModelURL != "" {
-			return mintCharacter(ctx, db, gens, g, userID, g.BaseModelURL, ""), nil
+			return mintCharacter(ctx, logger, db, gens, g, userID, g.BaseModelURL, ""), nil
 		}
-		_ = gens.Fail(ctx, g.ID)
+		refundGeneration(ctx, logger, db, gens, g)
 		g.Status = "failed"
 		return generationResult(g), nil
 	default:
@@ -188,10 +188,35 @@ func overallProgress(stage string, taskProgress int) int {
 	}
 }
 
+// refundGeneration marks a generation failed and, if this call is the one that
+// performed that transition, returns the fee.
+//
+// The fee was taken up front and only ever refunded when the job failed to
+// LAUNCH. Every failure after that — Tripo returning no model, the task ending
+// failed/cancelled/expired — marked the job failed and kept the money: the
+// player paid for a character, got nothing, and had no refund and no recourse.
+// Fail reports whether it moved the row, so a double poll cannot pay twice.
+func refundGeneration(ctx context.Context, logger runtime.Logger, db *sql.DB, gens *store.GenerationStore, g *store.Generation) {
+	transitioned, err := gens.Fail(ctx, g.ID)
+	if err != nil {
+		logger.Error("generation %s: marking failed: %v", g.ID, err)
+		return
+	}
+	if !transitioned || g.FeeCents <= 0 {
+		return
+	}
+	if rerr := store.NewWalletStore(db).Credit(ctx, g.UserID, g.FeeCents, "character_generate_refund"); rerr != nil {
+		// Charged with nothing delivered and the refund failed too — this has to
+		// be findable, not swallowed.
+		logger.Error("REFUND FAILED generation=%s user=%s amount_cents=%d: %v",
+			g.ID, g.UserID, g.FeeCents, rerr)
+	}
+}
+
 // mintCharacter creates the model cosmetic, grants it, and completes the job.
-func mintCharacter(ctx context.Context, db *sql.DB, gens *store.GenerationStore, g *store.Generation, userID, modelURL, previewURL string) string {
+func mintCharacter(ctx context.Context, logger runtime.Logger, db *sql.DB, gens *store.GenerationStore, g *store.Generation, userID, modelURL, previewURL string) string {
 	if modelURL == "" {
-		_ = gens.Fail(ctx, g.ID)
+		refundGeneration(ctx, logger, db, gens, g)
 		return generationResult(&store.Generation{ID: g.ID, Status: "failed"})
 	}
 	cs := store.NewCosmeticStore(db)
@@ -204,9 +229,18 @@ func mintCharacter(ctx context.Context, db *sql.DB, gens *store.GenerationStore,
 		OwnerUserID: userID,
 	})
 	if err != nil {
+		// This used to report "failed" to the caller while leaving the row
+		// running, so the job never reached a terminal state and the fee was
+		// never returned — the generation just hung forever.
+		logger.Error("generation %s: creating cosmetic: %v", g.ID, err)
+		refundGeneration(ctx, logger, db, gens, g)
 		return generationResult(&store.Generation{ID: g.ID, Status: "failed"})
 	}
-	_ = cs.Grant(ctx, userID, cid, "generate")
+	if gerr := cs.Grant(ctx, userID, cid, "generate"); gerr != nil {
+		logger.Error("generation %s: granting cosmetic %s: %v", g.ID, cid, gerr)
+		refundGeneration(ctx, logger, db, gens, g)
+		return generationResult(&store.Generation{ID: g.ID, Status: "failed"})
+	}
 
 	// Re-host the GLB durably. Tripo's model URL is a temporary signed URL, so an
 	// equipped character would break once it expires. Copy the bytes into our own

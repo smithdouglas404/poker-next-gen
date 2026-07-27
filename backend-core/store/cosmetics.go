@@ -83,11 +83,30 @@ func (s *CosmeticStore) ListActive(ctx context.Context, kind string) ([]Cosmetic
 
 // Grant adds a cosmetic to a user's inventory (idempotent).
 func (s *CosmeticStore) Grant(ctx context.Context, userID, cosmeticID, source string) error {
-	_, err := s.db.ExecContext(ctx, `
+	_, err := s.GrantOnce(ctx, userID, cosmeticID, source)
+	return err
+}
+
+// GrantOnce is Grant, reporting whether a row was actually inserted.
+//
+// Grant's ON CONFLICT DO NOTHING makes a re-grant a silent no-op, which is the
+// right behaviour for a free/idempotent award and the wrong behaviour for a
+// PURCHASE: the caller debits first, and a no-op grant leaves the buyer charged
+// with nothing delivered and no error to notice. Paid paths use this and refund
+// when `granted` comes back false.
+func (s *CosmeticStore) GrantOnce(ctx context.Context, userID, cosmeticID, source string) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `
 		INSERT INTO poker_inventory (user_id, cosmetic_id, source, acquired_at)
 		VALUES ($1,$2,$3,NOW()) ON CONFLICT (user_id, cosmetic_id) DO NOTHING`,
 		userID, cosmeticID, source)
-	return err
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return n == 1, nil
 }
 
 // Owns reports whether a user holds a cosmetic.

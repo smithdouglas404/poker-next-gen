@@ -92,11 +92,25 @@ func CosmeticBuy(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 			return "", runtime.NewError("purchase requires a balance of "+dollars(c.PriceCents)+" — add funds", 9)
 		}
 	}
-	if err := cs.Grant(ctx, userID, req.CosmeticID, "shop"); err != nil {
+	// A no-op grant used to be indistinguishable from a successful one: Grant
+	// inserts ON CONFLICT DO NOTHING and returned nil either way, so a buyer who
+	// acquired the item between the Owns check above and this line was charged
+	// full price and given nothing. Refund unless a row was genuinely created.
+	granted, gerr := cs.GrantOnce(ctx, userID, req.CosmeticID, "shop")
+	if gerr != nil || !granted {
 		if c.PriceCents > 0 {
-			_ = store.NewWalletStore(db).Credit(ctx, userID, c.PriceCents, "cosmetic_buy_refund")
+			// Loudly, not silently. If the refund itself fails, someone has been
+			// charged for nothing and support needs enough here to make them
+			// whole — a discarded error means nobody ever finds out.
+			if rerr := store.NewWalletStore(db).Credit(ctx, userID, c.PriceCents, "cosmetic_buy_refund"); rerr != nil {
+				logger.Error("REFUND FAILED user=%s cosmetic=%s amount_cents=%d: %v",
+					userID, req.CosmeticID, c.PriceCents, rerr)
+			}
 		}
-		return "", runtime.NewError(err.Error(), 13)
+		if gerr != nil {
+			return "", runtime.NewError(gerr.Error(), 13)
+		}
+		return "", runtime.NewError("you already own this item", 6)
 	}
 	out, _ := json.Marshal(map[string]interface{}{"ok": true, "cosmetic_id": req.CosmeticID})
 	return string(out), nil
