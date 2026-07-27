@@ -778,7 +778,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				s.NextDealTick = tick + autoDealDelayTicks
 			} else if tick >= s.NextDealTick {
 				s.NextDealTick = 0
-				autoStartHand(ctx, db, dispatcher, s)
+				autoStartHand(ctx, logger, db, dispatcher, s)
 			}
 		}
 	} else {
@@ -1246,10 +1246,10 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 					continue
 				}
 				s.Phase = poker.PhaseBetting
-				emitHandStarted(ctx, s)
+				emitHandStarted(ctx, logger, s)
 				narrate(dispatcher, s, fmt.Sprintf("Hand #%d dealt — blinds $%d/$%d", s.Table.HandNo, s.effSmallBlind()/100, s.effBigBlind()/100))
 				broadcastHandStart(ctx, db, dispatcher, s)
-				dealAndBeginBetting(ctx, db, dispatcher, s)
+				dealAndBeginBetting(ctx, logger, db, dispatcher, s)
 			}
 
 		case protocol.OpAction:
@@ -1279,19 +1279,19 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			if s.TimeoutStreak != nil {
 				delete(s.TimeoutStreak, userID)
 			}
-			emitPlayerAction(ctx, s, userID, req.Type, req.Amount)
+			emitPlayerAction(ctx, logger, s, userID, req.Type, req.Amount)
 			narrateAction(dispatcher, s, seatIdx, req.Type)
 			broadcastSnapshot(ctx, db, dispatcher, s, nil)
 
 			if _, uncontested := s.Table.UncontestedWinner(); uncontested {
-				beginShowdownResolution(ctx, s)
+				beginShowdownResolution(ctx, logger, s)
 				broadcastSnapshot(ctx, db, dispatcher, s, nil)
 				continue
 			}
 
 			showdown := s.Table.AdvanceAction()
 			if showdown {
-				beginShowdownResolution(ctx, s)
+				beginShowdownResolution(ctx, logger, s)
 				broadcastSnapshot(ctx, db, dispatcher, s, nil)
 			} else if s.Table.Street != poker.StreetPreflop || len(s.Table.Board) > 0 {
 				if len(s.Table.Board) > 0 {
@@ -1310,10 +1310,10 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 	}
 
 	// After human input, let any bot(s) whose turn it is act.
-	driveBots(ctx, db, dispatcher, s)
+	driveBots(ctx, logger, db, dispatcher, s)
 	// Then enforce the human action clock so an AFK/disconnected player can't
 	// freeze the table.
-	enforceActionDeadline(ctx, db, dispatcher, s, tick)
+	enforceActionDeadline(ctx, logger, db, dispatcher, s, tick)
 	return s
 }
 
@@ -1321,7 +1321,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 // past actionTimeoutTicks (check if free, else fold), then progresses the hand
 // exactly as a real action would. Bots act via driveBots and are never subject to
 // this. The deadline is (re)armed the first tick a given human seat is to act.
-func enforceActionDeadline(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, tick int64) {
+func enforceActionDeadline(ctx context.Context, logger runtime.Logger, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, tick int64) {
 	if s.Phase != poker.PhaseBetting {
 		s.ActionDeadlineTick, s.ActionDeadlineSeat = 0, -1
 		return
@@ -1358,7 +1358,7 @@ func enforceActionDeadline(ctx context.Context, db *sql.DB, dispatcher runtime.M
 		return
 	}
 	s.ActionDeadlineTick, s.ActionDeadlineSeat = 0, -1
-	emitPlayerAction(ctx, s, seat.UserID, action, 0)
+	emitPlayerAction(ctx, logger, s, seat.UserID, action, 0)
 	narrateAction(dispatcher, s, seatIdx, action)
 	// Inactivity auto-kick (#86): count consecutive server-acted timeouts. The
 	// actual stand-up is deferred to standUpBusted (between hands) so removing a
@@ -1379,12 +1379,12 @@ func enforceActionDeadline(ctx context.Context, db *sql.DB, dispatcher runtime.M
 	}
 	broadcastSnapshot(ctx, db, dispatcher, s, nil)
 	if _, uncontested := s.Table.UncontestedWinner(); uncontested {
-		beginShowdownResolution(ctx, s)
+		beginShowdownResolution(ctx, logger, s)
 		broadcastSnapshot(ctx, db, dispatcher, s, nil)
 		return
 	}
 	if s.Table.AdvanceAction() {
-		beginShowdownResolution(ctx, s)
+		beginShowdownResolution(ctx, logger, s)
 		broadcastSnapshot(ctx, db, dispatcher, s, nil)
 		return
 	}
@@ -1393,7 +1393,7 @@ func enforceActionDeadline(ctx context.Context, db *sql.DB, dispatcher runtime.M
 	}
 	broadcastActionRequired(ctx, db, dispatcher, s)
 	// A bot may now be first to act on the new street.
-	driveBots(ctx, db, dispatcher, s)
+	driveBots(ctx, logger, db, dispatcher, s)
 }
 
 // seatIdxSeat safely returns the seat at idx (nil if out of range/empty).
@@ -1407,7 +1407,7 @@ func seatIdxSeat(s *MatchState, idx int) *poker.Seat {
 // driveBots plays out consecutive bot turns during the betting phase. Bot hand
 // strength comes from rs_poker (engine-math) inside bot.Decide; the loop applies
 // each decision through the same table logic a human action uses.
-func driveBots(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
+func driveBots(ctx context.Context, logger runtime.Logger, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
 	for guard := 0; guard < poker.MaxSeats*4; guard++ {
 		if !s.Phase.AllowsPlayerActions() {
 			return
@@ -1448,17 +1448,17 @@ func driveBots(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatch
 			action, amount = fallback, 0
 		}
 
-		emitPlayerAction(ctx, s, seat.UserID, action, amount)
+		emitPlayerAction(ctx, logger, s, seat.UserID, action, amount)
 		narrateAction(dispatcher, s, seatIdx, action)
 		broadcastSnapshot(ctx, db, dispatcher, s, nil)
 
 		if _, uncontested := s.Table.UncontestedWinner(); uncontested {
-			beginShowdownResolution(ctx, s)
+			beginShowdownResolution(ctx, logger, s)
 			broadcastSnapshot(ctx, db, dispatcher, s, nil)
 			return
 		}
 		if s.Table.AdvanceAction() {
-			beginShowdownResolution(ctx, s)
+			beginShowdownResolution(ctx, logger, s)
 			broadcastSnapshot(ctx, db, dispatcher, s, nil)
 			return
 		}
@@ -1487,7 +1487,7 @@ func boardStrings(boards [][]poker.Card) []string {
 	return out
 }
 
-func beginShowdownResolution(ctx context.Context, s *MatchState) {
+func beginShowdownResolution(ctx context.Context, logger runtime.Logger, s *MatchState) {
 	if s.Phase == poker.PhaseResolvingSidePots {
 		return
 	}
@@ -1502,7 +1502,7 @@ func beginShowdownResolution(ctx context.Context, s *MatchState) {
 		PotBefore: s.Table.Pot,
 		Plan:      plan,
 	}
-	emitSidePotsPlanned(ctx, s, plan)
+	emitSidePotsPlanned(ctx, logger, s, plan)
 }
 
 // shouldRunItTwice reports whether the imminent showdown should run the board
@@ -1833,7 +1833,7 @@ func accrueCompetition(ctx context.Context, logger runtime.Logger, db *sql.DB, s
 
 // autoStartHand deals the next hand on a self-managing cash table (mirrors the
 // manual OpStartHand path). Bots are driven by the loop's trailing driveBots.
-func autoStartHand(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
+func autoStartHand(ctx context.Context, logger runtime.Logger, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
 	if s.Table.SeatedCount() < 2 || s.Phase != poker.PhaseWaiting || s.Table.Street != poker.StreetWaiting {
 		return
 	}
@@ -1858,23 +1858,23 @@ func autoStartHand(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDisp
 		narrate(dispatcher, s, "Dealer service restored — dealing resumed.")
 	}
 	s.Phase = poker.PhaseBetting
-	emitHandStarted(ctx, s)
+	emitHandStarted(ctx, logger, s)
 	narrate(dispatcher, s, fmt.Sprintf("Hand #%d dealt — blinds $%d/$%d", s.Table.HandNo, s.effSmallBlind()/100, s.effBigBlind()/100))
 	broadcastHandStart(ctx, db, dispatcher, s)
-	dealAndBeginBetting(ctx, db, dispatcher, s)
+	dealAndBeginBetting(ctx, logger, db, dispatcher, s)
 }
 
 // dealAndBeginBetting sends hole cards and opens the first betting round. It also
 // covers the bomb-pot case, where StartHand has already dealt the flop (so the
 // board must be broadcast) and — in the rare event every seated player is all-in
 // for the ante — advances straight to showdown resolution.
-func dealAndBeginBetting(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
+func dealAndBeginBetting(ctx context.Context, logger runtime.Logger, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
 	dealPrivateCards(dispatcher, s)
 	if len(s.Table.Board) > 0 { // bomb pot: flop is already out
 		broadcastBoard(dispatcher, s)
 	}
 	if s.Table.ActionSeat < 0 {
-		beginShowdownResolution(ctx, s)
+		beginShowdownResolution(ctx, logger, s)
 		broadcastSnapshot(ctx, db, dispatcher, s, nil)
 		return
 	}
@@ -1999,13 +1999,13 @@ func handleHostAction(ctx context.Context, logger runtime.Logger, db *sql.DB, di
 			if seat != nil && !seat.IsBot {
 				if err := s.Table.ApplyAction(req.Seat, "fold", 0); err == nil {
 					s.ActionDeadlineTick, s.ActionDeadlineSeat = 0, -1
-					emitPlayerAction(ctx, s, seat.UserID, "fold", 0)
+					emitPlayerAction(ctx, logger, s, seat.UserID, "fold", 0)
 					narrate(dispatcher, s, fmt.Sprintf("Host folded %s's hand.", seat.Username))
 					broadcastSnapshot(ctx, db, dispatcher, s, nil)
 					if _, uncontested := s.Table.UncontestedWinner(); uncontested {
-						beginShowdownResolution(ctx, s)
+						beginShowdownResolution(ctx, logger, s)
 					} else if s.Table.AdvanceAction() {
-						beginShowdownResolution(ctx, s)
+						beginShowdownResolution(ctx, logger, s)
 					} else {
 						broadcastActionRequired(ctx, db, dispatcher, s)
 					}
@@ -2060,7 +2060,7 @@ func matchIDForAudit(s *MatchState) string {
 	return s.RoomID
 }
 
-func emitHandStarted(ctx context.Context, s *MatchState) {
+func emitHandStarted(ctx context.Context, logger runtime.Logger, s *MatchState) {
 	// Start a fresh per-hand behavioural tracker (VPIP/PFR/AF derivation).
 	s.HandTrack = map[string]*playerHandTrack{}
 	// Composite time bank: top every seated human up by the per-hand increment.
@@ -2084,7 +2084,11 @@ func emitHandStarted(ctx context.Context, s *MatchState) {
 		"board":            boardCodes,
 		"deck_commit_hash": s.Table.DeckCommitment,
 	}
-	_ = s.Audit.Emit(ctx, audit.Event{
+	// hand_started carries the deck commitment (deck_commit_hash) — the
+	// pre-deal promise a hand can later be checked against. Miss this event and
+	// AuditVerifyHand can never confirm this hand's deck was fair, permanently:
+	// there is no way to reconstruct a commitment that was never recorded.
+	if err := s.Audit.Emit(ctx, audit.Event{
 		Type:        "hand_started",
 		MatchID:     matchIDForAudit(s),
 		HandNo:      s.Table.HandNo,
@@ -2092,10 +2096,13 @@ func emitHandStarted(ctx context.Context, s *MatchState) {
 		ClubID:      s.ClubID,
 		Payload:     payload,
 		PayloadHash: audit.HashPayload(payload),
-	})
+	}); err != nil {
+		logger.Error("audit hand_started not recorded match=%s hand=%d: %v",
+			matchIDForAudit(s), s.Table.HandNo, err)
+	}
 }
 
-func emitSidePotsPlanned(ctx context.Context, s *MatchState, plan poker.ShowdownPlan) {
+func emitSidePotsPlanned(ctx context.Context, logger runtime.Logger, s *MatchState, plan poker.ShowdownPlan) {
 	if s.Audit == nil {
 		return
 	}
@@ -2113,7 +2120,7 @@ func emitSidePotsPlanned(ctx context.Context, s *MatchState, plan poker.Showdown
 		"side_pots":          layers,
 		"uncontested_winner": plan.UncontestedWinner,
 	}
-	_ = s.Audit.Emit(ctx, audit.Event{
+	if err := s.Audit.Emit(ctx, audit.Event{
 		Type:        "sidepots_planned",
 		MatchID:     matchIDForAudit(s),
 		HandNo:      plan.HandNo,
@@ -2121,7 +2128,10 @@ func emitSidePotsPlanned(ctx context.Context, s *MatchState, plan poker.Showdown
 		ClubID:      s.ClubID,
 		Payload:     payload,
 		PayloadHash: audit.HashPayload(payload),
-	})
+	}); err != nil {
+		logger.Error("audit sidepots_planned not recorded match=%s hand=%d: %v",
+			matchIDForAudit(s), plan.HandNo, err)
+	}
 }
 
 func emitHandSettled(ctx context.Context, s *MatchState, res poker.ShowdownResult, potBefore int64, plan poker.ShowdownPlan) error {
@@ -2162,7 +2172,7 @@ func emitHandSettled(ctx context.Context, s *MatchState, res poker.ShowdownResul
 	})
 }
 
-func emitPlayerAction(ctx context.Context, s *MatchState, userID, action string, amount int64) {
+func emitPlayerAction(ctx context.Context, logger runtime.Logger, s *MatchState, userID, action string, amount int64) {
 	trackAction(s, userID, action)
 	recordAntibotAction(s, userID, action, amount)
 	if s.Audit == nil {
@@ -2180,7 +2190,7 @@ func emitPlayerAction(ctx context.Context, s *MatchState, userID, action string,
 		"pot_ratio": float64(amount) / float64(pot),
 		"street":    string(s.Table.Street),
 	}
-	_ = s.Audit.Emit(ctx, audit.Event{
+	if err := s.Audit.Emit(ctx, audit.Event{
 		Type:        "player_action",
 		MatchID:     matchIDForAudit(s),
 		HandNo:      s.Table.HandNo,
@@ -2188,7 +2198,10 @@ func emitPlayerAction(ctx context.Context, s *MatchState, userID, action string,
 		ClubID:      s.ClubID,
 		Payload:     payload,
 		PayloadHash: audit.HashPayload(payload),
-	})
+	}); err != nil {
+		logger.Error("audit player_action not recorded match=%s hand=%d user=%s: %v",
+			matchIDForAudit(s), s.Table.HandNo, userID, err)
+	}
 }
 
 func (s *MatchState) minBuyIn() int64 {
