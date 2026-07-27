@@ -10,15 +10,40 @@ import (
 	"github.com/smithdouglas404/poker-next-gen/backend-core/models"
 )
 
-// NewWalletBalance is the starting balance for a freshly-created wallet. In
-// real-money mode a new wallet starts at ZERO — funds only ever enter via a
-// verified deposit. In play-money mode new users get a starter stipend so they
-// can try the tables without depositing.
+// GuestStipendCents is the fixed balance a non-paying account starts with. The
+// product rule: anyone can join a table and play — against bots or people — on a
+// fixed stipend; only paying members with sponsor capability can HOST one.
+const GuestStipendCents int64 = 100000 // $1,000
+
+// NewWalletBalance is the starting balance for a freshly-created wallet when the
+// account's tier is unknown. Prefer StartingBalanceForTier, which is what Ensure
+// uses — this is kept for callers that genuinely have no user context.
+//
+// In real-money mode a wallet starts at ZERO: funds only ever enter via a
+// verified deposit.
 func NewWalletBalance() int64 {
 	if os.Getenv("REAL_MONEY_ENABLED") == "true" {
 		return 0
 	}
-	return 100000 // play-money starter stipend ($1,000)
+	return GuestStipendCents
+}
+
+// StartingBalanceForTier is the opening balance for a new wallet.
+//
+// A FREE account always gets the fixed stipend, in real-money mode too. That is
+// deliberate: free accounts cannot deposit or withdraw, so the stipend is play
+// money that can never become or come from real funds — it is what lets someone
+// sit down and play before they subscribe. Previously the stipend was keyed only
+// on REAL_MONEY_ENABLED, so turning real money on left a new free account with
+// an empty wallet and nothing to do.
+//
+// A PAID account in real-money mode starts at zero, because it is the only kind
+// that can move real money and its ledger has to start clean.
+func StartingBalanceForTier(tier string) int64 {
+	if tier == "" || tier == "free" {
+		return GuestStipendCents
+	}
+	return NewWalletBalance()
 }
 
 type WalletStore struct{ db *sql.DB }
@@ -26,9 +51,13 @@ type WalletStore struct{ db *sql.DB }
 func NewWalletStore(db *sql.DB) *WalletStore { return &WalletStore{db: db} }
 
 func (s *WalletStore) Ensure(ctx context.Context, userID string) (int64, error) {
+	// Opening balance depends on the account's tier — see StartingBalanceForTier.
+	// ON CONFLICT DO NOTHING means this only ever applies to a wallet's first
+	// creation; an existing balance is never rewritten.
+	opening := StartingBalanceForTier(SubscriptionTier(ctx, s.db, userID))
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO poker_global_wallet (user_id, balance, currency, updated_at)
-		VALUES ($1, $2, 'USD', NOW()) ON CONFLICT (user_id) DO NOTHING`, userID, NewWalletBalance())
+		VALUES ($1, $2, 'USD', NOW()) ON CONFLICT (user_id) DO NOTHING`, userID, opening)
 	if err != nil {
 		return 0, err
 	}

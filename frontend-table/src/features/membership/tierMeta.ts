@@ -105,6 +105,10 @@ export function keyLimits(t: TierDef): LimitRow[] {
     { label: "Rakeback", value: t.rakeback_percent > 0 ? `${t.rakeback_percent}%` : "—" },
     { label: "Daily deposit", value: t.deposit_limit_daily_cents > 0 ? moneyCompact(t.deposit_limit_daily_cents) : "—" },
     { label: "Weekly withdraw", value: t.withdraw_limit_weekly_cents > 0 ? moneyCompact(t.withdraw_limit_weekly_cents) : "—" },
+    // Hosting is the capability that makes a subscription worth buying for an
+    // operator, so it sits on the card rather than only being discovered at the
+    // moment table_create refuses.
+    { label: "Host tables", value: t.table_sponsor ? "Yes" : "—" },
     { label: "Tournaments", value: tourney(t) },
     { label: "Multi-table", value: `${t.multi_table_limit}` },
     { label: "Clubs", value: clubs(t) },

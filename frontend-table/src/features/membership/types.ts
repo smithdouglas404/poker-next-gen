@@ -16,6 +16,10 @@ export interface TierDef {
   daily_bonus_chips: number;
   club_create_limit: number;
   club_member_limit: number;
+  /** May stand up a table at all. Every table is sponsored by a club and only a
+   *  paying member with this capability can open one — free can join and play,
+   *  but not host. Server-enforced in table_create via billing.CanSponsorTable. */
+  table_sponsor?: boolean;
   multi_table_limit: number;
   marketplace_fee_bps: number;
   benefits: string[];
