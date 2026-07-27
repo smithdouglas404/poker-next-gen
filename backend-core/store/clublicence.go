@@ -3,8 +3,10 @@ package store
 import (
 	"context"
 	"database/sql"
+	"sort"
 
 	"github.com/smithdouglas404/poker-next-gen/backend-core/billing"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/models"
 )
 
 // Who may host what, and on whose authority.
@@ -69,6 +71,76 @@ type ClubLicence struct {
 	Reason string `json:"reason,omitempty"`
 	// OwnersChecked is how many owner seats were considered.
 	OwnersChecked int `json:"owners_checked"`
+}
+
+// QualifiesAsLicensee reports whether one person could carry a club's licence,
+// and if not, what they are missing in words an operator can act on.
+//
+// Role is deliberately NOT considered here — this answers "is this person
+// licensable", which the callers combine with "do they hold an owner seat".
+func QualifiesAsLicensee(ctx context.Context, db *sql.DB, userID string) (bool, string) {
+	if userID == "" {
+		return false, "no user"
+	}
+	if !billing.CanSponsorTable(SubscriptionTier(ctx, db, userID)) {
+		return false, "their membership does not allow sponsoring cash games"
+	}
+	st, _ := NewVerificationStore(db).Statuses(ctx, userID)
+	if st["kyc_aml"] != "verified" {
+		return false, "they have not completed identity verification (KYC)"
+	}
+	return true, ""
+}
+
+// PostTransferOwnerSeats is who would hold an owner-role seat after primary
+// ownership moves from `fromUser` to `toUser`.
+//
+// Transfer promotes the recipient to owner and demotes the outgoing owner to
+// manager (see ClubExtStore.TransferOwnership); every other seat is untouched.
+// Kept pure and sorted so the rule is testable and the licence check is
+// deterministic rather than depending on map iteration order.
+func PostTransferOwnerSeats(owners []models.Owner, fromUser, toUser string) []string {
+	seen := map[string]bool{toUser: true}
+	out := []string{toUser}
+	for _, o := range owners {
+		if o.Role != "owner" || o.UserID == fromUser || seen[o.UserID] {
+			continue
+		}
+		seen[o.UserID] = true
+		out = append(out, o.UserID)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// LicenceAfterTransfer evaluates the licence the club WOULD have once primary
+// ownership moves from one member to another.
+//
+// Transfer promotes the recipient to owner and demotes the outgoing owner to
+// manager, and a manager does not carry the licence however senior. So handing a
+// club to someone unqualified can strip its authority to run cash games with no
+// warning at all: the tables simply stop accepting sit-downs later, to nobody's
+// stated reason. This is what lets the transfer refuse up front instead.
+//
+// It fails CLOSED for the same reason LicenceFor does — an unreadable owner list
+// is not evidence of a licence.
+func LicenceAfterTransfer(ctx context.Context, db *sql.DB, clubID, fromUser, toUser string) ClubLicence {
+	lic := ClubLicence{ClubID: clubID}
+	owners, err := NewClubStore(db).ListOwners(ctx, clubID)
+	if err != nil {
+		lic.Reason = "could not verify the club's licence"
+		return lic
+	}
+	for _, userID := range PostTransferOwnerSeats(owners, fromUser, toUser) {
+		lic.OwnersChecked++
+		if ok, _ := QualifiesAsLicensee(ctx, db, userID); ok {
+			lic.CanHostCash = true
+			lic.LicensedBy = userID
+			return lic
+		}
+	}
+	lic.Reason = "no remaining owner would hold a membership and verified identity"
+	return lic
 }
 
 // LicenceFor reports whether a club may host cash games.

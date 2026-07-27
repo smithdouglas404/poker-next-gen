@@ -395,6 +395,43 @@ func (s *ClubStore) AllocateBalance(ctx context.Context, b *models.PlayerAllocat
 	return tx.Commit()
 }
 
+// EquityBpsExcluding totals the equity already allocated to a club's owner
+// seats, ignoring one user (the seat being added or edited).
+//
+// Equity was accepted verbatim from the request with no arithmetic anywhere, so
+// a club could be 150% owned — the creator holds 10000 bps and every seat added
+// afterwards adds more on top. The figure is shown to operators as their
+// ownership split; a split that does not add up is not a split.
+func (s *ClubStore) EquityBpsExcluding(ctx context.Context, clubID, exceptUserID string) (int, error) {
+	var total int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(equity_bps), 0) FROM poker_owner WHERE club_id=$1 AND user_id <> $2`,
+		clubID, exceptUserID).Scan(&total)
+	return total, err
+}
+
+// OutstandingChips reports how much a club still owes its members in club
+// chips, and to how many of them (spendable + locked, because chips in a live
+// pot are still owed).
+//
+// Closing a club is not a display change: whatever it holds on behalf of its
+// members has to be settled first, or the balance simply becomes unreachable.
+func (s *ClubStore) OutstandingChips(ctx context.Context, clubID string) (total int64, holders int, err error) {
+	err = s.db.QueryRowContext(ctx, `
+		SELECT COALESCE(SUM(balance + locked_amount), 0),
+		       COUNT(*) FILTER (WHERE balance + locked_amount > 0)
+		FROM poker_player_balance WHERE club_id=$1`, clubID).Scan(&total, &holders)
+	return total, holders, err
+}
+
+// OpenSeatCount is how many players are currently seated at this club's tables.
+func (s *ClubStore) OpenSeatCount(ctx context.Context, clubID string) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM poker_seat_session WHERE club_id=$1 AND status='open'`, clubID).Scan(&n)
+	return n, err
+}
+
 func (s *ClubStore) GetBalance(ctx context.Context, clubID, userID string) (*models.PlayerAllocatedBalance, error) {
 	var b models.PlayerAllocatedBalance
 	err := s.db.QueryRowContext(ctx, `

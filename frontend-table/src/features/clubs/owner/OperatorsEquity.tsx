@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Select } from "@/features/ui";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
@@ -19,12 +19,14 @@ type OpRole = (typeof ROLES)[number];
 
 export function OperatorsEquity({
   clubId,
+  clubName,
   roster,
   canManage,
   demo,
   onChanged,
 }: {
   clubId: string;
+  clubName?: string;
   roster: RosterRow[];
   canManage: boolean;
   demo: boolean;
@@ -47,6 +49,60 @@ export function OperatorsEquity({
   // Balance-lookup state.
   const [lookupId, setLookupId] = useState("");
   const [lookup, setLookup] = useState<string | null>(null);
+
+  // Ownership transfer + licence state.
+  const [transferTo, setTransferTo] = useState("");
+  const [transferBusy, setTransferBusy] = useState(false);
+  const [transferMsg, setTransferMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [licence, setLicence] = useState<{
+    can_host_cash: boolean;
+    licensed_by?: string;
+    reason?: string;
+  } | null>(null);
+
+  const loadLicence = useCallback(() => {
+    if (!clubId || demo) return;
+    void ownerApi
+      .licence(clubId)
+      .then(setLicence)
+      .catch(() => setLicence(null));
+  }, [clubId, demo]);
+
+  useEffect(loadLicence, [loadLicence]);
+
+  // Transfer is irreversible from this side — the outgoing owner is demoted to
+  // manager and cannot transfer it back. Name the consequence before the click,
+  // not in a toast afterwards.
+  const doTransfer = async () => {
+    if (!transferTo) return;
+    const name = roster.find((r) => r.user_id === transferTo)?.username ?? "that member";
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        `Transfer ${clubName || "this club"} to ${name}?\n\n` +
+          "They become the primary owner. You are demoted to manager and cannot " +
+          "undo this yourself — only the new owner can transfer it back.",
+      )
+    ) {
+      return;
+    }
+    setTransferBusy(true);
+    setTransferMsg(null);
+    try {
+      await ownerApi.transferOwnership(clubId, transferTo);
+      setTransferMsg({ ok: true, text: `${name} is now the primary owner of this club.` });
+      setTransferTo("");
+      loadLicence();
+      onChanged();
+    } catch (e) {
+      // The server refuses a transfer that would revoke the club's cash licence
+      // and says exactly what the recipient is missing. Show it verbatim — a
+      // generic "transfer failed" leaves the operator with nothing to act on.
+      setTransferMsg({ ok: false, text: e instanceof Error ? e.message : "Transfer failed." });
+    } finally {
+      setTransferBusy(false);
+    }
+  };
 
   const disabled = !canManage || demo;
   const equityBps = Math.round(Math.max(0, Math.min(100, Number(equityPct) || 0)) * 100);
@@ -210,6 +266,80 @@ export function OperatorsEquity({
             )}
           </div>
         </div>
+      </div>
+
+      {/* Transfer primary ownership. `club_transfer_ownership` shipped with the
+          club backend and its only caller was in the dead features/clubs/sections
+          tree, so in the running app an owner could not hand over a club at all. */}
+      <div className={cn(GLASS_PANEL, "flex flex-col gap-4 p-5")}>
+        <div>
+          <p className="font-display text-lg font-semibold text-white">Transfer Ownership</p>
+          <p className="mt-1 text-[11px] text-white/45">
+            Hand this club to another member. They become the primary owner; you are
+            demoted to manager and cannot reverse it yourself.
+          </p>
+        </div>
+
+        {/* The licence travels with the owner, so the transfer's real consequence
+            is whether the club can still run cash games afterwards. */}
+        {licence && (
+          <div
+            className={cn(
+              "rounded-xl border px-3 py-2.5 text-[12px]",
+              licence.can_host_cash
+                ? "border-emerald-500/25 bg-emerald-500/[0.06] text-green"
+                : "border-white/10 bg-black/30 text-white/60",
+            )}
+          >
+            {licence.can_host_cash ? (
+              <>
+                This club is licensed for cash games. That licence belongs to an
+                owner — transferring to someone without a sponsor-capable membership
+                and completed KYC will be refused unless another qualified owner
+                remains.
+              </>
+            ) : (
+              <>Cash games are not currently licensed here{licence.reason ? ` — ${licence.reason}` : ""}.</>
+            )}
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="min-w-[220px] flex-1">
+            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-white/45">
+              New primary owner
+            </span>
+            <Select
+              value={transferTo}
+              onChange={(e) => setTransferTo(e.target.value)}
+              disabled={disabled}
+            >
+              <option value="">Select a member…</option>
+              {roster.map((r) => (
+                <option key={r.user_id} value={r.user_id}>
+                  {r.username} · {r.role}
+                </option>
+              ))}
+            </Select>
+          </label>
+          <button
+            type="button"
+            onClick={doTransfer}
+            disabled={disabled || transferBusy || !transferTo}
+            className={cn(
+              "rounded-lg border border-brand/50 bg-brand/10 px-5 py-2.5 font-display text-sm font-bold uppercase tracking-wider text-brand transition",
+              "hover:bg-brand/20 disabled:opacity-40",
+            )}
+          >
+            {transferBusy ? "Transferring…" : "Transfer club"}
+          </button>
+        </div>
+        {transferMsg && (
+          <p className={cn("text-[12px]", transferMsg.ok ? "text-green" : "text-brand")}>
+            {transferMsg.text}
+          </p>
+        )}
+        {demo && <p className="text-[11px] text-white/40">Demo mode — transfer is disabled.</p>}
       </div>
     </div>
   );

@@ -135,19 +135,44 @@ func ClubCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		}
 	}
 
+	refundCreateFee := func(why string) {
+		if fee <= 0 {
+			return
+		}
+		if rerr := store.NewWalletStore(db).Credit(ctx, userID, fee, "club_create_fee_refund"); rerr != nil {
+			logger.Error("REFUND FAILED club_create user=%s amount_cents=%d (%s): %v",
+				userID, fee, why, rerr)
+		}
+	}
+
 	if err := clubStore.Create(ctx, &club); err != nil {
 		logger.Error("club create: %v", err)
-		// Refund the fee if the club couldn't be created.
-		if fee > 0 {
-			_ = store.NewWalletStore(db).Credit(ctx, userID, fee, "club_create_fee_refund")
-		}
+		refundCreateFee("club row not created")
 		return "", runtime.NewError("failed to create club", 13)
 	}
-	_ = clubStore.AddOwner(ctx, &models.Owner{
+
+	// The owner seat is the club. Both of these were discarded errors, so a
+	// failure here left a club with no owner and no members while the creator had
+	// already paid the ownership fee: nobody could configure it, nobody could
+	// delete it, and the licence check would later report "this club has no owner
+	// on record". Undo the whole thing instead.
+	if err := clubStore.AddOwner(ctx, &models.Owner{
 		ClubID: club.ID, UserID: userID, Role: "owner", EquityBps: 10000, CanConfigure: true,
-	})
+	}); err != nil {
+		logger.Error("club %s created but owner seat failed: %v", club.ID, err)
+		if derr := store.NewClubExtStore(db).Deactivate(ctx, club.ID); derr != nil {
+			logger.Error("club %s left active with no owner: %v", club.ID, derr)
+		}
+		refundCreateFee("owner seat not created")
+		return "", runtime.NewError("failed to create club", 13)
+	}
 	username, _ := ctx.Value(runtime.RUNTIME_CTX_USERNAME).(string)
-	_ = clubStore.AddMember(ctx, club.ID, userID, username, "owner")
+	if err := clubStore.AddMember(ctx, club.ID, userID, username, "owner"); err != nil {
+		// Less severe — the owner seat exists, so the club is governable — but it
+		// must not pass silently: the creator would be absent from their own
+		// roster, and roster membership is what several club reads gate on.
+		logger.Error("club %s: owner missing from roster: %v", club.ID, err)
+	}
 
 	out, err := json.Marshal(club)
 	if err != nil {
@@ -451,10 +476,37 @@ func ClubOwnerAdd(ctx context.Context, logger runtime.Logger, db *sql.DB, nk run
 		return "", runtime.NewError("club member limit reached for the owner's plan — upgrade for more", 7)
 	}
 
+	// Equity has to add up. It was taken verbatim from the request and never
+	// checked against the rest of the club, so a club whose creator already holds
+	// 100% could keep adding owners at any percentage and end up 150% owned —
+	// a figure shown to operators as their ownership split.
+	if req.EquityBps < 0 || req.EquityBps > 10000 {
+		return "", runtime.NewError("equity must be between 0% and 100%", 3)
+	}
+	allocatedRaw, err := clubStore.EquityBpsExcluding(ctx, req.ClubID, req.UserID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	allocated := int32(allocatedRaw)
+	if allocated+req.EquityBps > 10000 {
+		free := 10000 - allocated
+		if free < 0 {
+			free = 0
+		}
+		return "", runtime.NewError(fmt.Sprintf(
+			"that would take this club past 100%% ownership — %d.%02d%% is unallocated",
+			free/100, free%100), 9)
+	}
+
 	if err := clubStore.AddOwner(ctx, &req); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
-	out, _ := json.Marshal(req)
+	out, _ := json.Marshal(map[string]interface{}{
+		"id": req.ID, "user_id": req.UserID, "role": req.Role,
+		"equity_bps": req.EquityBps, "permissions": req.Permissions,
+		// So the caller can render the split without a second round trip.
+		"club_equity_allocated_bps": allocated + req.EquityBps,
+	})
 	return string(out), nil
 }
 

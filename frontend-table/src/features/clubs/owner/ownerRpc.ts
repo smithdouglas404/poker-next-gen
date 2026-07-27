@@ -129,13 +129,39 @@ export const ownerApi = {
     equityBps: number,
     canConfigure: boolean,
   ) =>
-    call<{ id?: string; role?: string; equity_bps?: number }>("club_owner_add", {
+    call<{
+      id?: string;
+      role?: string;
+      equity_bps?: number;
+      /** Club-wide equity after this grant, so the split can be shown without a refetch. */
+      club_equity_allocated_bps?: number;
+    }>("club_owner_add", {
       club_id: clubId,
       user_id: userId,
       role,
       equity_bps: equityBps,
       can_configure: canConfigure,
     }),
+  /**
+   * Hand primary ownership to another member (club_transfer_ownership).
+   *
+   * This RPC shipped with the club backend and its only caller lived in
+   * `features/clubs/sections/`, which nothing imports — so in the running app an
+   * owner had no way to hand over a club at all. The server refuses a transfer
+   * that would strip the club's cash licence, and says what the recipient is
+   * missing; surface that message verbatim.
+   */
+  transferOwnership: (clubId: string, userId: string) =>
+    call<{ ok: boolean; new_owner: string }>("club_transfer_ownership", {
+      club_id: clubId,
+      user_id: userId,
+    }),
+  /** A club's authority to run cash games, and who supplies it. */
+  licence: (clubId: string) =>
+    call<{ can_host_cash: boolean; licensed_by?: string; reason?: string; owners_checked: number }>(
+      "club_licence_get",
+      { club_id: clubId },
+    ),
   /** Read a player's allocated balance inside a club (balance_get). */
   getBalance: (clubId: string, userId: string) =>
     call<{ balance?: number; currency?: string; locked_amount?: number }>("balance_get", {

@@ -139,12 +139,35 @@ func ClubDelete(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" {
 		return "", runtime.NewError("club_id required", 3)
 	}
-	if _, err := clubsextRequireOwner(ctx, db, req.ClubID); err != nil {
+	ownerID, err := clubsextRequireOwner(ctx, db, req.ClubID)
+	if err != nil {
 		return "", err
 	}
+
+	// Closing a club was a one-line flag flip. It ignored everything the club was
+	// holding at the time: members with club chips lost access to them (the club
+	// is the only place those chips are spendable or cashable), and players
+	// mid-hand had the club closed out from under them.
+	//
+	// Both are refusals with a number attached, not silent cleanups — the chips
+	// are the members' money, and what happens to them is a decision for the
+	// operator to make deliberately, the same standard club_leave already holds
+	// an individual member to.
+	cs := store.NewClubStore(db)
+	if seated, serr := cs.OpenSeatCount(ctx, req.ClubID); serr == nil && seated > 0 {
+		return "", runtime.NewError(fmt.Sprintf(
+			"%d player(s) are still seated at this club's tables — close the tables first", seated), 9)
+	}
+	if total, holders, cerr := cs.OutstandingChips(ctx, req.ClubID); cerr == nil && total > 0 {
+		return "", runtime.NewError(fmt.Sprintf(
+			"this club still holds %d.%02d in chips for %d member(s) — settle those balances before closing",
+			total/100, total%100, holders), 9)
+	}
+
 	if err := store.NewClubExtStore(db).Deactivate(ctx, req.ClubID); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
+	_ = store.NewClubExtStore(db).LogActivity(ctx, req.ClubID, ownerID, "club_closed", "club closed by owner")
 	return `{"ok":true}`, nil
 }
 
@@ -173,6 +196,25 @@ func ClubTransferOwnership(ctx context.Context, logger runtime.Logger, db *sql.D
 	if target == nil {
 		return "", runtime.NewError("the new owner must be a club member", 9)
 	}
+
+	// The licence travels with the owner, not the club. Transfer promotes the
+	// recipient and DEMOTES the outgoing owner to manager, and a manager carries
+	// no licence — so handing the club to an unqualified member silently revokes
+	// its authority to run cash games. Nothing said so; the tables just began
+	// refusing sit-downs later, for no reason anyone was shown.
+	//
+	// A club that is already unlicensed cannot be made worse, so this only blocks
+	// a transfer that would DESTROY a licence the club currently has. The way
+	// through is stated rather than implied: the recipient qualifies, or a second
+	// qualified owner is added first (one qualified owner licenses the club).
+	if store.LicenceFor(ctx, db, req.ClubID).CanHostCash &&
+		!store.LicenceAfterTransfer(ctx, db, req.ClubID, ownerID, req.UserID).CanHostCash {
+		_, missing := store.QualifiesAsLicensee(ctx, db, req.UserID)
+		return "", runtime.NewError(
+			"this club runs cash games on your licence, and "+missing+
+				" — add another qualified owner first, or have them complete it, then transfer", 9)
+	}
+
 	es := store.NewClubExtStore(db)
 	if err := es.TransferOwnership(ctx, req.ClubID, ownerID, req.UserID, target.Username); err != nil {
 		return "", runtime.NewError(err.Error(), 13)

@@ -643,6 +643,7 @@ export function OwnerHub() {
       {section === "operators" && (
         <OperatorsEquity
           clubId={club?.id ?? ""}
+          clubName={club?.name}
           roster={roster}
           canManage={canManage}
           demo={demo}
