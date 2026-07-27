@@ -157,6 +157,10 @@ export interface JoinRequest {
   status: string;
   message: string;
   created_at: string;
+  /** Server-set expiry (poker_club_invitation.expires_at). Absent = no expiry.
+   *  Accepting a lapsed invite is refused server-side, because accepting is what
+   *  allocates its credit line against the club. */
+  expires_at?: string | null;
 }
 
 export interface RakeSeriesPoint {

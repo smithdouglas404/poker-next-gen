@@ -158,3 +158,32 @@ func TestAttachNextRuns_UnknownZoneFallsBackToUTC(t *testing.T) {
 		t.Error("an unknown zone dropped the next run entirely; it should fall back to UTC")
 	}
 }
+
+// ── invitation expiry ─────────────────────────────────────────────────────────
+
+func TestInvitationExpired(t *testing.T) {
+	now := time.Date(2026, 7, 27, 12, 0, 0, 0, time.UTC)
+	past := now.Add(-time.Hour)
+	future := now.Add(time.Hour)
+
+	// NULL expiry means no expiry. Every invitation written before the column
+	// existed carries NULL, and they must keep working rather than being voided
+	// retroactively the moment the migration runs.
+	if (&ClubInvitation{}).Expired(now) {
+		t.Error("an invitation with no expiry was treated as expired")
+	}
+	if (&ClubInvitation{ExpiresAt: &future}).Expired(now) {
+		t.Error("an invitation expiring in the future was treated as expired")
+	}
+	if !(&ClubInvitation{ExpiresAt: &past}).Expired(now) {
+		t.Error("an invitation past its expiry was NOT treated as expired — a stale invite would still allocate its credit line")
+	}
+	// Exactly at the boundary is still valid; only strictly after is expired.
+	if (&ClubInvitation{ExpiresAt: &now}).Expired(now) {
+		t.Error("an invitation expiring exactly now was treated as already expired")
+	}
+	var nilInv *ClubInvitation
+	if nilInv.Expired(now) {
+		t.Error("nil invitation reported expired instead of being ignored")
+	}
+}

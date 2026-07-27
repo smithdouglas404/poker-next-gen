@@ -770,6 +770,12 @@ CREATE TABLE IF NOT EXISTS poker_club_invitation (
 
 CREATE INDEX IF NOT EXISTS idx_poker_club_inv_club ON poker_club_invitation(club_id, type, status);
 CREATE INDEX IF NOT EXISTS idx_poker_club_inv_user ON poker_club_invitation(user_id, type, status);
+-- Invitations expire. Without this a pending invite lived forever: one sent a
+-- year ago was still acceptable, and accepting it still seeded the member's
+-- club balance with the credit_limit_cents that was granted at the time. NULL
+-- means "no expiry" so rows written before this column keep their old
+-- behaviour rather than being retroactively voided.
+ALTER TABLE poker_club_invitation ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS poker_club_stats (
     club_id TEXT PRIMARY KEY REFERENCES poker_club(id) ON DELETE CASCADE,

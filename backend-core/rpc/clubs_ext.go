@@ -396,6 +396,10 @@ func ClubInvite(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		Role             string `json:"role"`
 		CreditLimitCents int64  `json:"credit_limit_cents"`
 		Message          string `json:"message"`
+		// ExpiresInDays bounds how long the invite stays acceptable. Omitted =>
+		// the default window; explicit 0 => never expires, for the rare standing
+		// invitation an operator genuinely wants open-ended.
+		ExpiresInDays *int `json:"expires_in_days"`
 	}
 	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" || req.UserID == "" {
 		return "", runtime.NewError("club_id and user_id required", 3)
@@ -407,6 +411,25 @@ func ClubInvite(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 	if req.Role == "" {
 		req.Role = "member"
 	}
+	if req.CreditLimitCents < 0 {
+		return "", runtime.NewError("credit limit cannot be negative", 3)
+	}
+	// An invitation carries a credit line that is allocated the moment it is
+	// accepted, so an invite that never expires is a standing grant against the
+	// club's balance. Default to a bounded window.
+	days := defaultInviteExpiryDays
+	if req.ExpiresInDays != nil {
+		days = *req.ExpiresInDays
+	}
+	if days < 0 || days > maxInviteExpiryDays {
+		return "", runtime.NewError(
+			fmt.Sprintf("invite expiry must be between 0 (never) and %d days", maxInviteExpiryDays), 3)
+	}
+	var expiresAt *time.Time
+	if days > 0 {
+		t := time.Now().UTC().AddDate(0, 0, days)
+		expiresAt = &t
+	}
 	es := store.NewClubExtStore(db)
 	id, err := es.CreateInvitation(ctx, &store.ClubInvitation{
 		ClubID:           req.ClubID,
@@ -417,13 +440,25 @@ func ClubInvite(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		Role:             req.Role,
 		CreditLimitCents: req.CreditLimitCents,
 		Message:          req.Message,
+		ExpiresAt:        expiresAt,
 	})
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	_ = es.LogActivity(ctx, req.ClubID, inviter, "invite", "invited "+req.UserID)
-	return `{"ok":true,"invitation_id":"` + id + `"}`, nil
+	out, _ := json.Marshal(map[string]interface{}{
+		"ok": true, "invitation_id": id, "expires_at": expiresAt,
+	})
+	return string(out), nil
 }
+
+// Invitation expiry bounds. The default is deliberately short: an accepted
+// invite immediately allocates its credit line against the club, so a pending
+// one is an outstanding commitment, not just a message.
+const (
+	defaultInviteExpiryDays = 14
+	maxInviteExpiryDays     = 365
+)
 
 // ClubInviteRevoke cancels a pending club-issued invitation. Configurer-gated —
 // only an operator who can configure the club may pull back an invite it sent.
@@ -571,6 +606,13 @@ func ClubRequestReview(ctx context.Context, logger runtime.Logger, db *sql.DB, n
 		// Invitee-side decision: caller must be the invited user.
 		if callerUserID != inv.UserID {
 			return "", runtime.NewError("forbidden: not your invitation", 7)
+		}
+		// Expiry is enforced here rather than only being displayed, because
+		// accepting is what allocates the invitation's credit line against the
+		// club. A stale invite must not still be able to draw on it.
+		if inv.Expired(time.Now().UTC()) {
+			_ = es.SetInvitationStatus(ctx, inv.ID, "expired", callerUserID)
+			return "", runtime.NewError("this invitation has expired — ask the club to send a new one", 9)
 		}
 		switch req.Action {
 		case "accept", "approve":

@@ -52,6 +52,11 @@ export interface ClubInvitation {
   status: string; // pending | sent | accepted | expired | declined
   message: string;
   created_at: string;
+  /** Server-set expiry (poker_club_invitation.expires_at). Absent/null = no
+   *  expiry. The server refuses to accept a lapsed invite, because accepting is
+   *  what allocates its credit line against the club — so this is a real
+   *  deadline, not a display hint. */
+  expires_at?: string | null;
 }
 
 // ---- Live RPC wrappers ------------------------------------------------------
@@ -77,14 +82,18 @@ export const screensApi = {
     role?: string;
     creditLimitCents?: number;
     message?: string;
+    /** Days until the invite lapses. Omit for the server default (14);
+     *  0 means it never expires. */
+    expiresInDays?: number;
   }) =>
-    call<{ ok: boolean; invitation_id: string }>("club_invite", {
+    call<{ ok: boolean; invitation_id: string; expires_at?: string | null }>("club_invite", {
       club_id: opts.clubId,
       user_id: opts.userId,
       username: opts.username ?? opts.userId,
       role: opts.role ?? "member",
       credit_limit_cents: opts.creditLimitCents ?? 0,
       message: opts.message ?? "",
+      ...(opts.expiresInDays === undefined ? {} : { expires_in_days: opts.expiresInDays }),
     }),
   /** Revoke (cancel) a pending club-issued invitation. Configurer-gated. */
   revokeInvite: (invitationId: string) =>

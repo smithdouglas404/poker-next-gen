@@ -241,8 +241,17 @@ type ClubInvitation struct {
 	Status          string    `json:"status"`
 	Message         string    `json:"message"`
 	CreatedAt       time.Time `json:"created_at"`
+	// ExpiresAt bounds how long a pending invite stays acceptable. NULL means no
+	// expiry, which is what every row written before the column existed carries —
+	// they keep their old behaviour rather than being retroactively voided.
+	ExpiresAt       *time.Time `json:"expires_at,omitempty"`
 	ReviewedAt      *time.Time `json:"reviewed_at,omitempty"`
 	ReviewedBy      string    `json:"reviewed_by,omitempty"`
+}
+
+// Expired reports whether a pending invitation is past its expiry at `now`.
+func (i *ClubInvitation) Expired(now time.Time) bool {
+	return i != nil && i.ExpiresAt != nil && now.After(*i.ExpiresAt)
 }
 
 // CreateInvitation inserts an invite/request row and returns its id.
@@ -259,17 +268,17 @@ func (s *ClubExtStore) CreateInvitation(ctx context.Context, inv *ClubInvitation
 	inv.CreatedAt = time.Now().UTC()
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO poker_club_invitation
-			(id, club_id, user_id, username, inviter, type, role, credit_limit_cents, status, message, created_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+			(id, club_id, user_id, username, inviter, type, role, credit_limit_cents, status, message, created_at, expires_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
 		inv.ID, inv.ClubID, inv.UserID, inv.Username, inv.Inviter, inv.Type, inv.Role,
-		inv.CreditLimitCents, inv.Status, inv.Message, inv.CreatedAt)
+		inv.CreditLimitCents, inv.Status, inv.Message, inv.CreatedAt, inv.ExpiresAt)
 	return inv.ID, err
 }
 
 // GetInvitation returns an invitation by id, or (nil, nil) if missing.
 func (s *ClubExtStore) GetInvitation(ctx context.Context, id string) (*ClubInvitation, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, club_id, user_id, username, inviter, type, role, credit_limit_cents, status, message, created_at, reviewed_at, reviewed_by
+		SELECT id, club_id, user_id, username, inviter, type, role, credit_limit_cents, status, message, created_at, expires_at, reviewed_at, reviewed_by
 		FROM poker_club_invitation WHERE id=$1`, id)
 	inv, err := clubsextScanInvitation(row)
 	if err == sql.ErrNoRows {
@@ -284,7 +293,7 @@ func (s *ClubExtStore) GetInvitation(ctx context.Context, id string) (*ClubInvit
 // ListInvitationsForClub lists a club's invitations of a given type/status
 // (empty status returns all).
 func (s *ClubExtStore) ListInvitationsForClub(ctx context.Context, clubID, invType, status string) ([]ClubInvitation, error) {
-	q := `SELECT id, club_id, user_id, username, inviter, type, role, credit_limit_cents, status, message, created_at, reviewed_at, reviewed_by
+	q := `SELECT id, club_id, user_id, username, inviter, type, role, credit_limit_cents, status, message, created_at, expires_at, reviewed_at, reviewed_by
 		FROM poker_club_invitation WHERE club_id=$1 AND type=$2`
 	args := []interface{}{clubID, invType}
 	if status != "" {
@@ -297,7 +306,7 @@ func (s *ClubExtStore) ListInvitationsForClub(ctx context.Context, clubID, invTy
 
 // ListInvitationsForUser lists a user's invitations of a given type/status.
 func (s *ClubExtStore) ListInvitationsForUser(ctx context.Context, userID, invType, status string) ([]ClubInvitation, error) {
-	q := `SELECT id, club_id, user_id, username, inviter, type, role, credit_limit_cents, status, message, created_at, reviewed_at, reviewed_by
+	q := `SELECT id, club_id, user_id, username, inviter, type, role, credit_limit_cents, status, message, created_at, expires_at, reviewed_at, reviewed_by
 		FROM poker_club_invitation WHERE user_id=$1 AND type=$2`
 	args := []interface{}{userID, invType}
 	if status != "" {
@@ -329,12 +338,17 @@ func clubsextScanInvitation(row interface {
 	Scan(dest ...interface{}) error
 }) (*ClubInvitation, error) {
 	var inv ClubInvitation
+	var expiresAt sql.NullTime
 	var reviewedAt sql.NullTime
 	var reviewedBy sql.NullString
 	if err := row.Scan(&inv.ID, &inv.ClubID, &inv.UserID, &inv.Username, &inv.Inviter, &inv.Type,
 		&inv.Role, &inv.CreditLimitCents, &inv.Status, &inv.Message, &inv.CreatedAt,
-		&reviewedAt, &reviewedBy); err != nil {
+		&expiresAt, &reviewedAt, &reviewedBy); err != nil {
 		return nil, err
+	}
+	if expiresAt.Valid {
+		t := expiresAt.Time
+		inv.ExpiresAt = &t
 	}
 	if reviewedAt.Valid {
 		t := reviewedAt.Time

@@ -32,7 +32,10 @@ const ROLES = [
 
 // Invitations expire after this window; mirrors the server default surfaced by
 // ClubRequestReview's "already resolved" gate on stale invites.
-const INVITE_TTL_DAYS = 7;
+// The server sets and enforces the expiry (poker_club_invitation.expires_at,
+// default 14 days). This is only the value the composer REQUESTS for a new
+// invite — the column below reads the real stored date, not a guess.
+const INVITE_TTL_DAYS = 14;
 
 function inviteCode(seed: string): string {
   // Deterministic pseudo-code from the recipient — purely presentational; the
@@ -142,6 +145,9 @@ export function ClubInvitations() {
         username: to,
         role: r,
         creditLimitCents: credit,
+        // The server owns and enforces the deadline; this is the window the
+        // operator is asking for.
+        expiresInDays: INVITE_TTL_DAYS,
       });
       if (!resend && credit > 0) {
         // Seed the invitee's club credit; best-effort until they accept.
@@ -386,11 +392,15 @@ export function ClubInvitations() {
             </thead>
             <tbody>
               {invites.map((inv) => {
-                const sent = new Date(inv.created_at);
-                const expires = new Date(+sent + INVITE_TTL_DAYS * 86_400_000);
+                // Expiry used to be computed here as created_at + a client
+                // constant — a date the UI invented and the server had never heard
+                // of, so an "expired" invite was still perfectly acceptable. Read
+                // the real column; null means the operator chose no expiry.
+                const expiresAt = inv.expires_at ? new Date(inv.expires_at) : null;
                 const s = inv.status.toLowerCase();
                 const pending = s === "sent" || s === "pending";
                 const resolved = s === "accepted";
+                const lapsed = !!expiresAt && pending && expiresAt.getTime() < Date.now();
                 return (
                   <tr key={inv.id} className="border-b border-white/[0.05] last:border-0">
                     <td className="px-5 py-3">
@@ -402,9 +412,18 @@ export function ClubInvitations() {
                     <td className="px-5 py-3 capitalize text-white/70">{inv.role || "member"}</td>
                     <td className="px-5 py-3 text-white/70">{formatMoneyMode(inv.credit_limit_cents, "club")}</td>
                     <td className="px-5 py-3 text-white/55">{dateOnly(inv.created_at)}</td>
-                    <td className="px-5 py-3 text-white/55">{resolved ? "—" : dateOnly(expires.toISOString())}</td>
+                    <td className={cn("px-5 py-3", lapsed ? "text-brand" : "text-white/55")}>
+                      {resolved || !expiresAt ? (
+                        <span className="text-white/35">{resolved ? "—" : "No expiry"}</span>
+                      ) : (
+                        <>
+                          {dateOnly(expiresAt.toISOString())}
+                          {lapsed && <span className="ml-1.5 text-[10px] uppercase">lapsed</span>}
+                        </>
+                      )}
+                    </td>
                     <td className="px-5 py-3">
-                      <StatusPill status={inv.status} />
+                      <StatusPill status={lapsed ? "expired" : inv.status} />
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex items-center justify-end gap-2">
@@ -429,7 +448,15 @@ export function ClubInvitations() {
             </tbody>
           </table>
         </div>
-        {invites.length === 0 && <EmptyState>No invitations yet.</EmptyState>}
+        {invites.length === 0 && (
+          <EmptyState>
+            {failed
+              ? // Tracked since this screen was written but never rendered, so an
+                // outage looked identical to "nobody has been invited".
+                "Couldn't reach the club service, so no invitations are shown. This is not the same as having none."
+              : "No invitations yet."}
+          </EmptyState>
+        )}
       </div>
     </OwnerPageShell>
   );
