@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { Button } from "@/features/ui";
+import { Button, Field, Input, Select } from "@/features/ui";
 
 import { adminApi, relTime } from "../adminRpc";
 import { Badge, Card, Empty, GoldHeading, Mono, Row, Table, Td, Th } from "../primitives";
@@ -91,6 +91,8 @@ export function Rewards({ notify }: { notify: Notify }) {
 
   return (
     <div className="space-y-6">
+      <CatalogEditor notify={notify} />
+
       <Card>
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <GoldHeading>Reward Fulfilment</GoldHeading>
@@ -193,5 +195,189 @@ export function Rewards({ notify }: { notify: Notify }) {
         </div>
       </Card>
     </div>
+  );
+}
+
+
+/** Sponsor + reward catalog editor.
+ *
+ * reward_sponsor_upsert and reward_item_upsert both shipped and neither had a
+ * caller, so the rewards marketplace could only ever show rows seeded directly
+ * into the database. An operator could not add a sponsor or a reward at all.
+ *
+ * Deliberately minimal: the fields the RPCs actually validate, nothing more. A
+ * reward needs a sponsor, so the sponsor form comes first and the item form
+ * refuses to submit until one exists. */
+function CatalogEditor({ notify }: { notify: Notify }) {
+  const [sponsors, setSponsors] = useState<Array<{ id: string; name: string; category: string }>>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  const [sName, setSName] = useState("");
+  const [sCat, setSCat] = useState("experiences");
+  const [sDesc, setSDesc] = useState("");
+
+  const [iSponsor, setISponsor] = useState("");
+  const [iTitle, setITitle] = useState("");
+  const [iPoints, setIPoints] = useState("1000");
+  const [iValue, setIValue] = useState("");
+  const [iStock, setIStock] = useState("-1");
+
+  const load = useCallback(async () => {
+    try {
+      const res = await adminApi.rewardsCatalog();
+      setSponsors(res.sponsors ?? []);
+      setCategories(res.categories ?? []);
+      if (!iSponsor && (res.sponsors ?? []).length > 0) setISponsor(res.sponsors[0].id);
+    } catch {
+      /* catalog unreadable — the forms still work, the picker is just empty */
+    }
+  }, [iSponsor]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const addSponsor = () =>
+    void (async () => {
+      if (!sName.trim()) return;
+      setBusy(true);
+      try {
+        await adminApi.rewardSponsorUpsert({
+          name: sName.trim(),
+          category: sCat,
+          description: sDesc.trim(),
+        });
+        notify(`Sponsor "${sName.trim()}" saved.`);
+        setSName("");
+        setSDesc("");
+        await load();
+      } catch (err) {
+        notify(err instanceof Error ? err.message : "Could not save the sponsor", "err");
+      } finally {
+        setBusy(false);
+      }
+    })();
+
+  const addItem = () =>
+    void (async () => {
+      const points = Number(iPoints);
+      if (!iSponsor || !iTitle.trim() || !Number.isFinite(points) || points <= 0) return;
+      setBusy(true);
+      try {
+        const sponsor = sponsors.find((s) => s.id === iSponsor);
+        await adminApi.rewardItemUpsert({
+          sponsor_id: iSponsor,
+          // The item inherits its sponsor's category unless the catalog has none;
+          // a reward filed under a different category than its sponsor is how the
+          // marketplace filters start disagreeing with themselves.
+          category: sponsor?.category ?? sCat,
+          title: iTitle.trim(),
+          points_cost: Math.round(points),
+          cash_value_cents: iValue ? Math.round(Number(iValue) * 100) : 0,
+          stock: Number(iStock),
+        });
+        notify(`Reward "${iTitle.trim()}" saved.`);
+        setITitle("");
+        setIValue("");
+        await load();
+      } catch (err) {
+        notify(err instanceof Error ? err.message : "Could not save the reward", "err");
+      } finally {
+        setBusy(false);
+      }
+    })();
+
+  return (
+    <Card>
+      <GoldHeading>Catalog</GoldHeading>
+      <p className="mt-2 text-[12px] leading-snug text-neutral-500">
+        Sponsors and the rewards they offer. Players spend loyalty points here, so anything added
+        becomes immediately redeemable — and lands in the fulfilment queue below when it is.
+      </p>
+
+      <div className="mt-5 grid gap-6 lg:grid-cols-2">
+        {/* Sponsor */}
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-400">
+            Add a sponsor
+          </p>
+          <div className="mt-3 space-y-3">
+            <Field label="Name">
+              <Input value={sName} onChange={(e) => setSName(e.target.value)} placeholder="Brand name" />
+            </Field>
+            <Field label="Category">
+              <Select value={sCat} onChange={(e) => setSCat(e.target.value)}>
+                {(categories.length > 0
+                  ? categories
+                  : ["travel", "food", "recreation", "experiences", "merch"]
+                ).map((c) => (
+                  <option key={c} value={c} className="bg-[#262d38]">
+                    {c}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Description" hint="Optional.">
+              <Input value={sDesc} onChange={(e) => setSDesc(e.target.value)} placeholder="Short blurb" />
+            </Field>
+            <Button variant="gold" size="sm" disabled={busy || !sName.trim()} onClick={addSponsor}>
+              {busy ? "Saving…" : "Save sponsor"}
+            </Button>
+          </div>
+        </div>
+
+        {/* Reward */}
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-400">
+            Add a reward
+          </p>
+          {sponsors.length === 0 ? (
+            <p className="mt-3 text-[13px] text-neutral-500">
+              Add a sponsor first — every reward belongs to one.
+            </p>
+          ) : (
+            <div className="mt-3 space-y-3">
+              <Field label="Sponsor">
+                <Select value={iSponsor} onChange={(e) => setISponsor(e.target.value)}>
+                  {sponsors.map((s) => (
+                    <option key={s.id} value={s.id} className="bg-[#262d38]">
+                      {s.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Title">
+                <Input value={iTitle} onChange={(e) => setITitle(e.target.value)} placeholder="What the player gets" />
+              </Field>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Points cost">
+                  <Input
+                    type="number"
+                    min={1}
+                    value={iPoints}
+                    onChange={(e) => setIPoints(e.target.value)}
+                  />
+                </Field>
+                <Field label="Cash value ($)" hint="Optional; display only.">
+                  <Input value={iValue} onChange={(e) => setIValue(e.target.value)} placeholder="0" />
+                </Field>
+              </div>
+              <Field label="Stock" hint="-1 for unlimited. Redeeming reserves a unit.">
+                <Input type="number" value={iStock} onChange={(e) => setIStock(e.target.value)} />
+              </Field>
+              <Button
+                variant="gold"
+                size="sm"
+                disabled={busy || !iTitle.trim() || !iSponsor}
+                onClick={addItem}
+              >
+                {busy ? "Saving…" : "Save reward"}
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
   );
 }

@@ -256,13 +256,41 @@ func ClubLeave(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtim
 	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" {
 		return "", runtime.NewError("club_id required", 3)
 	}
-	m, _ := store.NewClubStore(db).GetMembership(ctx, req.ClubID, userID)
-	if m != nil && m.Role == "owner" {
+	cs := store.NewClubStore(db)
+	m, _ := cs.GetMembership(ctx, req.ClubID, userID)
+	if m == nil {
+		return "", runtime.NewError("you are not a member of this club", 5)
+	}
+	if m.Role == "owner" {
 		return "", runtime.NewError("owners cannot leave their own club", 9)
 	}
-	if err := store.NewClubStore(db).RemoveMember(ctx, req.ClubID, userID); err != nil {
+	// Two loose ends this used to leave behind. RemoveMember deletes the roster
+	// row and nothing else, so leaving was silently destructive in both cases:
+	//
+	//  1. Club-allocated chips live in poker_player_balance keyed by
+	//     (club_id, user_id), not on the roster row. Leaving with a balance
+	//     orphaned it — the club had extended credit to someone who was no longer
+	//     a member, and the player could not spend it because every club gate
+	//     checks membership first. Their chips simply vanished from their reach.
+	//  2. Leaving mid-session would strand a seat funded by that club's chips.
+	//
+	// Both are refusals rather than silent cleanups: the money is the player's
+	// and what happens to it is their decision, not a side effect of clicking
+	// Leave.
+	if bal, berr := cs.GetBalance(ctx, req.ClubID, userID); berr == nil && bal != nil {
+		if held := bal.Balance + bal.LockedAmount; held > 0 {
+			return "", runtime.NewError(fmt.Sprintf(
+				"you still hold %d.%02d in club chips — cash out or spend them before leaving",
+				held/100, held%100), 9)
+		}
+	}
+	if cnt, cerr := store.NewActiveSeatStore(db).Count(ctx, userID); cerr == nil && cnt > 0 {
+		return "", runtime.NewError("leave your table before leaving the club", 9)
+	}
+	if err := cs.RemoveMember(ctx, req.ClubID, userID); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
+	_ = store.NewClubExtStore(db).LogActivity(ctx, req.ClubID, userID, "member_leave", userID+" left the club")
 	return `{"ok":true}`, nil
 }
 

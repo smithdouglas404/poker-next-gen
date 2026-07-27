@@ -597,17 +597,18 @@ func DeviceRegister(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 	var req struct {
 		Fingerprint string `json:"fingerprint"`
 		UserAgent   string `json:"user_agent"`
-		IP          string `json:"ip"`
 	}
 	if err := json.Unmarshal([]byte(payload), &req); err != nil || strings.TrimSpace(req.Fingerprint) == "" {
 		return "", runtime.NewError("fingerprint required", 3)
 	}
-	ip := strings.TrimSpace(req.IP)
-	if ip == "" {
-		if v, ok := ctx.Value(runtime.RUNTIME_CTX_CLIENT_IP).(string); ok {
-			ip = v
-		}
-	}
+	// The IP comes from the CONNECTION, never from the payload.
+	//
+	// This used to accept a client-supplied `ip` and fall back to the observed one
+	// only when it was absent — so the input to shared-device and multi-account
+	// detection was set by the party being detected. Anyone colluding could send
+	// a different IP per account and never correlate, or send a victim's IP and
+	// have them flagged. A fraud signal the suspect controls is not a signal.
+	ip, _ := ctx.Value(runtime.RUNTIME_CTX_CLIENT_IP).(string)
 	if err := store.NewAiprocStore(db).RegisterDevice(ctx, userID, strings.TrimSpace(req.Fingerprint), ip, req.UserAgent); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
@@ -752,10 +753,10 @@ func RakebackProcessAll(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 		}
 	}
 	out, _ := json.Marshal(map[string]interface{}{
-		"users_paid":     paid,
-		"total_cents":    totalCents,
-		"total_dollars":  dollars(totalCents),
-		"candidates":     len(users),
+		"users_paid":    paid,
+		"total_cents":   totalCents,
+		"total_dollars": dollars(totalCents),
+		"candidates":    len(users),
 	})
 	return string(out), nil
 }
@@ -794,7 +795,7 @@ func PresenceOnline(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 		online = atTables
 	}
 	out, _ := json.Marshal(map[string]interface{}{
-		"online":          online,
+		"online":            online,
 		"players_at_tables": atTables,
 	})
 	return string(out), nil

@@ -17,6 +17,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+
+import { registerDevice } from "@/features/security/deviceRegister";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Award,
@@ -43,7 +45,7 @@ import {
   Users,
   Wallet,
   X,
-} from "lucide-react";
+  LifeBuoy,} from "lucide-react";
 
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { useMeRoles } from "@/features/commands/useMeRoles";
@@ -85,6 +87,7 @@ const SECONDARY: NavItem[] = [
   { icon: Shield, label: "Game Integrity", href: "/integrity" },
   { icon: ShoppingBag, label: "Verification", href: "/kyc" },
   { icon: Users, label: "My Profile", href: "/profile" },
+  { icon: LifeBuoy, label: "Support", href: "/support" },
 ];
 
 const ADMIN: NavItem = { icon: Shield, label: "Admin", href: "/admin" };
@@ -164,6 +167,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, [hidden, pathname]);
+
+  // Register this device once per session for multi-account / shared-device
+  // detection. device_register shipped with the anti-cheat backend and had no
+  // caller, so every shared-device check downstream read an empty table and
+  // reported a clean platform. Fire-and-forget: a player is never blocked
+  // because a fraud signal could not be recorded.
+  useEffect(() => {
+    if (hidden) return;
+    void registerDevice();
+  }, [hidden]);
 
   // Close the mobile drawer whenever the route changes.
   useEffect(() => setDrawerOpen(false), [pathname]);

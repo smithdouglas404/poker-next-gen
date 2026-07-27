@@ -15,6 +15,7 @@ import {
 import { BTN_GOLD, GLASS_PANEL, GLASS_PANEL_HOVER, HEADING_SM, cn } from "@/features/ui/tokens";
 import { DailyMissionsWidget } from "@/features/dashboard/DailyMissionsWidget";
 import { MyInvitations } from "@/features/clubs/MyInvitations";
+import { MyClubs } from "@/features/clubs/MyClubs";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
 
 /* ================================================================= sidebar */
@@ -556,6 +557,10 @@ export default function DashboardPage() {
               {/* Pending club invitations. Renders nothing when there are none,
                   so it costs the dashboard no space in the common case. */}
               <MyInvitations />
+
+              {/* Clubs the player belongs to, with the Leave control that
+                  club_leave shipped without. Renders nothing when they are in none. */}
+              <MyClubs />
 
               <HighStakes tables={data.tables} />
 

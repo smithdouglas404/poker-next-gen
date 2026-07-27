@@ -98,6 +98,30 @@ export const adminApi = {
     call<{ redemptions: RewardRedemptionRow[] }>("reward_redemptions_pending", { limit }),
   rewardRedemptionFulfil: (id: string, status: "fulfilled" | "cancelled") =>
     call<{ status: string; points_refunded: number }>("reward_redemption_fulfil", { id, status }),
+  // Catalog. Both upserts shipped with the rewards backend and had no caller, so
+  // the marketplace could only ever show what was seeded straight into the DB.
+  rewardSponsorUpsert: (sponsor: {
+    name: string;
+    category: string;
+    description?: string;
+    logo_url?: string;
+  }) => call<{ id: string }>("reward_sponsor_upsert", sponsor),
+  rewardItemUpsert: (item: {
+    sponsor_id: string;
+    category: string;
+    title: string;
+    description?: string;
+    image_url?: string;
+    points_cost: number;
+    cash_value_cents?: number;
+    stock?: number;
+  }) => call<{ id: string }>("reward_item_upsert", item),
+  rewardsCatalog: () =>
+    call<{
+      categories: string[];
+      sponsors: Array<{ id: string; name: string; category: string }>;
+      items: Array<{ id: string; title: string; points_cost: number; stock: number }>;
+    }>("rewards_catalog", {}),
 
   // Double-entry ledger. The audit backstop for every other money surface: if
   // the trial balance is non-zero the books have drifted, and no other screen
