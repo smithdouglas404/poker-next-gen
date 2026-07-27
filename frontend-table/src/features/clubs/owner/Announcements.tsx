@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
+import { InlineMarkup } from "@/features/ui/InlineMarkup";
 
 import { relTime } from "./ownerRpc";
 import { SectionTitle } from "./ui";
@@ -17,10 +18,22 @@ const AUDIENCE: Array<{ id: Audience; label: string }> = [
   { id: "tournament", label: "Tournament Players Only" },
 ];
 
-const DELIVERY: Array<{ id: DeliveryStyle; label: string; severity: string }> = [
-  { id: "overlay", label: "Sleek Overlay", severity: "info" },
-  { id: "modal", label: "Breaking News Modal", severity: "critical" },
-  { id: "chat", label: "Table Chat Blast", severity: "warning" },
+type Severity = "info" | "warning" | "critical";
+
+const DELIVERY: Array<{ id: DeliveryStyle; label: string }> = [
+  { id: "overlay", label: "Sleek Overlay" },
+  { id: "modal", label: "Breaking News Modal" },
+  { id: "chat", label: "Table Chat Blast" },
+];
+
+// Severity used to be DERIVED from the delivery style (overlay→info,
+// modal→critical, chat→warning), so an operator could never send an
+// informational modal or an urgent overlay. They are independent concerns:
+// delivery is HOW it appears, severity is HOW LOUD it is.
+const SEVERITY: Array<{ id: Severity; label: string; dot: string }> = [
+  { id: "info", label: "Info", dot: "#22c55e" },
+  { id: "warning", label: "Warning", dot: "#f5c518" },
+  { id: "critical", label: "Critical", dot: "#e01e2b" },
 ];
 
 /** Global Announcement Control Center (master: detailed_private_table_setup_4).
@@ -39,7 +52,7 @@ export function Announcements({
   onBroadcast: (
     title: string,
     body: string,
-    severity: string,
+    severity: Severity,
     audience: Audience,
     channel: DeliveryStyle,
   ) => Promise<void>;
@@ -65,9 +78,11 @@ export function Announcements({
   };
   const [audience, setAudience] = useState<Audience>("all");
   const [delivery, setDelivery] = useState<DeliveryStyle>("modal");
+  const [severity, setSeverity] = useState<Severity>("info");
   const [busy, setBusy] = useState(false);
 
   const deliveryMeta = DELIVERY.find((d) => d.id === delivery) ?? DELIVERY[1];
+  const severityMeta = SEVERITY.find((x) => x.id === severity) ?? SEVERITY[0];
   const canSend = canManage && (title.trim() !== "" || body.trim() !== "") && !busy;
 
   const broadcast = () => {
@@ -76,9 +91,9 @@ export function Announcements({
     const finalTitle = title.trim() || body.trim().split("\n")[0].slice(0, 80) || "Club Announcement";
     void (async () => {
       try {
-        // Audience + delivery channel are real params persisted server-side —
-        // no longer appended to the body as a text tag.
-        await onBroadcast(finalTitle, body.trim(), deliveryMeta.severity, audience, delivery);
+        // Audience, delivery channel and severity are all real params. The
+        // server resolves the audience to actual recipients and sends.
+        await onBroadcast(finalTitle, body.trim(), severity, audience, delivery);
         setTitle("");
         setBody("");
       } finally {
@@ -183,6 +198,29 @@ export function Announcements({
                 );
               })}
             </div>
+
+            <p className="mt-5 font-display text-base font-semibold text-white">Severity</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {SEVERITY.map((sv) => {
+                const on = severity === sv.id;
+                return (
+                  <button
+                    key={sv.id}
+                    type="button"
+                    onClick={() => setSeverity(sv.id)}
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition",
+                      on
+                        ? "border-white/40 bg-white/[0.06] text-white"
+                        : "border-white/12 text-white/55 hover:border-white/30 hover:text-white/80",
+                    )}
+                  >
+                    <span className="h-2 w-2 rounded-full" style={{ background: sv.dot }} />
+                    {sv.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -196,7 +234,11 @@ export function Announcements({
                   <div className="w-full max-w-sm rounded-lg bg-black/70 px-3 py-2 text-left">
                     <p className="text-[10px] font-bold uppercase tracking-wide text-gold">Table Chat</p>
                     <p className="mt-1 text-sm text-white/85">
-                      {body.trim() || "Your announcement appears in every table chat."}
+                      {body.trim() ? (
+                        <InlineMarkup text={body.trim()} />
+                      ) : (
+                        "Your announcement appears in every table chat."
+                      )}
                     </p>
                   </div>
                 ) : (
@@ -217,15 +259,37 @@ export function Announcements({
                       {title.trim() || (delivery === "modal" ? "Breaking News Modal" : "Announcement")}
                     </div>
                     <div className="px-4 py-4 text-sm text-white/85">
-                      {body.trim() || "ATTENTION ALL PLAYERS: your message renders here in the chosen style."}
+                      {body.trim() ? (
+                        // Same renderer the inbox uses, so the preview cannot
+                        // drift from what a player actually reads.
+                        <InlineMarkup text={body.trim()} />
+                      ) : (
+                        "ATTENTION ALL PLAYERS: your message renders here in the chosen style."
+                      )}
                     </div>
                   </div>
                 )}
               </div>
               <p className="mt-2 text-center text-[10px] uppercase tracking-[0.2em] text-white/35">
-                {deliveryMeta.label} · {AUDIENCE.find((a) => a.id === audience)?.label}
+                {deliveryMeta.label} · {severityMeta.label} ·{" "}
+                {AUDIENCE.find((a) => a.id === audience)?.label}
               </p>
             </div>
+            {/* Say what the reach actually is. The in-table renderer lives in the
+                table layer, which is frozen until the felt work resumes, so an
+                announcement does not appear on the felt yet — and the operator
+                should know that before they rely on it. */}
+            <p className="mt-3 text-[11px] leading-snug text-white/40">
+              Delivered to{" "}
+              <span className="text-white/70">
+                {audience === "private"
+                  ? "members sitting at your tables right now"
+                  : audience === "tournament"
+                    ? "members entered in your tournaments"
+                    : "every active member of your club"}
+              </span>
+              , and waiting in their notifications. It does not appear on the felt yet.
+            </p>
           </div>
 
           <button
@@ -264,7 +328,11 @@ export function Announcements({
                       <p className="min-w-0 flex-1 truncate font-semibold text-white">{a.title}</p>
                       <span className="shrink-0 text-[10px] text-white/35">{relTime(a.created_at)}</span>
                     </div>
-                    {a.body && <p className="mt-1 line-clamp-2 text-xs text-white/55">{a.body}</p>}
+                    {a.body && (
+                      <p className="mt-1 line-clamp-2 text-xs text-white/55">
+                        <InlineMarkup text={a.body} />
+                      </p>
+                    )}
                     {(a.audience || a.channel) && (
                       <div className="mt-1.5 flex flex-wrap gap-1.5">
                         <span className="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-white/50">

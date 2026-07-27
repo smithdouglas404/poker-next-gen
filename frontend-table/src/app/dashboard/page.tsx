@@ -14,6 +14,7 @@ import {
 } from "@/features/dashboard/dashboardRpc";
 import { BTN_GOLD, GLASS_PANEL, GLASS_PANEL_HOVER, HEADING_SM, cn } from "@/features/ui/tokens";
 import { DailyMissionsWidget } from "@/features/dashboard/DailyMissionsWidget";
+import { NotificationBell } from "@/features/notifications/NotificationBell";
 
 /* ================================================================= sidebar */
 
@@ -155,18 +156,13 @@ function TopBar({ mode }: { mode: DashboardData["mode"] }) {
             className="w-44 bg-transparent text-sm text-white placeholder:text-neutral-600 outline-none"
           />
         </label>
-        <Link
-          href="/loyalty"
-          aria-label="Notifications"
-          className="grid h-10 w-10 place-items-center rounded-xl border border-white/[0.06] bg-surface text-neutral-300 transition hover:text-brand"
-        >
-          <span className="relative">
-            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
-              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10.5 21a2 2 0 0 0 3 0" />
-            </svg>
-            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-brand" />
-          </span>
-        </Link>
+        {/* Was a second "Notifications" control that navigated to /loyalty and
+            wore a red dot lit unconditionally — a badge that meant nothing and a
+            bell that opened the wrong thing. Same component as the app bar so the
+            two cannot disagree about what is unread. */}
+        <div className="grid h-10 w-10 place-items-center rounded-xl border border-white/[0.06] bg-surface text-neutral-300">
+          <NotificationBell />
+        </div>
         <Link
           href="/wallet"
           aria-label="Vault"

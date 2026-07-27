@@ -21,7 +21,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Award,
   BarChart3,
-  Bell,
   ChevronRight,
   Coins,
   Crown,
@@ -49,6 +48,7 @@ import {
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { useMeRoles } from "@/features/commands/useMeRoles";
 import { cn } from "@/features/ui/tokens";
+import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { SPRINGS } from "@/features/ui/motion";
 
 interface NavItem {
@@ -326,14 +326,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           <div className="flex-1" />
 
-          <button
-            type="button"
-            className="rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-white/10 hover:text-foreground"
-            aria-label="Notifications"
-            onClick={() => router.push("/dashboard")}
-          >
-            <Bell className="h-4 w-4" />
-          </button>
+          {/* Was a bell that only navigated to /dashboard — a control that looked
+              like an inbox and was not one. Now reads real Nakama notifications,
+              which is also where club broadcasts land. */}
+          <NotificationBell />
 
           <Link
             href="/wallet"
