@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"time"
 )
 
 // Listing is a cosmetic offered for sale by a member.
@@ -80,6 +81,88 @@ func (s *MarketplaceStore) Browse(ctx context.Context, limit int) ([]Listing, er
 			return nil, err
 		}
 		out = append(out, l)
+	}
+	return out, rows.Err()
+}
+
+// Activity is one line of a member's own trading history — a listing they
+// posted or a purchase they made, in any state.
+type Activity struct {
+	ID         string `json:"id"`
+	CosmeticID string `json:"cosmetic_id"`
+	Name       string `json:"name,omitempty"`
+	Kind       string `json:"kind,omitempty"`
+	Rarity     string `json:"rarity,omitempty"`
+	PreviewRef string `json:"preview_ref,omitempty"`
+	PriceCents int64  `json:"price_cents"`
+	FeeCents   int64  `json:"fee_cents"`
+	// NetCents is what the SELLER actually received. Zero on a purchase line.
+	NetCents  int64  `json:"net_cents"`
+	Status    string `json:"status"` // open | sold | cancelled
+	Side      string `json:"side"`   // sell | buy
+	UpdatedAt string `json:"updated_at"`
+}
+
+// MyActivity returns the caller's own listings and purchases, newest first.
+//
+// Nothing read the sold rows. A seller's item left the floor, their wallet moved
+// by an amount that was not the price they set (the fee came out of it), and
+// there was no record anywhere connecting the two — the only trace of a
+// completed trade was a balance that had changed for no stated reason.
+func (s *MarketplaceStore) MyActivity(ctx context.Context, userID string, limit int) ([]Activity, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT l.id, l.cosmetic_id, c.name, c.kind, c.rarity, c.preview_ref,
+		       l.price_cents, l.fee_cents, l.status,
+		       CASE WHEN l.seller_user_id=$1 THEN 'sell' ELSE 'buy' END,
+		       l.updated_at
+		FROM poker_listing l JOIN poker_cosmetic c ON c.id=l.cosmetic_id
+		WHERE l.seller_user_id=$1 OR (l.buyer_user_id=$1 AND l.buyer_user_id<>'')
+		ORDER BY l.updated_at DESC LIMIT $2`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Activity{}
+	for rows.Next() {
+		var a Activity
+		var updated sql.NullTime
+		if err := rows.Scan(&a.ID, &a.CosmeticID, &a.Name, &a.Kind, &a.Rarity, &a.PreviewRef,
+			&a.PriceCents, &a.FeeCents, &a.Status, &a.Side, &updated); err != nil {
+			return nil, err
+		}
+		if updated.Valid {
+			a.UpdatedAt = updated.Time.UTC().Format(time.RFC3339)
+		}
+		// The fee is the seller's cost, so netting it off a buy line would
+		// misreport what the buyer paid — they paid the full price.
+		if a.Side == "sell" && a.Status == "sold" {
+			a.NetCents = a.PriceCents - a.FeeCents
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// OpenListingCosmetics returns the cosmetic ids the caller currently has on the
+// floor, so the sell grid can mark them instead of offering a "List for sale"
+// button the server will refuse with "already listed".
+func (s *MarketplaceStore) OpenListingCosmetics(ctx context.Context, userID string) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT cosmetic_id FROM poker_listing WHERE seller_user_id=$1 AND status='open'`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
 	}
 	return out, rows.Err()
 }

@@ -151,6 +151,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"marketplace_browse":          rpc.MarketplaceBrowse,
 		"marketplace_buy":             rpc.MarketplaceBuy,
 		"marketplace_cancel":          rpc.MarketplaceCancel,
+		"marketplace_activity":        rpc.MarketplaceActivity,
 		// Alliances
 		"alliance_create":      rpc.AllianceCreate,
 		"alliance_list":        rpc.AllianceList,

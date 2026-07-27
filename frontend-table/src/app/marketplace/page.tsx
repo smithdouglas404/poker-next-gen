@@ -17,6 +17,7 @@ import type {
   Listing,
   Loadout,
   NFTStatus,
+  TradeActivity,
 } from "@/features/marketplace/types";
 
 type Tab = "market" | "shop" | "tiers" | "premium" | "vault";
@@ -59,6 +60,9 @@ export default function MarketplacePage() {
   const [catalog, setCatalog] = useState<Cosmetic[]>([]);
   const [wishlist, setWishlist] = useState<Cosmetic[]>([]);
   const [loadouts, setLoadouts] = useState<Loadout[]>([]);
+  const [activity, setActivity] = useState<TradeActivity[]>([]);
+  const [feeBps, setFeeBps] = useState<number | null>(null);
+  const [listedIds, setListedIds] = useState<Set<string>>(new Set());
 
   // UI state
   const [error, setError] = useState<string | null>(null);
@@ -76,8 +80,25 @@ export default function MarketplacePage() {
   const equippedIds = useMemo(() => new Set(Object.values(equipped)), [equipped]);
 
   const loadMarket = useCallback(async () => {
-    const b = await rpc<{ listings?: Listing[] }>("marketplace_browse", {});
+    const b = await rpc<{
+      listings?: Listing[];
+      fee_bps?: number;
+      my_listed_cosmetic_ids?: string[];
+    }>("marketplace_browse", {});
     setListings(b.listings ?? []);
+    // null, not 0 — "we don't know your fee" and "your fee is zero" are
+    // different claims, and only one of them is safe to print next to a price.
+    setFeeBps(typeof b.fee_bps === "number" ? b.fee_bps : null);
+    setListedIds(new Set(b.my_listed_cosmetic_ids ?? []));
+  }, []);
+
+  const loadActivity = useCallback(async () => {
+    try {
+      const a = await rpc<{ activity?: TradeActivity[] }>("marketplace_activity", {});
+      setActivity(a.activity ?? []);
+    } catch {
+      /* history is supplementary — never block the floor on it */
+    }
   }, []);
 
   const loadInventory = useCallback(async () => {
@@ -105,11 +126,17 @@ export default function MarketplacePage() {
     try {
       const session = await ensureNakamaSession();
       setMyUserId(session.user_id ?? "");
-      await Promise.all([loadMarket(), loadInventory(), loadShop(), loadLoadouts()]);
+      await Promise.all([
+        loadMarket(),
+        loadInventory(),
+        loadShop(),
+        loadLoadouts(),
+        loadActivity(),
+      ]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load the vault");
     }
-  }, [loadMarket, loadInventory, loadShop, loadLoadouts]);
+  }, [loadMarket, loadInventory, loadShop, loadLoadouts, loadActivity]);
 
   useEffect(() => {
     void loadAll();
@@ -134,14 +161,14 @@ export default function MarketplacePage() {
     act("buy" + l.id, async () => {
       const r = await rpc<{ paid_cents?: number }>("marketplace_buy", { listing_id: l.id });
       setMessage(`Bought "${l.name ?? "item"}" for ${usd(r.paid_cents ?? l.price_cents)} — now in your Vault.`);
-      await Promise.all([loadMarket(), loadInventory()]);
+      await Promise.all([loadMarket(), loadInventory(), loadActivity()]);
     });
 
   const cancelListing = (l: Listing) =>
     act("cancel" + l.id, async () => {
       await rpc("marketplace_cancel", { listing_id: l.id });
       setMessage("Listing withdrawn.");
-      await loadMarket();
+      await Promise.all([loadMarket(), loadActivity()]);
     });
 
   const listForSale = (c: Cosmetic) =>
@@ -149,7 +176,7 @@ export default function MarketplacePage() {
       const cents = Math.max(1, Math.round(parseFloat(price[c.id] ?? "10") * 100));
       await rpc("marketplace_list", { cosmetic_id: c.id, price_cents: cents });
       setMessage(`Listed "${c.name}" for ${usd(cents)}.`);
-      await loadMarket();
+      await Promise.all([loadMarket(), loadActivity()]);
     });
 
   // Locally add a demo/offline avatar to the collection (labeled, never live).
@@ -351,6 +378,9 @@ export default function MarketplacePage() {
             busy={busy}
             price={price}
             setPrice={setPrice}
+            feeBps={feeBps}
+            listedIds={listedIds}
+            activity={activity}
             onBuy={buyListing}
             onCancel={cancelListing}
             onList={listForSale}
@@ -441,6 +471,9 @@ function MarketTab({
   busy,
   price,
   setPrice,
+  feeBps,
+  listedIds,
+  activity,
   onBuy,
   onCancel,
   onList,
@@ -451,10 +484,18 @@ function MarketTab({
   busy: string | null;
   price: Record<string, string>;
   setPrice: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  feeBps: number | null;
+  listedIds: Set<string>;
+  activity: TradeActivity[];
   onBuy: (l: Listing) => void;
   onCancel: (l: Listing) => void;
   onList: (c: Cosmetic) => void;
 }) {
+  // What the seller actually walks away with. The fee is charged either way;
+  // this only stops it being a surprise deducted after the fact.
+  const netOf = (cents: number) =>
+    feeBps === null ? null : cents - Math.floor((cents * feeBps) / 10000);
+
   return (
     <div className="space-y-10">
       <section>
@@ -510,8 +551,16 @@ function MarketTab({
       <section>
         <h2 className={HEADING_LG}>Sell From Your Collection</h2>
         <p className="mb-4 mt-1 text-xs text-neutral-500">
-          List an owned item. The platform fee (your tier&rsquo;s marketplace rate) is deducted at
-          sale; the remainder credits your wallet. Selling requires biometric verification.
+          List an owned item. {feeBps === null ? (
+            "The platform fee for your tier is deducted at sale; the remainder credits your wallet."
+          ) : (
+            <>
+              Your marketplace fee is{" "}
+              <span className="font-semibold text-gold">{(feeBps / 100).toFixed(2)}%</span>, deducted
+              at sale; the remainder credits your wallet.
+            </>
+          )}{" "}
+          Selling requires biometric verification.
         </p>
         {inventory.length === 0 ? (
           <Panel className="p-10 text-center text-sm text-neutral-500">
@@ -519,38 +568,111 @@ function MarketTab({
           </Panel>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {inventory.map((c) => (
-              <div key={c.id} className={cn(GLASS_PANEL, "overflow-hidden")}>
-                <CosmeticThumb preview={c.preview_ref} kind={c.kind} rarity={c.rarity} />
-                <div className="space-y-2 p-4">
-                  <p className="truncate text-sm font-semibold">{c.name}</p>
-                  <RarityTag rarity={c.rarity} kind={c.kind} />
-                  <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-black/40 px-3 py-1.5">
-                    <span className="text-neutral-500">$</span>
-                    <Input
-                      type="number"
-                      min={1}
-                      step={1}
-                      value={price[c.id] ?? "10"}
-                      onChange={(e) => setPrice((p) => ({ ...p, [c.id]: e.target.value }))}
-                      className="border-0 bg-transparent px-1 py-0.5 text-sm focus:ring-0"
-                    />
+            {inventory.map((c) => {
+              // Already on the floor. The server refuses a second listing with
+              // "already listed", so offering the button again is a click that
+              // can only fail — and the seller had no other way to tell which of
+              // their items were currently for sale.
+              const alreadyListed = listedIds.has(c.id);
+              const cents = Math.max(1, Math.round(parseFloat(price[c.id] ?? "10") * 100));
+              const net = netOf(cents);
+              return (
+                <div key={c.id} className={cn(GLASS_PANEL, "overflow-hidden")}>
+                  <CosmeticThumb preview={c.preview_ref} kind={c.kind} rarity={c.rarity} />
+                  <div className="space-y-2 p-4">
+                    <p className="truncate text-sm font-semibold">{c.name}</p>
+                    <RarityTag rarity={c.rarity} kind={c.kind} />
+                    {alreadyListed ? (
+                      <>
+                        <p className="pt-1 text-[11px] uppercase tracking-wider text-gold">
+                          On the trading floor
+                        </p>
+                        <p className="text-xs text-neutral-500">
+                          Withdraw it from the floor above to change the price.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-black/40 px-3 py-1.5">
+                          <span className="text-neutral-500">$</span>
+                          <Input
+                            type="number"
+                            min={1}
+                            step={1}
+                            value={price[c.id] ?? "10"}
+                            onChange={(e) => setPrice((p) => ({ ...p, [c.id]: e.target.value }))}
+                            className="border-0 bg-transparent px-1 py-0.5 text-sm focus:ring-0"
+                          />
+                        </div>
+                        {net !== null && (
+                          <p className="text-[11px] text-neutral-500">
+                            You receive <span className="font-semibold text-green">{usd(net)}</span>{" "}
+                            after the {(feeBps! / 100).toFixed(2)}% fee
+                          </p>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy !== null}
+                          onClick={() => onList(c)}
+                          className="w-full"
+                        >
+                          {busy === "list" + c.id ? "Listing…" : "List for sale"}
+                        </Button>
+                      </>
+                    )}
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy !== null}
-                    onClick={() => onList(c)}
-                    className="w-full"
-                  >
-                    {busy === "list" + c.id ? "Listing…" : "List for sale"}
-                  </Button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
+
+      {/* Trade history. The sold rows always existed — buyer, price and fee are
+          all on the listing — and nothing read them, so a completed sale left no
+          trace a player could see: the item vanished from the floor and the
+          wallet moved by an amount that wasn't the asking price. */}
+      {activity.length > 0 && (
+        <section>
+          <h2 className={HEADING_LG}>Your Trades</h2>
+          <p className="mb-4 mt-1 text-xs text-neutral-500">
+            Everything you&rsquo;ve listed, sold, withdrawn, or bought.
+          </p>
+          <Panel className="divide-y divide-white/[0.06] p-0">
+            {activity.map((a) => (
+              <div key={a.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                <span
+                  className={cn(
+                    "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+                    a.side === "buy"
+                      ? "border-white/15 text-neutral-400"
+                      : a.status === "sold"
+                        ? "border-emerald-500/40 text-green"
+                        : a.status === "open"
+                          ? "border-gold/40 text-gold"
+                          : "border-white/15 text-neutral-500",
+                  )}
+                >
+                  {a.side === "buy" ? "Bought" : a.status === "sold" ? "Sold" : a.status}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-sm text-neutral-200">
+                  {a.name ?? a.cosmetic_id}
+                </span>
+                <span className="shrink-0 text-right text-sm">
+                  <span className="font-display text-gold">{usd(a.price_cents)}</span>
+                  {a.side === "sell" && a.status === "sold" && (
+                    <span className="ml-2 text-[11px] text-neutral-500">
+                      net <span className="text-green">{usd(a.net_cents)}</span>
+                      {a.fee_cents > 0 && <> · fee {usd(a.fee_cents)}</>}
+                    </span>
+                  )}
+                </span>
+              </div>
+            ))}
+          </Panel>
+        </section>
+      )}
     </div>
   );
 }

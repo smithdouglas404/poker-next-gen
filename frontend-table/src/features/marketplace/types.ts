@@ -25,6 +25,23 @@ export interface Listing {
   preview_ref?: string;
 }
 
+/** One line of the caller's own trading history (marketplace_activity). */
+export interface TradeActivity {
+  id: string;
+  cosmetic_id: string;
+  name?: string;
+  kind?: string;
+  rarity?: string;
+  preview_ref?: string;
+  price_cents: number;
+  fee_cents: number;
+  /** What the seller actually received. Zero on a buy line. */
+  net_cents: number;
+  status: string; // open | sold | cancelled
+  side: "sell" | "buy";
+  updated_at?: string;
+}
+
 export interface Loadout {
   id: string;
   user_id: string;

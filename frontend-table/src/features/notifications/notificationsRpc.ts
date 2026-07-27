@@ -19,6 +19,12 @@ export const NOTIFICATION_CODE = {
    * the recipient accepts or declines — where the announcement codes are read-only.
    */
   clubInvite: 557,
+  /**
+   * "Your listing sold" (rpc/marketplace.go). Its own code because it is a MONEY
+   * event, not a message: the inbox shows the price, the fee and the net so the
+   * seller can reconcile it against the wallet movement.
+   */
+  marketplaceSale: 558,
 } as const;
 
 export interface AppNotification {
@@ -32,6 +38,13 @@ export interface AppNotification {
   body: string;
   severity: "info" | "warning" | "critical";
   clubName?: string;
+}
+
+/** Cents → "$12.34". Local to the inbox: a notification carries its own money
+ *  values and must render them without pulling in a page-level formatter. */
+export function notifMoney(cents: unknown): string {
+  const n = typeof cents === "number" ? cents : 0;
+  return `$${(n / 100).toFixed(2)}`;
 }
 
 function asSeverity(v: unknown): AppNotification["severity"] {

@@ -18,6 +18,7 @@ import {
   NOTIFICATION_CODE,
   dismissNotifications,
   listNotifications,
+  notifMoney,
   type AppNotification,
 } from "./notificationsRpc";
 
@@ -45,6 +46,7 @@ function sourceLabel(n: AppNotification): string {
   if (n.code === NOTIFICATION_CODE.clubAnnouncement) return n.clubName ?? "Club";
   if (n.code === NOTIFICATION_CODE.clubInvite) return n.clubName ?? "Club invitation";
   if (n.code === NOTIFICATION_CODE.platformAnnouncement) return "High Rollers";
+  if (n.code === NOTIFICATION_CODE.marketplaceSale) return "Marketplace";
   return "";
 }
 
@@ -192,6 +194,25 @@ export function NotificationBell() {
                       {sourceLabel(n) && (
                         <p className="mt-0.5 text-[10px] uppercase tracking-wider text-neutral-500">
                           {sourceLabel(n)}
+                        </p>
+                      )}
+                      {/* A sale carries numbers, not prose. Showing the net beside
+                          the price is the whole point: the wallet moved by the
+                          net, and without the fee spelled out the two figures
+                          look like a discrepancy. */}
+                      {n.code === NOTIFICATION_CODE.marketplaceSale && (
+                        <p className="mt-1 text-[12px] leading-snug text-neutral-400">
+                          Sold for{" "}
+                          <span className="font-semibold text-gold">
+                            {notifMoney(n.content.price_cents)}
+                          </span>{" "}
+                          · you received{" "}
+                          <span className="font-semibold text-green">
+                            {notifMoney(n.content.net_cents)}
+                          </span>
+                          {typeof n.content.fee_cents === "number" && n.content.fee_cents > 0 && (
+                            <> after a {notifMoney(n.content.fee_cents)} fee</>
+                          )}
                         </p>
                       )}
                       {n.body && (
