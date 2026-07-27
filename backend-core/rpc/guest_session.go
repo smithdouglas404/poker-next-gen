@@ -101,7 +101,7 @@ func GuestSessionReconcile(ctx context.Context, logger runtime.Logger, db *sql.D
 	if g == nil || g.Status != "open" {
 		return "", runtime.NewError("guest session not found or already reconciled", 5)
 	}
-	reviewer, err := requireClubConfigurer(ctx, db, g.ClubID)
+	reviewer, err := requireClubPermission(ctx, db, g.ClubID, store.PermMoney)
 	if err != nil {
 		return "", err
 	}

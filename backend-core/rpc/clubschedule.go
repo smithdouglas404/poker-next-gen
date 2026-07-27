@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
@@ -24,7 +25,7 @@ func ClubScheduleCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" || req.Name == "" {
 		return "", runtime.NewError("club_id and name required", 3)
 	}
-	author, err := requireClubConfigurer(ctx, db, req.ClubID)
+	author, err := requireClubPermission(ctx, db, req.ClubID, store.PermTables)
 	if err != nil {
 		return "", err
 	}
@@ -52,7 +53,15 @@ func ClubScheduleList(ctx context.Context, logger runtime.Logger, db *sql.DB, nk
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
-	out, _ := json.Marshal(map[string]interface{}{"schedules": list})
+	// Resolve each template's next occurrence in the club's timezone. weekday +
+	// "HH:MM" alone name no instant; until the club had a zone this was a time
+	// nobody could actually compute, only display.
+	tz := "UTC"
+	if c, cerr := store.NewClubStore(db).GetByID(ctx, req.ClubID); cerr == nil && c != nil && c.Timezone != "" {
+		tz = c.Timezone
+	}
+	store.AttachNextRuns(list, tz, time.Now().UTC())
+	out, _ := json.Marshal(map[string]interface{}{"schedules": list, "timezone": tz})
 	return string(out), nil
 }
 
@@ -72,7 +81,7 @@ func ClubNightLaunchNow(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 	if sch == nil {
 		return "", runtime.NewError("schedule not found", 5)
 	}
-	host, err := requireClubConfigurer(ctx, db, sch.ClubID)
+	host, err := requireClubPermission(ctx, db, sch.ClubID, store.PermTables)
 	if err != nil {
 		return "", err
 	}

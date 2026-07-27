@@ -145,7 +145,7 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 	if req.ClubID == "" {
 		return "", runtime.NewError("every table must be hosted by a club — pick a club to sponsor it", 3)
 	}
-	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+	if _, err := requireClubPermission(ctx, db, req.ClubID, store.PermTables); err != nil {
 		return "", err
 	}
 	if tier := store.SubscriptionTier(ctx, db, hostUserID); !billing.CanSponsorTable(tier) {

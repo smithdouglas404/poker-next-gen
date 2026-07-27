@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
@@ -53,11 +54,17 @@ func ClubUpdate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		AvatarRef       *string         `json:"avatar_ref"`
 		BannerRef       *string         `json:"banner_ref"`
 		Settings        json.RawMessage `json:"settings_json"`
+		// Preferences the SERVER interprets, so they are real columns rather than
+		// settings_json keys: the zone club-night schedules resolve in, the public
+		// listing's language label, and whether operators must hold 2FA.
+		Timezone        *string `json:"timezone"`
+		PrimaryLanguage *string `json:"primary_language"`
+		TwoFARequired   *bool   `json:"twofa_required"`
 	}
 	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" {
 		return "", runtime.NewError("club_id required", 3)
 	}
-	callerUserID, err := requireClubConfigurer(ctx, db, req.ClubID)
+	callerUserID, err := requireClubPermission(ctx, db, req.ClubID, store.PermSettings)
 	if err != nil {
 		return "", err
 	}
@@ -73,6 +80,44 @@ func ClubUpdate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		SettingsJSON:    req.Settings,
 	}); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
+	}
+	// Preference columns, when any were sent. Read-modify-write against the
+	// current row so a patch that carries only one of the three does not blank
+	// the other two.
+	if req.Timezone != nil || req.PrimaryLanguage != nil || req.TwoFARequired != nil {
+		cs := store.NewClubStore(db)
+		cur, cerr := cs.GetByID(ctx, req.ClubID)
+		if cerr != nil || cur == nil {
+			return "", runtime.NewError("club not found", 5)
+		}
+		tz, lang, twofa := cur.Timezone, cur.PrimaryLanguage, cur.TwoFARequired
+		if req.Timezone != nil {
+			// Reject an unloadable zone here rather than silently falling back to
+			// UTC at schedule time — a club night firing an hour off is worse than
+			// a rejected save.
+			if _, lerr := time.LoadLocation(*req.Timezone); lerr != nil {
+				return "", runtime.NewError("unknown timezone — use an IANA name such as America/New_York", 3)
+			}
+			tz = *req.Timezone
+		}
+		if req.PrimaryLanguage != nil {
+			lang = strings.TrimSpace(*req.PrimaryLanguage)
+			if lang == "" {
+				lang = "en"
+			}
+		}
+		if req.TwoFARequired != nil {
+			// An owner who turns this on without 2FA of their own would lock
+			// themselves out of their club at the very next operator action.
+			if *req.TwoFARequired && !callerHas2FA(ctx, db, callerUserID) {
+				return "", runtime.NewError(
+					"enable 2FA on your own account before requiring it of this club's operators", 9)
+			}
+			twofa = *req.TwoFARequired
+		}
+		if serr := cs.SetClubPreferences(ctx, req.ClubID, tz, lang, twofa); serr != nil {
+			return "", runtime.NewError(serr.Error(), 13)
+		}
 	}
 	_ = es.LogActivity(ctx, req.ClubID, callerUserID, "club_update", "settings updated")
 	club, err := es.GetExt(ctx, req.ClubID)
@@ -216,7 +261,7 @@ func ClubRakeReport(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" {
 		return "", runtime.NewError("club_id required", 3)
 	}
-	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+	if _, err := requireClubPermission(ctx, db, req.ClubID, store.PermMoney); err != nil {
 		return "", err
 	}
 	report, err := store.NewClubExtStore(db).RakeReport(ctx, req.ClubID, clubsextInterval(req.Period))
@@ -353,7 +398,7 @@ func ClubInvite(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" || req.UserID == "" {
 		return "", runtime.NewError("club_id and user_id required", 3)
 	}
-	inviter, err := requireClubConfigurer(ctx, db, req.ClubID)
+	inviter, err := requireClubPermission(ctx, db, req.ClubID, store.PermMembers)
 	if err != nil {
 		return "", err
 	}
@@ -399,7 +444,7 @@ func ClubInviteRevoke(ctx context.Context, logger runtime.Logger, db *sql.DB, nk
 	if inv.Type != "invite" {
 		return "", runtime.NewError("not an invitation", 3)
 	}
-	caller, err := requireClubConfigurer(ctx, db, inv.ClubID)
+	caller, err := requireClubPermission(ctx, db, inv.ClubID, store.PermMembers)
 	if err != nil {
 		return "", err
 	}
@@ -509,7 +554,7 @@ func ClubRequestReview(ctx context.Context, logger runtime.Logger, db *sql.DB, n
 	switch inv.Type {
 	case "request":
 		// Club-side review: caller must be a configurer of the club.
-		if _, err := requireClubConfigurer(ctx, db, inv.ClubID); err != nil {
+		if _, err := requireClubPermission(ctx, db, inv.ClubID, store.PermMembers); err != nil {
 			return "", err
 		}
 		switch req.Action {
@@ -614,7 +659,7 @@ func ClubAnnouncementCreate(ctx context.Context, logger runtime.Logger, db *sql.
 	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" || req.Title == "" {
 		return "", runtime.NewError("club_id and title required", 3)
 	}
-	author, err := requireClubConfigurer(ctx, db, req.ClubID)
+	author, err := requireClubPermission(ctx, db, req.ClubID, store.PermMembers)
 	if err != nil {
 		return "", err
 	}

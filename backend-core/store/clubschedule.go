@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -26,11 +28,53 @@ type ClubSchedule struct {
 	BuyIn      int64     `json:"buy_in"`
 	MaxSeats   int       `json:"max_seats"`
 	Variant    string    `json:"variant"`
-	Weekday    int       `json:"weekday"`     // 0=Sun … 6=Sat (recurrence hint / display)
-	TimeOfDay  string    `json:"time_of_day"` // "HH:MM", operator-local (display)
+	Weekday    int       `json:"weekday"`     // 0=Sun … 6=Sat
+	TimeOfDay  string    `json:"time_of_day"` // "HH:MM" in the CLUB's timezone
 	Enabled    bool      `json:"enabled"`
 	CreatedBy  string    `json:"created_by"`
 	CreatedAt  time.Time `json:"created_at"`
+	// NextRunAt is derived, not stored: the next moment this template comes due,
+	// resolved in the owning club's timezone. Weekday+TimeOfDay alone name no
+	// actual instant — before the club gained a timezone this template described
+	// a time that could not be computed, only displayed.
+	NextRunAt *time.Time `json:"next_run_at,omitempty"`
+}
+
+// NextRun returns the next occurrence of this template's weekday/time in `loc`,
+// strictly after `now`. Returns nil for a disabled template or an unparseable
+// time-of-day rather than guessing an instant.
+func (c *ClubSchedule) NextRun(now time.Time, loc *time.Location) *time.Time {
+	if !c.Enabled || loc == nil {
+		return nil
+	}
+	var hh, mm int
+	if n, err := fmt.Sscanf(strings.TrimSpace(c.TimeOfDay), "%d:%d", &hh, &mm); n != 2 || err != nil {
+		return nil
+	}
+	if hh < 0 || hh > 23 || mm < 0 || mm > 59 {
+		return nil
+	}
+	local := now.In(loc)
+	// Days until the target weekday; today counts only if the time has not passed.
+	delta := (c.Weekday - int(local.Weekday()) + 7) % 7
+	candidate := time.Date(local.Year(), local.Month(), local.Day(), hh, mm, 0, 0, loc).AddDate(0, 0, delta)
+	if !candidate.After(local) {
+		candidate = candidate.AddDate(0, 0, 7)
+	}
+	return &candidate
+}
+
+// AttachNextRuns fills NextRunAt on every template using the club's timezone.
+// An unknown zone falls back to UTC rather than dropping the field, so the
+// operator always sees a concrete time.
+func AttachNextRuns(schedules []ClubSchedule, timezone string, now time.Time) {
+	loc, err := time.LoadLocation(timezone)
+	if err != nil || loc == nil {
+		loc = time.UTC
+	}
+	for i := range schedules {
+		schedules[i].NextRunAt = schedules[i].NextRun(now, loc)
+	}
 }
 
 // Create inserts a schedule template and returns its id.

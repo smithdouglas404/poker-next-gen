@@ -465,6 +465,30 @@ CREATE TABLE IF NOT EXISTS poker_room_code (
 ALTER TABLE poker_club ADD COLUMN IF NOT EXISTS elo INT NOT NULL DEFAULT 1500;
 ALTER TABLE poker_club ADD COLUMN IF NOT EXISTS accepts_global_wallet BOOLEAN NOT NULL DEFAULT FALSE;
 
+-- Graduated club permissions (HRC `detailed_private_table_setup_9`, Security card).
+--
+-- Club authority used to be binary: requireClubConfigurer accepted
+-- `can_configure OR role='owner'` and that one check guarded 39 call sites, so
+-- there was no way to let somebody moderate a club without also handing them the
+-- club's money. `permissions` is a comma-separated slug list from the set
+-- {manage_members, manage_money, manage_tables, manage_settings}.
+--
+-- EMPTY MEANS FULL ACCESS. Every seat that exists today has an empty column, and
+-- enforcement must not begin the moment this ALTER runs — that would strip
+-- authority from every operator on every club on deploy. A seat is only
+-- constrained once an owner explicitly assigns it permissions. See
+-- rpc/clubperm.go.
+ALTER TABLE poker_owner ADD COLUMN IF NOT EXISTS permissions TEXT NOT NULL DEFAULT '';
+
+-- Club preferences the SERVER interprets, so they are real columns rather than
+-- settings_json keys. timezone resolves poker_club_schedule.time_of_day (stored
+-- as bare 'HH:MM' and commented "operator-local" with nothing to interpret it
+-- against); primary_language labels the club in club_browse; twofa_required is
+-- enforced in requireClubConfigurer.
+ALTER TABLE poker_club ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'UTC';
+ALTER TABLE poker_club ADD COLUMN IF NOT EXISTS primary_language TEXT NOT NULL DEFAULT 'en';
+ALTER TABLE poker_club ADD COLUMN IF NOT EXISTS twofa_required BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- Alliances: a federation of clubs. A founding club creates the alliance and
 -- other clubs join. A club belongs to at most one alliance (UNIQUE club_id).
 CREATE TABLE IF NOT EXISTS poker_alliance (

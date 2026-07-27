@@ -18,14 +18,15 @@ func (s *ClubStore) Create(ctx context.Context, club *models.Club) error {
 	now := time.Now().UTC()
 	club.CreatedAt, club.UpdatedAt = now, now
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO poker_club (id,name,slug,description,currency,accepts_global_wallet,is_active,created_at,updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-		club.ID, club.Name, club.Slug, club.Description, club.Currency, club.AcceptsGlobalWallet, club.IsActive, club.CreatedAt, club.UpdatedAt)
+		INSERT INTO poker_club (id,name,slug,description,currency,accepts_global_wallet,timezone,primary_language,twofa_required,is_active,created_at,updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+		club.ID, club.Name, club.Slug, club.Description, club.Currency, club.AcceptsGlobalWallet,
+		club.Timezone, club.PrimaryLanguage, club.TwoFARequired, club.IsActive, club.CreatedAt, club.UpdatedAt)
 	return err
 }
 
 func (s *ClubStore) List(ctx context.Context) ([]models.Club, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id,name,slug,description,currency,accepts_global_wallet,is_active,created_at,updated_at FROM poker_club WHERE is_active ORDER BY created_at DESC LIMIT 100`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,name,slug,description,currency,accepts_global_wallet,COALESCE(timezone,'UTC'),COALESCE(primary_language,'en'),COALESCE(twofa_required,FALSE),is_active,created_at,updated_at FROM poker_club WHERE is_active ORDER BY created_at DESC LIMIT 100`)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +34,7 @@ func (s *ClubStore) List(ctx context.Context) ([]models.Club, error) {
 	var out []models.Club
 	for rows.Next() {
 		var c models.Club
-		if err := rows.Scan(&c.ID, &c.Name, &c.Slug, &c.Description, &c.Currency, &c.AcceptsGlobalWallet, &c.IsActive, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Slug, &c.Description, &c.Currency, &c.AcceptsGlobalWallet, &c.Timezone, &c.PrimaryLanguage, &c.TwoFARequired, &c.IsActive, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, c)
@@ -43,8 +44,8 @@ func (s *ClubStore) List(ctx context.Context) ([]models.Club, error) {
 
 func (s *ClubStore) GetByID(ctx context.Context, id string) (*models.Club, error) {
 	var c models.Club
-	err := s.db.QueryRowContext(ctx, `SELECT id,name,slug,description,currency,accepts_global_wallet,is_active,created_at,updated_at FROM poker_club WHERE id=$1`, id).
-		Scan(&c.ID, &c.Name, &c.Slug, &c.Description, &c.Currency, &c.AcceptsGlobalWallet, &c.IsActive, &c.CreatedAt, &c.UpdatedAt)
+	err := s.db.QueryRowContext(ctx, `SELECT id,name,slug,description,currency,accepts_global_wallet,COALESCE(timezone,'UTC'),COALESCE(primary_language,'en'),COALESCE(twofa_required,FALSE),is_active,created_at,updated_at FROM poker_club WHERE id=$1`, id).
+		Scan(&c.ID, &c.Name, &c.Slug, &c.Description, &c.Currency, &c.AcceptsGlobalWallet, &c.Timezone, &c.PrimaryLanguage, &c.TwoFARequired, &c.IsActive, &c.CreatedAt, &c.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -58,8 +59,8 @@ func (s *ClubStore) GetByID(ctx context.Context, id string) (*models.Club, error
 // space-insensitive on the caller side; slugs are stored normalized.
 func (s *ClubStore) GetBySlug(ctx context.Context, slug string) (*models.Club, error) {
 	var c models.Club
-	err := s.db.QueryRowContext(ctx, `SELECT id,name,slug,description,currency,accepts_global_wallet,is_active,created_at,updated_at FROM poker_club WHERE slug=$1 AND is_active`, slug).
-		Scan(&c.ID, &c.Name, &c.Slug, &c.Description, &c.Currency, &c.AcceptsGlobalWallet, &c.IsActive, &c.CreatedAt, &c.UpdatedAt)
+	err := s.db.QueryRowContext(ctx, `SELECT id,name,slug,description,currency,accepts_global_wallet,COALESCE(timezone,'UTC'),COALESCE(primary_language,'en'),COALESCE(twofa_required,FALSE),is_active,created_at,updated_at FROM poker_club WHERE slug=$1 AND is_active`, slug).
+		Scan(&c.ID, &c.Name, &c.Slug, &c.Description, &c.Currency, &c.AcceptsGlobalWallet, &c.Timezone, &c.PrimaryLanguage, &c.TwoFARequired, &c.IsActive, &c.CreatedAt, &c.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -74,9 +75,10 @@ func (s *ClubStore) AddOwner(ctx context.Context, o *models.Owner) error {
 	now := time.Now().UTC()
 	o.CreatedAt, o.UpdatedAt = now, now
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO poker_owner (id,club_id,user_id,role,equity_bps,can_configure,created_at,updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (club_id,user_id) DO UPDATE SET role=$4,equity_bps=$5,can_configure=$6,updated_at=$8`,
-		o.ID, o.ClubID, o.UserID, o.Role, o.EquityBps, o.CanConfigure, o.CreatedAt, o.UpdatedAt)
+		INSERT INTO poker_owner (id,club_id,user_id,role,equity_bps,can_configure,permissions,created_at,updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		ON CONFLICT (club_id,user_id) DO UPDATE SET role=$4,equity_bps=$5,can_configure=$6,permissions=$7,updated_at=$9`,
+		o.ID, o.ClubID, o.UserID, o.Role, o.EquityBps, o.CanConfigure, o.Permissions, o.CreatedAt, o.UpdatedAt)
 	return err
 }
 
@@ -124,6 +126,11 @@ type ClubRole struct {
 	Role         string `json:"role"`
 	CanConfigure bool   `json:"can_configure"`
 	Operator     bool   `json:"operator"`
+	// Permissions is the seat's granted capability slugs. Empty means the seat
+	// predates the permission grid and still has full access — the UI must render
+	// that as "full access", NOT as "no permissions". Advisory only: the server
+	// re-checks in requireClubPermission.
+	Permissions []string `json:"permissions"`
 }
 
 // RolesFor returns the caller's fine role in every active club they belong to.
@@ -133,7 +140,7 @@ func (s *ClubStore) RolesFor(ctx context.Context, userID string) ([]ClubRole, er
 
 	// Owner seats (operators): owner | manager | agent + can_configure.
 	oRows, err := s.db.QueryContext(ctx, `
-		SELECT o.club_id, o.role, (o.can_configure OR o.role='owner')
+		SELECT o.club_id, o.role, (o.can_configure OR o.role='owner'), COALESCE(o.permissions,'')
 		FROM poker_owner o
 		JOIN poker_club c ON c.id=o.club_id AND c.is_active
 		WHERE o.user_id=$1`, userID)
@@ -142,11 +149,13 @@ func (s *ClubStore) RolesFor(ctx context.Context, userID string) ([]ClubRole, er
 	}
 	for oRows.Next() {
 		var r ClubRole
-		if err := oRows.Scan(&r.ClubID, &r.Role, &r.CanConfigure); err != nil {
+		var perms string
+		if err := oRows.Scan(&r.ClubID, &r.Role, &r.CanConfigure, &perms); err != nil {
 			oRows.Close()
 			return nil, err
 		}
 		r.Operator = true
+		r.Permissions = SplitPermissions(perms)
 		byClub[r.ClubID] = r
 	}
 	oRows.Close()
@@ -262,7 +271,7 @@ func (s *ClubStore) ListMembers(ctx context.Context, clubID string) ([]ClubMembe
 }
 
 func (s *ClubStore) ListOwners(ctx context.Context, clubID string) ([]models.Owner, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id,club_id,user_id,role,equity_bps,can_configure,created_at,updated_at FROM poker_owner WHERE club_id=$1`, clubID)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,club_id,user_id,role,equity_bps,can_configure,COALESCE(permissions,''),created_at,updated_at FROM poker_owner WHERE club_id=$1`, clubID)
 	if err != nil {
 		return nil, err
 	}
@@ -270,12 +279,37 @@ func (s *ClubStore) ListOwners(ctx context.Context, clubID string) ([]models.Own
 	var out []models.Owner
 	for rows.Next() {
 		var o models.Owner
-		if err := rows.Scan(&o.ID, &o.ClubID, &o.UserID, &o.Role, &o.EquityBps, &o.CanConfigure, &o.CreatedAt, &o.UpdatedAt); err != nil {
+		if err := rows.Scan(&o.ID, &o.ClubID, &o.UserID, &o.Role, &o.EquityBps, &o.CanConfigure, &o.Permissions, &o.CreatedAt, &o.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, o)
 	}
 	return out, rows.Err()
+}
+
+// SetOwnerPermissions updates one operator seat's role and capability grid.
+// Scoped by (club_id, user_id) so it can never touch a seat at another club.
+func (s *ClubStore) SetOwnerPermissions(ctx context.Context, clubID, userID, role, permissions string) error {
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE poker_owner SET role=$3, permissions=$4, updated_at=NOW()
+		WHERE club_id=$1 AND user_id=$2`, clubID, userID, role, permissions)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("no operator seat for that user at this club")
+	}
+	return nil
+}
+
+// SetClubPreferences persists the club settings the server itself interprets:
+// the timezone schedules resolve in, the public-profile language label, and
+// whether operators must have 2FA enrolled.
+func (s *ClubStore) SetClubPreferences(ctx context.Context, clubID, timezone, language string, twofaRequired bool) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE poker_club SET timezone=$2, primary_language=$3, twofa_required=$4, updated_at=NOW()
+		WHERE id=$1`, clubID, timezone, language, twofaRequired)
+	return err
 }
 
 func (s *ClubStore) SetRake(ctx context.Context, r *models.CustomRakeConfiguration) error {

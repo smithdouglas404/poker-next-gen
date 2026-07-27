@@ -43,6 +43,16 @@ func requireClubConfigurer(ctx context.Context, db *sql.DB, clubID string) (stri
 	}
 	for _, o := range owners {
 		if o.UserID == userID && (o.CanConfigure || o.Role == "owner") {
+			// Club-enforced 2FA. The Global Settings "2FA" toggle used to write a
+			// settings_json flag that nothing read; it is now a real column checked
+			// here, at the one chokepoint every club operator action already passes
+			// through. Deliberately placed AFTER the seat check so the message only
+			// ever reaches an actual operator — it must not tell a stranger whether
+			// a given club requires 2FA.
+			if clubRequires2FA(ctx, db, clubID) && !callerHas2FA(ctx, db, userID) {
+				return "", runtime.NewError(
+					"this club requires two-factor authentication for operators — enable 2FA on your account first", 7)
+			}
 			return userID, nil
 		}
 	}
@@ -256,7 +266,7 @@ func ClubMemberRole(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 	if req.Role != "member" && req.Role != "admin" {
 		return "", runtime.NewError("role must be member or admin", 3)
 	}
-	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+	if _, err := requireClubPermission(ctx, db, req.ClubID, store.PermMembers); err != nil {
 		return "", err
 	}
 	if err := store.NewClubStore(db).SetMemberRole(ctx, req.ClubID, req.UserID, req.Role); err != nil {
@@ -274,7 +284,7 @@ func ClubKick(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime
 	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" || req.UserID == "" {
 		return "", runtime.NewError("club_id and user_id required", 3)
 	}
-	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+	if _, err := requireClubPermission(ctx, db, req.ClubID, store.PermMembers); err != nil {
 		return "", err
 	}
 	clubStore := store.NewClubStore(db)
@@ -350,11 +360,30 @@ func ClubOwnerAdd(ctx context.Context, logger runtime.Logger, db *sql.DB, nk run
 	if req.ClubID == "" || req.UserID == "" {
 		return "", runtime.NewError("club_id and user_id required", 3)
 	}
-	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+	if _, err := requireClubPermission(ctx, db, req.ClubID, store.PermSettings); err != nil {
 		return "", err
 	}
 	if req.Role == "" {
 		req.Role = "manager"
+	}
+	switch req.Role {
+	case "owner", "manager", "moderator", "agent":
+	default:
+		return "", runtime.NewError("role must be one of owner, manager, moderator, agent", 3)
+	}
+	// A new seat gets its role's preset grid rather than an empty column. Empty
+	// means "legacy, full access" (see store.SeatHasPermission), which is right for
+	// seats that predate the grid and wrong for one created after it — a fresh
+	// moderator must not silently get everything.
+	if strings.TrimSpace(req.Permissions) == "" {
+		req.Permissions = store.JoinPermissions(store.RolePermissions(req.Role))
+	} else {
+		for _, p := range store.SplitPermissions(req.Permissions) {
+			if !store.IsPermission(p) {
+				return "", runtime.NewError("unknown permission in grid", 3)
+			}
+		}
+		req.Permissions = store.JoinPermissions(store.SplitPermissions(req.Permissions))
 	}
 	clubStore := store.NewClubStore(db)
 
@@ -386,7 +415,7 @@ func BalanceAllocate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk 
 	}
 	// Only a club owner/configurer may allocate chips — otherwise any player
 	// could mint themselves an unlimited buy-in bankroll.
-	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+	if _, err := requireClubPermission(ctx, db, req.ClubID, store.PermMoney); err != nil {
 		return "", err
 	}
 	if req.Currency == "" {
@@ -436,7 +465,7 @@ func RakeConfigSet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 	if req.ClubID == "" {
 		return "", runtime.NewError("club_id required", 3)
 	}
-	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+	if _, err := requireClubPermission(ctx, db, req.ClubID, store.PermMoney); err != nil {
 		return "", err
 	}
 	if req.Name == "" {
@@ -497,7 +526,7 @@ func RakeLedgerGet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 	if err := json.Unmarshal([]byte(payload), &req); err != nil {
 		return "", runtime.NewError("invalid payload", 3)
 	}
-	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+	if _, err := requireClubPermission(ctx, db, req.ClubID, store.PermMoney); err != nil {
 		return "", err
 	}
 	rakeStore := store.NewRakeStore(db)

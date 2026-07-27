@@ -58,7 +58,7 @@ func CreditRequestsPending(ctx context.Context, logger runtime.Logger, db *sql.D
 	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" {
 		return "", runtime.NewError("club_id required", 3)
 	}
-	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+	if _, err := requireClubPermission(ctx, db, req.ClubID, store.PermMoney); err != nil {
 		return "", err
 	}
 	list, err := store.NewCreditRequestStore(db).ListPending(ctx, req.ClubID)
@@ -90,7 +90,7 @@ func CreditRequestReview(ctx context.Context, logger runtime.Logger, db *sql.DB,
 	if cr == nil || cr.Status != "pending" {
 		return "", runtime.NewError("request not found or already resolved", 5)
 	}
-	reviewer, err := requireClubConfigurer(ctx, db, cr.ClubID)
+	reviewer, err := requireClubPermission(ctx, db, cr.ClubID, store.PermMoney)
 	if err != nil {
 		return "", err
 	}
