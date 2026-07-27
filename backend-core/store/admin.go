@@ -97,6 +97,28 @@ func (s *AdminStore) GetUserStatus(ctx context.Context, userID string) (*AdminUs
 	return &st, nil
 }
 
+// IsBanned reports whether a user is currently banned, and why.
+//
+// Fails CLOSED on a lookup error: the caller of this is the authentication
+// gate, and treating an unreadable ban status as "not banned" would let a
+// database hiccup wave a banned account straight through.
+func IsBanned(ctx context.Context, db *sql.DB, userID string) (bool, string, error) {
+	if userID == "" {
+		return false, "", nil
+	}
+	var banned bool
+	var reason string
+	err := db.QueryRowContext(ctx,
+		`SELECT banned, reason FROM poker_user_status WHERE user_id=$1`, userID).Scan(&banned, &reason)
+	if err == sql.ErrNoRows {
+		return false, "", nil
+	}
+	if err != nil {
+		return true, "", err
+	}
+	return banned, reason, nil
+}
+
 // SetBan upserts a user's ban state (banned=true to ban, false to unban).
 func (s *AdminStore) SetBan(ctx context.Context, userID string, banned bool, reason, adminUserID string) error {
 	_, err := s.db.ExecContext(ctx, `

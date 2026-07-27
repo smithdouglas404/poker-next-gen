@@ -99,6 +99,17 @@ func AntibotFlagsList(ctx context.Context, logger runtime.Logger, db *sql.DB, nk
 }
 
 // AntibotBan flags a user as a banned bot with a reason. Admin only.
+//
+// This wrote ONLY to poker_antibot_score.banned, a column nothing outside this
+// file ever read — not login, not table sit-down, nothing. The AntiCheat
+// console's Ban button told the operator "Banned <user>" and the account
+// played on completely unaffected. It now also flips the SAME
+// poker_user_status flag admin_ban/admin_unban use, which the new
+// After-authenticate hooks (rpc/authgate.go) actually enforce. The score
+// table still records the reason and evidence for the review queue; it is no
+// longer the enforcement mechanism. Reversing an antibot ban uses the same
+// Users → Unban control admin_unban already provides — one ban/unban control,
+// not two independent ones.
 func AntibotBan(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	adminID, err := aiprocRequireAdmin(ctx)
 	if err != nil {
@@ -117,6 +128,13 @@ func AntibotBan(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 	}
 	if err := store.NewAiprocStore(db).BanAntibotUser(ctx, req.UserID, reason); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
+	}
+	if err := store.NewAdminStore(db).SetBan(ctx, req.UserID, true, "antibot: "+reason, adminID); err != nil {
+		// The score-table flag is already set; a failure here must not be
+		// silent, because the operator's "Banned" toast would otherwise be a
+		// lie about the one thing that's actually enforced.
+		logger.Error("antibot ban recorded but enforcement flag not set for %s: %v", req.UserID, err)
+		return "", runtime.NewError("recorded, but the account is not actually blocked yet — try again", 13)
 	}
 	logger.Info("antibot ban user=%s by=%s reason=%s", req.UserID, adminID, reason)
 	return `{"ok":true}`, nil

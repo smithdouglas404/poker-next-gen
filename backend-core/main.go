@@ -347,6 +347,22 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		logger.Info("Clerk OAuth bridge enabled (issuer configured)")
 	}
 
+	// Enforce "Ban account" (admin_ban / antibot_ban). Until this, banning a
+	// user flipped a database column nothing read, and the account could log
+	// straight back in through any of the three paths the client uses. These
+	// three After-authenticate hooks are that enforcement — see rpc/authgate.go
+	// for why After rather than Before, and the stated limit (blocks the next
+	// login; does not force-disconnect an already-open session).
+	if err := initializer.RegisterAfterAuthenticateCustom(rpc.AfterAuthenticateCustomDenyBanned); err != nil {
+		return err
+	}
+	if err := initializer.RegisterAfterAuthenticateDevice(rpc.AfterAuthenticateDeviceDenyBanned); err != nil {
+		return err
+	}
+	if err := initializer.RegisterAfterAuthenticateEmail(rpc.AfterAuthenticateEmailDenyBanned); err != nil {
+		return err
+	}
+
 	if err := initializer.RegisterMatch(protocol.MatchModule, func(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule) (runtime.Match, error) {
 		return &holdem.Handler{}, nil
 	}); err != nil {
