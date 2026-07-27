@@ -698,18 +698,54 @@ func encryptForUser(s *MatchState, userID string, plaintext []byte) string {
 	return base64.StdEncoding.EncodeToString(append(nonce, ct...))
 }
 
+// MatchLeave fires on every socket disconnect — tab close, network drop, app
+// crash, forced logout. It called Table.StandUp directly, which just nils the
+// seat: t.Seats[seat] = nil, with the Stack field and everything in it. Every
+// OTHER exit path in this file (voluntary stand-up, host kick, inactivity
+// eviction, RG eviction, table close) returns the stack through releaseBuyIn
+// first. This one never did. Any player who lost wifi, closed their laptop, or
+// had the app crash while seated lost their entire stack, unconditionally,
+// every time — not credited, not locked, not logged, just gone. This was true
+// on every table since the handler shipped.
+//
+// The fix reuses two pieces of machinery already proven correct elsewhere in
+// this file rather than inventing new disconnect/reconnect logic:
+//
+//  1. The same cashout-lock OpStandUp already enforces: a seat holding live
+//     cards in a live hand (SeatSeated or SeatAllIn while the hand is running)
+//     is left exactly as it is. Yanking it out on a network blip would corrupt
+//     the hand for everyone still in it and abandon their chips mid-pot with
+//     no owner. enforceActionDeadline cannot tell a disconnected socket from
+//     an AFK-but-connected one — it never needs to, since it only reads
+//     Table/seat state, never presence — so it auto-checks/folds this seat on
+//     its own schedule exactly as it already does for anyone else who stops
+//     acting. If the disconnect turns out to be permanent, the inactivity
+//     auto-kick in standUpBusted takes over after maxConsecutiveTimeouts, and
+//     that path already calls releaseBuyIn correctly.
+//  2. Everywhere else — the seat is safe to vacate immediately (between hands,
+//     or already folded) — release the buy-in exactly the way every other
+//     stand-up path in this file does, instead of discarding it.
 func (h *Handler) MatchLeave(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, presences []runtime.Presence) interface{} {
 	s := state.(*MatchState)
 	seatReg := store.NewActiveSeatStore(db)
 	for _, p := range presences {
-		delete(s.Presences, p.GetUserId())
+		userID := p.GetUserId()
+		delete(s.Presences, userID)
 		for i, seat := range s.Table.Seats {
-			if seat != nil && seat.UserID == p.GetUserId() {
-				closeSeatSession(ctx, db, s, i)
-				s.Table.StandUp(i)
+			if seat == nil || seat.UserID != userID {
+				continue
 			}
+			if s.Phase != poker.PhaseWaiting && (seat.Status == poker.SeatSeated || seat.Status == poker.SeatAllIn) {
+				break // mid-hand: leave the seat live for the action clock to handle
+			}
+			closeSeatSession(ctx, db, s, i)
+			releaseBuyIn(ctx, logger, db, s, i, userID, seat.Stack)
+			delete(s.SeatWallet, i)
+			delete(s.SeatLocked, i)
+			s.Table.StandUp(i)
+			break
 		}
-		_ = seatReg.Unregister(ctx, p.GetUserId(), matchIDForAudit(s))
+		_ = seatReg.Unregister(ctx, userID, matchIDForAudit(s))
 	}
 	dispatcher.MatchLabelUpdate(buildLabel(s))
 	broadcastSnapshot(ctx, db, dispatcher, s, nil)
@@ -730,11 +766,11 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 	// auto-deal (unless the host paused the table).
 	if s.Phase == poker.PhaseWaiting && s.Table.Street == poker.StreetWaiting {
 		if s.HostClosed {
-			closeTable(ctx, db, dispatcher, s, "closed by host")
+			closeTable(ctx, logger, db, dispatcher, s, "closed by host")
 			return nil
 		}
 		if s.DurationSecs > 0 && tick >= int64(s.DurationSecs) {
-			closeTable(ctx, db, dispatcher, s, "scheduled time reached")
+			closeTable(ctx, logger, db, dispatcher, s, "scheduled time reached")
 			return nil // ending the match releases the handler
 		}
 		if s.AutoDeal && !s.effPaused() && !s.AdminPaused && s.Table.SeatedCount() >= s.minToStart() && len(s.Presences) >= 1 {
@@ -955,7 +991,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				username = fmt.Sprintf("Player_%s", userID[:4])
 			}
 			if err := s.Table.SitDown(req.Seat, userID, username, buyIn); err != nil {
-				releaseBuyIn(ctx, db, s, req.Seat, userID, buyIn)
+				releaseBuyIn(ctx, logger, db, s, req.Seat, userID, buyIn)
 				sendError(dispatcher, presence, "sit_failed", err.Error())
 				continue
 			}
@@ -1036,7 +1072,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 						sendError(dispatcher, presence, "in_hand", "you can't leave mid-hand — fold first, or wait for the hand to finish")
 						break
 					}
-					releaseBuyIn(ctx, db, s, i, userID, seat.Stack)
+					releaseBuyIn(ctx, logger, db, s, i, userID, seat.Stack)
 					delete(s.SeatWallet, i)
 					delete(s.SeatLocked, i)
 					closeSeatSession(ctx, db, s, i)
@@ -1132,7 +1168,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				sendError(dispatcher, presence, "not_host", "only the table host can do that")
 				continue
 			}
-			handleHostAction(ctx, db, dispatcher, s, msg.GetData())
+			handleHostAction(ctx, logger, db, dispatcher, s, msg.GetData())
 
 		case protocol.OpPostStraddle:
 			if !s.Table.AllowStraddle {
@@ -1172,7 +1208,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			}
 
 		case protocol.OpInsuranceAccept:
-			handleInsuranceAccept(ctx, db, dispatcher, s, userID, presence, msg.GetData())
+			handleInsuranceAccept(ctx, logger, db, dispatcher, s, userID, presence, msg.GetData())
 
 		case protocol.OpStartHand:
 			if s.Table.SeatedCount() >= s.minToStart() && s.Phase == poker.PhaseWaiting && s.Table.Street == poker.StreetWaiting {
@@ -1585,7 +1621,7 @@ func maybeOfferInsurance(ctx context.Context, db *sql.DB, dispatcher runtime.Mat
 // handleInsuranceAccept debits the premium from the player's wallet and records
 // the policy. Settlement (payout on loss) happens at showdown. Wallet-only: the
 // live pot is never touched, so pot/side-pot invariants are unaffected.
-func handleInsuranceAccept(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, userID string, presence runtime.Presence, data []byte) {
+func handleInsuranceAccept(ctx context.Context, logger runtime.Logger, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, userID string, presence runtime.Presence, data []byte) {
 	if !s.Table.AllowInsurance {
 		sendError(dispatcher, presence, "insurance_disabled", "insurance is not enabled at this table")
 		return
@@ -1604,7 +1640,14 @@ func handleInsuranceAccept(ctx context.Context, db *sql.DB, dispatcher runtime.M
 	}
 	s.Insurance[userID] = policy
 	delete(s.InsOffered, userID)
-	_ = store.NewInsuranceStore(db).RecordAccepted(ctx, matchIDForAudit(s), s.Table.HandNo, userID, policy.Premium, policy.Payout, policy.Equity)
+	// The premium is already debited and the policy is live in memory (settled
+	// off s.Insurance, not this row) — a failure here only loses the audit
+	// trail, not the payout. Still logged: an accepted policy with no DB record
+	// is exactly the kind of gap a later reconciliation needs to be told about.
+	if err := store.NewInsuranceStore(db).RecordAccepted(ctx, matchIDForAudit(s), s.Table.HandNo, userID, policy.Premium, policy.Payout, policy.Equity); err != nil {
+		logger.Error("insurance policy accepted but not recorded match=%s hand=%d user=%s: %v",
+			matchIDForAudit(s), s.Table.HandNo, userID, err)
+	}
 	narrate(dispatcher, s, fmt.Sprintf("%s took insurance on their all-in.", displayName(s, userID)))
 	broadcastSnapshot(ctx, db, dispatcher, s, nil)
 }
@@ -1612,7 +1655,7 @@ func handleInsuranceAccept(ctx context.Context, db *sql.DB, dispatcher runtime.M
 // settleInsurance pays out accepted policies whose holder lost the hand and marks
 // every policy resolved. Called at showdown before seats reset, using the winner
 // seats from the resolution. Wallet-only; independent of pot settlement.
-func settleInsurance(ctx context.Context, db *sql.DB, s *MatchState, res poker.ShowdownResult) {
+func settleInsurance(ctx context.Context, logger runtime.Logger, db *sql.DB, s *MatchState, res poker.ShowdownResult) {
 	if len(s.Insurance) == 0 {
 		return
 	}
@@ -1627,8 +1670,14 @@ func settleInsurance(ctx context.Context, db *sql.DB, s *MatchState, res poker.S
 		seat := seatForUser(s, userID)
 		playerWon := seat >= 0 && won[seat]
 		if !playerWon {
-			// Lost the hand — pay the insurance payout to their wallet.
-			_ = store.NewWalletStore(db).Credit(ctx, userID, policy.Payout, "insurance_payout")
+			// Lost the hand — pay the insurance payout to their wallet. The record
+			// is marked settled regardless of whether the credit lands, so a
+			// failure here has no retry: the policy reads "resolved" forever and
+			// the player is simply out the payout they paid a premium for.
+			if err := store.NewWalletStore(db).Credit(ctx, userID, policy.Payout, "insurance_payout"); err != nil {
+				logger.Error("INSURANCE PAYOUT FAILED match=%s hand=%d user=%s amount_cents=%d: %v",
+					matchIDForAudit(s), s.Table.HandNo, userID, policy.Payout, err)
+			}
 			_ = ins.Settle(ctx, matchIDForAudit(s), s.Table.HandNo, userID, true)
 		} else {
 			_ = ins.Settle(ctx, matchIDForAudit(s), s.Table.HandNo, userID, false)
@@ -1670,8 +1719,8 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 				sendError(dispatcher, p, "showdown_failed", res.Err.Error())
 			}
 			s.Table.ResetBetweenHands()
-			standUpBusted(ctx, db, dispatcher, s)
-			evictExcluded(ctx, db, dispatcher, s)
+			standUpBusted(ctx, logger, db, dispatcher, s)
+			evictExcluded(ctx, logger, db, dispatcher, s)
 			s.Phase = poker.PhaseWaiting
 			return true
 		}
@@ -1680,7 +1729,7 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		// Rake comes OUT of the pot: credit the club, then deduct that same amount
 		// from the winners' stacks so total chips are conserved (Σ player nets ==
 		// −rake) rather than the club's rake being minted on top of a full payout.
-		rakeAmount := creditRake(ctx, db, s, potBefore)
+		rakeAmount := creditRake(ctx, logger, db, s, potBefore)
 		poker.DeductRakeFromWinners(s.Table, res.Resolutions, rakeAmount)
 		if err := emitHandSettled(ctx, s, res, potBefore, plan); err != nil {
 			logger.Error("audit hand_settled: %v", err)
@@ -1693,7 +1742,7 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		// Tournament eliminations: record finish places for busted seats and, in a
 		// knockout event, pay the eliminator the busted player's head bounty. Runs
 		// while seats still carry this hand's stacks/winners.
-		processTournamentEliminations(ctx, db, s, winners)
+		processTournamentEliminations(ctx, logger, db, s, winners)
 		// Run-it-twice: persist the dealt boards (audit/replay). All-in insurance:
 		// pay out policies whose holder lost. Both run before ResetBetweenHands
 		// while seat/winner state is still intact; both are wallet/record only and
@@ -1701,7 +1750,7 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		if len(res.Boards) > 0 {
 			_ = store.NewRunItTwiceStore(db).Record(ctx, matchIDForAudit(s), s.Table.HandNo, boardStrings(res.Boards))
 		}
-		settleInsurance(ctx, db, s, res)
+		settleInsurance(ctx, logger, db, s, res)
 		// Per-hand analytics + mission progress (best-effort; must not break the
 		// match loop). Uses seat state before ResetBetweenHands clears it.
 		attributeHand(ctx, logger, db, s, res, plan, potBefore, rakeAmount)
@@ -1715,8 +1764,8 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		}
 		s.Table.ResetBetweenHands()
 		reportTournamentBusts(ctx, db, nk, s)
-		standUpBusted(ctx, db, dispatcher, s) // cash tables: clear felted players so the table stays playable
-		evictExcluded(ctx, db, dispatcher, s) // RG: remove players who self-excluded mid-session (#95)
+		standUpBusted(ctx, logger, db, dispatcher, s) // cash tables: clear felted players so the table stays playable
+		evictExcluded(ctx, logger, db, dispatcher, s) // RG: remove players who self-excluded mid-session (#95)
 		s.Phase = poker.PhaseWaiting
 		return true
 	default:
@@ -1807,7 +1856,7 @@ func dealAndBeginBetting(ctx context.Context, db *sql.DB, dispatcher runtime.Mat
 // effect between hands; pause stops new hands being auto-dealt; kick stands a
 // player up (refunding their stack). The caller has already verified the sender
 // is the host.
-func handleHostAction(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, data []byte) {
+func handleHostAction(ctx context.Context, logger runtime.Logger, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, data []byte) {
 	var req struct {
 		Action     string `json:"action"`
 		Seat       int    `json:"seat"`
@@ -1856,7 +1905,7 @@ func handleHostAction(ctx context.Context, db *sql.DB, dispatcher runtime.MatchD
 	case "kick":
 		seat := s.Table.Seats[req.Seat]
 		if req.Seat >= 0 && req.Seat < poker.MaxSeats && seat != nil && !seat.IsBot {
-			releaseBuyIn(ctx, db, s, req.Seat, seat.UserID, seat.Stack)
+			releaseBuyIn(ctx, logger, db, s, req.Seat, seat.UserID, seat.Stack)
 			delete(s.SeatWallet, req.Seat)
 			delete(s.SeatLocked, req.Seat)
 			_ = store.NewActiveSeatStore(db).Unregister(ctx, seat.UserID, matchIDForAudit(s))
@@ -1956,14 +2005,14 @@ func handleHostAction(ctx context.Context, db *sql.DB, dispatcher runtime.MatchD
 // closeTable ends a self-managing table: refunds every seated human's remaining
 // stack to their wallet, clears their active-seat registration, and tells the
 // room. Called only between hands, so no chips are tied up in a live pot.
-func closeTable(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, reason string) {
+func closeTable(ctx context.Context, logger runtime.Logger, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, reason string) {
 	seatReg := store.NewActiveSeatStore(db)
 	for i, seat := range s.Table.Seats {
 		if seat == nil {
 			continue
 		}
 		if !seat.IsBot {
-			releaseBuyIn(ctx, db, s, i, seat.UserID, seat.Stack)
+			releaseBuyIn(ctx, logger, db, s, i, seat.UserID, seat.Stack)
 			delete(s.SeatWallet, i)
 			delete(s.SeatLocked, i)
 			_ = seatReg.Unregister(ctx, seat.UserID, matchIDForAudit(s))
@@ -2173,7 +2222,17 @@ func reserveBuyIn(ctx context.Context, db *sql.DB, s *MatchState, userID string,
 }
 
 // releaseBuyIn returns chips to the SAME wallet the seat bought in from.
-func releaseBuyIn(ctx context.Context, db *sql.DB, s *MatchState, seat int, userID string, amount int64) {
+//
+// This is the game's cash-out path — every stand-up, kick, table close,
+// inactivity eviction, and RG eviction returns a player's stack through here.
+// Both branches used to discard their error entirely: if the credit failed,
+// s.Table.StandUp still ran, the seat emptied, and the player's chips were
+// gone from the table with no record anywhere that they were owed anything.
+// There is no natural retry at this point — the in-memory stack the amount
+// came from no longer exists once this function returns — so logging loudly
+// is the least this can do; it is what makes the loss findable and
+// compensable instead of just gone.
+func releaseBuyIn(ctx context.Context, logger runtime.Logger, db *sql.DB, s *MatchState, seat int, userID string, amount int64) {
 	if amount <= 0 || s.TournamentID != "" {
 		return
 	}
@@ -2191,18 +2250,24 @@ func releaseBuyIn(ctx context.Context, db *sql.DB, s *MatchState, seat int, user
 				locked = v
 			}
 		}
-		_ = store.NewClubStore(db).SettleSeatAtTable(ctx, s.ClubID, userID, locked, amount, matchIDForAudit(s))
+		if err := store.NewClubStore(db).SettleSeatAtTable(ctx, s.ClubID, userID, locked, amount, matchIDForAudit(s)); err != nil {
+			logger.Error("CASHOUT FAILED match=%s club=%s user=%s amount_cents=%d: %v",
+				matchIDForAudit(s), s.ClubID, userID, amount, err)
+		}
 		return
 	}
 	// "global", non-club tables, or unknown -> the global wallet.
-	_ = store.NewWalletStore(db).CreditFrom(ctx, userID, amount, "table_cashout",
-		store.TableAcct(matchIDForAudit(s)))
+	if err := store.NewWalletStore(db).CreditFrom(ctx, userID, amount, "table_cashout",
+		store.TableAcct(matchIDForAudit(s))); err != nil {
+		logger.Error("CASHOUT FAILED match=%s user=%s amount_cents=%d: %v",
+			matchIDForAudit(s), userID, amount, err)
+	}
 }
 
 // creditRake credits the club's rake ledger and accrues rakeback, returning the
 // rake amount so the caller can deduct it from the pot the winners received
 // (rake must come OUT of the pot — winners get pot − rake — or chips are minted).
-func creditRake(ctx context.Context, db *sql.DB, s *MatchState, pot int64) int64 {
+func creditRake(ctx context.Context, logger runtime.Logger, db *sql.DB, s *MatchState, pot int64) int64 {
 	if s.ClubID == "" || pot <= 0 {
 		return 0
 	}
@@ -2223,15 +2288,24 @@ func creditRake(ctx context.Context, db *sql.DB, s *MatchState, pot int64) int64
 	if rakeAmount <= 0 {
 		return 0
 	}
-	_ = store.NewRakeStore(db).Credit(ctx, s.ClubID, rakeAmount, s.MatchID, s.Table.HandNo)
-	accrueRakeback(ctx, db, s, rakeAmount)
+	// The caller deducts rakeAmount from the winners' stacks unconditionally
+	// (DeductRakeFromWinners, right after this returns) — the pot math assumes
+	// the rake was actually credited to the club. If it wasn't, chips vanish
+	// from the table's books: taken from the winners, never landing anywhere,
+	// breaking the exact money-conservation invariant this comment's sibling
+	// function (poker.DeductRakeFromWinners) exists to preserve.
+	if err := store.NewRakeStore(db).Credit(ctx, s.ClubID, rakeAmount, s.MatchID, s.Table.HandNo); err != nil {
+		logger.Error("RAKE CREDIT FAILED match=%s club=%s hand=%d amount_cents=%d (still deducted from winners): %v",
+			s.MatchID, s.ClubID, s.Table.HandNo, rakeAmount, err)
+	}
+	accrueRakeback(ctx, logger, db, s, rakeAmount)
 	return rakeAmount
 }
 
 // accrueRakeback distributes rakeback to the human contributors of the raked
 // pot, proportional to each one's contribution, at their membership tier's
 // rakeback percent. Bots (no tier) are skipped.
-func accrueRakeback(ctx context.Context, db *sql.DB, s *MatchState, rakeAmount int64) {
+func accrueRakeback(ctx context.Context, logger runtime.Logger, db *sql.DB, s *MatchState, rakeAmount int64) {
 	var totalContrib int64
 	for _, seat := range s.Table.Seats {
 		if seat != nil {
@@ -2253,7 +2327,10 @@ func accrueRakeback(ctx context.Context, db *sql.DB, s *MatchState, rakeAmount i
 		share := rakeAmount * seat.TotalContributed / totalContrib
 		amount := share * int64(pct) / 100
 		if amount > 0 {
-			_ = rb.Accrue(ctx, seat.UserID, amount)
+			if err := rb.Accrue(ctx, seat.UserID, amount); err != nil {
+				logger.Error("rakeback accrual failed match=%s user=%s amount_cents=%d: %v",
+					s.MatchID, seat.UserID, amount, err)
+			}
 		}
 	}
 }
@@ -2291,7 +2368,7 @@ func recordWinnings(ctx context.Context, nk runtime.NakamaModule, s *MatchState,
 // to the eliminator (the winning real player left with the largest stack). It is
 // idempotent per elimination via TournamentStore.Eliminate (WHERE status='playing')
 // and BountyStore.Claim (WHERE active), so a re-processed hand pays nothing twice.
-func processTournamentEliminations(ctx context.Context, db *sql.DB, s *MatchState, winnerGroups [][]int) {
+func processTournamentEliminations(ctx context.Context, logger runtime.Logger, db *sql.DB, s *MatchState, winnerGroups [][]int) {
 	if s.TournamentID == "" {
 		return
 	}
@@ -2335,8 +2412,14 @@ func processTournamentEliminations(ctx context.Context, db *sql.DB, s *MatchStat
 			continue // no live registration (bot/filler) or already recorded
 		}
 		if tour.Knockout && eliminator != "" && eliminator != seat.UserID {
-			if amt, _ := bs.Claim(ctx, s.TournamentID, seat.UserID, eliminator); amt > 0 {
-				_ = ws.Credit(ctx, eliminator, amt, "tournament_bounty")
+			// Claim is idempotent (WHERE active) — a re-processed hand won't claim
+			// this bounty again, which means a failed Credit here has no retry:
+			// the bounty reads claimed and the eliminator is simply never paid.
+			if amt, err := bs.Claim(ctx, s.TournamentID, seat.UserID, eliminator); err == nil && amt > 0 {
+				if cerr := ws.Credit(ctx, eliminator, amt, "tournament_bounty"); cerr != nil {
+					logger.Error("BOUNTY PAYOUT FAILED tournament=%s eliminator=%s busted=%s amount_cents=%d: %v",
+						s.TournamentID, eliminator, seat.UserID, amt, cerr)
+				}
 			}
 		}
 	}
@@ -2449,7 +2532,7 @@ func accrueLoyalty(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *
 // is instead auto-topped-up from their wallet to the configured stack and kept
 // seated — the proven "auto-rebuy" mechanic — falling back to standing up only
 // when their wallet can't fund the rebuy.
-func standUpBusted(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
+func standUpBusted(ctx context.Context, logger runtime.Logger, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
 	if s.TournamentID != "" {
 		return
 	}
@@ -2460,7 +2543,7 @@ func standUpBusted(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDisp
 			continue
 		}
 		name := seat.Username
-		releaseBuyIn(ctx, db, s, i, seat.UserID, seat.Stack)
+		releaseBuyIn(ctx, logger, db, s, i, seat.UserID, seat.Stack)
 		delete(s.SeatWallet, i)
 		delete(s.SeatLocked, i)
 		delete(s.TimeoutStreak, seat.UserID)
@@ -2507,7 +2590,7 @@ func standUpBusted(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDisp
 // between-hands point (right after standUpBusted), so no cards or pot chips are
 // live — the same reason the Tier-0 cashout-lock permits it. Reuses the proven
 // eviction idiom: releaseBuyIn → delete SeatWallet → Unregister → StandUp.
-func evictExcluded(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
+func evictExcluded(ctx context.Context, logger runtime.Logger, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
 	if s.TournamentID != "" {
 		return // tournament seats can't cash out mid-event; RG is enforced at registration
 	}
@@ -2521,7 +2604,7 @@ func evictExcluded(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDisp
 			continue
 		}
 		name := seat.Username
-		releaseBuyIn(ctx, db, s, i, seat.UserID, seat.Stack)
+		releaseBuyIn(ctx, logger, db, s, i, seat.UserID, seat.Stack)
 		delete(s.SeatWallet, i)
 		delete(s.SeatLocked, i)
 		_ = store.NewActiveSeatStore(db).Unregister(ctx, seat.UserID, matchIDForAudit(s))
@@ -2648,7 +2731,7 @@ func (h *Handler) MatchSignal(ctx context.Context, logger runtime.Logger, db *sq
 		s.HostClosed = true
 		narrate(dispatcher, s, "An administrator is closing this table…")
 		if s.Phase == poker.PhaseWaiting && s.Table.Street == poker.StreetWaiting {
-			closeTable(ctx, db, dispatcher, s, "closed by an administrator")
+			closeTable(ctx, logger, db, dispatcher, s, "closed by an administrator")
 			return nil, ""
 		}
 		broadcastSnapshot(ctx, db, dispatcher, s, nil)
