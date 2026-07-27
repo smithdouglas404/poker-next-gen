@@ -626,7 +626,7 @@ export function OwnerHub() {
             <SeatSessions clubId={club?.id} canManage={canManage} />
             <ClubNights clubId={club?.id} canManage={canManage} />
           </div>
-          <QuickStats data={emptyQuick} />
+          <QuickStats data={emptyQuick} clubId={club?.id ?? null} />
         </div>
       )}
 

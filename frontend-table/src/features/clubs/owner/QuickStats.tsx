@@ -17,44 +17,78 @@ interface HighlightRow {
 
 /** Right-rail "Quick Stats" panel from the owner master: most-active table, top
  * tournament, and the club rollup metrics. Metrics come from club_quick_stats;
- * the two highlight rows are derived live from table_list / tournament_list. */
-export function QuickStats({ data }: { data: QuickStatsData }) {
+ * the two highlight rows are derived live from table_list / tournament_list.
+ *
+ * Both of those RPCs are NETWORK-WIDE — table_list does a MatchList across every
+ * running holdem match, and tournament_list returns every club's brackets. Reading
+ * them unfiltered meant this panel could show another club's busiest table and
+ * biggest tournament to an owner as though they were their own. Both are filtered
+ * to `clubId` here; the match label carries club_id (buildLabel) and the bracket
+ * carries it as a column. */
+export function QuickStats({ data, clubId }: { data: QuickStatsData; clubId?: string | null }) {
   const s = data.stats;
   const winPct = s ? (s.win_rate_bps / 100).toFixed(1) : "—";
 
-  const [rows, setRows] = useState<HighlightRow[]>([
+  const emptyRows = (): HighlightRow[] => [
     { icon: "▤", label: "Most Active Table", value: "No live tables", note: "—" },
     { icon: "♛", label: "Top Tournament", value: "None scheduled", note: "—" },
-  ]);
+  ];
+  const [rows, setRows] = useState<HighlightRow[]>(emptyRows);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const next: HighlightRow[] = [
-        { icon: "▤", label: "Most Active Table", value: "No live tables", note: "—" },
-        { icon: "♛", label: "Top Tournament", value: "None scheduled", note: "—" },
-      ];
+      const next = emptyRows();
       try {
         const t = (await callSessionRpc("table_list", {})) as { matches?: Array<{ label?: string }> };
         let best: { room: string; sb: number; bb: number; seated: number } | null = null;
         for (const m of t.matches ?? []) {
-          let l: { room_id?: string; sb?: number; bb?: number; seated?: number } = {};
-          try { l = JSON.parse(m.label ?? "{}"); } catch { /* skip */ }
-          if (!best || (l.seated ?? 0) > best.seated) best = { room: l.room_id || "Table", sb: l.sb ?? 0, bb: l.bb ?? 0, seated: l.seated ?? 0 };
+          let l: { room_id?: string; sb?: number; bb?: number; seated?: number; club_id?: string } = {};
+          try { l = JSON.parse(m.label ?? "{}"); } catch { /* unparseable label */ }
+          // Only this club's tables. Without the filter the busiest table on the
+          // whole network was reported as the club's own.
+          if (clubId && l.club_id !== clubId) continue;
+          const seated = l.seated ?? 0;
+          if (!best || seated > best.seated) {
+            best = { room: l.room_id || "Table", sb: l.sb ?? 0, bb: l.bb ?? 0, seated };
+          }
         }
-        if (best && best.seated >= 0 && (t.matches?.length ?? 0) > 0) {
-          next[0] = { icon: "▤", label: "Most Active Table", value: best.room, note: `$${best.sb / 100} / $${best.bb / 100} · ${best.seated} seated` };
+        if (best) {
+          next[0] = {
+            icon: "▤",
+            label: "Most Active Table",
+            value: best.room,
+            note: `$${best.sb / 100} / $${best.bb / 100} · ${best.seated} seated`,
+          };
         }
-      } catch { /* offline */ }
+      } catch {
+        // An unreachable server is not "no live tables" — say which it is rather
+        // than reporting a quiet club that may in fact be busy.
+        next[0] = { icon: "▤", label: "Most Active Table", value: "Unavailable", note: "Couldn't reach the table service" };
+      }
       try {
-        const tr = (await callSessionRpc("tournament_list", {})) as { tournaments?: Array<{ name: string; buy_in_minor?: number; status: string }> };
-        const top = (tr.tournaments ?? []).filter((x) => x.status !== "finished").sort((a, b) => (b.buy_in_minor ?? 0) - (a.buy_in_minor ?? 0))[0];
-        if (top) next[1] = { icon: "♛", label: "Top Tournament", value: top.name, note: usdCompact(top.buy_in_minor ?? 0) + " buy-in" };
-      } catch { /* offline */ }
+        const tr = (await callSessionRpc("tournament_list", {})) as {
+          tournaments?: Array<{ name: string; buy_in_minor?: number; status: string; club_id?: string }>;
+        };
+        const top = (tr.tournaments ?? [])
+          .filter((x) => x.status !== "finished")
+          .filter((x) => !clubId || x.club_id === clubId)
+          .sort((a, b) => (b.buy_in_minor ?? 0) - (a.buy_in_minor ?? 0))[0];
+        if (top) {
+          next[1] = {
+            icon: "♛",
+            label: "Top Tournament",
+            value: top.name,
+            note: usdCompact(top.buy_in_minor ?? 0) + " buy-in",
+          };
+        }
+      } catch {
+        next[1] = { icon: "♛", label: "Top Tournament", value: "Unavailable", note: "Couldn't reach the tournament service" };
+      }
       if (!cancelled) setRows(next);
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [clubId]);
 
   const metrics = [
     { label: "Hands played", value: compact(s?.hands ?? 0) },
