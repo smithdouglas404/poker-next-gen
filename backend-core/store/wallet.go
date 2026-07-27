@@ -262,13 +262,30 @@ func (s *TournamentStore) List(ctx context.Context) ([]models.TournamentBracket,
 	return out, rows.Err()
 }
 
-func (s *TournamentStore) Register(ctx context.Context, tournamentID, userID, username string, stack int64) error {
+// Register enrolls a player, reporting whether a row was actually inserted.
+//
+// poker_tournament_registration carries UNIQUE(tournament_id, user_id), and
+// "ON CONFLICT DO NOTHING" with no target suppresses ANY unique violation on the
+// table — so a second registration attempt does not error, it just quietly
+// inserts nothing. The caller debits the buy-in BEFORE calling this; discarding
+// the bool (the old signature returned only an error, always nil here) meant a
+// double-registration attempt was charged in full and told "ok" while actually
+// registering nobody a second time — the second buy-in simply evaporated. The
+// caller must check the bool and refund when it's false.
+func (s *TournamentStore) Register(ctx context.Context, tournamentID, userID, username string, stack int64) (bool, error) {
 	id := NewID("reg")
-	_, err := s.db.ExecContext(ctx, `
+	res, err := s.db.ExecContext(ctx, `
 		INSERT INTO poker_tournament_registration (id,tournament_id,user_id,username,stack,status,created_at)
 		VALUES ($1,$2,$3,$4,$5,'registered',NOW()) ON CONFLICT DO NOTHING`,
 		id, tournamentID, userID, username, stack)
-	return err
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return n == 1, nil
 }
 
 func (s *TournamentStore) AddBlindLevel(ctx context.Context, b *models.BlindTimer) error {
@@ -508,10 +525,33 @@ func (s *TournamentStore) AdvanceLevel(ctx context.Context, tournamentID string,
 	return err
 }
 
-func (s *TournamentStore) Finish(ctx context.Context, tournamentID string) error {
-	_, err := s.db.ExecContext(ctx, `
-		UPDATE poker_tournament SET status='finished', updated_at=NOW() WHERE id=$1`, tournamentID)
-	return err
+// FinishOnce claims the right to pay out a tournament's prizes, reporting
+// whether THIS call performed the transition. WHERE status<>'finished' makes
+// the claim atomic — at most one caller ever observes true for a given
+// tournament, however many times it's attempted.
+//
+// This exists because PayWinner is a bare wallet Credit with no idempotency of
+// its own, and there are TWO independent callers that each loop over the full
+// finisher list crediting every prize: the tournament director's automatic
+// end-of-event check (checkFinish, on every tick while one player remains) and
+// the admin tournament_finalize RPC. Neither used to be gated on anything —
+// the director could re-run its own payout loop on a later tick before Finish
+// committed, and an admin manually finalizing a tournament the director had
+// already paid out would pay the entire prize pool a second time. Both callers
+// now MUST get true from this before paying anyone; a caller that gets false
+// pays nobody, because someone else already has.
+func (s *TournamentStore) FinishOnce(ctx context.Context, tournamentID string) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE poker_tournament SET status='finished', updated_at=NOW()
+		WHERE id=$1 AND status<>'finished'`, tournamentID)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return n == 1, nil
 }
 
 func (s *TournamentStore) GetBalancingRule(ctx context.Context, tournamentID string) (*models.MultiTableBalancingRule, error) {

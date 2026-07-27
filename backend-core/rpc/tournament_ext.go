@@ -305,6 +305,23 @@ func TournamentFinalize(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 		return "", runtime.NewError("tournament still in progress: more than one player left", 9)
 	}
 
+	// Claim the right to pay out BEFORE computing or crediting anything. The
+	// tournament director pays this same prize ladder automatically the moment
+	// one player remains (checkFinish, in match/tournament/director.go) — this
+	// RPC racing that, or being called twice itself, must not pay every winner
+	// a second time. A caller that doesn't get the claim pays nobody.
+	if claimed, cerr := ts.FinishOnce(ctx, req.TournamentID); cerr != nil {
+		return "", runtime.NewError(cerr.Error(), 13)
+	} else if !claimed {
+		out, _ := json.Marshal(map[string]interface{}{
+			"tournament_id": req.TournamentID,
+			"status":        "finished",
+			"already":       true,
+			"payouts":       []interface{}{},
+		})
+		return string(out), nil
+	}
+
 	// The last player still 'playing' is the champion — finish place 1.
 	if playing == 1 {
 		players, err := ts.ListRegistered(ctx, req.TournamentID)
@@ -313,7 +330,14 @@ func TournamentFinalize(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 		}
 		for _, p := range players {
 			if p.Status == "playing" {
-				_ = ts.SetFinishPlace(ctx, req.TournamentID, p.UserID, 1)
+				// ListFinishers (below) is what the payout loop reads to decide
+				// who gets paid what; a champion who never got finish_place=1
+				// recorded is a champion the payout loop cannot see, despite
+				// FinishOnce having already claimed the payout for this event.
+				if serr := ts.SetFinishPlace(ctx, req.TournamentID, p.UserID, 1); serr != nil {
+					logger.Error("champion finish place not recorded tournament=%s user=%s: %v",
+						req.TournamentID, p.UserID, serr)
+				}
 			}
 		}
 	}
@@ -365,9 +389,7 @@ func TournamentFinalize(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 		}
 	}
 
-	if err := ts.Finish(ctx, req.TournamentID); err != nil {
-		return "", runtime.NewError(err.Error(), 13)
-	}
+	// Status is already 'finished' — FinishOnce claimed it before any payout ran.
 
 	out, _ := json.Marshal(map[string]interface{}{
 		"tournament_id":      info.ID,

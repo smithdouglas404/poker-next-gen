@@ -133,11 +133,28 @@ func (h *Handler) checkFinish(ctx context.Context, logger runtime.Logger, db *sq
 	if err != nil || playing > 1 {
 		return
 	}
+	// checkFinish runs on every tick while one player remains — without this
+	// claim it would rebuild the finisher list and re-run the ENTIRE payout
+	// loop on every subsequent tick until the match actually stops calling it,
+	// crediting every winner's prize repeatedly. It also races the admin
+	// tournament_finalize RPC, which pays the identical prize ladder. Only the
+	// caller that wins this claim may pay anyone; FinishOnce is the same gate
+	// tournament_finalize uses, so at most one of the two ever pays out.
+	claimed, cerr := tStore.FinishOnce(ctx, s.TournamentID)
+	if cerr != nil || !claimed {
+		return
+	}
 	// The last player still 'playing' is the champion — finish place 1.
 	players, _ := tStore.ListRegistered(ctx, s.TournamentID)
 	for _, p := range players {
 		if p.Status == "playing" {
-			_ = tStore.SetFinishPlace(ctx, s.TournamentID, p.UserID, 1)
+			// ListFinishers (below) is what the payout loop reads; a champion
+			// who never got finish_place=1 recorded is invisible to it, and
+			// FinishOnce above means nothing will retry this.
+			if serr := tStore.SetFinishPlace(ctx, s.TournamentID, p.UserID, 1); serr != nil {
+				logger.Error("champion finish place not recorded tournament=%s user=%s: %v",
+					s.TournamentID, p.UserID, serr)
+			}
 		}
 	}
 
@@ -167,7 +184,13 @@ func (h *Handler) checkFinish(ctx context.Context, logger runtime.Logger, db *sq
 			if f.FinishPlace < int(prize.RankFrom) || f.FinishPlace > int(prize.RankTo) {
 				continue
 			}
-			_ = tStore.PayWinner(ctx, s.TournamentID, f.UserID, perPlace)
+			// FinishOnce already claimed and committed 'finished' above, by
+			// design, so nothing will ever retry this payout for this
+			// tournament — a failure here has no other chance to be corrected.
+			if perr := tStore.PayWinner(ctx, s.TournamentID, f.UserID, perPlace); perr != nil {
+				logger.Error("TOURNAMENT PAYOUT FAILED tournament=%s user=%s place=%d amount_cents=%d: %v",
+					s.TournamentID, f.UserID, f.FinishPlace, perPlace, perr)
+			}
 			subject, code := "tournament_cashed", social.CodeTournamentInfo
 			if f.FinishPlace == 1 {
 				subject, code = "tournament_won", social.CodeTournamentWon
@@ -180,7 +203,7 @@ func (h *Handler) checkFinish(ctx context.Context, logger runtime.Logger, db *sq
 		}
 	}
 
-	_ = tStore.Finish(ctx, s.TournamentID)
+	// Status is already 'finished' — FinishOnce claimed it before any payout ran.
 	payload, _ := json.Marshal(map[string]interface{}{"tournament_id": s.TournamentID, "status": "finished"})
 	_ = dispatcher.BroadcastMessage(protocol.OpTournamentInfo, payload, nil, nil, true)
 }

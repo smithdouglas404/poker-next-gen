@@ -189,14 +189,40 @@ func TournamentRegister(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 			return "", runtime.NewError("insufficient wallet balance", 9)
 		}
 	}
-	if err := tStore.Register(ctx, req.TournamentID, userID, username, stack); err != nil {
-		return "", runtime.NewError(err.Error(), 13)
+	registered, rerr := tStore.Register(ctx, req.TournamentID, userID, username, stack)
+	if rerr != nil {
+		if bracket.BuyInMinor > 0 {
+			refundTournamentBuyIn(ctx, logger, db, userID, req.TournamentID, bracket.BuyInMinor, "register error")
+		}
+		return "", runtime.NewError(rerr.Error(), 13)
+	}
+	if !registered {
+		// The UNIQUE(tournament_id, user_id) constraint refused a duplicate
+		// registration; the buy-in was already taken above. Return it — a
+		// double-click or a retried request must not pay twice for one entry.
+		if bracket.BuyInMinor > 0 {
+			refundTournamentBuyIn(ctx, logger, db, userID, req.TournamentID, bracket.BuyInMinor, "already registered")
+		}
+		return "", runtime.NewError("you are already registered for this tournament", 6)
 	}
 	// Arm this entrant's head bounty (funded from the buy-in) for a PKO event.
 	if knockout && bounty > 0 {
-		_ = store.NewBountyStore(db).SetBounty(ctx, req.TournamentID, userID, bounty)
+		if err := store.NewBountyStore(db).SetBounty(ctx, req.TournamentID, userID, bounty); err != nil {
+			logger.Error("bounty not armed tournament=%s user=%s amount_cents=%d: %v",
+				req.TournamentID, userID, bounty, err)
+		}
 	}
 	return `{"ok":true}`, nil
+}
+
+// refundTournamentBuyIn returns a tournament buy-in that was debited but could
+// not be applied. Logged loudly on failure: a discarded refund error here means
+// a player is out real money for an entry they never got, with no trace of why.
+func refundTournamentBuyIn(ctx context.Context, logger runtime.Logger, db *sql.DB, userID, tournamentID string, amount int64, why string) {
+	if err := store.NewWalletStore(db).Credit(ctx, userID, amount, "tournament_buyin_refund"); err != nil {
+		logger.Error("REFUND FAILED tournament=%s user=%s amount_cents=%d reason=%s: %v",
+			tournamentID, userID, amount, why, err)
+	}
 }
 
 func BlindLevelAdd(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
