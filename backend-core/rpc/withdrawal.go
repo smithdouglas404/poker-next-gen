@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
+	"github.com/smithdouglas404/poker-next-gen/backend-core/billing"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/payments"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
@@ -50,11 +52,39 @@ func WalletWithdraw(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 		currency = strings.ToLower(req.Currency)
 	}
 
-	// A player's own money is never gated behind a paid plan — withdrawals are
-	// limited only by KYC/AML verification (checked above) and AML review on
-	// approval. Subscription tier governs stakes / rakeback / multi-tabling, not
-	// access to your own balance.
 	wd := store.NewWithdrawalStore(db)
+
+	// Tier gate: the weekly withdrawal limit. Every tier advertises one on the
+	// membership page and the wallet screen shows it as a live figure, and
+	// nothing enforced it — the number was decoration on both surfaces.
+	//
+	// It is a VELOCITY cap, not an access gate. Access to your own money is never
+	// sold: the rule above stands, which is why a tier with no configured limit
+	// falls back to the lowest positive one rather than blocking outright. A free
+	// account cannot deposit, so it has little real balance to move, but a player
+	// who lapsed from a paid plan must still be able to withdraw what is theirs.
+	weekly := billing.GetTierDef(store.SubscriptionTier(ctx, db, userID)).WithdrawLimitWeeklyCents
+	if weekly <= 0 {
+		weekly = billing.LowestWithdrawWeeklyCents()
+	}
+	if weekly > 0 {
+		used, uerr := wd.SumRecentCents(ctx, userID, 24*7)
+		if uerr != nil {
+			// Fail CLOSED. An unreadable history means the limit cannot be
+			// evaluated, and letting money out on an unknown total is the one
+			// outcome that cannot be undone.
+			return "", runtime.NewError("could not verify your recent withdrawals — try again shortly", 13)
+		}
+		if used+req.AmountCents > weekly {
+			remaining := weekly - used
+			if remaining < 0 {
+				remaining = 0
+			}
+			return "", runtime.NewError(fmt.Sprintf(
+				"this would exceed your plan's weekly withdrawal limit of $%d — $%d remaining this week",
+				weekly/100, remaining/100), 9)
+		}
+	}
 
 	id, err := wd.CreateRequest(ctx, userID, req.AmountCents, currency, req.Destination, gateway)
 	if err != nil {
@@ -124,9 +154,9 @@ func WithdrawalApproveAdmin(ctx context.Context, logger runtime.Logger, db *sql.
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	out, _ := json.Marshal(map[string]interface{}{
-		"status":     "paid",
+		"status":      "paid",
 		"auto_payout": autopaid,
-		"payout_id":  payoutID,
+		"payout_id":   payoutID,
 	})
 	return string(out), nil
 }

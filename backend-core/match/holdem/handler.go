@@ -890,14 +890,32 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 					"this table is open "+store.DailyWindowLabel(s.OperatingStartMin, s.OperatingEndMin))
 				continue
 			}
+			tier := billing.GetTierDef(store.SubscriptionTier(ctx, db, userID))
+
+			// Tier gate: the stakes cap. table_create already caps what a HOST may
+			// open; nothing capped who may SIT at it, so a free account could take
+			// a seat in the biggest game on the platform and the "Max BB" a
+			// subscriber pays for bought them nothing.
+			//
+			// Through EffectiveMaxBigBlindCents, never the raw field: the catalog
+			// overloads 0 to mean BOTH "play chips only" (free) and "unlimited"
+			// (platinum), so reading it directly hands the free tier unlimited
+			// stakes — precisely backwards.
+			if maxBB := billing.EffectiveMaxBigBlindCents(tier.ID); s.BigBlind > maxBB && !isGuest(ctx, nk, userID) {
+				sendError(dispatcher, presence, "stake_limit", fmt.Sprintf(
+					"this table's big blind is above your plan's limit of $%d — upgrade to sit here",
+					maxBB/100))
+				continue
+			}
 			// Tier gate: enforce the multi-table limit (tables seated at once).
 			seatReg := store.NewActiveSeatStore(db)
 			matchKey := matchIDForAudit(s)
 			if !seatReg.IsSeated(ctx, userID, matchKey) {
-				limit := billing.GetTierDef(store.SubscriptionTier(ctx, db, userID)).MultiTableLimit
-				if cnt, _ := seatReg.Count(ctx, userID); limit > 0 && cnt >= limit {
-					sendError(dispatcher, presence, "multi_table_limit", "you have reached your plan's simultaneous-table limit")
-					continue
+				if limit := tier.MultiTableLimit; limit > 0 {
+					if cnt, _ := seatReg.Count(ctx, userID); cnt >= limit {
+						sendError(dispatcher, presence, "multi_table_limit", "you have reached your plan's simultaneous-table limit")
+						continue
+					}
 				}
 			}
 			// Certification rule: registered players buy in from the certified

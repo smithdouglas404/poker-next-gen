@@ -18,23 +18,23 @@ var TierOrder = []string{"free", "bronze", "silver", "gold", "platinum"}
 //     one. Free tier is false, which is what makes hosting a paid feature rather
 //     than something any account can do.
 type TierDef struct {
-	ID                      string   `json:"id"`
-	Name                    string   `json:"name"`
-	MonthlyPriceCents       int64    `json:"monthly_price_cents"`
-	AnnualPriceCents        int64    `json:"annual_price_cents"`
-	KYCLevel                string   `json:"kyc_level"`
-	DepositLimitDailyCents  int64    `json:"deposit_limit_daily_cents"`
-	WithdrawLimitWeeklyCents int64   `json:"withdraw_limit_weekly_cents"`
-	MaxBigBlindCents        int64    `json:"max_big_blind_cents"`
-	TournamentBuyInMaxCents int64    `json:"tournament_buy_in_max_cents"`
-	RakebackPercent         int      `json:"rakeback_percent"`
-	DailyBonusChips         int64    `json:"daily_bonus_chips"`
-	ClubCreateLimit         int      `json:"club_create_limit"`
-	ClubMemberLimit         int      `json:"club_member_limit"`
-	TableSponsor            bool     `json:"table_sponsor"`
-	MultiTableLimit         int      `json:"multi_table_limit"`
-	MarketplaceFeeBps       int      `json:"marketplace_fee_bps"`
-	Benefits                []string `json:"benefits"`
+	ID                       string   `json:"id"`
+	Name                     string   `json:"name"`
+	MonthlyPriceCents        int64    `json:"monthly_price_cents"`
+	AnnualPriceCents         int64    `json:"annual_price_cents"`
+	KYCLevel                 string   `json:"kyc_level"`
+	DepositLimitDailyCents   int64    `json:"deposit_limit_daily_cents"`
+	WithdrawLimitWeeklyCents int64    `json:"withdraw_limit_weekly_cents"`
+	MaxBigBlindCents         int64    `json:"max_big_blind_cents"`
+	TournamentBuyInMaxCents  int64    `json:"tournament_buy_in_max_cents"`
+	RakebackPercent          int      `json:"rakeback_percent"`
+	DailyBonusChips          int64    `json:"daily_bonus_chips"`
+	ClubCreateLimit          int      `json:"club_create_limit"`
+	ClubMemberLimit          int      `json:"club_member_limit"`
+	TableSponsor             bool     `json:"table_sponsor"`
+	MultiTableLimit          int      `json:"multi_table_limit"`
+	MarketplaceFeeBps        int      `json:"marketplace_fee_bps"`
+	Benefits                 []string `json:"benefits"`
 }
 
 // Tiers is the ordered catalog (free → platinum).
@@ -178,6 +178,24 @@ func EffectiveMaxBigBlindCents(id string) int64 {
 	return def.MaxBigBlindCents
 }
 
+// EffectiveTournamentBuyInMaxCents returns the highest tournament buy-in a tier
+// may enter.
+//
+// The catalog overloads 0 the same way MaxBigBlindCents does — it means
+// "freerolls only" on free and "unlimited" on gold and above — so reading the
+// raw field gives the free tier UNLIMITED access, the exact opposite of what is
+// advertised. Any gate must go through this.
+func EffectiveTournamentBuyInMaxCents(id string) int64 {
+	def := GetTierDef(id)
+	if def.TournamentBuyInMaxCents > 0 {
+		return def.TournamentBuyInMaxCents
+	}
+	if IsPaidTier(id) {
+		return Unlimited // gold / platinum
+	}
+	return 0 // free: freerolls only
+}
+
 // CanCreateClub reports whether a user on `tier` who already owns `owned` clubs
 // may create another (-1 = unlimited, 0 = cannot create).
 func CanCreateClub(id string, owned int) bool {
@@ -203,4 +221,22 @@ func ClubMemberCap(id string) int64 {
 		return Unlimited
 	}
 	return int64(limit)
+}
+
+// LowestWithdrawWeeklyCents is the smallest positive weekly withdrawal limit in
+// the catalog.
+//
+// Used as the floor for a tier that configures no limit of its own. Access to a
+// player's own funds is never sold, so "no limit configured" must not read as
+// "cannot withdraw" — that would trap the balance of anyone who lapsed from a
+// paid plan. Returns 0 only if no tier defines a limit at all, which disables
+// the check rather than blocking everyone.
+func LowestWithdrawWeeklyCents() int64 {
+	var lowest int64
+	for _, t := range Tiers {
+		if t.WithdrawLimitWeeklyCents > 0 && (lowest == 0 || t.WithdrawLimitWeeklyCents < lowest) {
+			lowest = t.WithdrawLimitWeeklyCents
+		}
+	}
+	return lowest
 }

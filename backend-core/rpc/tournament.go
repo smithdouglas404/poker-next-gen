@@ -9,6 +9,7 @@ import (
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
+	"github.com/smithdouglas404/poker-next-gen/backend-core/billing"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/match/tournament"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/models"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
@@ -162,6 +163,20 @@ func TournamentRegister(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 	// since closed. Both windows are now checked server-side.
 	if open, why := store.RegistrationOpen(bracket, time.Now().UTC()); !open {
 		return "", runtime.NewError(why, 9)
+	}
+	// Tier gate: the tournament buy-in cap. Advertised per tier on the membership
+	// page ("Up to $X") and enforced nowhere, so the cap bought nothing. Checked
+	// BEFORE the wallet is debited — a rejection after taking the money would be
+	// the worse failure.
+	// Through the Effective helper, not the raw field: 0 means "freerolls only"
+	// on free and "unlimited" on gold+, so the raw value would grant the free
+	// tier unlimited entry.
+	if maxBuyIn := billing.EffectiveTournamentBuyInMaxCents(store.SubscriptionTier(ctx, db, userID)); bracket.BuyInMinor > maxBuyIn {
+		if maxBuyIn == 0 {
+			return "", runtime.NewError("your plan covers freeroll tournaments only — upgrade to enter buy-in events", 9)
+		}
+		return "", runtime.NewError(fmt.Sprintf(
+			"this tournament's buy-in is above your plan's limit of $%d — upgrade to enter", maxBuyIn/100), 9)
 	}
 	stack := bracket.StartingStack
 	if stack <= 0 {

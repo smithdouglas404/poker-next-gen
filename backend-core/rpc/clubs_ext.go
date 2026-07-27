@@ -11,6 +11,7 @@ import (
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
+	"github.com/smithdouglas404/poker-next-gen/backend-core/billing"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/models"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
@@ -668,7 +669,24 @@ func ClubRequestReview(ctx context.Context, logger runtime.Logger, db *sql.DB, n
 				username = u
 			}
 		}
-		if err := store.NewClubStore(db).AddMember(ctx, inv.ClubID, inv.UserID, username, inv.Role); err != nil {
+		// The club's member cap, from the OWNER's plan. ClubJoin enforced this and
+		// this path did not, so invitations were the way around a limit the owner
+		// is paying for — and it is the operator's own path, so it is the one that
+		// would actually get used. An existing member re-accepting is not a new
+		// seat and must not be blocked by a full club.
+		cs := store.NewClubStore(db)
+		if existing, _ := cs.GetMembership(ctx, inv.ClubID, inv.UserID); existing == nil {
+			cap := billing.ClubMemberCap(clubOwnerTier(ctx, db, inv.ClubID))
+			count, cerr := cs.CountMembers(ctx, inv.ClubID)
+			if cerr != nil {
+				return "", runtime.NewError(cerr.Error(), 13)
+			}
+			if int64(count) >= cap {
+				return "", runtime.NewError(
+					"this club has reached its member limit — the owner needs to upgrade their plan", 9)
+			}
+		}
+		if err := cs.AddMember(ctx, inv.ClubID, inv.UserID, username, inv.Role); err != nil {
 			return "", runtime.NewError(err.Error(), 13)
 		}
 		if inv.CreditLimitCents > 0 {
