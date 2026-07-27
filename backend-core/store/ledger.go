@@ -141,6 +141,24 @@ func ClubMemberAcct(clubID, userID string) string {
 	return "clubchips:" + clubID + ":" + userID
 }
 
+// TableAcct is the chips currently ON a table.
+//
+// A poker table is a place money sits, not a place it vanishes. Buy-ins move
+// from a player's account into the table's; cash-outs move back; rake moves from
+// the table to the house. The account is therefore the live count of chips on
+// the felt, and it returns to zero when the last player leaves — which is a real
+// invariant an operator can check, and the thing that makes redistribution
+// between players visible at all.
+//
+// Without it, buy-ins and cash-outs landed in two unrelated house buckets that
+// each grew forever, so the books balanced globally while saying nothing about
+// any particular table, and a player winning another player's chips left no
+// trace anywhere.
+func TableAcct(matchID string) string { return "table:" + matchID }
+
+// AcctHouseRake receives rake taken out of table pots.
+const AcctHouseRake = "house:rake"
+
 // Transfer is the common 2-leg case: move amount (>0) from one account to another.
 func (s *LedgerStore) Transfer(ctx context.Context, from, to string, amountMinor int64, kind, ref, reason string) (string, error) {
 	if amountMinor <= 0 {

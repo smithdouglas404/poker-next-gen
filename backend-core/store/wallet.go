@@ -73,6 +73,16 @@ func (s *WalletStore) Get(ctx context.Context, userID string) (int64, error) {
 // Debit atomically removes funds and records a ledger entry in one transaction.
 // The balance check and the ledger write either both apply or neither does.
 func (s *WalletStore) Debit(ctx context.Context, userID string, amount int64, reason string) error {
+	return s.DebitTo(ctx, userID, amount, reason, "house:"+reason)
+}
+
+// DebitTo is Debit with an explicit counterparty account.
+//
+// The default counterparty is house:<reason>, which balances but says nothing:
+// every table buy-in on the platform lands in one house:table_buyin bucket that
+// only ever grows. Naming the real other side — a table, a club — is what makes
+// the ledger answer questions instead of merely reconciling.
+func (s *WalletStore) DebitTo(ctx context.Context, userID string, amount int64, reason, counterAccount string) error {
 	if amount <= 0 {
 		return nil
 	}
@@ -99,8 +109,8 @@ func (s *WalletStore) Debit(ctx context.Context, userID string, amount int64, re
 		VALUES ($1,$2,$3,$4,$5,NOW())`, NewID("wl"), userID, -amount, after, reason); err != nil {
 		return err
 	}
-	// Double-entry mirror (#88): user debited, house:<reason> credited — same txn.
-	if err := postLedgerLegs(ctx, tx, "user:"+userID, "house:"+reason, amount, reason); err != nil {
+	// Double-entry mirror (#88): user debited, counterparty credited — same txn.
+	if err := postLedgerLegs(ctx, tx, UserAcct(userID), counterAccount, amount, reason); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -130,6 +140,11 @@ func postLedgerKind(ctx context.Context, tx *sql.Tx, kind, from, to string, amou
 
 // Credit atomically adds funds and records a ledger entry in one transaction.
 func (s *WalletStore) Credit(ctx context.Context, userID string, amount int64, reason string) error {
+	return s.CreditFrom(ctx, userID, amount, reason, "house:"+reason)
+}
+
+// CreditFrom is Credit with an explicit counterparty account — see DebitTo.
+func (s *WalletStore) CreditFrom(ctx context.Context, userID string, amount int64, reason, counterAccount string) error {
 	if amount <= 0 {
 		return nil
 	}
@@ -152,8 +167,8 @@ func (s *WalletStore) Credit(ctx context.Context, userID string, amount int64, r
 		VALUES ($1,$2,$3,$4,$5,NOW())`, NewID("wl"), userID, amount, after, reason); err != nil {
 		return err
 	}
-	// Double-entry mirror (#88): house:<reason> debited, user credited — same txn.
-	if err := postLedgerLegs(ctx, tx, "house:"+reason, "user:"+userID, amount, reason); err != nil {
+	// Double-entry mirror (#88): counterparty debited, user credited — same txn.
+	if err := postLedgerLegs(ctx, tx, counterAccount, UserAcct(userID), amount, reason); err != nil {
 		return err
 	}
 	return tx.Commit()

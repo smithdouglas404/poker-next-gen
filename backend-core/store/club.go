@@ -411,17 +411,25 @@ func (s *ClubStore) GetBalance(ctx context.Context, clubID, userID string) (*mod
 }
 
 func (s *ClubStore) LockBalance(ctx context.Context, clubID, userID string, amount int64) error {
+	return s.LockBalanceForTable(ctx, clubID, userID, amount, "")
+}
+
+// LockBalanceForTable reserves club chips for a seat at `matchID`.
+//
+// The matchID is what lets the chips be followed. Reserving without it recorded
+// that a member's balance moved into "locked" but not where it went, so a pot
+// redistributing chips between members left no trace at all — the ledger knew
+// how much a club had issued and nothing about what happened next.
+func (s *ClubStore) LockBalanceForTable(ctx context.Context, clubID, userID string, amount int64, matchID string) error {
 	if amount <= 0 {
 		return nil
 	}
-	bal, err := s.GetBalance(ctx, clubID, userID)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	if bal.Balance < amount {
-		return fmt.Errorf("insufficient club balance")
-	}
-	res, err := s.db.ExecContext(ctx, `
+	defer tx.Rollback()
+	res, err := tx.ExecContext(ctx, `
 		UPDATE poker_player_balance SET locked_amount=locked_amount+$3, balance=balance-$3, updated_at=NOW()
 		WHERE club_id=$1 AND user_id=$2 AND balance>=$3`, clubID, userID, amount)
 	if err != nil {
@@ -430,6 +438,15 @@ func (s *ClubStore) LockBalance(ctx context.Context, clubID, userID string, amou
 	n, _ := res.RowsAffected()
 	if n == 0 {
 		return fmt.Errorf("insufficient club balance")
+	}
+	if matchID != "" {
+		if err := postLedgerKind(ctx, tx, "table_buyin",
+			ClubMemberAcct(clubID, userID), TableAcct(matchID), amount, "table_buyin:"+matchID); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -453,6 +470,14 @@ func (s *ClubStore) UnlockBalance(ctx context.Context, clubID, userID string, am
 // Releasing the ORIGINAL reservation and crediting the ACTUAL stack keeps
 // locked_amount a true measure of chips currently in play.
 func (s *ClubStore) SettleSeat(ctx context.Context, clubID, userID string, locked, returned int64) error {
+	return s.SettleSeatAtTable(ctx, clubID, userID, locked, returned, "")
+}
+
+// SettleSeatAtTable is SettleSeat with the table the chips are coming back from,
+// so the return posts against that table's ledger account. The difference
+// between what a player took to the table and what they carried off is exactly
+// what they won or lost, and the table account is where it comes from or goes.
+func (s *ClubStore) SettleSeatAtTable(ctx context.Context, clubID, userID string, locked, returned int64, matchID string) error {
 	if locked < 0 {
 		locked = 0
 	}
@@ -462,9 +487,22 @@ func (s *ClubStore) SettleSeat(ctx context.Context, clubID, userID string, locke
 	if locked == 0 && returned == 0 {
 		return nil
 	}
-	_, err := s.db.ExecContext(ctx, `
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `
 		UPDATE poker_player_balance
 		SET locked_amount=GREATEST(0,locked_amount-$3), balance=balance+$4, updated_at=NOW()
-		WHERE club_id=$1 AND user_id=$2`, clubID, userID, locked, returned)
-	return err
+		WHERE club_id=$1 AND user_id=$2`, clubID, userID, locked, returned); err != nil {
+		return err
+	}
+	if matchID != "" && returned > 0 {
+		if err := postLedgerKind(ctx, tx, "table_cashout",
+			TableAcct(matchID), ClubMemberAcct(clubID, userID), returned, "table_cashout:"+matchID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }

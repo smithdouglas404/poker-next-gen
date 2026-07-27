@@ -2117,14 +2117,18 @@ func reserveBuyIn(ctx context.Context, db *sql.DB, s *MatchState, userID string,
 	}
 	if s.ClubID != "" && guest {
 		// Guest / comp seat only: club-allocated chips, under the operator's limit.
-		if err := store.NewClubStore(db).LockBalance(ctx, s.ClubID, userID, amount); err != nil {
+		if err := store.NewClubStore(db).LockBalanceForTable(ctx, s.ClubID, userID, amount, matchIDForAudit(s)); err != nil {
 			return ""
 		}
 		return "club"
 	}
 	// Registered player (club or non-club table) = certified cash game → the
 	// global wallet only. No club-chip fallback; a funded global wallet is required.
-	if err := store.NewWalletStore(db).Debit(ctx, userID, amount, "table_buyin"); err != nil {
+	// The table is the counterparty, not a generic house bucket: chips move onto
+	// the felt and come back off it, so table:<matchID> is the live count of what
+	// is in play and returns to zero when the last seat empties.
+	if err := store.NewWalletStore(db).DebitTo(ctx, userID, amount, "table_buyin",
+		store.TableAcct(matchIDForAudit(s))); err != nil {
 		return ""
 	}
 	return "global"
@@ -2149,11 +2153,12 @@ func releaseBuyIn(ctx context.Context, db *sql.DB, s *MatchState, seat int, user
 				locked = v
 			}
 		}
-		_ = store.NewClubStore(db).SettleSeat(ctx, s.ClubID, userID, locked, amount)
+		_ = store.NewClubStore(db).SettleSeatAtTable(ctx, s.ClubID, userID, locked, amount, matchIDForAudit(s))
 		return
 	}
 	// "global", non-club tables, or unknown -> the global wallet.
-	_ = store.NewWalletStore(db).Credit(ctx, userID, amount, "table_cashout")
+	_ = store.NewWalletStore(db).CreditFrom(ctx, userID, amount, "table_cashout",
+		store.TableAcct(matchIDForAudit(s)))
 }
 
 // creditRake credits the club's rake ledger and accrues rakeback, returning the

@@ -11,20 +11,44 @@ type RakeStore struct{ db *sql.DB }
 func NewRakeStore(db *sql.DB) *RakeStore { return &RakeStore{db: db} }
 
 func (s *RakeStore) Credit(ctx context.Context, clubID string, amount int64, matchID string, handNo int) error {
-	id := NewID("rake")
-	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO poker_rake_ledger (id, club_id, amount, match_id, hand_no, created_at)
-		VALUES ($1, $2, $3, $4, $5, NOW())`,
-		id, clubID, amount, matchID, handNo)
+	if amount <= 0 {
+		return nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	_, err = s.db.ExecContext(ctx, `
+	defer tx.Rollback()
+
+	id := NewID("rake")
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO poker_rake_ledger (id, club_id, amount, match_id, hand_no, created_at)
+		VALUES ($1, $2, $3, $4, $5, NOW())`,
+		id, clubID, amount, matchID, handNo); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO poker_club_house_balance (club_id, balance, updated_at)
 		VALUES ($1, $2, NOW())
 		ON CONFLICT (club_id) DO UPDATE SET balance = poker_club_house_balance.balance + $2, updated_at = NOW()`,
-		clubID, amount)
-	return err
+		clubID, amount); err != nil {
+		return err
+	}
+	// Double-entry: rake comes OUT of the table, which is the only way the table
+	// account can close at zero once every seat has cashed out. Posting it from a
+	// house bucket instead would leave the table permanently long by the rake and
+	// make "did this table settle?" unanswerable.
+	//
+	// Also makes the whole thing one transaction: the rake row, the club's house
+	// balance and the ledger now commit or roll back together, where before a
+	// failure between the two statements left rake recorded but uncredited.
+	if matchID != "" {
+		if err := postLedgerKind(ctx, tx, "rake",
+			TableAcct(matchID), AcctHouseRake, amount, "rake:"+clubID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (s *RakeStore) HouseBalance(ctx context.Context, clubID string) (int64, error) {

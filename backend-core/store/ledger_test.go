@@ -105,3 +105,64 @@ func TestLedgerAccountNamespaces(t *testing.T) {
 		}
 	}
 }
+
+func TestTableAccountSettlesToZero(t *testing.T) {
+	// The invariant the table account exists to make checkable: chips move onto
+	// the felt, get redistributed by play, rake comes out, and once every seat has
+	// cashed out the table holds nothing.
+	//
+	// Modelled here as the postings a real hand produces. Alice and Bob each buy
+	// in 1000; Alice wins the 2000 pot less 50 rake and leaves with 1950; Bob
+	// leaves with 0. If any leg were posted against a house bucket instead of the
+	// table — which is what every one of these did before — the table would stay
+	// permanently long and "did this table settle?" would be unanswerable.
+	const table = "table:match-1"
+	legs := []Posting{
+		{Account: UserAcct("alice"), AmountMinor: -1000}, // buy-in
+		{Account: table, AmountMinor: 1000},
+		{Account: UserAcct("bob"), AmountMinor: -1000}, // buy-in
+		{Account: table, AmountMinor: 1000},
+		{Account: table, AmountMinor: -50}, // rake out of the pot
+		{Account: AcctHouseRake, AmountMinor: 50},
+		{Account: table, AmountMinor: -1950}, // Alice cashes out
+		{Account: UserAcct("alice"), AmountMinor: 1950},
+	}
+	if err := ValidatePostings(legs); err != nil {
+		t.Fatalf("the hand's postings do not balance: %v", err)
+	}
+	var tableBal int64
+	for _, p := range legs {
+		if p.Account == table {
+			tableBal += p.AmountMinor
+		}
+	}
+	if tableBal != 0 {
+		t.Errorf("table account closed at %d, not 0 — chips were left on an empty felt", tableBal)
+	}
+	// And the players' net is exactly the pot less rake: Alice +950, Bob -1000.
+	var alice, bob int64
+	for _, p := range legs {
+		switch p.Account {
+		case UserAcct("alice"):
+			alice += p.AmountMinor
+		case UserAcct("bob"):
+			bob += p.AmountMinor
+		}
+	}
+	if alice != 950 || bob != -1000 || alice+bob+50 != 0 {
+		t.Errorf("player net wrong: alice=%d bob=%d (rake 50 must close the gap)", alice, bob)
+	}
+}
+
+func TestTableAcctNamespace(t *testing.T) {
+	if TableAcct("m1") != "table:m1" {
+		t.Errorf("TableAcct = %q", TableAcct("m1"))
+	}
+	// Must not collide with the player or club namespaces, or a crafted match id
+	// could post into someone's balance.
+	for _, prefix := range []string{"user:", "clubchips:", "house:", "external:"} {
+		if len(TableAcct("x")) >= len(prefix) && TableAcct("x")[:len(prefix)] == prefix {
+			t.Errorf("table account collides with the %q namespace", prefix)
+		}
+	}
+}
