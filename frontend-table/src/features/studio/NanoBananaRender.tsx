@@ -8,7 +8,6 @@ import { Button } from "@/features/ui";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 import {
   renderPhaseLabel,
-  renderTelemetry,
   stageBreakdown,
   type RenderStage,
 } from "./renderStages";
@@ -22,6 +21,9 @@ interface RenderState {
   online: boolean | null;
   status: Status;
   progress: number;
+  /** The pipeline step the SERVER says the job is on (model | rig | retarget).
+   *  Undefined offline, where the breakdown falls back to progress alone. */
+  stage?: string;
   cosmeticId: string | null;
 }
 
@@ -70,7 +72,7 @@ export function NanoBananaRender({ generationId }: { generationId: string | null
       try {
         const st = (await callSessionRpc("character_generation_status", {
           generation_id: generationId,
-        })) as { status: string; progress?: number; cosmetic_id?: string };
+        })) as { status: string; progress?: number; cosmetic_id?: string; stage?: string };
         failures = 0;
         if (st.status === "success") {
           clear();
@@ -89,6 +91,7 @@ export function NanoBananaRender({ generationId }: { generationId: string | null
             ...s,
             online: true,
             progress: Math.max(s.progress, st.progress ?? s.progress),
+            stage: st.stage ?? s.stage,
           }));
         }
       } catch {
@@ -114,10 +117,9 @@ export function NanoBananaRender({ generationId }: { generationId: string | null
     return clear;
   }, [generationId]);
 
-  const { progress, status, online } = state;
-  const stages = stageBreakdown(progress);
-  const telemetry = renderTelemetry(progress);
-  const phase = renderPhaseLabel(progress, status === "success", status === "failed");
+  const { progress, status, online, stage } = state;
+  const stages = stageBreakdown(progress, stage);
+  const phase = renderPhaseLabel(progress, status === "success", status === "failed", stage);
   const done = status === "success";
   const failed = status === "failed";
 
@@ -219,19 +221,14 @@ export function NanoBananaRender({ generationId }: { generationId: string | null
             ))}
           </div>
 
-          <div className="border-t border-white/10 pt-4">
-            <table className="w-full text-[11px]">
-              <tbody>
-                {telemetry.map((row) => (
-                  <tr key={row.label} className="text-muted">
-                    <td className="py-1 pr-2">{row.label}</td>
-                    <td className="py-1 pr-2 text-right tabular-nums text-neutral-300">{row.pct}%</td>
-                    <td className="py-1 text-right tabular-nums text-gold/80">{row.metric}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {/* An "engine telemetry" table used to sit here — mesh throughput in
+              GHz, neural lighting at "6000%" — all of it computed from the single
+              progress number. It measured nothing, so it is gone rather than
+              dressed up. */}
+          <p className="border-t border-white/10 pt-4 text-[11px] leading-relaxed text-muted">
+            Generation runs in three steps and can take a few minutes. You can leave this page —
+            the character lands in your inventory when it is done.
+          </p>
         </aside>
       </main>
     </div>
@@ -239,27 +236,29 @@ export function NanoBananaRender({ generationId }: { generationId: string | null
 }
 
 function StageRow({ stage }: { stage: RenderStage }) {
+  const waiting = stage.state === "waiting";
   return (
-    <div>
-      <div className="mb-1.5 flex items-center justify-between">
+    <div className={waiting ? "opacity-45" : undefined}>
+      <div className="mb-1 flex items-center justify-between gap-2">
         <span className="text-sm font-semibold text-white">{stage.label}</span>
-        <span className="text-sm font-bold tabular-nums" style={{ color: stage.accent }}>
-          {stage.pct}%
+        <span
+          className="shrink-0 text-sm font-bold tabular-nums"
+          style={{ color: stage.state === "done" ? "#22c55e" : stage.accent }}
+        >
+          {/* A stage that has not started says so, rather than showing 0% as
+              though it were stalled. */}
+          {stage.state === "done" ? "Done" : waiting ? "Waiting" : `${stage.pct}%`}
         </span>
       </div>
-      <div className="flex items-center gap-3">
+      <p className="mb-1.5 text-[11px] leading-snug text-muted">{stage.blurb}</p>
+      <div className="h-2 overflow-hidden rounded-full bg-black/50">
         <div
-          className="h-10 w-14 shrink-0 rounded-md border border-white/10"
+          className="h-full rounded-full transition-[width] duration-500"
           style={{
-            background: `radial-gradient(120% 120% at 30% 20%, ${stage.accent}55, transparent 65%), #0e1116`,
+            width: `${stage.pct}%`,
+            background: stage.state === "done" ? "#22c55e" : stage.accent,
           }}
         />
-        <div className="h-2 flex-1 overflow-hidden rounded-full bg-black/50">
-          <div
-            className="h-full rounded-full transition-[width] duration-500"
-            style={{ width: `${stage.pct}%`, background: stage.accent }}
-          />
-        </div>
       </div>
     </div>
   );

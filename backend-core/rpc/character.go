@@ -128,8 +128,7 @@ func CharacterGenerationStatus(ctx context.Context, logger runtime.Logger, db *s
 			}
 			if rigTask, rerr := integrations.CreateRigTask(ctx, g.TripoTask); rerr == nil && rigTask != "" {
 				_ = gens.AdvanceToRig(ctx, g.ID, task.ModelURL, rigTask)
-				out, _ := json.Marshal(map[string]interface{}{"status": "running", "progress": 60})
-				return string(out), nil
+				return runningStatus("rig", 60), nil
 			}
 			// Rigging unavailable → mint the base model.
 			return mintCharacter(ctx, db, gens, g, userID, task.ModelURL, task.PreviewURL), nil
@@ -143,8 +142,7 @@ func CharacterGenerationStatus(ctx context.Context, logger runtime.Logger, db *s
 			}
 			if rtTask, rerr := integrations.CreateRetargetTask(ctx, g.TripoTask); rerr == nil && rtTask != "" {
 				_ = gens.AdvanceToRetarget(ctx, g.ID, rigged, rtTask)
-				out, _ := json.Marshal(map[string]interface{}{"status": "running", "progress": 80})
-				return string(out), nil
+				return runningStatus("retarget", 80), nil
 			}
 			return mintCharacter(ctx, db, gens, g, userID, rigged, task.PreviewURL), nil
 		}
@@ -163,11 +161,30 @@ func CharacterGenerationStatus(ctx context.Context, logger runtime.Logger, db *s
 		g.Status = "failed"
 		return generationResult(g), nil
 	default:
-		out, _ := json.Marshal(map[string]interface{}{
-			"status":   "running",
-			"progress": task.Progress,
-		})
-		return string(out), nil
+		// Tripo reports progress within the CURRENT task. Map it onto the whole
+		// three-stage pipeline so the bar does not reset to 0% twice on its way to
+		// a finished character.
+		return runningStatus(g.Stage, overallProgress(g.Stage, task.Progress)), nil
+	}
+}
+
+// overallProgress maps a per-task percentage onto the full pipeline. The three
+// stages are weighted by roughly how long each takes: modelling dominates,
+// rigging and retargeting are shorter.
+func overallProgress(stage string, taskProgress int) int {
+	if taskProgress < 0 {
+		taskProgress = 0
+	}
+	if taskProgress > 100 {
+		taskProgress = 100
+	}
+	switch stage {
+	case "rig":
+		return 60 + taskProgress*20/100 // 60 → 80
+	case "retarget":
+		return 80 + taskProgress*20/100 // 80 → 100
+	default: // "model"
+		return taskProgress * 60 / 100 // 0 → 60
 	}
 }
 
@@ -212,6 +229,41 @@ func generationResult(g *store.Generation) string {
 	out, _ := json.Marshal(map[string]interface{}{
 		"status":      g.Status,
 		"cosmetic_id": g.CosmeticID,
+		"stage":       g.Stage,
+		"stages":      generationStages,
+		"progress":    terminalProgress(g.Status),
+	})
+	return string(out)
+}
+
+// generationStages is the real Tripo pipeline, in order. The client renders these
+// rather than inventing stage names of its own — the studio previously showed
+// "Anatomy Synthesis / Armor Forging / Neural Lighting", none of which are steps
+// this pipeline actually performs.
+var generationStages = []string{"model", "rig", "retarget"}
+
+func terminalProgress(status string) int {
+	if status == "success" {
+		return 100
+	}
+	return 0
+}
+
+// runningStatus is the single shape every in-flight response uses, so the client
+// always knows which of the three real stages a job is in and never has to infer
+// it from a bare percentage.
+func runningStatus(stage string, progress int) string {
+	if progress < 0 {
+		progress = 0
+	}
+	if progress > 99 {
+		progress = 99 // 100 is reserved for a genuinely finished job
+	}
+	out, _ := json.Marshal(map[string]interface{}{
+		"status":   "running",
+		"stage":    stage,
+		"stages":   generationStages,
+		"progress": progress,
 	})
 	return string(out)
 }
