@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { Button } from "@/features/ui";
 import { GLASS_PANEL, RARITY, cn } from "@/features/ui/tokens";
 import { useStudio } from "./useStudio";
@@ -45,6 +46,14 @@ export function DyeShop() {
   const [preview, setPreview] = useState(true);
   const [activePack, setActivePack] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
+  // The dye already saved for this model, read back from the server.
+  //
+  // `cosmetic_dye_set` has always stored the dye and `cosmetic_dye_get` has
+  // always existed to read it — but nothing in the app called it. So the shop
+  // opened on the same hardcoded gold/red/cyan every time: a player who dyed
+  // their character, reloaded, and came back saw the defaults and had every
+  // reason to believe their dye had not saved. It had.
+  const [saved, setSaved] = useState<Channels | null>(null);
 
   // The model being dyed: the equipped model, else the first owned model.
   const target: Cosmetic | null = useMemo(() => {
@@ -91,10 +100,51 @@ export function DyeShop() {
   const editChannel = (setter: (id: string) => void) => (id: string) => {
     packOverrideRef.current = null;
     setActivePack(null);
+    // Clear the saved-dye override too, or a hand-picked swatch would be
+    // invisible behind the dye already on the model.
+    setSaved(null);
     setter(id);
   };
 
-  const effective: Channels = packOverrideRef.current ?? channels;
+  // Hydrate from the saved dye whenever the model being dyed changes. A failure
+  // leaves the swatch defaults rather than blanking the shop — the dye is still
+  // applied server-side either way.
+  useEffect(() => {
+    if (!target) {
+      setSaved(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = (await callSessionRpc("cosmetic_dye_get", {
+          cosmetic_id: target.id,
+        })) as { params?: Partial<Channels> | string };
+        const p =
+          typeof res?.params === "string"
+            ? (JSON.parse(res.params || "{}") as Partial<Channels>)
+            : (res?.params ?? {});
+        if (cancelled) return;
+        // Only treat it as a saved dye if it actually carries colors; an empty
+        // params object means this model has never been dyed.
+        setSaved(
+          p.primary || p.secondary || p.accent
+            ? { primary: p.primary ?? "", secondary: p.secondary ?? "", accent: p.accent ?? "" }
+            : null,
+        );
+      } catch {
+        if (!cancelled) setSaved(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [target]);
+
+  // A pack the player just chose wins; otherwise the dye already on the model;
+  // otherwise the swatch selections. Editing a channel clears both overrides, so
+  // hand-picking always takes effect immediately.
+  const effective: Channels = packOverrideRef.current ?? saved ?? channels;
   const shown = preview ? effective : { primary: "", secondary: "", accent: "" };
 
   const applyDye = async () => {
