@@ -1934,6 +1934,25 @@ func handleHostAction(ctx context.Context, logger runtime.Logger, db *sql.DB, di
 	case "kick":
 		seat := s.Table.Seats[req.Seat]
 		if req.Seat >= 0 && req.Seat < poker.MaxSeats && seat != nil && !seat.IsBot {
+			// Same cashout-lock OpStandUp already enforces on a voluntary leave,
+			// applied here for the same reason. Without it: a seat kicked while
+			// SeatAllIn has Stack == 0 (their stake is in TotalContributed, in
+			// the live pot, not at the seat) — releaseBuyIn returns nothing
+			// because there is nothing at the seat to return, StandUp nils the
+			// seat, and BuildSidePots only sums TotalContributed for seats that
+			// still exist in t.Seats. Their entire stake — money already in the
+			// pot, not the empty seat — vanishes: never paid to them, never
+			// reaching another player, never reaching the house. This is
+			// reachable within a single tick if a kick and the action that
+			// resolves the hand land in the same message batch, ahead of the
+			// PhaseResolvingSidePots gate that blocks a kick once resolution has
+			// already started.
+			if s.Phase != poker.PhaseWaiting && (seat.Status == poker.SeatSeated || seat.Status == poker.SeatAllIn) {
+				narrate(dispatcher, s, fmt.Sprintf(
+					"Host tried to remove %s, but they're still live in this hand — the kick will apply once it finishes.",
+					seat.Username))
+				break
+			}
 			releaseBuyIn(ctx, logger, db, s, req.Seat, seat.UserID, seat.Stack)
 			delete(s.SeatWallet, req.Seat)
 			delete(s.SeatLocked, req.Seat)
@@ -2765,11 +2784,27 @@ func (h *Handler) MatchSignal(ctx context.Context, logger runtime.Logger, db *sq
 		})
 		_ = dispatcher.BroadcastMessage(protocol.OpBlindUpdate, payload, nil, nil, true)
 	case "balance_table":
+		// The same money-destruction bug the "kick" host action had: a felted
+		// (Stack<=0) seat that is currently SeatAllIn in a LIVE hand still has
+		// its real stake sitting in TotalContributed, not at the seat — a
+		// zero-stack seat is exactly what an all-in player looks like while
+		// their hand is still being contested. Standing them up here removes
+		// their seat from t.Seats before the pot resolves, and BuildSidePots
+		// only sums TotalContributed for seats that still exist: their stake
+		// is silently dropped from every side-pot layer — never paid to them,
+		// never reaching anyone else, never reaching the house. MatchSignal
+		// runs outside the MatchLoop message queue, so it is not protected by
+		// that loop's "hand_busy" phase gate — this check is the only thing
+		// standing between an automated multi-table rebalance and that loss.
 		for i, seat := range s.Table.Seats {
-			if seat != nil && seat.Stack <= 0 {
-				closeSeatSession(ctx, db, s, i)
-				s.Table.StandUp(i)
+			if seat == nil || seat.Stack > 0 {
+				continue
 			}
+			if s.Phase != poker.PhaseWaiting && seat.Status == poker.SeatAllIn {
+				continue // still contesting a live pot — leave them seated
+			}
+			closeSeatSession(ctx, db, s, i)
+			s.Table.StandUp(i)
 		}
 		broadcastSnapshot(ctx, db, dispatcher, s, nil)
 	case "close":
