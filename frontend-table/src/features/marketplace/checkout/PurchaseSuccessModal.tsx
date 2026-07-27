@@ -11,6 +11,13 @@ import type { CartItem } from "./types";
 // with a gold-confetti burst, the hero item, and the two HRC exits
 // (View in Wardrobe / Back to Market). Component-local keyframes only; it
 // does not touch globals.css. Confetti is gated on prefers-reduced-motion.
+//
+// It also reports what did NOT settle. A cart is bought line by line, and the
+// checkout opens this modal when ANY line succeeds — so a two-item cart with one
+// failure used to show an unqualified "Purchase Successful!" listing only the
+// item that worked. The player was charged for one, told everything was fine,
+// and never learned the other had failed. Anything money touches has to say what
+// actually happened, so partial settlement is named rather than rounded up.
 
 const CONFETTI_COUNT = 28;
 
@@ -19,19 +26,29 @@ function usePrefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+/** A cart line that did not settle, with the server's reason. */
+export interface FailedLine {
+  name: string;
+  error?: string;
+}
+
 export function PurchaseSuccessModal({
   items,
   totalCents,
+  failed = [],
   onWardrobe,
   onBackToMarket,
 }: {
   items: CartItem[];
   totalCents: number;
+  /** Lines that failed. Non-empty means this was a PARTIAL purchase. */
+  failed?: FailedLine[];
   onWardrobe: () => void;
   onBackToMarket: () => void;
 }) {
   const reduced = usePrefersReducedMotion();
   const hero = items[0];
+  const partial = failed.length > 0;
 
   const confetti = useMemo(
     () =>
@@ -116,7 +133,7 @@ export function PurchaseSuccessModal({
               textShadow: "0 0 24px rgba(245,197,24,0.55), 0 2px 0 rgba(0,0,0,0.4)",
             }}
           >
-            Purchase Successful!
+            {partial ? "Partly Successful" : "Purchase Successful!"}
           </h2>
 
           {/* Hero item */}
@@ -146,7 +163,31 @@ export function PurchaseSuccessModal({
             <p className="font-display text-lg font-bold text-gold">
               {formatPrice(totalCents)}
             </p>
+            {partial && (
+              <p className="text-[11px] text-neutral-500">
+                Charged for what settled — the items below were not.
+              </p>
+            )}
           </div>
+
+          {/* What did not go through, and why. Naming each line matters: the
+              player needs to know which item to retry, and that they were not
+              charged for it. */}
+          {partial && (
+            <div className="w-full rounded-xl border border-brand/35 bg-brand/[0.07] px-4 py-3 text-left">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand">
+                {failed.length === 1 ? "1 item didn't go through" : `${failed.length} items didn't go through`}
+              </p>
+              <ul className="mt-2 space-y-1.5">
+                {failed.map((f, i) => (
+                  <li key={`${f.name}-${i}`} className="text-[12px] leading-snug text-neutral-300">
+                    <span className="font-semibold text-white">{f.name}</span>
+                    {f.error ? <span className="text-neutral-400"> — {f.error}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="mt-2 w-full space-y-3">
             <button

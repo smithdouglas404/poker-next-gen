@@ -116,6 +116,17 @@ export default function CheckoutPage() {
 
   const settled = results?.filter((r) => r.ok).map((r) => r.item) ?? cart;
   const settledTotal = useMemo(() => cartTotals(settled).cents, [settled]);
+  // The success modal opens as soon as ANY line settles, so it has to be told
+  // about the lines that did not. Without this a two-item cart with one failure
+  // showed an unqualified "Purchase Successful!" listing only the item that
+  // worked — the player was charged for one and never learned about the other.
+  const failedLines = useMemo(
+    () =>
+      (results ?? [])
+        .filter((r) => !r.ok)
+        .map((r) => ({ name: r.item.name, error: r.error })),
+    [results],
+  );
 
   return (
     <div className="min-h-screen bg-background font-body text-foreground">
@@ -282,6 +293,7 @@ export default function CheckoutPage() {
         <PurchaseSuccessModal
           items={settled}
           totalCents={settledTotal}
+          failed={failedLines}
           onWardrobe={() => router.push("/marketplace?tab=vault")}
           onBackToMarket={() => router.push("/marketplace")}
         />
