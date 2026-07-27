@@ -64,7 +64,9 @@ func StakingOffer(ctx context.Context, logger runtime.Logger, db *sql.DB, nk run
 		MarkupBps: req.MarkupBps, Note: req.Note,
 	})
 	if err != nil {
-		_ = store.NewWalletStore(db).Credit(ctx, caller, req.StakeMinor, "staking_stake_refund")
+		if rerr := store.NewWalletStore(db).Credit(ctx, caller, req.StakeMinor, "staking_stake_refund"); rerr != nil {
+			logger.Error("REFUND FAILED staking_offer user=%s amount_minor=%d: %v", caller, req.StakeMinor, rerr)
+		}
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	return `{"ok":true,"id":"` + id + `"}`, nil
@@ -106,8 +108,14 @@ func StakingAccept(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 	if !ok {
 		return "", runtime.NewError("this offer was just taken", 9)
 	}
-	// Advance the escrowed stake to the player as bankroll.
-	_ = store.NewWalletStore(db).Credit(ctx, caller, deal.StakeMinor, "staking_advance")
+	// Advance the escrowed stake to the player as bankroll. Accept already
+	// flipped the deal to accepted, so a failed credit here leaves the player
+	// marked as backed with no bankroll actually advanced and no automatic
+	// retry — findable is the least this needs to be.
+	if perr := store.NewWalletStore(db).Credit(ctx, caller, deal.StakeMinor, "staking_advance"); perr != nil {
+		logger.Error("ADVANCE FAILED staking_accept deal=%s player=%s amount_minor=%d: %v",
+			req.DealID, caller, deal.StakeMinor, perr)
+	}
 	return `{"ok":true}`, nil
 }
 
@@ -138,7 +146,10 @@ func StakingCancel(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 	if !ok {
 		return "", runtime.NewError("only an unaccepted offer can be cancelled", 9)
 	}
-	_ = store.NewWalletStore(db).Credit(ctx, caller, deal.StakeMinor, "staking_refund")
+	if rerr := store.NewWalletStore(db).Credit(ctx, caller, deal.StakeMinor, "staking_refund"); rerr != nil {
+		logger.Error("REFUND FAILED staking_cancel user=%s deal=%s amount_minor=%d: %v",
+			caller, req.DealID, deal.StakeMinor, rerr)
+	}
 	return `{"ok":true}`, nil
 }
 
@@ -172,7 +183,10 @@ func StakingDecline(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 	if !ok {
 		return "", runtime.NewError("only an unaccepted offer can be declined", 9)
 	}
-	_ = store.NewWalletStore(db).Credit(ctx, deal.Backer, deal.StakeMinor, "staking_refund")
+	if rerr := store.NewWalletStore(db).Credit(ctx, deal.Backer, deal.StakeMinor, "staking_refund"); rerr != nil {
+		logger.Error("REFUND FAILED staking_decline backer=%s deal=%s amount_minor=%d: %v",
+			deal.Backer, req.DealID, deal.StakeMinor, rerr)
+	}
 	return `{"ok":true}`, nil
 }
 
@@ -247,10 +261,19 @@ func StakingSettleConfirm(ctx context.Context, logger runtime.Logger, db *sql.DB
 	}
 	ok, err := ss.ConfirmSettle(ctx, req.DealID)
 	if err != nil || !ok {
-		_ = ws.Credit(ctx, deal.Player, deal.RepayMinor, "staking_settle_refund")
+		if rerr := ws.Credit(ctx, deal.Player, deal.RepayMinor, "staking_settle_refund"); rerr != nil {
+			logger.Error("REFUND FAILED staking_settle_confirm player=%s deal=%s amount_minor=%d: %v",
+				deal.Player, req.DealID, deal.RepayMinor, rerr)
+		}
 		return "", runtime.NewError("could not confirm settlement", 13)
 	}
-	_ = ws.Credit(ctx, deal.Backer, deal.RepayMinor, "staking_settle")
+	// Confirmed already flipped the deal to settled, so a failed backer payout
+	// here has no retry — the deal reads settled and the backer is simply never
+	// paid their repay.
+	if perr := ws.Credit(ctx, deal.Backer, deal.RepayMinor, "staking_settle"); perr != nil {
+		logger.Error("PAYOUT FAILED staking_settle_confirm backer=%s deal=%s amount_minor=%d: %v",
+			deal.Backer, req.DealID, deal.RepayMinor, perr)
+	}
 	return `{"ok":true,"repay_minor":` + strconv.FormatInt(deal.RepayMinor, 10) + `}`, nil
 }
 

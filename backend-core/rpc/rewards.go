@@ -166,7 +166,9 @@ func PointsPurchase(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 	ls := store.NewLoyaltyStore(db)
 	if err := ls.AddSpendable(ctx, caller, req.Points); err != nil {
 		// Refund the chips if crediting points fails.
-		_ = ws.Credit(ctx, caller, costCents, "points_purchase_refund")
+		if rerr := ws.Credit(ctx, caller, costCents, "points_purchase_refund"); rerr != nil {
+			logger.Error("REFUND FAILED points_purchase user=%s amount_cents=%d: %v", caller, costCents, rerr)
+		}
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	_ = store.NewRewardsStore(db).RecordPointsPurchase(ctx, caller, req.Points, costCents)

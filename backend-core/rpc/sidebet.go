@@ -44,7 +44,9 @@ func SidebetOffer(ctx context.Context, logger runtime.Logger, db *sql.DB, nk run
 		Proposition: req.Proposition, StakeMinor: req.StakeMinor,
 	})
 	if err != nil {
-		_ = store.NewWalletStore(db).Credit(ctx, caller, req.StakeMinor, "sidebet_escrow_refund")
+		if rerr := store.NewWalletStore(db).Credit(ctx, caller, req.StakeMinor, "sidebet_escrow_refund"); rerr != nil {
+			logger.Error("REFUND FAILED sidebet_offer user=%s amount_minor=%d: %v", caller, req.StakeMinor, rerr)
+		}
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	return `{"ok":true,"id":"` + id + `"}`, nil
@@ -80,7 +82,10 @@ func SidebetAccept(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 	}
 	ok, err := ss.Accept(ctx, req.SidebetID, caller, name)
 	if err != nil || !ok {
-		_ = ws.Credit(ctx, caller, bet.StakeMinor, "sidebet_escrow_refund")
+		if rerr := ws.Credit(ctx, caller, bet.StakeMinor, "sidebet_escrow_refund"); rerr != nil {
+			logger.Error("REFUND FAILED sidebet_accept user=%s bet=%s amount_minor=%d: %v",
+				caller, req.SidebetID, bet.StakeMinor, rerr)
+		}
 		if err != nil {
 			return "", runtime.NewError(err.Error(), 13)
 		}
@@ -116,7 +121,10 @@ func SidebetCancel(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 	if !ok {
 		return "", runtime.NewError("only an unaccepted offer can be cancelled", 9)
 	}
-	_ = store.NewWalletStore(db).Credit(ctx, caller, bet.StakeMinor, "sidebet_refund")
+	if rerr := store.NewWalletStore(db).Credit(ctx, caller, bet.StakeMinor, "sidebet_refund"); rerr != nil {
+		logger.Error("REFUND FAILED sidebet_cancel user=%s bet=%s amount_minor=%d: %v",
+			caller, req.SidebetID, bet.StakeMinor, rerr)
+	}
 	return `{"ok":true}`, nil
 }
 
@@ -160,7 +168,14 @@ func SidebetSettle(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 		if ok, serr := ss.Settle(ctx, bet.ID, winner); serr != nil || !ok {
 			return "", runtime.NewError("could not settle side bet", 13)
 		}
-		_ = ws.Credit(ctx, winner, pot, "sidebet_win")
+		// Settle already marked the bet resolved, so a failed payout here has no
+		// natural retry — the caller sees "ok" and the winner is simply never
+		// paid, with the system believing it's fully settled. This has to be
+		// findable.
+		if perr := ws.Credit(ctx, winner, pot, "sidebet_win"); perr != nil {
+			logger.Error("PAYOUT FAILED sidebet_settle_concede bet=%s winner=%s amount_minor=%d: %v",
+				bet.ID, winner, pot, perr)
+		}
 		return `{"ok":true,"winner":"` + winner + `","mode":"concede"}`, nil
 	}
 
@@ -187,11 +202,18 @@ func SidebetSettle(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 	if ok, serr := ss.Settle(ctx, bet.ID, winner); serr != nil || !ok {
 		return "", runtime.NewError("could not settle side bet", 13)
 	}
+	// Same "already settled, no retry" hazard as the concede path above.
 	if proposerShare > 0 {
-		_ = ws.Credit(ctx, bet.Proposer, proposerShare, "sidebet_equity")
+		if perr := ws.Credit(ctx, bet.Proposer, proposerShare, "sidebet_equity"); perr != nil {
+			logger.Error("PAYOUT FAILED sidebet_settle_equity bet=%s user=%s amount_minor=%d: %v",
+				bet.ID, bet.Proposer, proposerShare, perr)
+		}
 	}
 	if acceptorShare > 0 {
-		_ = ws.Credit(ctx, bet.Acceptor, acceptorShare, "sidebet_equity")
+		if perr := ws.Credit(ctx, bet.Acceptor, acceptorShare, "sidebet_equity"); perr != nil {
+			logger.Error("PAYOUT FAILED sidebet_settle_equity bet=%s user=%s amount_minor=%d: %v",
+				bet.ID, bet.Acceptor, acceptorShare, perr)
+		}
 	}
 	out, _ := json.Marshal(map[string]interface{}{
 		"ok": true, "mode": "equity", "winner": winner,

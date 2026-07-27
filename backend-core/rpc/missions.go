@@ -397,7 +397,10 @@ func BattlePassPurchasePremium(ctx context.Context, logger runtime.Logger, db *s
 	if err := bp.SetPremium(ctx, userID, season.ID); err != nil {
 		// Refund on persistence failure so the player never loses the debit.
 		if season.PremiumCents > 0 {
-			_ = store.NewWalletStore(db).Credit(ctx, userID, season.PremiumCents, "battlepass_premium_refund:"+season.ID)
+			if rerr := store.NewWalletStore(db).Credit(ctx, userID, season.PremiumCents, "battlepass_premium_refund:"+season.ID); rerr != nil {
+				logger.Error("REFUND FAILED battlepass_premium user=%s season=%s amount_cents=%d: %v",
+					userID, season.ID, season.PremiumCents, rerr)
+			}
 		}
 		return "", runtime.NewError(err.Error(), 13)
 	}
