@@ -317,6 +317,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"tournament_analytics": rpc.TournamentAnalytics,
 		"tournament_finalize":  rpc.TournamentFinalize,
 		"tournament_config":    rpc.TournamentConfig,
+		"tournament_rules_set": rpc.TournamentRulesSet,
 	}
 	for id, fn := range rpcs {
 		if err := initializer.RegisterRpc(id, fn); err != nil {

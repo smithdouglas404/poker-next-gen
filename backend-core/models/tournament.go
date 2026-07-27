@@ -27,6 +27,29 @@ type TournamentBracket struct {
 	// head bounty, won by whoever eliminates them.
 	Knockout        bool      `json:"knockout" db:"knockout" label:"Knockout (Bounty)" help:"Eliminating a player wins their bounty."`
 	BountyMinor     int64     `json:"bounty_minor" db:"bounty_minor" validate:"min=0" unit:"money_minor" label:"Per-Player Bounty"`
+	// AdminFeeBps is the club's percentage cut of each buy-in, charged alongside
+	// the flat FeeMinor. Like FeeMinor it comes OUT of the buy-in rather than on
+	// top of it — the advertised entry price is what the player pays, and the
+	// prize pool is what is left. See store.TournamentEconomics.
+	AdminFeeBps     int32     `json:"admin_fee_bps" db:"admin_fee_bps" validate:"min=0,max=10000" unit:"bps" label:"Admin Fee" help:"Club's percentage of each buy-in, on top of the flat entry fee."`
+	// GuaranteeMinor is a guaranteed prize pool. If entries fall short the club
+	// covers the shortfall (the overlay); it never reduces a pool that exceeds it.
+	GuaranteeMinor  int64     `json:"guarantee_minor" db:"guarantee_minor" validate:"min=0" unit:"money_minor" label:"Guaranteed Prize Pool"`
+	// OperatingStartMin / OperatingEndMin bound registration to a daily window,
+	// in minutes past midnight UTC. Equal values mean no window. Start > End is a
+	// window that wraps midnight (18:00–04:00 => 1080, 240).
+	OperatingStartMin int32   `json:"operating_start_min" db:"operating_start_min" validate:"min=0,max=1439" unit:"count" label:"Operating Hours Start"`
+	OperatingEndMin   int32   `json:"operating_end_min" db:"operating_end_min" validate:"min=0,max=1439" unit:"count" label:"Operating Hours End"`
+	// AutoAwayOnTimeout sits a player out after two consecutive decision timeouts.
+	// Tournament-scoped; applied to every table this tournament starts.
+	AutoAwayOnTimeout bool    `json:"auto_away_on_timeout" db:"auto_away_on_timeout" label:"Auto-Away on 2× Timeout"`
+	// TimeBankPerHandSecs tops the bank up each hand; TimeBankSecs is the total.
+	TimeBankPerHandSecs int32 `json:"time_bank_per_hand_secs" db:"time_bank_per_hand_secs" validate:"min=0,max=120" unit:"seconds" label:"Time Bank per Hand"`
+	// LateRegSecs is how long after the scheduled start registration stays open.
+	// Enforced by TournamentRegister — 0 closes registration at the start time.
+	LateRegSecs     int32     `json:"late_reg_secs" db:"late_reg_secs" validate:"min=0" unit:"seconds" label:"Late Registration Window"`
+	// TimeBankSecs is each player's total banked seconds, passed to the tables.
+	TimeBankSecs    int32     `json:"time_bank_secs" db:"time_bank_secs" validate:"min=0,max=600" unit:"seconds" label:"Time Bank (total)"`
 	Status          string    `json:"status" db:"status" server:"true"` // registering | running | finished
 	ScheduledAt     time.Time `json:"scheduled_at" db:"scheduled_at" label:"Scheduled Start" help:"Defaults to now."`
 	CreatedAt       time.Time `json:"created_at" db:"created_at" server:"true"`

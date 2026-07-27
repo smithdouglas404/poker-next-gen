@@ -1017,6 +1017,30 @@ ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS late_reg_secs INT NOT NULL
 ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS time_bank_secs INT NOT NULL DEFAULT 0;
 ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS format TEXT NOT NULL DEFAULT 'mtt';
 
+-- Tournament builder fields (HRC `comprehensive_tournament_setup`). Every column
+-- here is READ by something — see store.TournamentEconomics, TournamentRegister
+-- and tournament.StartTournament. A column nothing consumes is a config field
+-- that silently does nothing, which is the defect class fixed in #83.
+--
+-- admin_fee_bps is the club's PERCENTAGE cut of each buy-in, charged alongside
+-- the flat fee_minor. Both come out of the buy-in (they do not raise the entry
+-- price), so the prize pool is what remains — see TournamentEconomics.
+ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS admin_fee_bps INT NOT NULL DEFAULT 0;
+-- Guaranteed prize pool. When entries fall short the club covers the shortfall
+-- (the "overlay"); when they exceed it the guarantee is simply met.
+ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS guarantee_minor BIGINT NOT NULL DEFAULT 0;
+-- Operating-hours window, in minutes past midnight UTC. start == end means "no
+-- window" (always open). start > end is a window that wraps midnight, e.g.
+-- 18:00–04:00 => start=1080, end=240.
+ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS operating_start_min INT NOT NULL DEFAULT 0;
+ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS operating_end_min INT NOT NULL DEFAULT 0;
+-- Tournament-scoped auto-away: sit a player out after two consecutive timeouts.
+-- Passed to every table this tournament starts.
+ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS auto_away_on_timeout BOOLEAN NOT NULL DEFAULT FALSE;
+-- Time bank is a composite in the design: a total (time_bank_secs, above) plus a
+-- per-hand top-up. Both are passed to the tournament's tables.
+ALTER TABLE poker_tournament ADD COLUMN IF NOT EXISTS time_bank_per_hand_secs INT NOT NULL DEFAULT 0;
+
 -- ============================================================
 -- table features (#41): run-it-twice + all-in insurance
 -- ============================================================

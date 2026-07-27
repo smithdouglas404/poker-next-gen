@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"time"
+
+	"github.com/smithdouglas404/poker-next-gen/backend-core/models"
 )
 
 // TournamentExtStore backs the tournament read/analytics + config domain
@@ -38,6 +40,40 @@ type TournamentExtInfo struct {
 	TimeBankSecs    int       `json:"time_bank_secs"`
 	Format          string    `json:"format"`
 	ScheduledAt     time.Time `json:"scheduled_at"`
+	// Builder config (HRC comprehensive_tournament_setup). Read by
+	// TournamentMoney for the pool/rake split and by RegistrationOpen for the
+	// operating-hours window.
+	AdminFeeBps         int32 `json:"admin_fee_bps"`
+	GuaranteeMinor      int64 `json:"guarantee_minor"`
+	OperatingStartMin   int32 `json:"operating_start_min"`
+	OperatingEndMin     int32 `json:"operating_end_min"`
+	AutoAwayOnTimeout   bool  `json:"auto_away_on_timeout"`
+	TimeBankPerHandSecs int32 `json:"time_bank_per_hand_secs"`
+}
+
+// Bracket projects the snapshot back onto the canonical model so the shared
+// money/registration helpers (TournamentMoney, RegistrationOpen) take exactly
+// one input type — the pool must never be computed from two different shapes.
+func (t *TournamentExtInfo) Bracket() *models.TournamentBracket {
+	return &models.TournamentBracket{
+		ID:                  t.ID,
+		Name:                t.Name,
+		Status:              t.Status,
+		Variant:             t.Variant,
+		BuyInMinor:          t.BuyInMinor,
+		FeeMinor:            t.FeeMinor,
+		StartingStack:       t.StartingStack,
+		MaxPlayers:          t.MaxPlayers,
+		ScheduledAt:         t.ScheduledAt,
+		LateRegSecs:         int32(t.LateRegSecs),
+		TimeBankSecs:        int32(t.TimeBankSecs),
+		AdminFeeBps:         t.AdminFeeBps,
+		GuaranteeMinor:      t.GuaranteeMinor,
+		OperatingStartMin:   t.OperatingStartMin,
+		OperatingEndMin:     t.OperatingEndMin,
+		AutoAwayOnTimeout:   t.AutoAwayOnTimeout,
+		TimeBankPerHandSecs: t.TimeBankPerHandSecs,
+	}
 }
 
 // GetInfo returns a tournament's base + config fields, or (nil, nil) if missing.
@@ -46,11 +82,16 @@ func (s *TournamentExtStore) GetInfo(ctx context.Context, tournamentID string) (
 	err := s.db.QueryRowContext(ctx, `
 		SELECT id, name, status, variant, buy_in_minor, fee_minor, starting_stack, max_players,
 		       COALESCE(current_level,0), COALESCE(level_started_at,NOW()), COALESCE(director_match_id,''),
-		       COALESCE(late_reg_secs,0), COALESCE(time_bank_secs,0), COALESCE(format,'mtt'), scheduled_at
+		       COALESCE(late_reg_secs,0), COALESCE(time_bank_secs,0), COALESCE(format,'mtt'), scheduled_at,
+		       COALESCE(admin_fee_bps,0), COALESCE(guarantee_minor,0),
+		       COALESCE(operating_start_min,0), COALESCE(operating_end_min,0),
+		       COALESCE(auto_away_on_timeout,FALSE), COALESCE(time_bank_per_hand_secs,0)
 		FROM poker_tournament WHERE id=$1`, tournamentID).
 		Scan(&t.ID, &t.Name, &t.Status, &t.Variant, &t.BuyInMinor, &t.FeeMinor, &t.StartingStack, &t.MaxPlayers,
 			&t.CurrentLevel, &t.LevelStartedAt, &t.DirectorMatchID,
-			&t.LateRegSecs, &t.TimeBankSecs, &t.Format, &t.ScheduledAt)
+			&t.LateRegSecs, &t.TimeBankSecs, &t.Format, &t.ScheduledAt,
+			&t.AdminFeeBps, &t.GuaranteeMinor, &t.OperatingStartMin, &t.OperatingEndMin,
+			&t.AutoAwayOnTimeout, &t.TimeBankPerHandSecs)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -67,6 +108,30 @@ func (s *TournamentExtStore) SetConfig(ctx context.Context, tournamentID string,
 		UPDATE poker_tournament
 		SET late_reg_secs=$2, time_bank_secs=$3, format=$4, updated_at=NOW()
 		WHERE id=$1`, tournamentID, lateRegSecs, timeBankSecs, format)
+	return err
+}
+
+// TournamentRules is the editable builder config, separate from SetConfig so the
+// existing three-field call sites keep working untouched.
+type TournamentRules struct {
+	AdminFeeBps         int32
+	GuaranteeMinor      int64
+	OperatingStartMin   int32
+	OperatingEndMin     int32
+	AutoAwayOnTimeout   bool
+	TimeBankPerHandSecs int32
+}
+
+// SetRules persists the builder's Financials/Rules tabs. Values are validated by
+// the caller (rpc.TournamentConfig) — this is storage only.
+func (s *TournamentExtStore) SetRules(ctx context.Context, tournamentID string, r TournamentRules) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE poker_tournament
+		SET admin_fee_bps=$2, guarantee_minor=$3, operating_start_min=$4,
+		    operating_end_min=$5, auto_away_on_timeout=$6, time_bank_per_hand_secs=$7,
+		    updated_at=NOW()
+		WHERE id=$1`, tournamentID, r.AdminFeeBps, r.GuaranteeMinor, r.OperatingStartMin,
+		r.OperatingEndMin, r.AutoAwayOnTimeout, r.TimeBankPerHandSecs)
 	return err
 }
 

@@ -113,9 +113,18 @@ type MatchState struct {
 	// AFK protection — the proven oddslingers mechanic).
 	TimeoutStreak    map[string]int
 	// Per-table shot-clock config (0 => server defaults): ActionSecsCfg is the base
-	// clock in seconds; TimeBankGrant is the one-time bank granted on sit.
+	// clock in seconds; TimeBankGrant is the one-time bank granted on sit;
+	// TimeBankPerHand tops the bank up at the start of every hand (0 => no top-up,
+	// which is the old behaviour of granting once and never refilling).
 	ActionSecsCfg    int
 	TimeBankGrant    int64
+	TimeBankPerHand  int64
+	// AutoAwayOnTimeout sits a player OUT after two consecutive timeouts rather
+	// than letting the server keep folding for them. Tournament-scoped: at a cash
+	// table the inactivity rule stands a player up (standUpBusted), but a
+	// tournament seat holds chips that cannot be surrendered, so away is the only
+	// correct response.
+	AutoAwayOnTimeout bool
 	// Per-hand behavioural tracking (userID -> counters), reset each hand start
 	// and drained into poker_hand_stats at settlement. Feeds VPIP/PFR/AF.
 	HandTrack        map[string]*playerHandTrack
@@ -169,6 +178,12 @@ const actionSecs int = int(actionTimeoutTicks / 10)
 // row (time-outs) before the inactivity auto-kick stands them up, freeing the
 // seat so an AFK player can't hold a table hostage. Reset by any voluntary act.
 const maxConsecutiveTimeouts = 3
+
+// autoAwayTimeoutStreak is the "2x timeout" of the tournament builder's
+// Auto-Away rule: two consecutive server-acted timeouts sit the player out.
+// Deliberately stricter than maxConsecutiveTimeouts (the cash-table stand-up
+// threshold) — a tournament seat that stops acting is blocking a whole field.
+const autoAwayTimeoutStreak = 2
 
 // Tier-1 C (hit-and-run / ratholing) thresholds. Advisory flags only.
 const ratholeWindowSecs = 30 * 60 // re-buying short within 30 min of leaving bigger = rathole
@@ -284,6 +299,14 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	timeBankCfg := int64(0)
 	if v, ok := numParam(params, "time_bank_secs"); ok && v > 0 {
 		timeBankCfg = v
+	}
+	timeBankPerHand := int64(0)
+	if v, ok := numParam(params, "time_bank_per_hand"); ok && v > 0 {
+		timeBankPerHand = v
+	}
+	autoAwayOnTimeout := false
+	if v, ok := params["auto_away_on_timeout"].(bool); ok {
+		autoAwayOnTimeout = v
 	}
 	hostUserID := ""
 	if v, ok := params["host_user_id"].(string); ok {
@@ -407,6 +430,8 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		TimeoutStreak: map[string]int{},
 		ActionSecsCfg: actionSecsCfg,
 		TimeBankGrant: timeBankCfg,
+		TimeBankPerHand:   timeBankPerHand,
+		AutoAwayOnTimeout: autoAwayOnTimeout,
 		DurationSecs: durationSecs,
 		MinPlayers:   minPlayers,
 		// Cash tables deal themselves (no operator babysitting); tournament tables
@@ -506,6 +531,30 @@ func (s *MatchState) timeBankGrant() int64 {
 		return s.TimeBankGrant
 	}
 	return timeBankSecs
+}
+
+// refillTimeBanks tops every seated human's bank up by TimeBankPerHand at the
+// start of a hand, capped at the total grant. This is the design's composite
+// time bank ("60s total, 5s per hand"); with TimeBankPerHand at 0 the bank is
+// granted once and never refilled, which is the previous behaviour.
+func (s *MatchState) refillTimeBanks() {
+	if s.TimeBankPerHand <= 0 || s.Table == nil {
+		return
+	}
+	cap := s.timeBankGrant()
+	if s.TimeBank == nil {
+		s.TimeBank = map[string]int64{}
+	}
+	for _, seat := range s.Table.Seats {
+		if seat == nil || seat.IsBot || seat.UserID == "" {
+			continue
+		}
+		v := s.TimeBank[seat.UserID] + s.TimeBankPerHand
+		if v > cap {
+			v = cap
+		}
+		s.TimeBank[seat.UserID] = v
+	}
 }
 
 func (h *Handler) MatchJoinAttempt(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, presence runtime.Presence, metadata map[string]string) (interface{}, bool, string) {
@@ -1130,6 +1179,16 @@ func enforceActionDeadline(ctx context.Context, db *sql.DB, dispatcher runtime.M
 		s.TimeoutStreak = map[string]int{}
 	}
 	s.TimeoutStreak[seat.UserID]++
+	// Auto-away on 2x timeout (tournament-scoped, operator-configured). Marking
+	// the seat SittingOut is safe mid-hand: the table only consults the flag when
+	// choosing who is dealt in next hand, so the current hand still resolves with
+	// this seat's folded/checked action intact. Standing them up here would
+	// forfeit a tournament stack, which is why the cash-table auto-kick is not
+	// reused for this.
+	if s.AutoAwayOnTimeout && !seat.SittingOut && s.TimeoutStreak[seat.UserID] >= autoAwayTimeoutStreak {
+		seat.SittingOut = true
+		narrate(dispatcher, s, fmt.Sprintf("%s was sat out after %d consecutive time-outs.", seat.Username, autoAwayTimeoutStreak))
+	}
 	broadcastSnapshot(ctx, db, dispatcher, s, nil)
 	if _, uncontested := s.Table.UncontestedWinner(); uncontested {
 		beginShowdownResolution(ctx, s)
@@ -1796,6 +1855,8 @@ func matchIDForAudit(s *MatchState) string {
 func emitHandStarted(ctx context.Context, s *MatchState) {
 	// Start a fresh per-hand behavioural tracker (VPIP/PFR/AF derivation).
 	s.HandTrack = map[string]*playerHandTrack{}
+	// Composite time bank: top every seated human up by the per-hand increment.
+	s.refillTimeBanks()
 	// Clear per-hand table-feature state (run-it-twice votes, insurance offers).
 	s.RITAgree = map[string]bool{}
 	s.Insurance = map[string]insurancePolicy{}

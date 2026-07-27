@@ -167,16 +167,20 @@ func (s *TournamentStore) Create(ctx context.Context, t *models.TournamentBracke
 		t.MaxSeatsPerTable = 6
 	}
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO poker_tournament (id,name,club_id,created_by,variant,buy_in_minor,fee_minor,starting_stack,max_players,max_seats_per_table,knockout,bounty_minor,status,scheduled_at,created_at,updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
-		t.ID, t.Name, t.ClubID, t.CreatedBy, t.Variant, t.BuyInMinor, t.FeeMinor, t.StartingStack, t.MaxPlayers, t.MaxSeatsPerTable, t.Knockout, t.BountyMinor, t.Status, t.ScheduledAt, t.CreatedAt, t.UpdatedAt)
+		INSERT INTO poker_tournament (id,name,club_id,created_by,variant,buy_in_minor,fee_minor,starting_stack,max_players,max_seats_per_table,knockout,bounty_minor,admin_fee_bps,guarantee_minor,operating_start_min,operating_end_min,auto_away_on_timeout,time_bank_per_hand_secs,late_reg_secs,time_bank_secs,status,scheduled_at,created_at,updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
+		t.ID, t.Name, t.ClubID, t.CreatedBy, t.Variant, t.BuyInMinor, t.FeeMinor, t.StartingStack, t.MaxPlayers, t.MaxSeatsPerTable, t.Knockout, t.BountyMinor,
+		t.AdminFeeBps, t.GuaranteeMinor, t.OperatingStartMin, t.OperatingEndMin, t.AutoAwayOnTimeout, t.TimeBankPerHandSecs, t.LateRegSecs, t.TimeBankSecs,
+		t.Status, t.ScheduledAt, t.CreatedAt, t.UpdatedAt)
 	return err
 }
 
-const tournamentCols = `id,name,club_id,created_by,variant,buy_in_minor,fee_minor,starting_stack,max_players,max_seats_per_table,knockout,bounty_minor,status,scheduled_at,created_at,updated_at`
+const tournamentCols = `id,name,club_id,created_by,variant,buy_in_minor,fee_minor,starting_stack,max_players,max_seats_per_table,knockout,bounty_minor,admin_fee_bps,guarantee_minor,operating_start_min,operating_end_min,auto_away_on_timeout,time_bank_per_hand_secs,late_reg_secs,time_bank_secs,status,scheduled_at,created_at,updated_at`
 
 func scanTournament(sc interface{ Scan(...any) error }, t *models.TournamentBracket) error {
-	return sc.Scan(&t.ID, &t.Name, &t.ClubID, &t.CreatedBy, &t.Variant, &t.BuyInMinor, &t.FeeMinor, &t.StartingStack, &t.MaxPlayers, &t.MaxSeatsPerTable, &t.Knockout, &t.BountyMinor, &t.Status, &t.ScheduledAt, &t.CreatedAt, &t.UpdatedAt)
+	return sc.Scan(&t.ID, &t.Name, &t.ClubID, &t.CreatedBy, &t.Variant, &t.BuyInMinor, &t.FeeMinor, &t.StartingStack, &t.MaxPlayers, &t.MaxSeatsPerTable, &t.Knockout, &t.BountyMinor,
+		&t.AdminFeeBps, &t.GuaranteeMinor, &t.OperatingStartMin, &t.OperatingEndMin, &t.AutoAwayOnTimeout, &t.TimeBankPerHandSecs, &t.LateRegSecs, &t.TimeBankSecs,
+		&t.Status, &t.ScheduledAt, &t.CreatedAt, &t.UpdatedAt)
 }
 
 // Get returns a single tournament by id (nil if not found). Used for authorization.

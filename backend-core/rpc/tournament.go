@@ -121,24 +121,28 @@ func TournamentRegister(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 	username, _ := ctx.Value(runtime.RUNTIME_CTX_USERNAME).(string)
 
 	tStore := store.NewTournamentStore(db)
-	tournaments, err := tStore.List(ctx)
+	bracket, err := tStore.Get(ctx, req.TournamentID)
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
-	var stack int64 = 10000
-	var knockout bool
-	var bounty int64
-	for _, t := range tournaments {
-		if t.ID == req.TournamentID {
-			stack = t.StartingStack
-			knockout, bounty = t.Knockout, t.BountyMinor
-			if t.BuyInMinor > 0 {
-				wStore := store.NewWalletStore(db)
-				if err := wStore.Debit(ctx, userID, t.BuyInMinor, "tournament_buyin"); err != nil {
-					return "", runtime.NewError("insufficient wallet balance", 9)
-				}
-			}
-			break
+	if bracket == nil {
+		return "", runtime.NewError("tournament not found", 5)
+	}
+	// Late registration and operating hours were stored on the tournament and
+	// enforced nowhere — a player could register into an event that had long
+	// since closed. Both windows are now checked server-side.
+	if open, why := store.RegistrationOpen(bracket, time.Now().UTC()); !open {
+		return "", runtime.NewError(why, 9)
+	}
+	stack := bracket.StartingStack
+	if stack <= 0 {
+		stack = 10000
+	}
+	knockout, bounty := bracket.Knockout, bracket.BountyMinor
+	if bracket.BuyInMinor > 0 {
+		wStore := store.NewWalletStore(db)
+		if err := wStore.Debit(ctx, userID, bracket.BuyInMinor, "tournament_buyin"); err != nil {
+			return "", runtime.NewError("insufficient wallet balance", 9)
 		}
 	}
 	if err := tStore.Register(ctx, req.TournamentID, userID, username, stack); err != nil {

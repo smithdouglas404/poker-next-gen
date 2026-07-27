@@ -141,18 +141,14 @@ func (h *Handler) checkFinish(ctx context.Context, logger runtime.Logger, db *sq
 		}
 	}
 
-	// Real prize pool = entrants × buy-in (was a hardcoded placeholder).
+	// Prize pool comes from store.TournamentMoney — the same function the
+	// analytics snapshot and tournament_finalize use, so what the operator was
+	// shown before the event is what the winners are actually paid. This was
+	// `entrants × buy_in` computed inline, which paid out the club's entry fee
+	// as prize money while the reports counted it as club revenue.
 	entrants, _ := tStore.CountEntrants(ctx, s.TournamentID)
-	var buyIn int64
-	if tours, err := tStore.List(ctx); err == nil {
-		for _, t := range tours {
-			if t.ID == s.TournamentID {
-				buyIn = t.BuyInMinor
-				break
-			}
-		}
-	}
-	pool := int64(entrants) * buyIn
+	bracket, _ := tStore.Get(ctx, s.TournamentID)
+	pool := store.TournamentMoney(bracket, entrants).PoolMinor
 
 	// Pay the full prize ladder: each tier's basis-point share is split evenly
 	// across the finishing positions it covers.
@@ -290,23 +286,38 @@ func StartTournament(ctx context.Context, nk runtime.NakamaModule, db *sql.DB, t
 	if len(players) < 2 {
 		return "", nil, runtime.NewError("need at least 2 registered players", 3)
 	}
-	tournaments, _ := tStore.List(ctx)
+	bracket, _ := tStore.Get(ctx, tournamentID)
 	var startingStack int64 = 10000
-	for _, t := range tournaments {
-		if t.ID == tournamentID {
-			startingStack = t.StartingStack
-			break
+	var timeBankSecs, timeBankPerHand int32
+	var autoAway bool
+	var seatsPerTable = protocol.MaxSeats
+	if bracket != nil {
+		if bracket.StartingStack > 0 {
+			startingStack = bracket.StartingStack
+		}
+		timeBankSecs, timeBankPerHand = bracket.TimeBankSecs, bracket.TimeBankPerHandSecs
+		autoAway = bracket.AutoAwayOnTimeout
+		if bracket.MaxSeatsPerTable >= 2 && int(bracket.MaxSeatsPerTable) < seatsPerTable {
+			seatsPerTable = int(bracket.MaxSeatsPerTable)
 		}
 	}
-	tableCount := int(math.Max(1, math.Ceil(float64(len(players))/float64(protocol.MaxSeats))))
+	tableCount := int(math.Max(1, math.Ceil(float64(len(players))/float64(seatsPerTable))))
 	var tableMatches []string
 	for i := 0; i < tableCount; i++ {
+		// The tournament's own shot-clock / seating config is passed to every
+		// table it starts. time_bank_secs and max_seats_per_table were stored on
+		// the tournament and never reached the tables, so the configured values
+		// had no effect on play.
 		matchID, err := nk.MatchCreate(ctx, protocol.MatchModule, map[string]interface{}{
-			"room_id":       fmt.Sprintf("%s-table-%d", tournamentID, i+1),
-			"tournament_id": tournamentID,
-			"small_blind":   float64(50),
-			"big_blind":     float64(100),
-			"buy_in":        float64(startingStack),
+			"room_id":              fmt.Sprintf("%s-table-%d", tournamentID, i+1),
+			"tournament_id":        tournamentID,
+			"small_blind":          float64(50),
+			"big_blind":            float64(100),
+			"buy_in":               float64(startingStack),
+			"max_seats":            float64(seatsPerTable),
+			"time_bank_secs":       float64(timeBankSecs),
+			"time_bank_per_hand":   float64(timeBankPerHand),
+			"auto_away_on_timeout": autoAway,
 		})
 		if err != nil {
 			return "", nil, err

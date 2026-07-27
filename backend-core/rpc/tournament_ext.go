@@ -29,11 +29,15 @@ func tournextValidFormat(f string) bool {
 
 // tournextPrizePool derives the prize pool from entrants × buy-in — the same
 // basis the director uses when it settles (see match/tournament/director.go).
-func tournextPrizePool(entrants int, buyInMinor int64) int64 {
-	if entrants < 0 {
-		entrants = 0
+// tournextMoney is the ONLY prize-pool computation in this file. It used to be
+// `entrants × buy_in`, which ignored the entry fee entirely — so the pool paid
+// out money the club had already been credited with in "Total Fees". See
+// store.TournamentMoney for the accounting.
+func tournextMoney(info *store.TournamentExtInfo, entrants int) store.TournamentEconomics {
+	if info == nil {
+		return store.TournamentEconomics{}
 	}
-	return int64(entrants) * buyInMinor
+	return store.TournamentMoney(info.Bracket(), entrants)
 }
 
 // TournamentBalance signals the tournament director to rebalance/merge tables
@@ -105,7 +109,8 @@ func TournamentStatus(ctx context.Context, logger runtime.Logger, db *sql.DB, nk
 		return "", runtime.NewError(err.Error(), 13)
 	}
 
-	pool := tournextPrizePool(registered, info.BuyInMinor)
+	econ := tournextMoney(info, registered)
+	pool := econ.PoolMinor
 	out, _ := json.Marshal(map[string]interface{}{
 		"tournament_id":       info.ID,
 		"name":                info.Name,
@@ -167,8 +172,8 @@ func TournamentAnalytics(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		return "", runtime.NewError(err.Error(), 13)
 	}
 
-	pool := tournextPrizePool(entrants, info.BuyInMinor)
-	totalFees := int64(entrants) * info.FeeMinor
+	econ := tournextMoney(info, entrants)
+	pool, totalFees := econ.PoolMinor, econ.RakeMinor
 	progressPct := 0.0
 	if entrants > 0 {
 		progressPct = float64(entrants-playersLeft) / float64(entrants) * 100.0
@@ -192,6 +197,20 @@ func TournamentAnalytics(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		"prize_pool_display": dollars(pool),
 		"total_fees_minor":   totalFees,
 		"total_fees_display": dollars(totalFees),
+		// Gross is what entrants paid; pool is what pays out; overlay is the
+		// club's cost of meeting a guarantee the field did not cover.
+		"gross_minor":        econ.GrossMinor,
+		"rake_minor":         econ.RakeMinor,
+		"overlay_minor":      econ.OverlayMinor,
+		"admin_fee_bps":      info.AdminFeeBps,
+		"guarantee_minor":    info.GuaranteeMinor,
+		"late_reg_secs":      info.LateRegSecs,
+		"time_bank_secs":     info.TimeBankSecs,
+		"time_bank_per_hand_secs": info.TimeBankPerHandSecs,
+		"auto_away_on_timeout":    info.AutoAwayOnTimeout,
+		"operating_start_min":     info.OperatingStartMin,
+		"operating_end_min":       info.OperatingEndMin,
+		"scheduled_at":            info.ScheduledAt,
 		"prizes":             prizes,
 		"finishers":          finishers,
 	})
@@ -304,7 +323,7 @@ func TournamentFinalize(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
-	pool := tournextPrizePool(entrants, info.BuyInMinor)
+	pool := tournextMoney(info, entrants).PoolMinor
 
 	prizes, err := ts.ListPrizes(ctx, req.TournamentID)
 	if err != nil {
@@ -361,5 +380,83 @@ func TournamentFinalize(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 		"paid_total_display": dollars(paidTotal),
 		"payouts":            payouts,
 	})
+	return string(out), nil
+}
+
+// TournamentRulesSet persists the tournament builder's Financials and Rules
+// tabs (HRC `comprehensive_tournament_setup`): the club's admin fee percentage,
+// a guaranteed prize pool, the daily operating-hours window, tournament-scoped
+// auto-away, and the composite time bank.
+//
+// Authorized as a tournament mutation (creator or a configurer of the owning
+// club) rather than platform-admin like TournamentConfig — an operator building
+// their own event must be able to set its rules. The values are consumed by
+// store.TournamentMoney (fee/guarantee), store.RegistrationOpen (hours) and
+// tournament.StartTournament (auto-away, time bank), so nothing set here is
+// merely recorded.
+func TournamentRulesSet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	var req struct {
+		TournamentID        string `json:"tournament_id"`
+		AdminFeeBps         int32  `json:"admin_fee_bps"`
+		GuaranteeMinor      int64  `json:"guarantee_minor"`
+		OperatingStartMin   int32  `json:"operating_start_min"`
+		OperatingEndMin     int32  `json:"operating_end_min"`
+		AutoAwayOnTimeout   bool   `json:"auto_away_on_timeout"`
+		TimeBankPerHandSecs int32  `json:"time_bank_per_hand_secs"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.TournamentID == "" {
+		return "", runtime.NewError("tournament_id required", 3)
+	}
+	if _, err := requireTournamentOwner(ctx, db, req.TournamentID); err != nil {
+		return "", err
+	}
+	// An admin fee at or above 100% would leave nothing to pay out. Cap it well
+	// below that: the pool, not the club's cut, is the point of the event.
+	if req.AdminFeeBps < 0 || req.AdminFeeBps > 5000 {
+		return "", runtime.NewError("admin fee must be between 0% and 50%", 3)
+	}
+	if req.GuaranteeMinor < 0 {
+		return "", runtime.NewError("guaranteed prize pool cannot be negative", 3)
+	}
+	if req.OperatingStartMin < 0 || req.OperatingStartMin > 1439 ||
+		req.OperatingEndMin < 0 || req.OperatingEndMin > 1439 {
+		return "", runtime.NewError("operating hours must be minutes past midnight (0–1439)", 3)
+	}
+	if req.TimeBankPerHandSecs < 0 || req.TimeBankPerHandSecs > 120 {
+		return "", runtime.NewError("per-hand time bank must be between 0 and 120 seconds", 3)
+	}
+
+	es := store.NewTournamentExtStore(db)
+	info, err := es.GetInfo(ctx, req.TournamentID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	if info == nil {
+		return "", runtime.NewError("tournament not found", 5)
+	}
+	// The flat entry fee and the admin percentage both come out of the buy-in, so
+	// together they must leave something to play for.
+	if info.BuyInMinor > 0 {
+		perEntryRake := info.FeeMinor + info.BuyInMinor*int64(req.AdminFeeBps)/10000
+		if perEntryRake >= info.BuyInMinor {
+			return "", runtime.NewError(
+				"the entry fee plus admin fee would consume the whole buy-in — lower one of them", 3)
+		}
+	}
+	if err := es.SetRules(ctx, req.TournamentID, store.TournamentRules{
+		AdminFeeBps:         req.AdminFeeBps,
+		GuaranteeMinor:      req.GuaranteeMinor,
+		OperatingStartMin:   req.OperatingStartMin,
+		OperatingEndMin:     req.OperatingEndMin,
+		AutoAwayOnTimeout:   req.AutoAwayOnTimeout,
+		TimeBankPerHandSecs: req.TimeBankPerHandSecs,
+	}); err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	info, err = es.GetInfo(ctx, req.TournamentID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	out, _ := json.Marshal(info)
 	return string(out), nil
 }
