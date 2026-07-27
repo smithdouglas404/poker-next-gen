@@ -122,6 +122,40 @@ func (s *MarketplaceStore) Buy(ctx context.Context, listingID, buyerID string, f
 	if sellerID == buyerID {
 		return 0, fmt.Errorf("you can't buy your own listing")
 	}
+
+	// Both ownership checks run BEFORE any money moves. They used to be implicit
+	// in the transfer below, where each failed silently:
+	//
+	//   * The seller's copy was removed with a bare DELETE whose row count was
+	//     never checked. A stale listing — the seller having disposed of the item
+	//     some other way since posting — deleted nothing, yet the buyer was still
+	//     charged and still received the item. That mints inventory out of
+	//     nothing, and on a one-of-one cosmetic it mints a second original.
+	//
+	//   * The buyer's copy was added with ON CONFLICT DO NOTHING. A buyer who
+	//     already owned the item paid full price for a no-op: debited, seller
+	//     credited, seller's copy destroyed, buyer's holdings unchanged.
+	//
+	// A purchase that cannot deliver has to fail before it takes the money.
+	var sellerOwns bool
+	if err := tx.QueryRowContext(ctx,
+		`SELECT EXISTS(SELECT 1 FROM poker_inventory WHERE user_id=$1 AND cosmetic_id=$2)`,
+		sellerID, cosmeticID).Scan(&sellerOwns); err != nil {
+		return 0, err
+	}
+	if !sellerOwns {
+		return 0, fmt.Errorf("this listing is no longer valid — the seller no longer holds the item")
+	}
+	var buyerOwns bool
+	if err := tx.QueryRowContext(ctx,
+		`SELECT EXISTS(SELECT 1 FROM poker_inventory WHERE user_id=$1 AND cosmetic_id=$2)`,
+		buyerID, cosmeticID).Scan(&buyerOwns); err != nil {
+		return 0, err
+	}
+	if buyerOwns {
+		return 0, fmt.Errorf("you already own this item")
+	}
+
 	fee := price * int64(feeBps) / 10000
 	sellerNet := price - fee
 
@@ -156,14 +190,26 @@ func (s *MarketplaceStore) Buy(ctx context.Context, listingID, buyerID string, f
 		}
 	}
 
-	// Transfer ownership.
-	if _, err := tx.ExecContext(ctx, `DELETE FROM poker_inventory WHERE user_id=$1 AND cosmetic_id=$2`, sellerID, cosmeticID); err != nil {
+	// Transfer ownership. The row counts are asserted rather than assumed: the
+	// checks above hold the listing under FOR UPDATE, but the inventory rows are
+	// not locked by that, so this is the point where a concurrent transfer would
+	// show up. Returning an error rolls the whole transaction back, money
+	// included — the alternative is a charge with nothing delivered.
+	res, err := tx.ExecContext(ctx, `DELETE FROM poker_inventory WHERE user_id=$1 AND cosmetic_id=$2`, sellerID, cosmeticID)
+	if err != nil {
 		return 0, err
 	}
-	if _, err := tx.ExecContext(ctx, `
+	if n, _ := res.RowsAffected(); n != 1 {
+		return 0, fmt.Errorf("the seller no longer holds this item — the sale was not completed")
+	}
+	res, err = tx.ExecContext(ctx, `
 		INSERT INTO poker_inventory (user_id, cosmetic_id, source, acquired_at)
-		VALUES ($1,$2,'marketplace',NOW()) ON CONFLICT (user_id, cosmetic_id) DO NOTHING`, buyerID, cosmeticID); err != nil {
+		VALUES ($1,$2,'marketplace',NOW()) ON CONFLICT (user_id, cosmetic_id) DO NOTHING`, buyerID, cosmeticID)
+	if err != nil {
 		return 0, err
+	}
+	if n, _ := res.RowsAffected(); n != 1 {
+		return 0, fmt.Errorf("you already own this item — the sale was not completed")
 	}
 	// Un-equip the item for the seller if it was equipped.
 	if _, err := tx.ExecContext(ctx, `DELETE FROM poker_equipped WHERE user_id=$1 AND cosmetic_id=$2`, sellerID, cosmeticID); err != nil {
