@@ -54,6 +54,7 @@ because an inert control is indistinguishable from a working one until someone d
 | `_25` Avatar render progress | missing — jobs exist, no progress UI | A full progress UI | It was fabricated. Stage names ("Anatomy Synthesis", "Armor Forging") are not steps this generator performs, and the "engine telemetry" beneath them — mesh throughput in GHz, neural lighting at "6000%" — was arithmetic on one progress number. The real stage (`model`/`rig`/`retarget`) sat in the database and was never returned. |
 | `comprehensive_tournament_setup` | builder missing 8 fields | 4 tabs, summary rail, break schedule, editable ladders | The entire Rules tab was dead: an "Enabled" `<span>` and two `<Select>`s with `defaultValue` and no handler. `guaranteedPrize`, `lateReg` and `regCloseAt` were collected and never sent. "Admin Fee %" was not an admin fee — it read and wrote the flat entry fee. |
 | `dpts_1` Tournament Center | no Drafts, no alerts rail | **Drafts tab and the Tournament Alerts + Global Club Chat rail both exist** (VERIFIED by render) | Only the table thumbnails are genuinely absent, and those are deferred table-render work. |
+| `dpts_8` Table setup | "data model already at parity"; missing start/end, Game Sponsor header, Public tooltip | Game Sponsor section and the Public tooltip both existed | Three of the nine fields this doc credited us with "sending" had **no field on `TableCreateRequest`**, so `json.Unmarshal` discarded them on arrival. `operating_hours` was a bare boolean read by nothing. `auto_away_on_timeout` is read by the match handler but was only ever sent by the tournament director — at a cash table the toggle did nothing. |
 
 ### The largest finding was not on this list at all
 
@@ -198,17 +199,33 @@ podium-less leaderboard, and **no settlement screen at all**.
 
 ### Table setup — 1 mockup · **data model already at parity, presentation is the gap**
 
-`dpts_8` "Advanced Table Access Configuration". Checked field-by-field against
-`features/lobby/PrivateTableSetup.tsx` — we already send `access_type`, `join_code`,
-`wallet_limit_cents`, `auto_buy_back_cents`, `operating_hours`, `action_secs`,
-`auto_away_on_timeout`, `auto_away_below`, `min_players`.
+✅ **DONE**. This row was wrong twice over.
 
-Genuinely missing:
+**"Data model already at parity" was wrong.** The claim rested on the setup form "already sending"
+nine fields. It does send them — but three had **no field on `TableCreateRequest` at all**, so
+`json.Unmarshal` dropped them on arrival:
 
-- **Start Time / End Time** — a scheduled window for the table (we have duration only)
-- **"Game Sponsor: Club Owner"** shown in the header
-- **Public access type disabled with the tooltip** explaining only club owners may sponsor public
-  games — the design states our product rule; our UI doesn't
+| Field | Sent by the form | Field on the request | Read by anything |
+|---|---|---|---|
+| `operating_hours` | ✅ (a bare `true`/`false`) | ✗ | ✗ nothing in the Go tree |
+| `auto_away_below` | ✅ | ✗ | ✗ |
+| `auto_away_on_timeout` | ✅ | ✗ | the match handler reads the param, but only the **tournament** director ever sent it — at a cash table the toggle did nothing |
+
+The form's own comment was honest about it (*"Still forward-compat (no backend home yet)"*); this
+document read the payload and counted the keys.
+
+**Two of the three "genuinely missing" items already existed.** Verified by reading the component:
+the **Game Sponsor** section is a real club picker with a no-club fallback that links to club
+creation, and the **Public** access type is disabled with exactly the master's tooltip,
+`"Only Club Owners can sponsor Public Games"`.
+
+**What was actually built:** the operating window, as a real window rather than a boolean. Start/end
+times in the operator's local clock, converted to the UTC minutes the server stores, with the UTC
+shown back so nobody discovers the conversion at closing time. Enforced at the **sit-down** gate, so
+closing time stops new players sitting down but never pulls a seated player out of a live pot. The
+midnight-wrap arithmetic is shared with the tournament path (`store/daily_window.go`) so the two
+cannot drift. `auto_away_below` now holds dealing while the table is under-full — distinct from
+`min_players`, which only gates whether a table ever starts.
 
 ### Avatar economy — 7 mockups · ◐ one real gap
 
@@ -258,8 +275,8 @@ sound/chips/shuffling session (owner's instruction, 2026-07-26):
   announcement list; pointing it at club announcements is a one-file change in
   `features/table3d/overlays/`
 
-Plus a short tail of genuinely-small gaps: `dpts_6` welcome-card preview, `dpts_8` start/end window
-and the "Game Sponsor" header, `_22` purchase-success screen, `_29`/`_30`/`_23` avatar-studio depth.
+Plus a short tail of genuinely-small gaps: `dpts_6` welcome-card preview, `_22` purchase-success
+screen, `_29`/`_30`/`_23` avatar-studio depth.
 
 ### What the original verdict got wrong
 
@@ -269,9 +286,11 @@ and the "Game Sponsor" header, `_22` purchase-success screen, `_29`/`_30`/`_23` 
    different ways, late registration was unenforced, and the time bank never reached the tables.
 2. **"Club-owner console depth"** — the tabbed centre and the alerts/chat rail already existed on the
    screens that were checked. What was missing was that the controls did anything.
-3. **"Table setup presentation"** — still accurate; the fields exist, the framing doesn't. Note the
-   sponsor gate is now enforced end-to-end, so `dpts_8`'s "Game Sponsor: Club Owner" header and
-   locked Public option now describe real behaviour rather than an aspiration.
+3. **"Table setup presentation — the fields exist, the framing doesn't"** — backwards. The framing
+   existed (Game Sponsor section, locked Public option with the master's tooltip); three of the
+   *fields* did not, and had been silently discarded on every table create since the form shipped.
+   This is the clearest single case of the failure mode: "we already send X" was taken as evidence
+   that X worked, when the receiving struct had no such field.
 4. **"Avatar render progress — jobs run with no progress UI"** — there was a progress UI. It was
    inventing its numbers.
 5. **"No canvas-free table renderer"** — unchanged and still correct. This is the single thing
