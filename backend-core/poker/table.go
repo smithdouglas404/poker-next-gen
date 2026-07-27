@@ -259,7 +259,21 @@ func (t *Table) StandUp(seat int) {
 
 // SitDownBot seats an AI player (no wallet debit; not tied to a presence).
 func (t *Table) SitDownBot(seat int, userID, username string, buyIn int64) error {
-	if err := t.SitDown(seat, userID, username, buyIn); err != nil {
+	return t.sitDownBot(seat, userID, username, buyIn, false)
+}
+
+// SitDownBotUnlimited is SitDownBot without the MaxBuyInCents cap, for tables
+// configured "Unlimited buy-in (play money)". Without this, a table's own
+// human players could correctly buy in above the $1,000 default cap (once
+// stack-seated) while every filler bot at the same table stayed capped at it
+// regardless — the table's own stated stakes and its bots would silently
+// disagree with each other.
+func (t *Table) SitDownBotUnlimited(seat int, userID, username string, buyIn int64) error {
+	return t.sitDownBot(seat, userID, username, buyIn, true)
+}
+
+func (t *Table) sitDownBot(seat int, userID, username string, buyIn int64, allowUnlimited bool) error {
+	if err := t.sitDown(seat, userID, username, buyIn, allowUnlimited); err != nil {
 		return err
 	}
 	t.Seats[seat].IsBot = true

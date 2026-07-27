@@ -74,3 +74,30 @@ func TestSitDownUnlimitedMatchesReserveBuyInClamp(t *testing.T) {
 		t.Fatalf("capped SitDown let %d through, want it clamped to %d", got, MaxBuyInCents)
 	}
 }
+
+// A table's filler bots must respect the same buy-in band as its human
+// players — a table configured "Unlimited buy-in (play money)" seating a human
+// for $5,000 next to a bot capped at $1,000 is the table silently disagreeing
+// with itself about its own stakes.
+func TestSitDownBotUnlimitedMatchesSitDownUnlimited(t *testing.T) {
+	amount := int64(500_000) // above MaxBuyInCents
+
+	tb := NewTable()
+	if err := tb.SitDownBotUnlimited(0, "bot_room_0", "Bot_1", amount); err != nil {
+		t.Fatalf("SitDownBotUnlimited: %v", err)
+	}
+	if got := tb.Seats[0].Stack; got != amount {
+		t.Fatalf("SitDownBotUnlimited capped an unlimited-table bot buy-in: got %d, want %d unchanged", got, amount)
+	}
+	if !tb.Seats[0].IsBot {
+		t.Fatal("SitDownBotUnlimited did not mark the seat as a bot")
+	}
+
+	tb2 := NewTable()
+	if err := tb2.SitDownBot(0, "bot_room_1", "Bot_1", amount); err != nil {
+		t.Fatalf("SitDownBot: %v", err)
+	}
+	if got := tb2.Seats[0].Stack; got != MaxBuyInCents {
+		t.Fatalf("capped SitDownBot let %d through, want it clamped to %d", got, MaxBuyInCents)
+	}
+}

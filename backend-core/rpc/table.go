@@ -272,7 +272,17 @@ func RoomResolve(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 
 // TableAddBot seats an AI player at the given match (fills empty seats so a
 // player can play against bots). Signals the match to seat the bot.
+// TableAddBot seats a filler bot at a table. Host-only, same as kick/pause/
+// close — this had no caller check at all, so any authenticated player could
+// inject bots into a table they weren't hosting, or weren't even seated at.
+// The match's own "add_bot" case in MatchSignal (match/holdem/handler.go)
+// verifies the userID sent here against its HostUserID before honoring it,
+// mirroring the check every OpHostAction message already gets.
 func TableAddBot(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	userID, err := callerID(ctx)
+	if err != nil {
+		return "", err
+	}
 	var req struct {
 		MatchID string `json:"match_id"`
 	}
@@ -282,7 +292,8 @@ func TableAddBot(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 	if req.MatchID == "" {
 		return "", runtime.NewError("match_id required", 3)
 	}
-	if _, err := nk.MatchSignal(ctx, req.MatchID, `{"type":"add_bot"}`); err != nil {
+	sig, _ := json.Marshal(map[string]interface{}{"type": "add_bot", "user_id": userID})
+	if _, err := nk.MatchSignal(ctx, req.MatchID, string(sig)); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	return `{"ok":true}`, nil

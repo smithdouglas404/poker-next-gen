@@ -430,12 +430,22 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		tableArt = v
 	}
 	// Seed AI opponents at creation (server-authoritative, like OddSlingers).
+	// noMaxBuyIn, not the unconditional clamp: a table created "Unlimited
+	// buy-in (play money)" must not seat its own bots at the $1,000 default
+	// while human players at the same table can correctly buy in above it.
 	for i := 0; i < numBots; i++ {
 		seat := table.FirstEmptySeat()
 		if seat < 0 {
 			break
 		}
-		_ = table.SitDownBot(seat, fmt.Sprintf("bot_%s_%d", roomID, seat), fmt.Sprintf("Bot_%d", i+1), poker.ClampBuyIn(buyIn))
+		botBuyIn := poker.ClampBuyInBand(buyIn, noMaxBuyIn)
+		botID := fmt.Sprintf("bot_%s_%d", roomID, seat)
+		botName := fmt.Sprintf("Bot_%d", i+1)
+		if noMaxBuyIn {
+			_ = table.SitDownBotUnlimited(seat, botID, botName, botBuyIn)
+		} else {
+			_ = table.SitDownBot(seat, botID, botName, botBuyIn)
+		}
 	}
 	state := &MatchState{
 		Table:    table,
@@ -2819,16 +2829,35 @@ func (h *Handler) MatchSignal(ctx context.Context, logger runtime.Logger, db *sq
 		}
 		broadcastSnapshot(ctx, db, dispatcher, s, nil)
 	case "add_bot":
+		// Same host check OpHostAction's dispatch already applies to every
+		// other host command (kick/pause/close/set_blinds/...) — table_add_bot
+		// had no caller verification anywhere before this, on either the RPC
+		// side or here, so any authenticated player could add bots to a table
+		// they weren't hosting or even seated at.
+		callerID, _ := sig["user_id"].(string)
+		if s.HostUserID == "" || callerID != s.HostUserID {
+			break
+		}
 		if realMoneyEnabled() {
 			break // no bots on real-money tables
 		}
 		seatIdx := s.Table.FirstEmptySeat()
 		if seatIdx >= 0 {
 			s.BotCount++
-			buyIn := poker.ClampBuyIn(s.BuyIn)
+			// Same band the human path uses (reserveBuyIn / OpSitDown): the
+			// table's own configured stakes, not always the $1,000 global
+			// default — a bot's buy-in must not silently disagree with what
+			// human players at the same table are actually seated for.
+			buyIn := poker.ClampBuyInBand(s.BuyIn, s.NoMaxBuyIn)
 			name := fmt.Sprintf("Bot_%d", s.BotCount)
 			botID := fmt.Sprintf("bot_%s_%d", s.RoomID, seatIdx)
-			if err := s.Table.SitDownBot(seatIdx, botID, name, buyIn); err == nil {
+			var err error
+			if s.NoMaxBuyIn {
+				err = s.Table.SitDownBotUnlimited(seatIdx, botID, name, buyIn)
+			} else {
+				err = s.Table.SitDownBot(seatIdx, botID, name, buyIn)
+			}
+			if err == nil {
 				dispatcher.MatchLabelUpdate(buildLabel(s))
 				broadcastSnapshot(ctx, db, dispatcher, s, nil)
 			}
