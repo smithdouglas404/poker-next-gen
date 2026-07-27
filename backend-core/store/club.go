@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/smithdouglas404/poker-next-gen/backend-core/models"
@@ -338,16 +339,60 @@ func (s *ClubStore) GetRake(ctx context.Context, clubID string) (*models.CustomR
 	return &r, nil
 }
 
-func (s *ClubStore) AllocateBalance(ctx context.Context, b *models.PlayerAllocatedBalance) error {
+// AllocateBalance moves club-issued chips to a member. `b.Balance` is a DELTA,
+// not an absolute: it is added to whatever the member already holds.
+//
+// `reason` is required and ends up in the ledger. Club chips used to move with
+// no record whatsoever — no audit row, no ledger posting, no table anywhere that
+// said who allocated what — so a member's balance could change and nobody, the
+// member least of all, could find out why.
+func (s *ClubStore) AllocateBalance(ctx context.Context, b *models.PlayerAllocatedBalance, reason string) error {
+	if b.Balance == 0 {
+		return fmt.Errorf("allocation amount cannot be zero")
+	}
+	if strings.TrimSpace(reason) == "" {
+		return fmt.Errorf("an allocation reason is required")
+	}
 	b.ID = NewID("bal")
 	now := time.Now().UTC()
 	b.CreatedAt, b.UpdatedAt = now, now
-	_, err := s.db.ExecContext(ctx, `
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// The balance guard is what makes a negative delta safe. Clawing back more
+	// than a member holds would leave them owing chips they never had, and the
+	// seating code reads this balance as spendable — a negative would be treated
+	// as a very large unsigned budget by any comparison that forgets the sign.
+	var after int64
+	err = tx.QueryRowContext(ctx, `
 		INSERT INTO poker_player_balance (id,club_id,user_id,balance,locked_amount,currency,created_at,updated_at)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-		ON CONFLICT (club_id,user_id) DO UPDATE SET balance=poker_player_balance.balance+$4, updated_at=$8`,
-		b.ID, b.ClubID, b.UserID, b.Balance, b.LockedAmount, b.Currency, b.CreatedAt, b.UpdatedAt)
-	return err
+		ON CONFLICT (club_id,user_id) DO UPDATE
+			SET balance=poker_player_balance.balance+$4, updated_at=$8
+			WHERE poker_player_balance.balance + $4 >= 0
+		RETURNING balance`,
+		b.ID, b.ClubID, b.UserID, b.Balance, b.LockedAmount, b.Currency, b.CreatedAt, b.UpdatedAt,
+	).Scan(&after)
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("that would take the member's club balance below zero")
+	}
+	if err != nil {
+		return err
+	}
+
+	// Double-entry: chips issued by a club are a debt the club takes on, so the
+	// club's own account is debited as the member's is credited. The club account
+	// running negative is the point — it is exactly how much credit the club has
+	// extended, a figure nobody was tracking before.
+	if err := postLedgerKind(ctx, tx, "club_allocation",
+		ClubIssuanceAcct(b.ClubID), ClubMemberAcct(b.ClubID, b.UserID), b.Balance, reason); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *ClubStore) GetBalance(ctx context.Context, clubID, userID string) (*models.PlayerAllocatedBalance, error) {
@@ -390,8 +435,36 @@ func (s *ClubStore) LockBalance(ctx context.Context, clubID, userID string, amou
 }
 
 func (s *ClubStore) UnlockBalance(ctx context.Context, clubID, userID string, amount int64) error {
+	return s.SettleSeat(ctx, clubID, userID, amount, amount)
+}
+
+// SettleSeat releases a seat funded by club chips: `locked` is what was reserved
+// at sit-down, `returned` is the stack actually leaving the table.
+//
+// These differ every time a player wins or loses, and conflating them was a live
+// leak. The old UnlockBalance took ONE amount — the caller passed the final
+// stack — and unlocked it with GREATEST(0, locked_amount - stack). A player who
+// bought in for 1000 and left with 400 therefore had 400 returned to their
+// balance and 600 left pinned in locked_amount forever: not destroyed, but
+// unspendable and invisible, and it grew with every losing session. Their
+// balance read low while locked_amount claimed they were sitting in a pot they
+// had left.
+//
+// Releasing the ORIGINAL reservation and crediting the ACTUAL stack keeps
+// locked_amount a true measure of chips currently in play.
+func (s *ClubStore) SettleSeat(ctx context.Context, clubID, userID string, locked, returned int64) error {
+	if locked < 0 {
+		locked = 0
+	}
+	if returned < 0 {
+		returned = 0
+	}
+	if locked == 0 && returned == 0 {
+		return nil
+	}
 	_, err := s.db.ExecContext(ctx, `
-		UPDATE poker_player_balance SET locked_amount=GREATEST(0,locked_amount-$3), balance=balance+$3, updated_at=NOW()
-		WHERE club_id=$1 AND user_id=$2`, clubID, userID, amount)
+		UPDATE poker_player_balance
+		SET locked_amount=GREATEST(0,locked_amount-$3), balance=balance+$4, updated_at=NOW()
+		WHERE club_id=$1 AND user_id=$2`, clubID, userID, locked, returned)
 	return err
 }

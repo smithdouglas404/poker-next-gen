@@ -109,7 +109,7 @@ func CreditRequestReview(ctx context.Context, logger runtime.Logger, db *sql.DB,
 	if req.Approve {
 		if err := store.NewClubStore(db).AllocateBalance(ctx, &models.PlayerAllocatedBalance{
 			ClubID: cr.ClubID, UserID: cr.UserID, Balance: cr.AmountMinor, Currency: "USD",
-		}); err != nil {
+		}, "credit request "+cr.ID); err != nil {
 			return "", runtime.NewError("approved but allocation failed: "+err.Error(), 13)
 		}
 	}

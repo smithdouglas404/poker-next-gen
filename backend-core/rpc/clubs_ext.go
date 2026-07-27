@@ -298,12 +298,12 @@ func ClubTournamentFees(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	out, _ := json.Marshal(map[string]interface{}{
-		"club_id":          req.ClubID,
-		"period":           req.Period,
-		"fee_total_minor":  feeTotal,
+		"club_id":           req.ClubID,
+		"period":            req.Period,
+		"fee_total_minor":   feeTotal,
 		"buyin_total_minor": buyInTotal,
-		"entries":          entries,
-		"tournaments":      breakdown,
+		"entries":           entries,
+		"tournaments":       breakdown,
 	})
 	return string(out), nil
 }
@@ -378,11 +378,11 @@ func ClubAnalyticsSeries(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	out, _ := json.Marshal(map[string]interface{}{
-		"club_id":          req.ClubID,
-		"days":             len(series),
-		"series":           series,
-		"new_total":        newTotal,
-		"returning_total":  retTotal,
+		"club_id":         req.ClubID,
+		"days":            len(series),
+		"series":          series,
+		"new_total":       newTotal,
+		"returning_total": retTotal,
 	})
 	return string(out), nil
 }
@@ -675,7 +675,7 @@ func ClubRequestReview(ctx context.Context, logger runtime.Logger, db *sql.DB, n
 			// Seed the member's club-allocated balance with the granted credit line.
 			_ = store.NewClubStore(db).AllocateBalance(ctx, &models.PlayerAllocatedBalance{
 				ClubID: inv.ClubID, UserID: inv.UserID, Balance: inv.CreditLimitCents, Currency: "USD",
-			})
+			}, "invitation "+inv.ID+" accepted")
 		}
 		_ = es.LogActivity(ctx, inv.ClubID, callerUserID, "member_join", inv.UserID+" joined")
 	}
@@ -800,14 +800,14 @@ func ClubAnnouncementCreate(ctx context.Context, logger runtime.Logger, db *sql.
 			clubName = c.Name
 		}
 		content := map[string]interface{}{
-			"kind":         "club_announcement",
-			"id":           id,
-			"club_id":      req.ClubID,
-			"club_name":    clubName,
-			"body":         req.Body,
-			"severity":     severity,
-			"channel":      channel,
-			"audience":     audience,
+			"kind":      "club_announcement",
+			"id":        id,
+			"club_id":   req.ClubID,
+			"club_name": clubName,
+			"body":      req.Body,
+			"severity":  severity,
+			"channel":   channel,
+			"audience":  audience,
 		}
 		sends := make([]*runtime.NotificationSend, 0, len(recipients))
 		for _, uid := range recipients {

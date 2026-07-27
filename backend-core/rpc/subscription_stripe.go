@@ -121,9 +121,9 @@ func SubscriptionCheckout(ctx context.Context, logger runtime.Logger, db *sql.DB
 		return "", runtime.NewError("billing error", 13)
 	}
 	out, _ := json.Marshal(map[string]interface{}{
-		"configured":  true,
+		"configured":   true,
 		"checkout_url": session.URL,
-		"session_id":  session.ID,
+		"session_id":   session.ID,
 	})
 	return string(out), nil
 }

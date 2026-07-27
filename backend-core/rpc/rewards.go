@@ -66,11 +66,11 @@ func PointsBalance(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	out, _ := json.Marshal(map[string]interface{}{
-		"user_id":       caller,
-		"spendable":     l.HRPSpendable,
-		"lifetime":      l.HRPTotal,
-		"hands_played":  l.HandsPlayed,
-		"hands_won":     l.HandsWon,
+		"user_id":      caller,
+		"spendable":    l.HRPSpendable,
+		"lifetime":     l.HRPTotal,
+		"hands_played": l.HandsPlayed,
+		"hands_won":    l.HandsWon,
 	})
 	return string(out), nil
 }

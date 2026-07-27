@@ -63,5 +63,5 @@ func ClockLabel(minutes int) string {
 }
 
 func twoDigit(v int) string {
-	return string(rune('0' + v/10)) + string(rune('0' + v%10))
+	return string(rune('0'+v/10)) + string(rune('0'+v%10))
 }

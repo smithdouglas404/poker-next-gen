@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -344,9 +345,9 @@ func ClubGet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.
 		mine, _ = clubStore.GetMembership(ctx, req.ClubID, userID)
 	}
 	out, _ := json.Marshal(map[string]interface{}{
-		"club":            club,
-		"members":         members,
-		"my_membership":   mine,
+		"club":             club,
+		"members":          members,
+		"my_membership":    mine,
 		"create_fee_cents": clubCreateFeeCents(),
 	})
 	return string(out), nil
@@ -445,9 +446,15 @@ func BalanceAllocate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk 
 	if req.Currency == "" {
 		req.Currency = "USD"
 	}
-	if err := store.NewClubStore(db).AllocateBalance(ctx, &req); err != nil {
-		return "", runtime.NewError(err.Error(), 13)
+	if err := store.NewClubStore(db).AllocateBalance(ctx, &req, "operator allocation"); err != nil {
+		return "", runtime.NewError(err.Error(), 3)
 	}
+	// Record it in the club's own activity feed. An operator moving a member's
+	// chips is exactly the kind of action the other operators need to be able to
+	// see after the fact.
+	actor, _ := callerID(ctx)
+	_ = store.NewClubExtStore(db).LogActivity(ctx, req.ClubID, actor, "balance_allocate",
+		fmt.Sprintf("allocated %d to %s", req.Balance, req.UserID))
 	out, _ := json.Marshal(req)
 	return string(out), nil
 }

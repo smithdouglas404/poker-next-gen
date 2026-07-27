@@ -36,21 +36,21 @@ type PendingShowdown struct {
 }
 
 type MatchState struct {
-	Table            *poker.Table
-	Phase            poker.HandPhase
-	PendingShowdown  *PendingShowdown
-	Audit            audit.Emitter
-	MatchID          string
-	RoomID           string
-	ClubID           string
-	TournamentID     string
+	Table           *poker.Table
+	Phase           poker.HandPhase
+	PendingShowdown *PendingShowdown
+	Audit           audit.Emitter
+	MatchID         string
+	RoomID          string
+	ClubID          string
+	TournamentID    string
 	// WarID / LeagueID tag a table as part of a club-war or league so per-hand
 	// results accrue to those standings at settlement (empty => not participating).
-	WarID            string
-	LeagueID         string
-	SmallBlind       int64
-	BigBlind         int64
-	Ante             int64
+	WarID      string
+	LeagueID   string
+	SmallBlind int64
+	BigBlind   int64
+	Ante       int64
 	// Initial* capture the table's configured allocations at creation. Host
 	// overrides (set_blinds, pause) only take effect while the host is present
 	// AT the table; when the host is absent the table reverts to these initial
@@ -58,47 +58,52 @@ type MatchState struct {
 	InitialSmallBlind int64
 	InitialBigBlind   int64
 	InitialAnte       int64
-	BuyIn            int64
-	MinBuyIn         int64 // table minimum buy-in / rebuy (0 => BuyIn)
-	MaxBuyIn         int64 // table maximum buy-in (0 => 3x BuyIn)
-	Presences        map[string]runtime.Presence
+	BuyIn             int64
+	MinBuyIn          int64 // table minimum buy-in / rebuy (0 => BuyIn)
+	MaxBuyIn          int64 // table maximum buy-in (0 => 3x BuyIn)
+	Presences         map[string]runtime.Presence
 	// SeatWallet remembers which wallet each seat's buy-in was drawn from
 	// ("global" | "club") so cash-out/refund returns chips to the SAME wallet.
-	SeatWallet       map[int]string
+	SeatWallet map[int]string
+	// SeatLocked is how much a club-funded seat RESERVED at sit-down. Release has
+	// to unlock the reservation, not the final stack — those differ every time a
+	// player wins or loses, and unlocking the stack strands the difference in
+	// locked_amount forever. See ClubStore.SettleSeat.
+	SeatLocked map[int]int64
 	// Seat-session tracking (Tier-1 C): per-seat open seat_session id, cumulative
 	// buy-in this sitting (initial + auto-rebuys), and hands dealt while seated.
 	// Drained into poker_seat_session when the player leaves (hit-and-run/rathole
 	// visibility). Advisory only — never blocks play.
-	SeatSessionID    map[int]string
-	SeatBuyIn        map[int]int64
-	SeatHands        map[int]int
+	SeatSessionID map[int]string
+	SeatBuyIn     map[int]int64
+	SeatHands     map[int]int
 	// LastActionNonce dedupes a re-sent action per player (userID -> last accepted
 	// nonce): a client retry / double-tap carrying the same nonce is a no-op, so a
 	// flaky connection can't apply an action twice. Empty nonce => no dedup.
-	LastActionNonce  map[string]string
-	BotCount         int
-	Rand             *rand.Rand
+	LastActionNonce map[string]string
+	BotCount        int
+	Rand            *rand.Rand
 	// Per-session AES-256-GCM keys (userID -> 32 raw bytes) used to encrypt each
 	// player's own hole cards so the wire never carries plaintext card codes.
-	SessionKeys      map[string][]byte
+	SessionKeys map[string][]byte
 	// Self-managing table lifecycle (no operator babysitting):
-	DurationSecs     int   // auto-close after this many seconds (0 = no limit)
-	MinPlayers       int   // players required before hands auto-start (default 2)
-	AutoDeal         bool  // auto-start each hand (cash tables); tournaments deal via director
-	NextDealTick     int64 // tick at which to auto-deal the next hand (0 = unset)
+	DurationSecs int   // auto-close after this many seconds (0 = no limit)
+	MinPlayers   int   // players required before hands auto-start (default 2)
+	AutoDeal     bool  // auto-start each hand (cash tables); tournaments deal via director
+	NextDealTick int64 // tick at which to auto-deal the next hand (0 = unset)
 	// Host controls (the table creator can pause/kick/adjust/close live):
-	HostUserID       string
-	HostPaused       bool
-	HostClosed       bool
+	HostUserID string
+	HostPaused bool
+	HostClosed bool
 	// AdminPaused is a platform-admin freeze (tables_freeze_all). Unlike HostPaused
 	// it is honored regardless of host presence — it's an operator override.
-	AdminPaused      bool
+	AdminPaused bool
 	// DealerDown tracks the engine-math (rs_poker) sidecar being unreachable so the
 	// table pauses dealing gracefully and tells players ONCE, rather than silently
 	// failing to deal. Cleared (with a "restored" notice) on the next successful
 	// StartHand. There is no local shuffle fallback (Golden rule 4) — the table
 	// simply waits for the authoritative dealer service to return.
-	DealerDown       bool
+	DealerDown bool
 	// Human action clock: when the seat to act is a human, ActionDeadlineTick is
 	// the tick by which they must act before the server auto-checks/folds them.
 	ActionDeadlineTick int64
@@ -106,19 +111,19 @@ type MatchState struct {
 	// TimeBank is each human's remaining banked seconds (userID -> secs), burned
 	// only after the base ActionSecs lapses, before the server auto-folds. Granted
 	// once when a player first sits; not auto-refilled.
-	TimeBank         map[string]int64
+	TimeBank map[string]int64
 	// TimeoutStreak counts each human's CONSECUTIVE server-acted timeouts (userID
 	// -> count); reset to 0 the moment they act voluntarily. After
 	// maxConsecutiveTimeouts the inactivity auto-kick stands them up (orbit-style
 	// AFK protection — the proven oddslingers mechanic).
-	TimeoutStreak    map[string]int
+	TimeoutStreak map[string]int
 	// Per-table shot-clock config (0 => server defaults): ActionSecsCfg is the base
 	// clock in seconds; TimeBankGrant is the one-time bank granted on sit;
 	// TimeBankPerHand tops the bank up at the start of every hand (0 => no top-up,
 	// which is the old behaviour of granting once and never refilling).
-	ActionSecsCfg    int
-	TimeBankGrant    int64
-	TimeBankPerHand  int64
+	ActionSecsCfg   int
+	TimeBankGrant   int64
+	TimeBankPerHand int64
 	// AutoAwayOnTimeout sits a player OUT after two consecutive timeouts rather
 	// than letting the server keep folding for them. Originally tournament-scoped
 	// — at a cash table the inactivity rule stands a player up (standUpBusted),
@@ -135,15 +140,15 @@ type MatchState struct {
 	AutoAwayBelowPlayers int
 	// Per-hand behavioural tracking (userID -> counters), reset each hand start
 	// and drained into poker_hand_stats at settlement. Feeds VPIP/PFR/AF.
-	HandTrack        map[string]*playerHandTrack
+	HandTrack map[string]*playerHandTrack
 	// AntibotLog is a rolling window of each human's recent actions, scored at
 	// settlement so bot-likelihood accrues from LIVE play (previously the scorer
 	// only ran when an admin hand-posted action batches). Capped per user.
-	AntibotLog       map[string][]antibot.ActionRecord
+	AntibotLog map[string][]antibot.ActionRecord
 	// Optional table features (#41), all per-hand and reset at hand start:
-	RITAgree         map[string]bool             // userID -> agreed to run it twice
-	Insurance        map[string]insurancePolicy  // userID -> accepted all-in insurance
-	InsOffered       map[string]insurancePolicy  // userID -> standing (unaccepted) offer
+	RITAgree   map[string]bool            // userID -> agreed to run it twice
+	Insurance  map[string]insurancePolicy // userID -> accepted all-in insurance
+	InsOffered map[string]insurancePolicy // userID -> standing (unaccepted) offer
 	// Access & seating policy (#83). Configured at MatchInit; enforced at the
 	// join gate (JoinCode) and the sit-down gate (KYC / members / geo / wallet cap).
 	AccessType       string // "public" | "members" | "invite" (empty => public)
@@ -425,9 +430,9 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		_ = table.SitDownBot(seat, fmt.Sprintf("bot_%s_%d", roomID, seat), fmt.Sprintf("Bot_%d", i+1), poker.ClampBuyIn(buyIn))
 	}
 	state := &MatchState{
-		Table:        table,
-		BotCount:     numBots,
-		Phase:        poker.PhaseWaiting,
+		Table:    table,
+		BotCount: numBots,
+		Phase:    poker.PhaseWaiting,
 		Audit: audit.MultiEmitter{Sinks: []audit.Emitter{
 			audit.NewPostgresEmitter(db),
 			audit.NewArweaveEmitter(),
@@ -441,39 +446,40 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		BigBlind:     bb,
 		// Snapshot the configured allocations so host overrides can be reverted
 		// when the host leaves the table (see hostPresent / effSmallBlind).
-		InitialSmallBlind: sb,
-		InitialBigBlind:   bb,
-		BuyIn:        buyIn,
-		MinBuyIn:     minBuyIn,
-		MaxBuyIn:     maxBuyIn,
-		Presences:    map[string]runtime.Presence{},
-		SeatWallet:   map[int]string{},
-		SeatSessionID:   map[int]string{},
-		SeatBuyIn:       map[int]int64{},
-		SeatHands:       map[int]int{},
-		LastActionNonce: map[string]string{},
-		Rand:         rand.New(rand.NewSource(time.Now().UnixNano())),
-		SessionKeys:  map[string][]byte{},
-		RITAgree:     map[string]bool{},
-		Insurance:    map[string]insurancePolicy{},
-		InsOffered:   map[string]insurancePolicy{},
-		AntibotLog:   map[string][]antibot.ActionRecord{},
-		TimeBank:     map[string]int64{},
-		TimeoutStreak: map[string]int{},
-		ActionSecsCfg: actionSecsCfg,
-		TimeBankGrant: timeBankCfg,
-		TimeBankPerHand:   timeBankPerHand,
-		AutoAwayOnTimeout: autoAwayOnTimeout,
+		InitialSmallBlind:    sb,
+		InitialBigBlind:      bb,
+		BuyIn:                buyIn,
+		MinBuyIn:             minBuyIn,
+		MaxBuyIn:             maxBuyIn,
+		Presences:            map[string]runtime.Presence{},
+		SeatWallet:           map[int]string{},
+		SeatLocked:           map[int]int64{},
+		SeatSessionID:        map[int]string{},
+		SeatBuyIn:            map[int]int64{},
+		SeatHands:            map[int]int{},
+		LastActionNonce:      map[string]string{},
+		Rand:                 rand.New(rand.NewSource(time.Now().UnixNano())),
+		SessionKeys:          map[string][]byte{},
+		RITAgree:             map[string]bool{},
+		Insurance:            map[string]insurancePolicy{},
+		InsOffered:           map[string]insurancePolicy{},
+		AntibotLog:           map[string][]antibot.ActionRecord{},
+		TimeBank:             map[string]int64{},
+		TimeoutStreak:        map[string]int{},
+		ActionSecsCfg:        actionSecsCfg,
+		TimeBankGrant:        timeBankCfg,
+		TimeBankPerHand:      timeBankPerHand,
+		AutoAwayOnTimeout:    autoAwayOnTimeout,
 		AutoAwayBelowPlayers: autoAwayBelowPlayers,
 		// Daily operating window (dpts_8).
 		OperatingStartMin: operatingStartMin,
 		OperatingEndMin:   operatingEndMin,
-		DurationSecs: durationSecs,
-		MinPlayers:   minPlayers,
+		DurationSecs:      durationSecs,
+		MinPlayers:        minPlayers,
 		// Cash tables deal themselves (no operator babysitting); tournament tables
 		// are driven by the tournament director, so they opt out.
-		AutoDeal:     tournamentID == "",
-		HostUserID:   hostUserID,
+		AutoDeal:   tournamentID == "",
+		HostUserID: hostUserID,
 		// Access & seating policy (#83).
 		AccessType:       accessType,
 		JoinCode:         joinCode,
@@ -916,6 +922,15 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				continue
 			}
 			s.SeatWallet[req.Seat] = wallet
+			if wallet == "club" {
+				// Remember what was RESERVED. The stack that eventually leaves the
+				// table is a different number, and releasing that one instead
+				// strands the difference in locked_amount (ClubStore.SettleSeat).
+				if s.SeatLocked == nil {
+					s.SeatLocked = map[int]int64{}
+				}
+				s.SeatLocked[req.Seat] = buyIn
+			}
 			if s.TimeBank == nil {
 				s.TimeBank = map[string]int64{}
 			}
@@ -985,6 +1000,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 					}
 					releaseBuyIn(ctx, db, s, i, userID, seat.Stack)
 					delete(s.SeatWallet, i)
+					delete(s.SeatLocked, i)
 					closeSeatSession(ctx, db, s, i)
 					s.Table.StandUp(i)
 					stoodUp = true
@@ -1804,6 +1820,7 @@ func handleHostAction(ctx context.Context, db *sql.DB, dispatcher runtime.MatchD
 		if req.Seat >= 0 && req.Seat < poker.MaxSeats && seat != nil && !seat.IsBot {
 			releaseBuyIn(ctx, db, s, req.Seat, seat.UserID, seat.Stack)
 			delete(s.SeatWallet, req.Seat)
+			delete(s.SeatLocked, req.Seat)
 			_ = store.NewActiveSeatStore(db).Unregister(ctx, seat.UserID, matchIDForAudit(s))
 			name := seat.Username
 			closeSeatSession(ctx, db, s, req.Seat)
@@ -1910,6 +1927,7 @@ func closeTable(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatc
 		if !seat.IsBot {
 			releaseBuyIn(ctx, db, s, i, seat.UserID, seat.Stack)
 			delete(s.SeatWallet, i)
+			delete(s.SeatLocked, i)
 			_ = seatReg.Unregister(ctx, seat.UserID, matchIDForAudit(s))
 		}
 		closeSeatSession(ctx, db, s, i)
@@ -1943,12 +1961,12 @@ func emitHandStarted(ctx context.Context, s *MatchState) {
 		boardCodes = append(boardCodes, c.Code())
 	}
 	payload := map[string]any{
-		"hand_no":           s.Table.HandNo,
-		"small_blind":       s.effSmallBlind(),
-		"big_blind":         s.effBigBlind(),
-		"seated":            s.Table.SeatedCount(),
-		"board":             boardCodes,
-		"deck_commit_hash":  s.Table.DeckCommitment,
+		"hand_no":          s.Table.HandNo,
+		"small_blind":      s.effSmallBlind(),
+		"big_blind":        s.effBigBlind(),
+		"seated":           s.Table.SeatedCount(),
+		"board":            boardCodes,
+		"deck_commit_hash": s.Table.DeckCommitment,
 	}
 	_ = s.Audit.Emit(ctx, audit.Event{
 		Type:        "hand_started",
@@ -1968,16 +1986,16 @@ func emitSidePotsPlanned(ctx context.Context, s *MatchState, plan poker.Showdown
 	layers := make([]map[string]any, 0, len(plan.Pots))
 	for i, pot := range plan.Pots {
 		layers = append(layers, map[string]any{
-			"index":     i,
-			"amount":    pot.Amount,
-			"eligible":  pot.Eligible,
+			"index":    i,
+			"amount":   pot.Amount,
+			"eligible": pot.Eligible,
 		})
 	}
 	payload := map[string]any{
-		"hand_no":             plan.HandNo,
-		"total_pot":           plan.TotalPot,
-		"side_pots":           layers,
-		"uncontested_winner":  plan.UncontestedWinner,
+		"hand_no":            plan.HandNo,
+		"total_pot":          plan.TotalPot,
+		"side_pots":          layers,
+		"uncontested_winner": plan.UncontestedWinner,
 	}
 	_ = s.Audit.Emit(ctx, audit.Event{
 		Type:        "sidepots_planned",
@@ -2122,7 +2140,16 @@ func releaseBuyIn(ctx context.Context, db *sql.DB, s *MatchState, seat int, user
 		wallet = s.SeatWallet[seat]
 	}
 	if wallet == "club" && s.ClubID != "" {
-		_ = store.NewClubStore(db).UnlockBalance(ctx, s.ClubID, userID, amount)
+		// Unlock what was reserved; credit what is actually leaving. Passing the
+		// stack for both — the old behaviour — pinned a losing player's shortfall
+		// in locked_amount permanently.
+		locked := amount
+		if s.SeatLocked != nil {
+			if v, ok := s.SeatLocked[seat]; ok {
+				locked = v
+			}
+		}
+		_ = store.NewClubStore(db).SettleSeat(ctx, s.ClubID, userID, locked, amount)
 		return
 	}
 	// "global", non-club tables, or unknown -> the global wallet.
@@ -2392,6 +2419,7 @@ func standUpBusted(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDisp
 		name := seat.Username
 		releaseBuyIn(ctx, db, s, i, seat.UserID, seat.Stack)
 		delete(s.SeatWallet, i)
+		delete(s.SeatLocked, i)
 		delete(s.TimeoutStreak, seat.UserID)
 		_ = store.NewActiveSeatStore(db).Unregister(ctx, seat.UserID, matchIDForAudit(s))
 		closeSeatSession(ctx, db, s, i)
@@ -2452,6 +2480,7 @@ func evictExcluded(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDisp
 		name := seat.Username
 		releaseBuyIn(ctx, db, s, i, seat.UserID, seat.Stack)
 		delete(s.SeatWallet, i)
+		delete(s.SeatLocked, i)
 		_ = store.NewActiveSeatStore(db).Unregister(ctx, seat.UserID, matchIDForAudit(s))
 		closeSeatSession(ctx, db, s, i)
 		s.Table.StandUp(i)
@@ -2695,35 +2724,35 @@ func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) 
 		}
 	}
 	return protocol.TableSnapshot{
-		MatchID:        s.MatchID,
-		RoomID:         s.RoomID,
+		MatchID:             s.MatchID,
+		RoomID:              s.RoomID,
 		MinBuyIn:            s.minBuyIn(),
 		MaxBuyIn:            s.maxBuyIn(),
 		AcceptsGlobalWallet: acceptsGlobal,
 		HeroClubBalance:     heroClubBalance,
-		Phase:          poker.HandPhaseForTable(s.Table, s.Phase),
-		Seats:          seats,
-		Board:          board,
-		Pot:            s.Table.Pot,
-		CurrentBet:     s.Table.CurrentBet,
-		ActionSeat:     s.Table.ActionSeat,
-		ButtonSeat:     s.Table.ButtonSeat,
-		SmallBlind:     s.effSmallBlind(),
-		BigBlind:       s.effBigBlind(),
-		MaxSeats:       s.Table.Cap(),
-		HeroWallet:     heroWallet,
-		HandNo:         s.Table.HandNo,
-		DeckCommitHash: s.Table.DeckCommitment,
-		Variant:        s.Table.Variant,
-		RenderStyle:    s.RenderStyle,
-		TableArt:       s.TableArt,
-		HostUserID:     s.HostUserID,
-		HostPaused:     s.effPaused() || s.AdminPaused,
-		AllowStraddle:   s.Table.AllowStraddle,
-		AllowBombPot:    s.Table.AllowBombPot,
-		AllowInsurance:  s.Table.AllowInsurance,
-		AllowRunItTwice: s.Table.AllowRunItTwice,
-		StraddleArmed:   s.Table.StraddleRequested,
+		Phase:               poker.HandPhaseForTable(s.Table, s.Phase),
+		Seats:               seats,
+		Board:               board,
+		Pot:                 s.Table.Pot,
+		CurrentBet:          s.Table.CurrentBet,
+		ActionSeat:          s.Table.ActionSeat,
+		ButtonSeat:          s.Table.ButtonSeat,
+		SmallBlind:          s.effSmallBlind(),
+		BigBlind:            s.effBigBlind(),
+		MaxSeats:            s.Table.Cap(),
+		HeroWallet:          heroWallet,
+		HandNo:              s.Table.HandNo,
+		DeckCommitHash:      s.Table.DeckCommitment,
+		Variant:             s.Table.Variant,
+		RenderStyle:         s.RenderStyle,
+		TableArt:            s.TableArt,
+		HostUserID:          s.HostUserID,
+		HostPaused:          s.effPaused() || s.AdminPaused,
+		AllowStraddle:       s.Table.AllowStraddle,
+		AllowBombPot:        s.Table.AllowBombPot,
+		AllowInsurance:      s.Table.AllowInsurance,
+		AllowRunItTwice:     s.Table.AllowRunItTwice,
+		StraddleArmed:       s.Table.StraddleRequested,
 	}
 }
 

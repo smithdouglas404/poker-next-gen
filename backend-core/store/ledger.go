@@ -122,6 +122,25 @@ const (
 // UserAcct is the ledger account for a player's chip balance.
 func UserAcct(userID string) string { return "user:" + userID }
 
+// Club-allocated chips are a SEPARATE economy from the global wallet: a club
+// extends credit to its members, buy-ins at that club's tables draw it, and pots
+// rake back to the club. Keeping it in its own namespace matters — folding a
+// member's club credit into user:<id> would conflate two balances that settle
+// differently and make both unreadable.
+//
+//	club:<clubID>                 what the club has issued (goes negative as it lends)
+//	clubchips:<clubID>:<userID>   a member's allocated balance at that club
+//
+// Because every issuance posts both legs, "how much credit has this club
+// extended?" becomes a single account balance instead of a sum nobody was
+// keeping.
+func ClubIssuanceAcct(clubID string) string { return "club:" + clubID }
+
+// ClubMemberAcct is a member's allocated balance at one club.
+func ClubMemberAcct(clubID, userID string) string {
+	return "clubchips:" + clubID + ":" + userID
+}
+
 // Transfer is the common 2-leg case: move amount (>0) from one account to another.
 func (s *LedgerStore) Transfer(ctx context.Context, from, to string, amountMinor int64, kind, ref, reason string) (string, error) {
 	if amountMinor <= 0 {
