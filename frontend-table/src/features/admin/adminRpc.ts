@@ -59,6 +59,19 @@ export const adminApi = {
       "admin_user_adjust_wallet",
       { user_id: userId, delta_cents: deltaCents, reason },
     ),
+  /** Membership catalog — the tier ids/names a grant can target. */
+  tiers: () =>
+    call<{ tiers: Array<{ id: string; name: string }>; order: string[] }>(
+      "subscription_tiers",
+      {},
+    ),
+  /** Comp / correct a membership. Same tier extends the term; a different tier
+   *  replaces it starting now. Audited server-side. */
+  grantTier: (userId: string, tier: string, months: number, reason: string) =>
+    call<{ subscription: { tier: string; status: string; expires_at?: string | null } }>(
+      "subscription_grant_admin",
+      { user_id: userId, tier, months, reason },
+    ),
   ban: (userId: string, reason: string) =>
     call<{ ok: boolean; banned: boolean }>("admin_ban", { user_id: userId, reason }),
   unban: (userId: string) =>

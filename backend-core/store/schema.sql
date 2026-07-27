@@ -215,6 +215,11 @@ CREATE TABLE IF NOT EXISTS poker_subscription (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Cancellation scheduled for the end of the current period. SubscriptionCancel
+-- told Stripe and recorded nothing here, so a player who cancelled reloaded the
+-- membership page and saw "Active" exactly as before — no evidence it had worked.
+ALTER TABLE poker_subscription ADD COLUMN IF NOT EXISTS cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- Append-only audit trail of every tier grant/change (who, what, why, when).
 CREATE TABLE IF NOT EXISTS poker_subscription_ledger (
     id TEXT PRIMARY KEY,

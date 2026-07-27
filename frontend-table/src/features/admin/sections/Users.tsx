@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import { Button, Field, Input } from "@/features/ui";
+import { Button, Field, Input, Select } from "@/features/ui";
 
 import { adminApi, money } from "../adminRpc";
 import { Badge, Card, Empty, GoldHeading, Mono, Row, Table, Td, Th } from "../primitives";
@@ -19,6 +19,22 @@ export function Users({ notify }: { notify: Notify }) {
   const [delta, setDelta] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [tierList, setTierList] = useState<Array<{ id: string; name: string }>>([]);
+  const [grantTier, setGrantTier] = useState("");
+  const [grantMonths, setGrantMonths] = useState("1");
+
+  // The catalog, not a hardcoded list — a tier added in billing/tiers.go has to
+  // show up here without a frontend change, or support can't comp it.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await adminApi.tiers();
+        setTierList((res.tiers ?? []).map((t) => ({ id: t.id, name: t.name })));
+      } catch {
+        /* the grant control stays hidden rather than offering invented tiers */
+      }
+    })();
+  }, []);
 
   const search = useCallback(async () => {
     setLoading(true);
@@ -87,6 +103,25 @@ export function Users({ notify }: { notify: Notify }) {
       }
     })();
 
+  const grant = () =>
+    void (async () => {
+      if (!selected || !grantTier) return;
+      const months = Math.max(1, Math.round(Number(grantMonths) || 1));
+      setBusy(true);
+      try {
+        const res = await adminApi.grantTier(selected.user_id, grantTier, months, reason.trim());
+        const until = res.subscription.expires_at
+          ? ` until ${new Date(res.subscription.expires_at).toLocaleDateString()}`
+          : "";
+        notify(`Membership set to ${res.subscription.tier}${until}`);
+        await refreshSelected(selected.user_id);
+      } catch (err) {
+        notify(err instanceof Error ? err.message : "Grant failed", "err");
+      } finally {
+        setBusy(false);
+      }
+    })();
+
   return (
     <div className="space-y-6">
       <div>
@@ -127,6 +162,7 @@ export function Users({ notify }: { notify: Notify }) {
                 <>
                   <Th>User</Th>
                   <Th>Balance</Th>
+                  <Th>Membership</Th>
                   <Th>Status</Th>
                   <Th className="text-right">Manage</Th>
                 </>
@@ -140,6 +176,14 @@ export function Users({ notify }: { notify: Notify }) {
                   </Td>
                   <Td className="font-display text-gold">{money(u.balance_cents)}</Td>
                   <Td>
+                    <span className="capitalize text-neutral-300">{u.tier || "free"}</span>
+                    {u.cancel_at_period_end && (
+                      <span className="ml-1.5 text-[10px] uppercase tracking-wider text-gold">
+                        cancelling
+                      </span>
+                    )}
+                  </Td>
+                  <Td>
                     <Badge tone={u.banned ? "red" : "green"}>{u.banned ? "banned" : "active"}</Badge>
                   </Td>
                   <Td className="text-right">
@@ -149,6 +193,9 @@ export function Users({ notify }: { notify: Notify }) {
                       onClick={() => {
                         setSelected(u);
                         setReason("");
+                        // Pre-select what they already hold, so the default action
+                        // is "extend this membership" rather than a silent switch.
+                        setGrantTier(u.tier || "free");
                       }}
                     >
                       {selected?.user_id === u.user_id ? "Selected" : "Select"}
@@ -202,6 +249,54 @@ export function Users({ notify }: { notify: Notify }) {
               </div>
             </div>
           </div>
+        </Card>
+      )}
+
+      {/* Membership. `subscription_grant_admin` shipped with the tier system and
+          had no caller anywhere, so support could not comp a tier, honour a
+          goodwill upgrade, or repair a membership a failed Stripe sync had left
+          on the wrong plan — the only route in was a hand-written SQL update. */}
+      {selected && tierList.length > 0 && (
+        <Card eyebrow="Membership" title="Grant or correct a tier">
+          <div className="flex flex-wrap items-end gap-3">
+            <Field label="Tier" className="min-w-[160px]">
+              <Select value={grantTier} onChange={(e) => setGrantTier(e.target.value)}>
+                {tierList.map((t) => (
+                  <option key={t.id} value={t.id} className="bg-[#262d38]">
+                    {t.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Months" className="w-28">
+              <Input
+                value={grantMonths}
+                onChange={(e) => setGrantMonths(e.target.value)}
+                inputMode="numeric"
+                placeholder="1"
+              />
+            </Field>
+            <Button onClick={grant} disabled={busy || !grantTier}>
+              {grantTier === (selected.tier || "free") && grantTier !== "free"
+                ? "Extend membership"
+                : "Apply membership"}
+            </Button>
+          </div>
+
+          <p className="mt-3 text-xs text-neutral-500">
+            Currently{" "}
+            <span className="capitalize text-neutral-300">{selected.tier || "free"}</span>
+            {selected.tier_expires_at && (
+              <>
+                {" "}
+                {selected.cancel_at_period_end ? "ending" : "until"}{" "}
+                {new Date(selected.tier_expires_at).toLocaleDateString()}
+              </>
+            )}
+            . Granting the same tier adds to the remaining term; a different tier
+            replaces it starting today. The reason above is recorded in the admin audit
+            log.
+          </p>
         </Card>
       )}
 

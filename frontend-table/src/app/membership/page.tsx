@@ -127,6 +127,23 @@ export default function MembershipPage() {
     }
   }, [load, notify]);
 
+  const resumeSub = useCallback(async () => {
+    setBusy("resume");
+    try {
+      const res = await membershipApi.resume();
+      if (res.resumed) {
+        notify(res.message ?? "Your membership will renew as normal.", "ok");
+        await load();
+      } else {
+        notify(res.message ?? "Billing is not configured yet.", "err");
+      }
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "Could not resume", "err");
+    } finally {
+      setBusy(null);
+    }
+  }, [load, notify]);
+
   const startVerification = useCallback(
     async (kind: "biometric" | "kyc_aml") => {
       setBusy(`kyc:${kind}`);
@@ -149,6 +166,14 @@ export default function MembershipPage() {
 
   const currentDef = status?.tier ?? null;
   const accent = accentFor(currentTier);
+  // A cancelled membership keeps status "active" until the period ends — that is
+  // how Stripe models it. Reading only `status` therefore shows a member who has
+  // just cancelled exactly what they saw before, which reads as "the click did
+  // nothing" and is how a cancellation turns into a chargeback.
+  const cancelling = currentTier !== "free" && !!status?.subscription.cancel_at_period_end;
+  const endsOn = status?.subscription.expires_at
+    ? new Date(status.subscription.expires_at).toLocaleDateString()
+    : null;
 
   const nextTier = useMemo(() => {
     const sorted = tiers
@@ -214,12 +239,14 @@ export default function MembershipPage() {
                   <span
                     className={cn(
                       "rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider",
-                      status.subscription.status === "active"
-                        ? "border-emerald-500/40 text-emerald-300"
-                        : "border-white/15 text-neutral-400",
+                      cancelling
+                        ? "border-gold/40 text-gold"
+                        : status.subscription.status === "active"
+                          ? "border-emerald-500/40 text-emerald-300"
+                          : "border-white/15 text-neutral-400",
                     )}
                   >
-                    {status.subscription.status}
+                    {cancelling ? "Cancelling" : status.subscription.status}
                   </span>
                 )}
                 {status && !status.billing_configured && (
@@ -232,22 +259,43 @@ export default function MembershipPage() {
                 {currentDef && currentDef.rakeback_percent > 0
                   ? `Earning ${currentDef.rakeback_percent}% rakeback with ${currentDef.name}.`
                   : "Upgrade for real-money stakes, rakeback, higher limits, and club creation."}
-                {status?.subscription.expires_at && currentTier !== "free" && (
-                  <span className="text-neutral-600">
+                {endsOn && currentTier !== "free" && (
+                  <span className={cancelling ? "text-gold/90" : "text-neutral-600"}>
                     {" "}
-                    · renews {new Date(status.subscription.expires_at).toLocaleDateString()}
+                    · {cancelling ? "ends" : "renews"} {endsOn}
                   </span>
                 )}
               </p>
+
+              {cancelling && (
+                <p className="mt-2 max-w-xl text-[13px] text-gold/90">
+                  Your membership is scheduled to end{endsOn ? ` on ${endsOn}` : ""}. You keep every{" "}
+                  {currentDef?.name ?? "paid"} benefit until then — resume any time before that
+                  date and nothing changes.
+                </p>
+              )}
+
               {currentTier !== "free" && status?.billing_configured && (
-                <button
-                  type="button"
-                  disabled={busy !== null}
-                  onClick={() => void cancelSub()}
-                  className="mt-3 text-xs font-semibold uppercase tracking-wider text-neutral-500 underline-offset-2 transition hover:text-[#ff9ba1] hover:underline disabled:opacity-40"
-                >
-                  {busy === "cancel" ? "Cancelling…" : "Cancel membership"}
-                </button>
+                cancelling ? (
+                  <Button
+                    variant="gold"
+                    size="sm"
+                    className="mt-3"
+                    disabled={busy !== null}
+                    onClick={() => void resumeSub()}
+                  >
+                    {busy === "resume" ? "Resuming…" : "Resume membership"}
+                  </Button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={busy !== null}
+                    onClick={() => void cancelSub()}
+                    className="mt-3 text-xs font-semibold uppercase tracking-wider text-neutral-500 underline-offset-2 transition hover:text-[#ff9ba1] hover:underline disabled:opacity-40"
+                  >
+                    {busy === "cancel" ? "Cancelling…" : "Cancel membership"}
+                  </button>
+                )
               )}
             </div>
 

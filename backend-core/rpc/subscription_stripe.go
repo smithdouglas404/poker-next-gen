@@ -160,11 +160,73 @@ func SubscriptionCancel(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 		logger.Error("stripe cancel http %d: %s", status, string(body))
 		return "", runtime.NewError("billing error", 13)
 	}
+	// Record it locally. Stripe accepted the cancellation and nothing here knew:
+	// subscription_status still returned status "active" with no hint the
+	// membership was ending, so the player reloaded the page, saw exactly what
+	// they saw before, and had no evidence their click had done anything. On a
+	// recurring charge that is the difference between a cancellation and a
+	// chargeback.
+	if serr := store.NewSubscriptionStore(db).SetCancelAtPeriodEnd(ctx, userID, true); serr != nil {
+		logger.Error("stripe cancel succeeded but local flag not set for %s: %v", userID, serr)
+	}
 	out, _ := json.Marshal(map[string]interface{}{
 		"configured":             true,
 		"canceled_at_period_end": true,
 		"tier":                   sub.Tier,
-		"message":                "Your membership stays active until the end of the current billing period, then downgrades to Free. You can resubscribe anytime.",
+		"expires_at":             sub.ExpiresAt,
+		"message":                "Your membership stays active until the end of the current billing period, then downgrades to Free. You can resume it any time before then.",
+	})
+	return string(out), nil
+}
+
+// SubscriptionResume undoes a scheduled cancellation before the period ends.
+//
+// The natural pair to in-app cancel. Offering one without the other means a
+// member who changes their mind — or clicked by accident — has to let the
+// membership lapse and buy it again, losing the remainder they already paid for.
+// Stripe supports this directly (cancel_at_period_end=false); nothing was
+// calling it.
+func SubscriptionResume(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	userID, ok := ctx.Value(runtime.RUNTIME_CTX_USER_ID).(string)
+	if !ok || userID == "" {
+		return "", runtime.NewError("unauthorized", 16)
+	}
+	subs := store.NewSubscriptionStore(db)
+	sub, err := subs.Get(ctx, userID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	if !sub.CancelAtPeriodEnd {
+		return "", runtime.NewError("this membership is not scheduled to cancel", 9)
+	}
+	if sub.StripeSubscriptionID == "" {
+		return "", runtime.NewError("no Stripe subscription to resume", 9)
+	}
+	if !stripeConfigured() {
+		out, _ := json.Marshal(map[string]interface{}{"configured": false, "message": "Billing is not configured yet."})
+		return string(out), nil
+	}
+	form := url.Values{}
+	form.Set("cancel_at_period_end", "false")
+	body, status, err := stripePost(ctx, "https://api.stripe.com/v1/subscriptions/"+sub.StripeSubscriptionID, form)
+	if err != nil {
+		logger.Error("stripe resume error: %v", err)
+		return "", runtime.NewError("billing error", 13)
+	}
+	if status < 200 || status >= 300 {
+		logger.Error("stripe resume http %d: %s", status, string(body))
+		return "", runtime.NewError("billing error", 13)
+	}
+	// Only after Stripe confirms. Clearing it first would show a resumed
+	// membership that is still set to lapse.
+	if serr := subs.SetCancelAtPeriodEnd(ctx, userID, false); serr != nil {
+		logger.Error("stripe resume succeeded but local flag not cleared for %s: %v", userID, serr)
+	}
+	out, _ := json.Marshal(map[string]interface{}{
+		"configured": true,
+		"resumed":    true,
+		"tier":       sub.Tier,
+		"message":    "Your membership will renew as normal.",
 	})
 	return string(out), nil
 }

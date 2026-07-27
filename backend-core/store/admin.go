@@ -115,6 +115,11 @@ type AdminUserRow struct {
 	Email        string `json:"email"`
 	Banned       bool   `json:"banned"`
 	BalanceCents int64  `json:"balance_cents"`
+	// Membership, so support can see what someone holds before changing it. A
+	// comp granted blind is a comp that can silently downgrade a paying member.
+	Tier              string     `json:"tier"`
+	TierExpiresAt     *time.Time `json:"tier_expires_at,omitempty"`
+	CancelAtPeriodEnd bool       `json:"cancel_at_period_end,omitempty"`
 }
 
 // SearchUsers finds users by username / email substring or exact id, joining
@@ -124,12 +129,19 @@ func (s *AdminStore) SearchUsers(ctx context.Context, query string, limit int) (
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
+	// The tier is reported through the same lazy-expiry rule SubscriptionStore.Get
+	// applies, so a lapsed row reads "free" here too. Showing the stale paid tier
+	// would have support looking at a membership the player no longer has.
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT u.id, u.username, COALESCE(u.email,''),
-		       COALESCE(st.banned, FALSE), COALESCE(w.balance, 0)
+		       COALESCE(st.banned, FALSE), COALESCE(w.balance, 0),
+		       CASE WHEN sub.expires_at IS NOT NULL AND sub.expires_at < NOW()
+		            THEN 'free' ELSE COALESCE(sub.tier,'free') END,
+		       sub.expires_at, COALESCE(sub.cancel_at_period_end, FALSE)
 		FROM users u
 		LEFT JOIN poker_user_status st ON st.user_id = u.id
 		LEFT JOIN poker_global_wallet w ON w.user_id = u.id
+		LEFT JOIN poker_subscription sub ON sub.user_id = u.id
 		WHERE $1 = '' OR u.username ILIKE '%'||$1||'%' OR u.email ILIKE '%'||$1||'%' OR u.id::text = $1
 		ORDER BY u.create_time DESC LIMIT $2`, query, limit)
 	if err != nil {
@@ -139,8 +151,14 @@ func (s *AdminStore) SearchUsers(ctx context.Context, query string, limit int) (
 	out := []AdminUserRow{}
 	for rows.Next() {
 		var r AdminUserRow
-		if err := rows.Scan(&r.UserID, &r.Username, &r.Email, &r.Banned, &r.BalanceCents); err != nil {
+		var expires sql.NullTime
+		if err := rows.Scan(&r.UserID, &r.Username, &r.Email, &r.Banned, &r.BalanceCents,
+			&r.Tier, &expires, &r.CancelAtPeriodEnd); err != nil {
 			return nil, err
+		}
+		if expires.Valid {
+			t := expires.Time
+			r.TierExpiresAt = &t
 		}
 		out = append(out, r)
 	}

@@ -33,6 +33,12 @@ export const membershipApi = {
       "subscription_cancel",
       {},
     ),
+  /** Undo a scheduled cancellation before the period ends. */
+  resume: () =>
+    call<{ configured: boolean; resumed?: boolean; tier?: string; message?: string }>(
+      "subscription_resume",
+      {},
+    ),
   /** Caller's identity-verification state (none | pending | verified | rejected). */
   kycStatus: () => call<KycStatusResponse>("kyc_status", {}),
   /** Per-kind verification statuses + unlocked capabilities. */

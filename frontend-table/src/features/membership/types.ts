@@ -35,6 +35,10 @@ export interface Subscription {
   tier: string;
   status: string; // active | inactive | expired
   expires_at?: string | null;
+  /** Scheduled to end at `expires_at` rather than renew. Status stays "active"
+   *  until then, so this is the only thing that distinguishes a live membership
+   *  from one that is running out. */
+  cancel_at_period_end?: boolean;
 }
 
 export interface StatusResponse {

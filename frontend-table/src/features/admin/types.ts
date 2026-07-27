@@ -24,6 +24,10 @@ export interface UserRow {
   email: string;
   banned: boolean;
   balance_cents: number;
+  /** Current membership, lazy-expiry already applied server-side. */
+  tier?: string;
+  tier_expires_at?: string | null;
+  cancel_at_period_end?: boolean;
 }
 
 export interface KycPendingRow {

@@ -16,6 +16,11 @@ type Subscription struct {
 	ExpiresAt            *time.Time `json:"expires_at,omitempty"`
 	StripeCustomerID     string     `json:"stripe_customer_id,omitempty"`
 	StripeSubscriptionID string     `json:"stripe_subscription_id,omitempty"`
+	// CancelAtPeriodEnd: the member cancelled and keeps their tier until
+	// ExpiresAt, then drops to free. Without this the UI could not tell an
+	// active subscription from one that had been cancelled and was running out,
+	// so cancelling produced no visible change anywhere.
+	CancelAtPeriodEnd bool `json:"cancel_at_period_end,omitempty"`
 }
 
 type SubscriptionStore struct{ db *sql.DB }
@@ -28,9 +33,11 @@ func (s *SubscriptionStore) Get(ctx context.Context, userID string) (Subscriptio
 	sub := Subscription{UserID: userID, Tier: "free", Status: "inactive"}
 	var expires sql.NullTime
 	err := s.db.QueryRowContext(ctx, `
-		SELECT tier, status, expires_at, stripe_customer_id, stripe_subscription_id
+		SELECT tier, status, expires_at, stripe_customer_id, stripe_subscription_id,
+		       COALESCE(cancel_at_period_end, FALSE)
 		FROM poker_subscription WHERE user_id=$1`, userID).
-		Scan(&sub.Tier, &sub.Status, &expires, &sub.StripeCustomerID, &sub.StripeSubscriptionID)
+		Scan(&sub.Tier, &sub.Status, &expires, &sub.StripeCustomerID, &sub.StripeSubscriptionID,
+			&sub.CancelAtPeriodEnd)
 	if err == sql.ErrNoRows {
 		return sub, nil
 	}
@@ -49,6 +56,19 @@ func (s *SubscriptionStore) Get(ctx context.Context, userID string) (Subscriptio
 		return Subscription{UserID: userID, Tier: "free", Status: "expired", ExpiresAt: sub.ExpiresAt}, nil
 	}
 	return sub, nil
+}
+
+// SetCancelAtPeriodEnd records (or clears) a scheduled cancellation.
+//
+// Local state, not a guess: the membership screen reads this to say "cancels on
+// <date>" instead of "active", and to offer Resume. Stripe remains the
+// authority on billing — this is what the player is shown between the click and
+// the period actually ending.
+func (s *SubscriptionStore) SetCancelAtPeriodEnd(ctx context.Context, userID string, cancel bool) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE poker_subscription SET cancel_at_period_end=$2, updated_at=NOW() WHERE user_id=$1`,
+		userID, cancel)
+	return err
 }
 
 func (s *SubscriptionStore) expire(ctx context.Context, userID, fromTier string) error {
@@ -123,10 +143,15 @@ func (s *SubscriptionStore) grant(ctx context.Context, userID, tier string, mont
 	}
 	defer tx.Rollback()
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO poker_subscription (user_id, tier, status, expires_at, stripe_customer_id, stripe_subscription_id, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,NOW())
+		INSERT INTO poker_subscription (user_id, tier, status, expires_at, stripe_customer_id, stripe_subscription_id, cancel_at_period_end, updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,FALSE,NOW())
 		ON CONFLICT (user_id) DO UPDATE SET
 			tier=EXCLUDED.tier, status=EXCLUDED.status, expires_at=EXCLUDED.expires_at,
+			-- A new grant CLEARS any scheduled cancellation. Someone who cancels
+			-- and then resubscribes (or whose renewal arrives) is not cancelling
+			-- any more, and a stale flag would tell them their live subscription
+			-- was about to end.
+			cancel_at_period_end=FALSE,
 			stripe_customer_id=CASE WHEN EXCLUDED.stripe_customer_id<>'' THEN EXCLUDED.stripe_customer_id ELSE poker_subscription.stripe_customer_id END,
 			stripe_subscription_id=CASE WHEN EXCLUDED.stripe_subscription_id<>'' THEN EXCLUDED.stripe_subscription_id ELSE poker_subscription.stripe_subscription_id END,
 			updated_at=NOW()`,
