@@ -3,6 +3,10 @@
   (Archive.zip / Archive 2.zip / Archive 3.zip) — 41 mockup screens, each opened
   at full size, plus a source read of HighRollersClub itself.
   Regenerate by re-reading the sources, not by editing summaries.
+
+  REVISED 2026-07-27 after implementing eight of these rows. The "Us" column was
+  wrong on six of the eight screens audited — see "Correction log" below. Treat
+  any row not marked VERIFIED as an unaudited guess.
 -->
 
 # HRC Design-Archive Parity Review — where they are deeper, and where we are
@@ -27,6 +31,46 @@ club; only a paying member with sponsor capability can create one; non-members c
 a fixed 1000 wallet. Mockup `detailed_private_table_setup_8` confirms it in the design itself —
 the header reads **"Game Sponsor: Club Owner"** and the *Public* access type is disabled with the
 tooltip **"Only Club Owners can sponsor Public Games."**
+
+---
+
+## Correction log — what implementing these rows actually found
+
+This review's **"Us" column was written by reading our source for the CONTROLS a screen renders.
+That turned out to be the wrong test.** On six of the eight screens since built, the controls were
+already there; what was missing was the wiring underneath them. A screen can look complete, match
+the mockup control-for-control, and still do nothing.
+
+Where this document said "missing", the truth was usually "present and inert" — which is worse,
+because an inert control is indistinguishable from a working one until someone depends on it.
+
+| Screen | This doc said | What was actually there | The real defect |
+|---|---|---|---|
+| `dpts_9` Global Settings | no timezone/language, no admin-role matrix, no API integration | **All of it**, as UI | Four decorative controls. "Admin Roles"/"Moderator" were dropdowns of role NAMES with no person attached, writing free text to `settings_json`. The 2FA toggle set a flag nothing read. Timezone had no consumer. Language could not translate anything — there is no i18n system. |
+| `dpts_4` Announcement Control | no live preview, no delivery style | **Both**, plus a working B/I/U toolbar | `club_announcement_create` inserted a row and did nothing else — no push, no notification. "Broadcast Now" broadcast to nobody and delivery style was an inert tag. `club_announcement_list` had **no permission gate at all**. `severity` was unvalidated, so `"high"` (written by the in-table composer) stored a value no client recognises. The toolbar's markers were rendered by nothing, so players saw literal asterisks. |
+| `dpts_6` Member Invite Flow | no credit limit on invite, no expiry column | Credit limit **and** it is really applied on accept; an Expiration column | Invitations never expired server-side. A year-old invite was still acceptable and still allocated its credit line. The Expiration column was computing `created_at + a client constant` — a date the browser invented that the server had never heard of. |
+| `club_owner_management_hub` | no contribution column, no pagination, Quick Stats hardcoded | **All three**; Quick Stats derives both rows live | `table_list` and `tournament_list` are network-wide, so an owner was shown **another club's** busiest table and biggest tournament as their own. |
+| `dpts_17` Prize Pool & Settlement | missing entirely | About half of it, inline in `OwnerCenter` | The payout table rendered one row per prize BAND showing the band's whole share, so a 6th–9th band at 600bps read as if each finisher collected 6% when each actually collects 1.5% — 4× overstated, on the screen whose only job is "what does each place get". |
+| `_25` Avatar render progress | missing — jobs exist, no progress UI | A full progress UI | It was fabricated. Stage names ("Anatomy Synthesis", "Armor Forging") are not steps this generator performs, and the "engine telemetry" beneath them — mesh throughput in GHz, neural lighting at "6000%" — was arithmetic on one progress number. The real stage (`model`/`rig`/`retarget`) sat in the database and was never returned. |
+| `comprehensive_tournament_setup` | builder missing 8 fields | 4 tabs, summary rail, break schedule, editable ladders | The entire Rules tab was dead: an "Enabled" `<span>` and two `<Select>`s with `defaultValue` and no handler. `guaranteedPrize`, `lateReg` and `regCloseAt` were collected and never sent. "Admin Fee %" was not an admin fee — it read and wrote the flat entry fee. |
+| `dpts_1` Tournament Center | no Drafts, no alerts rail | **Drafts tab and the Tournament Alerts + Global Club Chat rail both exist** (VERIFIED by render) | Only the table thumbnails are genuinely absent, and those are deferred table-render work. |
+
+### The largest finding was not on this list at all
+
+Auditing the tournament screens surfaced three things no mockup comparison would have caught,
+because they are invisible in the UI:
+
+1. **The entry fee was never real.** Registration debited only the buy-in, and the prize pool was
+   computed as `entrants × buy_in` in three separate places — none subtracting the fee — while
+   analytics reported `entrants × fee` as club revenue. The club's cut existed on the operator's
+   reports and nowhere in the ledger.
+2. **Late registration was never enforced.** `late_reg_secs` was stored, returned by
+   `tournament_status`, and checked by nothing.
+3. **Time bank and seats-per-table never reached the tables.** `StartTournament` created every table
+   with only room/blinds/buy-in, so both settings had no effect on play.
+
+**Lesson for the next pass of this document: check the data path, not the control.** For each row
+ask what reads the value, not whether the field renders.
 
 ---
 
@@ -80,16 +124,16 @@ tabbed centre or the right rail.
 
 | Mockup | Their depth | Us |
 |---|---|---|
-| `club_owner_management_hub` | Member table with Avatar / Name / Join Date / **Total Contribution** / Edit·Kick·Promote, paginated; header shows Total Club Bankroll + Online 128/500; Quick Stats names most-active table and top tournament | ◐ `MemberManagement` has roster + actions; no contribution column, no pagination, Quick Stats hardcoded |
-| `dpts_1` Tournament Center | 5 KPIs; Live/Upcoming/Completed/**Drafts** tabs; grid of **rendered table thumbnails** with prize pool, 42/100 fill, blinds; right rail Tournament Alerts + Global Club Chat | ◐ 3 stat cards + text list. No thumbnails, no Drafts, no alerts rail |
-| `dpts_5` Club Overview | 5 KPIs; Featured Tables / Upcoming Tournaments / Financial Analytics / **Player High Scores** tabs; table thumbnails; Club Activity & Chat rail | ◐ overview exists, no thumbnail grid, no chat rail |
+| `club_owner_management_hub` | Member table with Avatar / Name / Join Date / **Total Contribution** / Edit·Kick·Promote, paginated; header shows Total Club Bankroll + Online 128/500; Quick Stats names most-active table and top tournament | ✅ **DONE** (VERIFIED). Contribution column + meter, pagination and live Quick Stats all already existed — this row was wrong. Fixed the real bug: Quick Stats read network-wide `table_list`/`tournament_list`, so it showed another club's table and tournament as the owner's own. |
+| `dpts_1` Tournament Center | 5 KPIs; Live/Upcoming/Completed/**Drafts** tabs; grid of **rendered table thumbnails** with prize pool, 42/100 fill, blinds; right rail Tournament Alerts + Global Club Chat | ◐ **row was wrong** — 4 KPIs, the Drafts tab and the Tournament Alerts + Global Club Chat rail all exist (VERIFIED by render). Only the **table thumbnails** are missing, and those are ⏸️ deferred table-render work. |
+| `dpts_5` Club Overview | 5 KPIs; Featured Tables / Upcoming Tournaments / Financial Analytics / **Player High Scores** tabs; table thumbnails; Club Activity & Chat rail | ◐ all four tabs exist (VERIFIED by render). Thumbnail grid ⏸️ deferred. Chat rail **not re-verified** — treat as unknown, not as absent. |
 | `dpts_10` Revenue Reports | Revenue/Profit/Rake/Fees KPIs + 30-day trend, revenue-sources donut, **detailed transaction log** with status | ✅ close — we have all of this |
-| `dpts_17` Prize Pool & Tournament Analytics | Payout table (rank / % / chip value / paid ✓), payout donut, tournament progress (players remaining 94/512), Export Report + **Finalize Tournament** | ✗ **missing entirely** |
+| `dpts_17` Prize Pool & Tournament Analytics | Payout table (rank / % / chip value / paid ✓), payout donut, tournament progress (players remaining 94/512), Export Report + **Finalize Tournament** | ✅ **DONE**. Was NOT missing entirely — about half existed inline in `OwnerCenter`. The real defect: payouts rendered one row per prize BAND showing the band's whole share, overstating each finisher's cut by 4–6×. Now flattened to one row per place, matching the settlement math in `director.go`. |
 | `dpts_24` Member Analytics | Active members line, table volume bars, new-vs-returning donut, member activity table | ✅ built |
-| `dpts_4` Announcement Control | Rich-text body, **live preview of the in-table modal**, target audience (All / Private tables / Tournament players), delivery style (Sleek overlay / Breaking news / Table chat blast), Broadcast Now | ◐ have composer + audience; **no live preview**, no delivery style |
-| `dpts_6` Member Invite Flow | Email-or-wallet, **assign initial credit limit**, welcome-card preview, pending invitations with Status / Sent / Expiration | ◐ have invites; no credit limit on invite, no welcome-card preview, no expiry column |
+| `dpts_4` Announcement Control | Rich-text body, **live preview of the in-table modal**, target audience (All / Private tables / Tournament players), delivery style (Sleek overlay / Breaking news / Table chat blast), Broadcast Now | ✅ **DONE**. Preview and delivery style both already existed — this row was wrong. The defect was that `club_announcement_create` delivered to nobody. Now sends to the resolved audience; markdown renders; severity is its own control. ⏸️ On-felt display still waits on the table freeze. |
+| `dpts_6` Member Invite Flow | Email-or-wallet, **assign initial credit limit**, welcome-card preview, pending invitations with Status / Sent / Expiration | ✅ **DONE** for the substantive part. Credit limit existed and really is applied on accept; the Expiration column existed but was a client-invented date. Invitations now expire server-side and a lapsed one is refused. Welcome-card preview still ✗. |
 | `dpts_7` Public Table Browser | Owner-side browser: stakes / game type / available seats filters, LIVE badges, 6/10 fill | ◐ player-side browser exists; no owner-side view |
-| `dpts_9` Global Club Settings | Club prefs (timezone, language), financial defaults (rake %, max buy-in caps), **security (2FA required, admin roles: Super Admin / Moderator)**, branding upload, **Integration & API — connect external wallets & data services** | ◐ have rake config + branding; **no timezone/language, no admin-role matrix, no API integration** |
+| `dpts_9` Global Club Settings | Club prefs (timezone, language), financial defaults (rake %, max buy-in caps), **security (2FA required, admin roles: Super Admin / Moderator)**, branding upload, **Integration & API — connect external wallets & data services** | ✅ **DONE**. Every item this row called missing was already on screen — and four of them did nothing. Now: a real operator × capability grid (members/money/tables/settings) with a `moderator` role, 2FA enforced at the club gate, timezone driving club-night schedules, language as honest public-profile metadata. |
 
 ### Tournaments — **5 mockups**, and this is the deepest area in the whole archive
 
@@ -173,7 +217,7 @@ Genuinely missing:
 | `_29` Wardrobe Hub — equipped figure, **4 equipment slots**, owned grid by rarity, Save Preset / Nano Banana Render | ◐ studio exists; no slot model |
 | `_30` Dye Shop — primary/secondary/accent swatches with hex, named dye packs, live preview | ◐ `studio/dyeData.ts` exists; no live preview |
 | `_23` AI Customizer — prompt + **prompt-assistance chips**, premium-locked toggles with padlock, render preview | ◐ studio has prompt; no preset chips, no locked-toggle treatment |
-| `_25` **Render progress** — per-stage bars (Anatomy 72% / Armor 50% / Lighting 70%) each with a thumbnail, overall 72% | ✗ **missing** — jobs exist, no progress UI |
+| `_25` **Render progress** — per-stage bars (Anatomy 72% / Armor 50% / Lighting 70%) each with a thumbnail, overall 72% | ✅ **DONE**. Not missing — the UI existed and was fabricating its content (invented stage names, "6000%" telemetry). Now reports the real pipeline (`model` → `rig` → `retarget`) with done/running/waiting states. NOTE: the mockup's Anatomy/Armor/Lighting are not steps our generator performs, so ours names the real ones instead. |
 | `_19` Premium Exclusive — Mythic / 1-of-1 cards with **360° badge**, gold/ETH pricing | ◐ `PremiumMarket` exists; 360° badge is decorative |
 | `_22` Purchase Successful — celebration, View in Wardrobe / Back to Market | ✗ missing |
 | `_18` Premium Upgrade — perk list, monthly/yearly, Upgrade to Premium | ✅ membership covers it |
@@ -197,7 +241,44 @@ Their version has a **Club Type dropdown with Private / Semi-Private / Public**;
 
 ---
 
-## Verdict — the four real gaps
+## Verdict — REVISED after building eight of these rows
+
+The original verdict is kept below, collapsed, because the way it was wrong is the useful part.
+
+### What is actually left
+
+Everything still outstanding is **⏸️ deferred table-render work**, waiting on the joint
+sound/chips/shuffling session (owner's instruction, 2026-07-26):
+
+- Rendered table thumbnails — `dpts_1` Tournament Center, `dpts_5` Club Overview
+- `dpts_7` owner-side Public Table Browser (a thumbnail grid)
+- `fbapt_12` in-tournament leaderboard podium (renders from the felt)
+- `_6`/`_7` on-felt street scrubber
+- Club announcements appearing **on the felt** — the in-table renderer reads the platform
+  announcement list; pointing it at club announcements is a one-file change in
+  `features/table3d/overlays/`
+
+Plus a short tail of genuinely-small gaps: `dpts_6` welcome-card preview, `dpts_8` start/end window
+and the "Game Sponsor" header, `_22` purchase-success screen, `_29`/`_30`/`_23` avatar-studio depth.
+
+### What the original verdict got wrong
+
+1. **"Tournaments — the whole lifecycle, not one form"** — right that it was the biggest area, wrong
+   about why. The builder had four tabs and a summary rail; the settlement screen half-existed. The
+   real problem was underneath: the entry fee was never charged, the pool was computed three
+   different ways, late registration was unenforced, and the time bank never reached the tables.
+2. **"Club-owner console depth"** — the tabbed centre and the alerts/chat rail already existed on the
+   screens that were checked. What was missing was that the controls did anything.
+3. **"Table setup presentation"** — still accurate; the fields exist, the framing doesn't. Note the
+   sponsor gate is now enforced end-to-end, so `dpts_8`'s "Game Sponsor: Club Owner" header and
+   locked Public option now describe real behaviour rather than an aspiration.
+4. **"Avatar render progress — jobs run with no progress UI"** — there was a progress UI. It was
+   inventing its numbers.
+5. **"No canvas-free table renderer"** — unchanged and still correct. This is the single thing
+   blocking the remaining rows.
+
+<details>
+<summary>Original verdict, as written before implementation</summary>
 
 Ranked by distance from the design, not by effort:
 
@@ -215,11 +296,11 @@ Ranked by distance from the design, not by effort:
 5. **No canvas-free table renderer.** HRC's `ImageTable` (pre-rendered plate + %-coordinate DOM
    overlay + CSS `rotateX` chips, zero WebGL) is what lets their Tournament Center and Public Table
    Browser show a dozen tables at once. Our only table renderer is an R3F canvas, which cannot be
-   gridded. This blocks several of the gaps above rather than being cosmetic. See Deliverable 6.
+   gridded. This blocks several of the gaps above rather than being cosmetic.
 
 Everything else is at or above the design.
 
----
+</details>
 
 ---
 
@@ -298,8 +379,18 @@ over the plate, which is exactly what a grid cannot afford.
 5. The rendering finding was taken from HighRollersClub's own source (`components/poker/ImageTable.tsx`,
    `lib/table-constants.ts`, `pages/Game.tsx`), not from the mockups.
 
+**Step 4 is where this went wrong** (see the Correction log). Reading "the corresponding source
+file" showed which controls a screen renders, and stopped there. It did not follow the value from
+the control to a store method, to a column, to a reader. Six of the eight screens since built had
+the control and no reader. A re-audit must trace the data path per field: what writes it, what
+persists it, and — the one that kept failing — **what reads it back and acts on it**.
+
 ## Known limits of this review
 
 - The mockups are **designs**, not HRC's shipped code. Some were never built by HRC either.
+- **Rows are not equally trustworthy.** Rows marked ✅ **DONE** or VERIFIED were exercised while
+  being implemented. Every other row is still the original control-level read, which has a known
+  ~75% error rate on the sample that was checked. Do not plan off an unmarked row without
+  re-auditing it.
 - Verification of our side was done by reading source. Screens that need a live Nakama backend to
   populate were not exercised end-to-end here.
