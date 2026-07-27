@@ -251,15 +251,23 @@ func (h *Handler) MatchSignal(ctx context.Context, logger runtime.Logger, db *sq
 	var msg map[string]interface{}
 	if json.Unmarshal([]byte(data), &msg) == nil {
 		if msg["type"] == "balance" {
-			h.rebalance(ctx, db, nk, s)
+			h.rebalance(ctx, logger, db, nk, s)
 		}
 	}
 	return s, ""
 }
 
-func (h *Handler) rebalance(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *DirectorState) {
+func (h *Handler) rebalance(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, s *DirectorState) {
 	tStore := store.NewTournamentStore(db)
-	rule, _ := tStore.GetBalancingRule(ctx, s.TournamentID)
+	rule, err := tStore.GetBalancingRule(ctx, s.TournamentID)
+	if err != nil || rule == nil {
+		// GetBalancingRule only returns (nil, nil) on ErrNoRows via its own
+		// defaulted-struct fallback, so a nil rule here means a real query
+		// error that the old `rule, _ := ...` discarded — the two int(rule....)
+		// reads a few lines below would nil-pointer-panic on it.
+		logger.Error("rebalance: GetBalancingRule tournament=%s: %v", s.TournamentID, err)
+		return
+	}
 	tables := s.TableMatches
 	if len(tables) < 2 {
 		return
@@ -274,10 +282,9 @@ func (h *Handler) rebalance(ctx context.Context, db *sql.DB, nk runtime.NakamaMo
 		counts = append(counts, tableCount{matchID: m, count: n})
 	}
 	minC, maxC := counts[0].count, counts[0].count
-	minIdx := 0
-	for i, c := range counts {
+	for _, c := range counts {
 		if c.count < minC {
-			minC, minIdx = c.count, i
+			minC = c.count
 		}
 		if c.count > maxC {
 			maxC = c.count
@@ -286,17 +293,52 @@ func (h *Handler) rebalance(ctx context.Context, db *sql.DB, nk runtime.NakamaMo
 	if maxC-minC <= int(rule.MaxSeatDifference) {
 		return
 	}
-	// Break table if at or below threshold
+	// Break the first table at or below threshold, merging it into whichever
+	// OTHER table currently has the fewest players. The target search excludes
+	// the table being broken — the old code picked a single global minIdx
+	// before knowing which table would break, so whenever the smallest table
+	// overall was also the one selected to break (the common case: that IS why
+	// it's the one being broken), mergeTable ran with fromMatch == toMatch. That
+	// merge was a no-op, but the table was still unconditionally dropped from
+	// s.TableMatches afterward — silently cutting its still-live, still-playing
+	// players off from every future blind-level advance and break signal the
+	// director sends, while the director carried on as if the table no longer
+	// existed.
+	seatCounts := make([]int, len(counts))
 	for i, c := range counts {
-		if c.count <= int(rule.BreakTableAtOrBelow) && len(tables) > 1 {
-			payload, _ := json.Marshal(map[string]interface{}{"type": "balance_table"})
-			_, _ = nk.MatchSignal(ctx, c.matchID, string(payload))
-			_ = mergeTable(ctx, db, nk, s, c.matchID, counts[minIdx].matchID)
-			tables = append(tables[:i], tables[i+1:]...)
-			s.TableMatches = tables
-			break
+		seatCounts[i] = c.count
+	}
+	for i, c := range counts {
+		if c.count > int(rule.BreakTableAtOrBelow) {
+			continue
+		}
+		targetIdx := pickMergeTarget(seatCounts, i)
+		if targetIdx == -1 {
+			break // no other table exists to receive these players
+		}
+		payload, _ := json.Marshal(map[string]interface{}{"type": "balance_table"})
+		_, _ = nk.MatchSignal(ctx, c.matchID, string(payload))
+		_ = mergeTable(ctx, db, nk, s, c.matchID, counts[targetIdx].matchID)
+		tables = append(tables[:i], tables[i+1:]...)
+		s.TableMatches = tables
+		break
+	}
+}
+
+// pickMergeTarget returns the index of the table with the fewest players,
+// excluding `skip` (the table being broken) — never merging a table into
+// itself. Returns -1 if skip is the only table (nothing to merge into).
+func pickMergeTarget(seatCounts []int, skip int) int {
+	targetIdx := -1
+	for j, n := range seatCounts {
+		if j == skip {
+			continue
+		}
+		if targetIdx == -1 || n < seatCounts[targetIdx] {
+			targetIdx = j
 		}
 	}
+	return targetIdx
 }
 
 func countAtTable(ctx context.Context, db *sql.DB, tournamentID, matchID string) (int, error) {
