@@ -4,9 +4,9 @@
   at full size, plus a source read of HighRollersClub itself.
   Regenerate by re-reading the sources, not by editing summaries.
 
-  REVISED 2026-07-27 after implementing eight of these rows. The "Us" column was
-  wrong on six of the eight screens audited — see "Correction log" below. Treat
-  any row not marked VERIFIED as an unaudited guess.
+  REVISED 2026-07-27 after implementing thirteen of these rows. The "Us" column
+  was wrong on twelve of the thirteen screens audited — see "Correction log"
+  below. Treat any row not marked VERIFIED as an unaudited guess.
 -->
 
 # HRC Design-Archive Parity Review — where they are deeper, and where we are
@@ -37,9 +37,12 @@ tooltip **"Only Club Owners can sponsor Public Games."**
 ## Correction log — what implementing these rows actually found
 
 This review's **"Us" column was written by reading our source for the CONTROLS a screen renders.
-That turned out to be the wrong test.** On six of the eight screens since built, the controls were
-already there; what was missing was the wiring underneath them. A screen can look complete, match
-the mockup control-for-control, and still do nothing.
+That turned out to be the wrong test.** On twelve of the thirteen screens since built, the controls
+were already there; what was missing was the wiring underneath them. A screen can look complete,
+match the mockup control-for-control, and still do nothing.
+
+The one row that was directionally right — `comprehensive_tournament_setup`, where fields genuinely
+were absent — was still wrong about which ones and why.
 
 Where this document said "missing", the truth was usually "present and inert" — which is worse,
 because an inert control is indistinguishable from a working one until someone depends on it.
@@ -55,6 +58,7 @@ because an inert control is indistinguishable from a working one until someone d
 | `comprehensive_tournament_setup` | builder missing 8 fields | 4 tabs, summary rail, break schedule, editable ladders | The entire Rules tab was dead: an "Enabled" `<span>` and two `<Select>`s with `defaultValue` and no handler. `guaranteedPrize`, `lateReg` and `regCloseAt` were collected and never sent. "Admin Fee %" was not an admin fee — it read and wrote the flat entry fee. |
 | `_22` Purchase Successful | missing entirely | The whole modal, wired to the settled results | The checkout opens it when **any** cart line settles. A two-item cart with one failure reported "Purchase Successful!", showed only the item that worked, and discarded the failure — the player was charged for one, told everything was fine, and never learned which item had failed. |
 | `dpts_1` Tournament Center | no Drafts, no alerts rail | **Drafts tab and the Tournament Alerts + Global Club Chat rail both exist** (VERIFIED by render) | Only the table thumbnails are genuinely absent, and those are deferred table-render work. |
+| `_29`/`_30`/`_23` Avatar studio | 3 rows of "◐ … no slot model / no live preview / no preset chips" | **All of it.** Slot model, live preview with a toggle, prompt-assistance presets and premium locks — every one already built and wired | `_30` opened on hardcoded colours and never read the dye already saved: `cosmetic_dye_get` was registered and called by nothing, so a player who reloaded believed their dye was lost. The bigger one is still open — the dye never reaches the **table** (`SeatView` has no dye field), so the colours are invisible at the only place they are bought for. |
 | `dpts_8` Table setup | "data model already at parity"; missing start/end, Game Sponsor header, Public tooltip | Game Sponsor section and the Public tooltip both existed | Three of the nine fields this doc credited us with "sending" had **no field on `TableCreateRequest`**, so `json.Unmarshal` discarded them on arrival. `operating_hours` was a bare boolean read by nothing. `auto_away_on_timeout` is read by the match handler but was only ever sent by the tournament director — at a cash table the toggle did nothing. |
 
 ### The largest finding was not on this list at all
@@ -232,9 +236,9 @@ cannot drift. `auto_away_below` now holds dealing while the table is under-full 
 
 | Mockup | Us |
 |---|---|
-| `_29` Wardrobe Hub — equipped figure, **4 equipment slots**, owned grid by rarity, Save Preset / Nano Banana Render | ◐ studio exists; no slot model |
-| `_30` Dye Shop — primary/secondary/accent swatches with hex, named dye packs, live preview | ◐ `studio/dyeData.ts` exists; no live preview |
-| `_23` AI Customizer — prompt + **prompt-assistance chips**, premium-locked toggles with padlock, render preview | ◐ studio has prompt; no preset chips, no locked-toggle treatment |
+| `_29` Wardrobe Hub — equipped figure, **4 equipment slots**, owned grid by rarity, Save Preset / Nano Banana Render | ✅ **DONE** — row was wrong. The slot model exists (`LoadoutPanel` + `loadout_save` / `loadout_equip`), as do Save Preset and the Nano Banana render. |
+| `_30` Dye Shop — primary/secondary/accent swatches with hex, named dye packs, live preview | ✅ **DONE** — the live preview existed, with an on/off toggle. The defect: the shop opened on hardcoded gold/red/cyan and never read the dye already saved, so a player who reloaded thought their dye had been lost. `cosmetic_dye_get` was registered and called by nothing. Now hydrated. ⏸️ The dye still does not reach the **table** — see below. |
+| `_23` AI Customizer — prompt + **prompt-assistance chips**, premium-locked toggles with padlock, render preview | ✅ **DONE** — row was wrong. `NanoBananaCustomizer` has the Prompt Assistant presets and `PremiumLock` toggles linking to the real upgrade surface, wired to `character_generate` / `character_generation_status`. |
 | `_25` **Render progress** — per-stage bars (Anatomy 72% / Armor 50% / Lighting 70%) each with a thumbnail, overall 72% | ✅ **DONE**. Not missing — the UI existed and was fabricating its content (invented stage names, "6000%" telemetry). Now reports the real pipeline (`model` → `rig` → `retarget`) with done/running/waiting states. NOTE: the mockup's Anatomy/Armor/Lighting are not steps our generator performs, so ours names the real ones instead. |
 | `_19` Premium Exclusive — Mythic / 1-of-1 cards with **360° badge**, gold/ETH pricing | ◐ `PremiumMarket` exists; 360° badge is decorative |
 | `_22` Purchase Successful — celebration, View in Wardrobe / Back to Market | ✅ **DONE**. Not missing — `PurchaseSuccessModal` existed complete, with confetti, hero item, both exits and a `prefers-reduced-motion` gate. The defect was what it claimed: the checkout opens it when **any** line settles, so a partial failure showed an unqualified "Purchase Successful!", listed only the item that worked, and never set `error`. Now names the failed lines and says the total covers only what settled. |
@@ -259,7 +263,7 @@ Their version has a **Club Type dropdown with Private / Semi-Private / Public**;
 
 ---
 
-## Verdict — REVISED after building eight of these rows
+## Verdict — REVISED after building thirteen of these rows
 
 The original verdict is kept below, collapsed, because the way it was wrong is the useful part.
 
@@ -275,8 +279,12 @@ sound/chips/shuffling session (owner's instruction, 2026-07-26):
 - Club announcements appearing **on the felt** — the in-table renderer reads the platform
   announcement list; pointing it at club announcements is a one-file change in
   `features/table3d/overlays/`
+- **Avatar dye reaching the table.** `SeatView` carries `model_url` and no dye params, so a
+  player's chosen colors are applied in the studio and invisible at the seat — the one place the
+  purchase is for. Needs the seat renderer, so it waits with the rest.
 
-Plus a short tail of genuinely-small gaps: `_29`/`_30`/`_23` avatar-studio depth.
+The short tail is now empty: `_29`, `_30` and `_23` were all already built (see the avatar-economy
+table above), and the only avatar gap left is the dye-at-the-table item listed above.
 
 ### What the original verdict got wrong
 
