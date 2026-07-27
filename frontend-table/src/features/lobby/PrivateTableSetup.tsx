@@ -26,6 +26,7 @@ import {
   type AccessType,
   type ClubLite,
 } from "./lobbyData";
+import { buildOperatingWindow } from "./operatingWindow";
 
 // A rich private-table (also club public-game) setup form synthesized from the
 // HRC "detailed private table setup" masters: blinds, buy-in, seats 2-9, variant,
@@ -109,11 +110,25 @@ export function PrivateTableSetup({
   const [autoBuyBackDollars, setAutoBuyBackDollars] = useState("");
   const [geoRestricted, setGeoRestricted] = useState(false);
   const [kycRequired, setKycRequired] = useState(false);
+  // Operating window (dpts_8). This used to be a lone boolean that was sent on
+  // every create and read by nothing — `operating_hours: true` had no field on
+  // TableCreateRequest, so json.Unmarshal dropped it. A window needs times to
+  // mean anything, so the toggle now carries a pair of them.
   const [operatingHours, setOperatingHours] = useState(false);
+  const [operatingStart, setOperatingStart] = useState("18:00");
+  const [operatingEnd, setOperatingEnd] = useState("02:00");
 
   // Invite-only access hides the table from the public list; derived from the
   // Access Type control so the two never disagree.
   const inviteOnly = accessType !== "public";
+
+  // The window the server will actually receive, converted from the operator's
+  // local clock. Computed here (not at submit) so the form can show the UTC it
+  // is about to send and refuse a zero-length window before the button is armed.
+  const openWindow = useMemo(
+    () => buildOperatingWindow(operatingHours, operatingStart, operatingEnd),
+    [operatingHours, operatingStart, operatingEnd],
+  );
 
   // A host can list a table publicly only when they operate a club (sponsored
   // public games); otherwise the "Public" access type stays gated, matching the
@@ -195,15 +210,19 @@ export function PrivateTableSetup({
       // TableCreateRequest does not map, and only when the table was public, so
       // the club never reached the server at all.
       club_id: sponsorClub,
-      // ---- Still forward-compat (no backend home yet): auto-away needs orbit
-      // counting (#86); operating_hours needs a schedule/window model. Sent so
-      // the UI state is preserved once those land. ----
+      // ---- Operating window + auto-away (dpts_8). These now bind to real
+      // TableCreateRequest fields: the window is enforced at the sit-down gate
+      // and the auto-away floor holds dealing while the table is under-full.
+      // Previously all three were sent to a backend with no field for them. ----
+      operating_start_min: openWindow.startMin,
+      operating_end_min: openWindow.endMin,
+      auto_away_on_timeout: autoAwayTimeout,
+      auto_away_below: autoAwayBelow ? autoAwayBelowN : 0,
+      // ---- Still forward-compat: derived flags the server recomputes from
+      // access_type. Kept so an older reader sees a consistent payload. ----
       invite_only: inviteOnly,
       ante: features.ante,
       public: accessType === "public",
-      auto_away_on_timeout: autoAwayTimeout,
-      auto_away_below: autoAwayBelow ? autoAwayBelowN : 0,
-      operating_hours: operatingHours,
     };
 
     try {
@@ -248,7 +267,7 @@ export function PrivateTableSetup({
     autoAwayBelowN,
     geoRestricted,
     kycRequired,
-    operatingHours,
+    openWindow,
     walletLimitDollars,
     autoBuyBackDollars,
     connected,
@@ -661,12 +680,47 @@ export function PrivateTableSetup({
               on={geoRestricted}
               onToggle={() => setGeoRestricted((v) => !v)}
             />
-            <ToggleRow
-              label="Game Operating Hours"
-              blurb="Table auto-opens and closes on the club's scheduled window."
-              on={operatingHours}
-              onToggle={() => setOperatingHours((v) => !v)}
-            />
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+              <ToggleRow
+                label="Game Operating Hours"
+                blurb="Only seat players inside a daily window. Anyone already seated finishes their hand."
+                on={operatingHours}
+                onToggle={() => setOperatingHours((v) => !v)}
+              />
+              {operatingHours && (
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Field label="Opens">
+                      <Input
+                        type="time"
+                        value={operatingStart}
+                        onChange={(e) => setOperatingStart(e.target.value)}
+                        className="w-32"
+                      />
+                    </Field>
+                    <Field label="Closes">
+                      <Input
+                        type="time"
+                        value={operatingEnd}
+                        onChange={(e) => setOperatingEnd(e.target.value)}
+                        className="w-32"
+                      />
+                    </Field>
+                  </div>
+                  {/* The server enforces the window in UTC — one match, one
+                      clock — so show the operator the UTC they are choosing
+                      rather than letting them discover it at closing time. */}
+                  {openWindow.error ? (
+                    <p className="text-[11px] font-semibold text-brand">{openWindow.error}</p>
+                  ) : (
+                    <p className="text-[11px] leading-snug text-neutral-500">
+                      Enforced as <span className="font-semibold text-neutral-300">{openWindow.utcLabel}</span>
+                      {openWindow.wrapsMidnight ? " — this window runs past midnight." : ""}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Min Players + Decision Time */}
@@ -702,13 +756,13 @@ export function PrivateTableSetup({
             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
               <ToggleRow
                 label="Auto-Away if Players Below"
-                blurb="Pause seats when the table thins out below the threshold."
+                blurb="Hold dealing while the table is under this many players, so nobody is blinded down short-handed."
                 on={autoAwayBelow}
                 onToggle={() => setAutoAwayBelow((v) => !v)}
               />
               {autoAwayBelow && (
                 <div className="mt-2 flex items-center gap-2">
-                  <span className="text-[10px] uppercase tracking-wider text-neutral-500">Threshold</span>
+                  <span className="text-[10px] uppercase tracking-wider text-neutral-500">Players</span>
                   <Input
                     type="number"
                     min={1}
@@ -803,6 +857,10 @@ export function PrivateTableSetup({
             />
             <SummaryRow k="Decision" v={`${decisionSecs}s`} />
             <SummaryRow
+              k="Open"
+              v={operatingHours && !openWindow.error ? `${operatingStart}–${operatingEnd}` : "Always"}
+            />
+            <SummaryRow
               k="Features"
               v={
                 [
@@ -817,9 +875,12 @@ export function PrivateTableSetup({
             />
           </dl>
 
+          {/* A bad operating window is a create-blocking error, not a warning:
+              the server reads a zero-length window as "always open", so sending
+              it would give the operator the opposite of what they asked for. */}
           <button
             type="button"
-            disabled={busy || !sponsorClub}
+            disabled={busy || !sponsorClub || !!openWindow.error}
             onClick={() => void create()}
             className={cn(
               BTN_GOLD,

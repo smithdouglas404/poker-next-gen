@@ -204,6 +204,28 @@ type TableCreateRequest struct {
 	//  - TableArt: the owner-chosen baked table plate id (frontend bakedTable.ts);
 	//    empty => the default cinematic felt.
 	TableArt string `json:"table_art,omitempty" label:"Table Art"`
+	// Operating window + auto-away (dpts_8). The setup form has offered all three
+	// of these since it was built and sent them on every create; TableCreateRequest
+	// had no field for any of them, so json.Unmarshal dropped them silently and a
+	// host who set them got a table that ignored them. They are fields now.
+	//
+	//  - OperatingStartMin/OperatingEndMin: a daily window in minutes past midnight
+	//    UTC, wrap-midnight aware (18:00–02:00 is an evening session). Equal values
+	//    mean no window, which is what every existing table sends. Enforced at the
+	//    SIT-DOWN gate, not at creation: outside the window nobody may take a seat,
+	//    but players already seated finish their hand rather than having the table
+	//    yanked out from under a live pot.
+	OperatingStartMin int `json:"operating_start_min,omitempty" validate:"min=0,max=1439" unit:"count" label:"Opens (minutes past midnight UTC)"`
+	OperatingEndMin   int `json:"operating_end_min,omitempty" validate:"min=0,max=1439" unit:"count" label:"Closes (minutes past midnight UTC)"`
+	//  - AutoAwayOnTimeout: sit a player OUT after two consecutive time-outs
+	//    instead of folding them forever. The match handler has read this param
+	//    since the tournament work; only the cash-table path never sent it.
+	//  - AutoAwayBelow: hold dealing while fewer than this many players are seated
+	//    (0 => off). Distinct from MinPlayers, which only decides whether a table
+	//    ever starts — this keeps a table that has thinned out from blinding down
+	//    the players who are still there.
+	AutoAwayOnTimeout bool `json:"auto_away_on_timeout,omitempty" label:"Sit out after 2 time-outs"`
+	AutoAwayBelow     int  `json:"auto_away_below,omitempty" validate:"min=0,max=10" unit:"count" label:"Pause below (players)"`
 }
 
 // ClubMemberRoleRequest is the club_member_role RPC payload: promote/demote a

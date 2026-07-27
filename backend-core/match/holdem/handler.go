@@ -120,11 +120,19 @@ type MatchState struct {
 	TimeBankGrant    int64
 	TimeBankPerHand  int64
 	// AutoAwayOnTimeout sits a player OUT after two consecutive timeouts rather
-	// than letting the server keep folding for them. Tournament-scoped: at a cash
-	// table the inactivity rule stands a player up (standUpBusted), but a
-	// tournament seat holds chips that cannot be surrendered, so away is the only
-	// correct response.
+	// than letting the server keep folding for them. Originally tournament-scoped
+	// — at a cash table the inactivity rule stands a player up (standUpBusted),
+	// but a tournament seat holds chips that cannot be surrendered, so away is the
+	// only correct response. Cash tables now offer it too (the setup form always
+	// showed the toggle; nothing carried it here), where it is the gentler option:
+	// away keeps the seat, standing up ends the session.
 	AutoAwayOnTimeout bool
+	// AutoAwayBelowPlayers holds dealing while fewer than this many players are
+	// seated (0 => off). Distinct from MinPlayers, which only gates whether a
+	// table ever starts: this covers a table that filled, played, and then thinned
+	// out, so nobody is blinded down short-handed at a table they joined expecting
+	// a full ring. See autoAwayHoldsHand.
+	AutoAwayBelowPlayers int
 	// Per-hand behavioural tracking (userID -> counters), reset each hand start
 	// and drained into poker_hand_stats at settlement. Feeds VPIP/PFR/AF.
 	HandTrack        map[string]*playerHandTrack
@@ -148,6 +156,12 @@ type MatchState struct {
 	NoMaxBuyIn       bool   // unlimited buy-in (no max) — PLAY-MONEY tables only
 	RenderStyle      string // owner-chosen table look: "2.5d" | "3d" (empty => per-device)
 	TableArt         string // owner-chosen baked table plate id (empty => cinematic felt)
+	// Daily operating window in minutes past midnight UTC, wrap-midnight aware
+	// (see store.WithinDailyWindow). Equal values mean always-open, which is what
+	// every table created before this existed reports. Enforced at sit-down only:
+	// closing time stops new players taking a seat, it does not evict a live pot.
+	OperatingStartMin int
+	OperatingEndMin   int
 }
 
 // insurancePolicy is one all-in insurance wager, settled against the wallet (not
@@ -308,6 +322,24 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	if v, ok := params["auto_away_on_timeout"].(bool); ok {
 		autoAwayOnTimeout = v
 	}
+	autoAwayBelowPlayers := 0
+	if v, ok := numParam(params, "auto_away_below"); ok && v > 0 {
+		autoAwayBelowPlayers = int(v)
+	}
+	// Operating window. Out-of-range values collapse the window to always-open
+	// rather than closing the table: a malformed param must not lock everyone out
+	// of a table that was working a moment ago. table_create rejects bad values at
+	// the boundary, so this only catches a hand-built MatchCreate.
+	operatingStartMin, operatingEndMin := 0, 0
+	if v, ok := numParam(params, "operating_start_min"); ok {
+		operatingStartMin = int(v)
+	}
+	if v, ok := numParam(params, "operating_end_min"); ok {
+		operatingEndMin = int(v)
+	}
+	if !store.ValidDailyMinute(operatingStartMin) || !store.ValidDailyMinute(operatingEndMin) {
+		operatingStartMin, operatingEndMin = 0, 0
+	}
 	hostUserID := ""
 	if v, ok := params["host_user_id"].(string); ok {
 		hostUserID = v
@@ -432,6 +464,10 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		TimeBankGrant: timeBankCfg,
 		TimeBankPerHand:   timeBankPerHand,
 		AutoAwayOnTimeout: autoAwayOnTimeout,
+		AutoAwayBelowPlayers: autoAwayBelowPlayers,
+		// Daily operating window (dpts_8).
+		OperatingStartMin: operatingStartMin,
+		OperatingEndMin:   operatingEndMin,
 		DurationSecs: durationSecs,
 		MinPlayers:   minPlayers,
 		// Cash tables deal themselves (no operator babysitting); tournament tables
@@ -555,6 +591,26 @@ func (s *MatchState) refillTimeBanks() {
 		}
 		s.TimeBank[seat.UserID] = v
 	}
+}
+
+// autoAwayHoldsHand reports whether the table should hold off dealing because it
+// has thinned below the host's "Auto-Away if Players Below N" threshold.
+//
+// This is NOT MinPlayers, which gates whether a table ever starts. This handles a
+// table that fills, plays, and then empties out: a 9-max club table that drops to
+// two players would otherwise grind those two heads-up, blinding down whoever
+// stepped away, at a table they joined expecting a full ring.
+//
+// It pauses dealing rather than flipping SittingOut on everyone. Mutating seat
+// status is a one-way door — the players would each have to sit back in by hand
+// once the table refilled, and a player who had already stepped away would never
+// do so. Pausing self-heals: the moment enough players are back, the next tick
+// deals. From the seat it looks identical (no blinds are posted either way).
+func (s *MatchState) autoAwayHoldsHand() bool {
+	if s.AutoAwayBelowPlayers <= 0 || s.Table == nil {
+		return false
+	}
+	return s.Table.SeatedCount() < s.AutoAwayBelowPlayers
 }
 
 func (h *Handler) MatchJoinAttempt(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, state interface{}, presence runtime.Presence, metadata map[string]string) (interface{}, bool, string) {
@@ -814,6 +870,19 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 						continue
 					}
 				}
+			}
+			// (d) Operating hours — a table with a daily window seats nobody
+			// outside it. The check is HERE and not in the hand loop on purpose:
+			// closing time must stop new players sitting down, but it must never
+			// pull a seated player out of a live pot. A table empties itself as
+			// players stand up, which is what "closing" means at a poker table.
+			//
+			// The host is exempt, so an operator can always take their own seat to
+			// set up or wind down a session outside the advertised hours.
+			if userID != s.HostUserID && !store.WithinDailyWindow(s.OperatingStartMin, s.OperatingEndMin, time.Now()) {
+				sendError(dispatcher, presence, "outside_operating_hours",
+					"this table is open "+store.DailyWindowLabel(s.OperatingStartMin, s.OperatingEndMin))
+				continue
 			}
 			// Tier gate: enforce the multi-table limit (tables seated at once).
 			seatReg := store.NewActiveSeatStore(db)
@@ -1634,6 +1703,11 @@ func accrueCompetition(ctx context.Context, logger runtime.Logger, db *sql.DB, s
 // manual OpStartHand path). Bots are driven by the loop's trailing driveBots.
 func autoStartHand(ctx context.Context, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
 	if s.Table.SeatedCount() < 2 || s.Phase != poker.PhaseWaiting || s.Table.Street != poker.StreetWaiting {
+		return
+	}
+	// The host's "Auto-Away if Players Below N" floor. Unlike MinPlayers this
+	// applies for the life of the table, not just its first hand.
+	if s.autoAwayHoldsHand() {
 		return
 	}
 	if err := s.Table.StartHand(s.effSmallBlind(), s.effBigBlind()); err != nil {
@@ -2550,6 +2624,12 @@ func buildLabel(s *MatchState) string {
 		"invite_only":      s.AccessType == "invite" || s.AccessType == "members",
 		"allow_spectators": s.AllowSpectators,
 		"club_id":          s.ClubID,
+		// Operating window (dpts_8) so a browser can say "opens 18:00 UTC" instead
+		// of offering a seat the sit-down gate is about to refuse. Omitted entirely
+		// when the table is always open, which is the common case.
+		"operating_start_min": s.OperatingStartMin,
+		"operating_end_min":   s.OperatingEndMin,
+		"open_now":            store.WithinDailyWindow(s.OperatingStartMin, s.OperatingEndMin, time.Now()),
 	})
 	return string(label)
 }

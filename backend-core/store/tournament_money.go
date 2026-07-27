@@ -115,35 +115,15 @@ func RegistrationOpen(t *models.TournamentBracket, now time.Time) (bool, string)
 }
 
 // withinOperatingHours checks the daily UTC window. Equal start/end = no window.
+//
+// The arithmetic (including the midnight wrap) is shared with the cash-table
+// sit-down gate — see daily_window.go. Both surfaces expose the same control to
+// operators, so they must not drift on what "18:00–02:00" means.
 func withinOperatingHours(t *models.TournamentBracket, now time.Time) (bool, string) {
 	start, end := int(t.OperatingStartMin), int(t.OperatingEndMin)
-	if start == end {
-		return true, ""
-	}
-	utc := now.UTC()
-	minute := utc.Hour()*60 + utc.Minute()
-	within := false
-	if start < end {
-		within = minute >= start && minute < end
-	} else {
-		// Wraps midnight, e.g. 18:00–04:00.
-		within = minute >= start || minute < end
-	}
-	if within {
+	if WithinDailyWindow(start, end, now) {
 		return true, ""
 	}
 	return false, "this tournament is outside its operating hours (" +
-		clockLabel(start) + "–" + clockLabel(end) + " UTC)"
-}
-
-func clockLabel(minutes int) string {
-	h, m := minutes/60, minutes%60
-	return twoDigit(h) + ":" + twoDigit(m)
-}
-
-func twoDigit(v int) string {
-	if v < 10 {
-		return "0" + string(rune('0'+v))
-	}
-	return string(rune('0'+v/10)) + string(rune('0'+v%10))
+		DailyWindowLabel(start, end) + ")"
 }

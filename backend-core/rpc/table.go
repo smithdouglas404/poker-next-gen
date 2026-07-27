@@ -128,6 +128,21 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 	actionSecs := clampSecs(req.ActionSecs)
 	timeBankSecs := clampSecs(req.TimeBankSecs)
 
+	// Operating window (dpts_8). Rejected rather than clamped: a host who typed a
+	// bad time wants to know, and silently rewriting 25:00 to 23:59 would open the
+	// table at an hour they never chose. Equal start/end is the "always open"
+	// case every existing table sends.
+	if !store.ValidDailyMinute(req.OperatingStartMin) || !store.ValidDailyMinute(req.OperatingEndMin) {
+		return "", runtime.NewError("operating hours must be minutes past midnight (0–1439)", 3)
+	}
+	autoAwayBelow := req.AutoAwayBelow
+	if autoAwayBelow < 0 {
+		autoAwayBelow = 0
+	}
+	if autoAwayBelow > maxSeats {
+		autoAwayBelow = maxSeats // a floor above the seat cap would never deal a hand
+	}
+
 	// EVERY table belongs to a club, and a paying member sponsors it.
 	//
 	// This used to read `if req.ClubID != ""`, so the guard only fired when a club
@@ -187,6 +202,12 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		"no_max_buyin":        req.NoMaxBuyIn,
 		"render_style":        req.RenderStyle,
 		"table_art":           req.TableArt,
+		// Operating window + auto-away (dpts_8). The setup form sent these keys
+		// from the day it shipped; nothing carried them past json.Unmarshal.
+		"operating_start_min":  req.OperatingStartMin,
+		"operating_end_min":    req.OperatingEndMin,
+		"auto_away_on_timeout": req.AutoAwayOnTimeout,
+		"auto_away_below":      autoAwayBelow,
 	})
 	if err != nil {
 		return "", err

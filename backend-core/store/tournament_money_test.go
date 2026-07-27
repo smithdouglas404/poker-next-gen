@@ -150,14 +150,5 @@ func TestRegistrationOpen_EqualHoursMeansAlwaysOpen(t *testing.T) {
 	}
 }
 
-func TestClockLabel(t *testing.T) {
-	// twoDigit builds strings rune-by-rune; a regression here would corrupt the
-	// operator-facing "outside its operating hours" message.
-	for _, tc := range []struct{ min int; want string }{
-		{0, "00:00"}, {9 * 60, "09:00"}, {18*60 + 30, "18:30"}, {23*60 + 59, "23:59"},
-	} {
-		if got := clockLabel(tc.min); got != tc.want {
-			t.Errorf("clockLabel(%d) = %q, want %q", tc.min, got, tc.want)
-		}
-	}
-}
+// ClockLabel / the window arithmetic moved to daily_window.go when cash tables
+// started sharing it; their tests live in daily_window_test.go.
