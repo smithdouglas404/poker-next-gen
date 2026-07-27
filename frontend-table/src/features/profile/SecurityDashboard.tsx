@@ -55,7 +55,15 @@ function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; labe
   );
 }
 
-function WalletRow({ w }: { w: LinkedWalletInfo }) {
+function WalletRow({
+  w,
+  busy,
+  onUnlink,
+}: {
+  w: LinkedWalletInfo;
+  busy: boolean;
+  onUnlink: (w: LinkedWalletInfo) => void;
+}) {
   return (
     <div className={cn(GLASS_PANEL, "flex items-center gap-3 p-4")}>
       <span className="text-2xl" aria-hidden>{w.emoji}</span>
@@ -63,7 +71,23 @@ function WalletRow({ w }: { w: LinkedWalletInfo }) {
         <p className="text-sm font-semibold text-foreground">{w.name}</p>
         <p className="truncate font-mono text-[11px] text-neutral-500">{w.short}</p>
       </div>
-      <p className="font-display text-lg font-bold text-gold">{w.balance}</p>
+      {w.real ? (
+        // A linked wallet can reset this account's password
+        // (account_recovery_wallet_verify), so it is a live second factor — and
+        // wallet_unlink, the only way to revoke one, had no control anywhere in
+        // the app. A wallet the player loses control of was a permanent
+        // account-takeover path with no remedy.
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => onUnlink(w)}
+          className="shrink-0 rounded-lg border border-brand/40 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-brand transition hover:bg-brand/10 disabled:opacity-40"
+        >
+          {busy ? "Removing…" : "Unlink"}
+        </button>
+      ) : (
+        <p className="font-display text-lg font-bold text-gold">{w.balance}</p>
+      )}
     </div>
   );
 }
@@ -73,6 +97,7 @@ export function SecurityDashboard({ notify }: { notify: (msg: string, kind?: "ok
   const [keys, setKeys] = useState<ApiKey[] | null>(null);
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [linked, setLinked] = useState<LinkedWalletInfo[]>(DEMO_LINKED_WALLETS);
+  const [unlinking, setUnlinking] = useState<string | null>(null);
   const sessions: ActiveSession[] = DEMO_SESSIONS;
 
   useEffect(() => {
@@ -101,6 +126,8 @@ export function SecurityDashboard({ notify }: { notify: (msg: string, kind?: "ok
           const rows = ((wl.value as { wallets?: Array<{ provider: string; chain: string; address: string }> }).wallets ?? []).map(
             (w) => ({
               id: w.address,
+              address: w.address,
+              real: true,
               name: w.provider ? w.provider[0].toUpperCase() + w.provider.slice(1) : "Wallet",
               balance: w.chain === "solana" ? "SOL" : "ETH",
               short: w.address.length > 12 ? `${w.address.slice(0, 6)}…${w.address.slice(-4)}` : w.address,
@@ -126,6 +153,39 @@ export function SecurityDashboard({ notify }: { notify: (msg: string, kind?: "ok
       cancelled = true;
     };
   }, []);
+
+  const unlinkWallet = useCallback(
+    (w: LinkedWalletInfo) => {
+      const address = w.address ?? w.id;
+      if (!w.real || !address) return;
+      // Confirm, because this removes a way back into the account. The wording
+      // names the consequence rather than asking "are you sure?" — the player
+      // may not know a linked wallet can reset their password.
+      if (
+        !window.confirm(
+          `Unlink ${w.name} (${w.short})?\n\nThis wallet can currently recover your account. After unlinking it can no longer be used to reset your password.`,
+        )
+      ) {
+        return;
+      }
+      void (async () => {
+        setUnlinking(w.id);
+        try {
+          await callSessionRpc("wallet_unlink", { address });
+          // Drop it locally only after the server confirms. Removing it
+          // optimistically would show a wallet as revoked while it could still
+          // recover the account — the worst possible thing to be wrong about.
+          setLinked((prev) => prev.filter((x) => x.id !== w.id));
+          notify(`${w.name} unlinked — it can no longer recover this account.`);
+        } catch (e) {
+          notify(e instanceof Error ? e.message : "Could not unlink that wallet", "err");
+        } finally {
+          setUnlinking(null);
+        }
+      })();
+    },
+    [notify],
+  );
 
   const togglePref = useCallback(
     (key: keyof Prefs) => {
@@ -246,7 +306,12 @@ export function SecurityDashboard({ notify }: { notify: (msg: string, kind?: "ok
         <p className={cn(HEADING_SM, "text-gold/80")}>Financials &amp; Wallets</p>
         <div className="mt-4 space-y-3">
           {linked.map((w) => (
-            <WalletRow key={w.id} w={w} />
+            <WalletRow
+              key={w.id}
+              w={w}
+              busy={unlinking === w.id}
+              onUnlink={unlinkWallet}
+            />
           ))}
           <div className={cn(GLASS_PANEL, "flex items-center gap-3 p-4")}>
             <span className="text-2xl" aria-hidden>🪙</span>
@@ -264,7 +329,9 @@ export function SecurityDashboard({ notify }: { notify: (msg: string, kind?: "ok
           Add New Wallet
         </Link>
         <p className="mt-3 text-[11px] text-neutral-500">
-          Linked crypto wallets are illustrative; the chips balance is your authoritative on-platform wallet.
+          {linked.some((w) => w.real)
+            ? "A linked wallet can recover this account, so treat it as a second factor — unlink any wallet you no longer control. The chips balance is your authoritative on-platform wallet."
+            : "No wallet is linked yet; the rows above are examples. The chips balance is your authoritative on-platform wallet."}
         </p>
       </section>
 

@@ -278,6 +278,14 @@ export interface LinkedWalletInfo {
   balance: string;
   short: string;
   emoji: string;
+  /** The full on-chain address — what wallet_unlink is keyed on. */
+  address?: string;
+  /**
+   * True for a wallet the server actually holds a signature-verified link for,
+   * false for the placeholder rows shown to a guest. Only a real one may be
+   * unlinked, and only a real one is a live account-recovery factor.
+   */
+  real?: boolean;
 }
 
 export const DEMO_LINKED_WALLETS: LinkedWalletInfo[] = [
