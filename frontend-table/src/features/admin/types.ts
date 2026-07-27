@@ -65,6 +65,16 @@ export interface AntibotScore {
   updated_at: string;
 }
 
+/** A device fingerprint shared by more than one account — the raw signal
+ *  device_multi_account_list surfaces. Sharing a device isn't proof of
+ *  anything by itself (a household, a club LAN); it's a lead for review. */
+export interface MultiAccountGroup {
+  fingerprint: string;
+  user_ids: string[];
+  account_count: number;
+  last_seen_at: string;
+}
+
 export interface CollusionFlag {
   id: string;
   user_a: string;

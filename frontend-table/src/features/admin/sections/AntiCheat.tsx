@@ -7,13 +7,14 @@ import { cn } from "@/features/ui/tokens";
 
 import { adminApi, relTime } from "../adminRpc";
 import { Badge, Card, Empty, GoldHeading, Mono, Row, Table, Td, Th, statusTone } from "../primitives";
-import type { AntibotScore, CollusionFlag, GeoRule, HitlItem, IPRule } from "../types";
+import type { AntibotScore, CollusionFlag, GeoRule, HitlItem, IPRule, MultiAccountGroup } from "../types";
 import type { Notify } from "./shared";
 
-type Tab = "antibot" | "collusion" | "hitl" | "ip" | "geo";
+type Tab = "antibot" | "multi" | "collusion" | "hitl" | "ip" | "geo";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "antibot", label: "Bot Detection" },
+  { id: "multi", label: "Multi-Account" },
   { id: "collusion", label: "Collusion" },
   { id: "hitl", label: "HITL Queue" },
   { id: "ip", label: "IP Rules" },
@@ -51,6 +52,7 @@ export function AntiCheat({ notify }: { notify: Notify }) {
       </div>
 
       {tab === "antibot" && <Antibot notify={notify} />}
+      {tab === "multi" && <MultiAccount notify={notify} />}
       {tab === "collusion" && <Collusion notify={notify} />}
       {tab === "hitl" && <Hitl notify={notify} />}
       {tab === "ip" && <IPRules notify={notify} />}
@@ -154,6 +156,86 @@ function Antibot({ notify }: { notify: Notify }) {
                   </Button>
                 )}
               </Td>
+            </Row>
+          ))}
+        </Table>
+      )}
+    </Card>
+  );
+}
+
+// Sharing a device is a LEAD, not a verdict — a household, a club LAN, a
+// shared kiosk all fingerprint the same way a colluding pair would. This is
+// why the row links out to the existing tools (collusion scan, per-user ban)
+// rather than adding a third, redundant ban button here: the data belongs in
+// this queue, the decision belongs to the reviewer.
+function MultiAccount({ notify }: { notify: Notify }) {
+  const [rows, setRows] = useState<MultiAccountGroup[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await adminApi.multiAccountList();
+      setRows(res.multi_accounts ?? []);
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Failed to load device fingerprints", "err");
+    } finally {
+      setLoading(false);
+    }
+  }, [notify]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return (
+    <Card
+      eyebrow="Device fingerprints"
+      title="Accounts sharing a device"
+      actions={
+        <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
+          Refresh
+        </Button>
+      }
+    >
+      <p className="mb-4 text-xs text-neutral-500">
+        Device fingerprints seen across more than one account. Not proof of anything on its
+        own — cross-reference with Collusion before acting.
+      </p>
+      {rows.length === 0 ? (
+        <Empty>{loading ? "Loading…" : "No device shared by more than one account."}</Empty>
+      ) : (
+        <Table
+          head={
+            <>
+              <Th>Fingerprint</Th>
+              <Th>Accounts</Th>
+              <Th>Count</Th>
+              <Th className="text-right">Last seen</Th>
+            </>
+          }
+        >
+          {rows.map((g) => (
+            <Row key={g.fingerprint}>
+              <Td>
+                <Mono>{g.fingerprint}</Mono>
+              </Td>
+              <Td className="max-w-[360px]">
+                <div className="flex flex-wrap gap-1.5">
+                  {g.user_ids.map((id) => (
+                    <Mono key={id} className="rounded bg-white/[0.04] px-1.5 py-0.5">
+                      {id}
+                    </Mono>
+                  ))}
+                </div>
+              </Td>
+              <Td>
+                <Badge tone={g.account_count >= 4 ? "red" : g.account_count >= 3 ? "gold" : "neutral"}>
+                  {g.account_count} accounts
+                </Badge>
+              </Td>
+              <Td className="text-right text-neutral-500">{relTime(g.last_seen_at)}</Td>
             </Row>
           ))}
         </Table>

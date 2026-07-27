@@ -10,6 +10,7 @@ import type {
   AntibotScore,
   AuditRow,
   CollusionFlag,
+  MultiAccountGroup,
   EnvKey,
   Financials,
   GlobalStats,
@@ -157,6 +158,11 @@ export const adminApi = {
     call<{ flagged: AntibotScore[] }>("antibot_flags_list", { limit }),
   antibotBan: (userId: string, reason: string) =>
     call<{ ok: boolean }>("antibot_ban", { user_id: userId, reason }),
+  /** Device fingerprints shared by more than one account. device_register
+   *  (support/deviceRegister.ts) has written this data since #128; nothing read
+   *  it back until now. */
+  multiAccountList: (limit = 100) =>
+    call<{ multi_accounts: MultiAccountGroup[] }>("device_multi_account_list", { limit }),
   collusionList: (status = "", limit = 50) =>
     call<{ flags: CollusionFlag[] }>("collusion_list", { status, limit }),
   collusionReview: (flagId: string, status: "confirmed" | "dismissed", note: string) =>
