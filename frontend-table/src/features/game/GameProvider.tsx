@@ -37,6 +37,7 @@ import {
   OpStartHand,
   OpHostAction,
   OpActionRequired,
+  OpTableMoved,
   type ActionRequiredMessage,
   type CardView,
   type ChatMessage,
@@ -45,6 +46,7 @@ import {
   type GameState,
   type ShowdownMessage,
   type TableListItem,
+  type TableMovedMessage,
   type TableSnapshot,
 } from "./protocol";
 import { ensureSession } from "@/lib/nakama/auth";
@@ -152,6 +154,26 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Declared before wireSocket (which references it for OpTableMoved) rather
+  // than left in its original spot further down — both are useCallbacks in
+  // the same component body, so wireSocket needs joinRoom's binding to exist
+  // by the time it's actually invoked (any later render, never at definition
+  // time), and listing it as a real dependency keeps that assumption honest
+  // instead of relying on an unlisted closure over a later `const`.
+  const joinRoom = useCallback(
+    async (id: string) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      await socket.joinMatch(id);
+      setMatchId(id);
+      setHoleCards([]);
+      setActionRequired(null);
+      setShowdown(null);
+      pushLog("You joined the table", "info");
+    },
+    [pushLog],
+  );
+
   const wireSocket = useCallback(
     (socket: Socket) => {
       socket.onmatchdata = (md) => {
@@ -251,12 +273,39 @@ export function GameProvider({ children }: { children: ReactNode }) {
             setError(payload.message ?? "Game error");
             pushLog(payload.message ?? "Error", "error");
             break;
+          case OpTableMoved: {
+            // Multi-table tournament merge (match/tournament/director.go
+            // rebalance): this player's table was broken and they were
+            // reseated at a different live match with their exact stack. The
+            // server already did the seat transfer server-side — the client's
+            // only job is to stop listening to the old (now player-less, from
+            // its point of view) match and subscribe to the new one.
+            const moved = payload as TableMovedMessage;
+            const oldMatchId = md.match_id;
+            const newMatchId = moved?.new_match_id;
+            if (newMatchId && newMatchId !== oldMatchId) {
+              pushLog("Table merged — moving you to a new table…", "info");
+              void (async () => {
+                try {
+                  await socket.leaveMatch(oldMatchId);
+                } catch {
+                  /* already gone / connection dropped — still try the new one */
+                }
+                try {
+                  await joinRoom(newMatchId);
+                } catch (e) {
+                  pushLog(e instanceof Error ? e.message : "Failed to join the new table", "error");
+                }
+              })();
+            }
+            break;
+          }
           default:
             break;
         }
       };
     },
-    [pushLog],
+    [pushLog, joinRoom],
   );
 
   const connect = useCallback(async () => {
@@ -295,20 +344,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
       pushLog(e instanceof Error ? e.message : "List tables failed", "error");
     }
   }, [pushLog]);
-
-  const joinRoom = useCallback(
-    async (id: string) => {
-      const socket = socketRef.current;
-      if (!socket) return;
-      await socket.joinMatch(id);
-      setMatchId(id);
-      setHoleCards([]);
-      setActionRequired(null);
-      setShowdown(null);
-      pushLog("You joined the table", "info");
-    },
-    [pushLog],
-  );
 
   const createRoom = useCallback(
     async (opts?: {

@@ -35,6 +35,13 @@ type PendingShowdown struct {
 	Plan      poker.ShowdownPlan
 }
 
+// pendingTournamentSeat is a queued incoming multi-table-merge seat transfer —
+// see MatchState.PendingSeatIn.
+type pendingTournamentSeat struct {
+	Username string
+	Stack    int64
+}
+
 type MatchState struct {
 	Table           *poker.Table
 	Phase           poker.HandPhase
@@ -104,6 +111,22 @@ type MatchState struct {
 	// level ends, so dealing actually stops for the scheduled break instead of
 	// continuing through it while only a countdown display changes.
 	TournamentBreak bool
+	// PendingSeatOut queues a live multi-table-merge seat transfer (userID ->
+	// destination match id), set by MatchSignal case "tournament_seat_out" from
+	// the tournament director. Processed at MatchLoop's between-hands safe point
+	// (never mid-hand, matching the cashout-lock invariant), which confirms the
+	// destination accepted (queued, not necessarily seated yet — see
+	// PendingSeatIn) the player via "tournament_seat_in" before standing them
+	// up here — see processPendingSeatTransfers.
+	PendingSeatOut map[string]string
+	// PendingSeatIn queues an incoming multi-table-merge seat transfer (userID
+	// -> username/stack), set by MatchSignal case "tournament_seat_in". Seating
+	// them is deferred to MatchLoop's between-hands safe point exactly like
+	// PendingSeatOut's removal — accepting the signal is not itself permission
+	// to mutate a live hand's seat array (dealer button / action-seat indices
+	// would be corrupted by a seat appearing mid-hand). See
+	// processPendingSeatIn.
+	PendingSeatIn map[string]pendingTournamentSeat
 	// DealerDown tracks the engine-math (rs_poker) sidecar being unreachable so the
 	// table pauses dealing gracefully and tells players ONCE, rather than silently
 	// failing to deal. Cleared (with a "restored" notice) on the next successful
@@ -781,6 +804,12 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 	// never abandoned: close after the configured duration or a host close, else
 	// auto-deal (unless the host paused the table).
 	if s.Phase == poker.PhaseWaiting && s.Table.Street == poker.StreetWaiting {
+		if len(s.PendingSeatIn) > 0 {
+			processPendingSeatIn(ctx, logger, db, dispatcher, s)
+		}
+		if len(s.PendingSeatOut) > 0 {
+			processPendingSeatTransfers(ctx, logger, db, nk, dispatcher, s)
+		}
 		if s.HostClosed {
 			closeTable(ctx, logger, db, dispatcher, s, "closed by host")
 			return nil
@@ -2606,6 +2635,93 @@ func accrueLoyalty(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *
 	}
 }
 
+// processPendingSeatIn seats every player queued by MatchSignal case
+// "tournament_seat_in" (see PendingSeatIn), called only from MatchLoop's
+// between-hands safe point so a transferred-in player can never appear mid
+// hand and corrupt dealer-button/action-seat indices. Uses
+// Table.SeatTransferIn — no buy-in clamp, since these are tournament chips
+// already in play, not a fresh wallet buy-in: clamping here would mint chips
+// for a short stack or destroy them for a big one.
+func processPendingSeatIn(ctx context.Context, logger runtime.Logger, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
+	moved := false
+	for userID, req := range s.PendingSeatIn {
+		delete(s.PendingSeatIn, userID)
+		if seatForUser(s, userID) >= 0 {
+			continue // already seated (shouldn't happen, but never double-seat)
+		}
+		seatIdx := s.Table.FirstEmptySeat()
+		if seatIdx < 0 {
+			// The reservation check in "tournament_seat_in" should have refused
+			// this before it was ever queued; re-queue rather than drop the
+			// player's chips into nowhere, and let the next safe point retry.
+			logger.Error("tournament seat-in: table full at safe point, re-queuing user=%s", userID)
+			s.PendingSeatIn[userID] = req
+			continue
+		}
+		if err := s.Table.SeatTransferIn(seatIdx, userID, req.Username, req.Stack); err != nil {
+			logger.Error("tournament seat-in failed user=%s: %v", userID, err)
+			continue
+		}
+		moved = true
+	}
+	if moved {
+		dispatcher.MatchLabelUpdate(buildLabel(s))
+		broadcastSnapshot(ctx, db, dispatcher, s, nil)
+	}
+}
+
+// processPendingSeatTransfers executes every seat transfer the tournament
+// director has queued for this table (see MatchSignal case
+// "tournament_seat_out"), called only from MatchLoop's between-hands safe
+// point. For each queued player it signals the destination match to accept
+// them with their exact live stack ("tournament_seat_in") and stands them up
+// here ONLY once the destination durably commits to seating them (its own
+// PendingSeatIn queue, processed at ITS next safe point — not proof they're
+// already seated there) — a "full"/"error"/transport failure instead leaves
+// the player seated right where they are, rather than vanishing them from the
+// tournament. The DB match_id (poker_tournament_registration) is updated
+// here, at the point the move is actually committed to — not by the director
+// when it merely decided the move should happen, which is what let that
+// bookkeeping drift from reality before.
+func processPendingSeatTransfers(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, s *MatchState) {
+	moved := false
+	for userID, dest := range s.PendingSeatOut {
+		delete(s.PendingSeatOut, userID)
+		seatIdx := seatForUser(s, userID)
+		if seatIdx < 0 {
+			continue // busted / already gone / never was here
+		}
+		seat := s.Table.Seats[seatIdx]
+		if seat.Stack <= 0 {
+			continue // busted seats are handled by reportTournamentBusts/MarkBusted
+		}
+		payload, _ := json.Marshal(map[string]interface{}{
+			"type":     "tournament_seat_in",
+			"user_id":  userID,
+			"username": seat.Username,
+			"stack":    seat.Stack,
+		})
+		resp, err := nk.MatchSignal(ctx, dest, string(payload))
+		if err != nil || resp != "ok" {
+			logger.Error("tournament seat transfer refused user=%s dest=%s resp=%q: %v", userID, dest, resp, err)
+			continue // leave them seated here rather than strand them nowhere
+		}
+		if p, ok := s.Presences[userID]; ok {
+			movedMsg, _ := json.Marshal(map[string]interface{}{"new_match_id": dest})
+			_ = dispatcher.BroadcastMessage(protocol.OpTableMoved, movedMsg, []runtime.Presence{p}, nil, true)
+		}
+		s.Table.StandUp(seatIdx)
+		if err := store.NewTournamentStore(db).AssignPlayerTable(ctx, s.TournamentID, userID, dest); err != nil {
+			logger.Error("tournament seat transfer: match_id not recorded user=%s dest=%s: %v", userID, dest, err)
+		}
+		moved = true
+	}
+	if moved {
+		dispatcher.MatchLabelUpdate(buildLabel(s))
+		broadcastSnapshot(ctx, db, dispatcher, s, nil)
+	}
+}
+
 // standUpBusted removes any seat with no chips left after a hand settles. On a
 // cash table a felted player (bot or human) must leave the seat — leaving them
 // seated at $0 wastes a seat and, before the allMatched() fix, could deadlock the
@@ -2796,6 +2912,61 @@ func (h *Handler) MatchSignal(ctx context.Context, logger runtime.Logger, db *sq
 		s.TournamentBreak = false
 		narrate(dispatcher, s, "Break's over — dealing back in.")
 		broadcastSnapshot(ctx, db, dispatcher, s, nil)
+	case "tournament_seat_out":
+		// Sent by the tournament director (match/tournament/director.go
+		// mergeTable) when a multi-table rebalance breaks this table and moves
+		// one of its players elsewhere. Queued rather than executed immediately:
+		// MatchSignal runs outside MatchLoop's message queue, so it has none of
+		// the "only between hands" protection the cashout-lock invariant relies
+		// on elsewhere — acting on it here could rip a seat out of a live pot.
+		// MatchLoop's PhaseWaiting safe point (processPendingSeatTransfers)
+		// performs the actual move.
+		userID, _ := sig["user_id"].(string)
+		dest, _ := sig["dest_match_id"].(string)
+		if userID == "" || dest == "" || dest == matchIDForAudit(s) {
+			break
+		}
+		if s.PendingSeatOut == nil {
+			s.PendingSeatOut = map[string]string{}
+		}
+		s.PendingSeatOut[userID] = dest
+	case "tournament_seat_in":
+		// Sent by another table's processPendingSeatTransfers, offering an
+		// incoming tournament player with their EXACT existing stack. This
+		// only QUEUES the seat (PendingSeatIn) rather than seating them right
+		// here — MatchSignal runs outside MatchLoop's message queue, so acting
+		// immediately could insert a seat into a hand that's mid-betting on
+		// THIS table right now, corrupting its dealer-button/action-seat
+		// indices. processPendingSeatIn performs the actual seat at MatchLoop's
+		// next between-hands safe point. The response string still means what
+		// the sender needs it to: "ok" is a durable commitment to seat this
+		// player soon, which is what lets the sender stand them up at their old
+		// table now — not proof they're already seated here.
+		userID, _ := sig["user_id"].(string)
+		username, _ := sig["username"].(string)
+		stackF, _ := sig["stack"].(float64)
+		stack := int64(stackF)
+		if userID == "" || stack <= 0 {
+			return s, "invalid"
+		}
+		if seatForUser(s, userID) >= 0 {
+			return s, "ok" // already seated here — idempotent retry
+		}
+		if _, queued := s.PendingSeatIn[userID]; queued {
+			return s, "ok" // already queued — idempotent retry
+		}
+		// Reserve against seats already spoken for by earlier-queued transfers,
+		// not just currently-occupied ones, so a burst of concurrent transfers
+		// can't all be accepted and then overflow the table at the safe point.
+		reserved := len(s.PendingSeatIn)
+		if s.Table.SeatedCount()+reserved >= s.Table.Cap() {
+			return s, "full"
+		}
+		if s.PendingSeatIn == nil {
+			s.PendingSeatIn = map[string]pendingTournamentSeat{}
+		}
+		s.PendingSeatIn[userID] = pendingTournamentSeat{Username: username, Stack: stack}
+		return s, "ok"
 	case "blind_update":
 		if v, ok := sig["small_blind"].(float64); ok {
 			s.SmallBlind = int64(v)

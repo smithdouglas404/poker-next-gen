@@ -251,6 +251,34 @@ func (t *Table) sitDown(seat int, userID, username string, buyIn int64, allowUnl
 	return nil
 }
 
+// SeatTransferIn seats a player arriving from another table via a live
+// multi-table tournament merge, with their EXACT existing stack — no buy-in
+// clamp, since these are chips already in play (mirrors MoveSeat's no-clamp
+// rule for the same reason), not a fresh wallet-funded buy-in. Using SitDown/
+// SitDownUnlimited here instead would run the stack through ClampBuyInBand,
+// which floors to MinBuyInCents unconditionally — silently minting chips for
+// a short-stacked player, or (above MaxBuyInCents on a capped table) silently
+// destroying them for a big-stacked one. Intended for use only between hands.
+func (t *Table) SeatTransferIn(seat int, userID, username string, stack int64) error {
+	if seat < 0 || seat >= t.cap() {
+		return fmt.Errorf("invalid seat")
+	}
+	if t.Seats[seat] != nil {
+		return fmt.Errorf("seat taken")
+	}
+	if stack <= 0 {
+		return fmt.Errorf("invalid stack")
+	}
+	t.Seats[seat] = &Seat{
+		Index:    seat,
+		UserID:   userID,
+		Username: username,
+		Stack:    stack,
+		Status:   SeatSeated,
+	}
+	return nil
+}
+
 func (t *Table) StandUp(seat int) {
 	if seat >= 0 && seat < MaxSeats {
 		t.Seats[seat] = nil

@@ -101,3 +101,45 @@ func TestSitDownBotUnlimitedMatchesSitDownUnlimited(t *testing.T) {
 		t.Fatalf("capped SitDownBot let %d through, want it clamped to %d", got, MaxBuyInCents)
 	}
 }
+
+// SeatTransferIn backs a live multi-table tournament merge (see
+// match/holdem/handler.go's "tournament_seat_in" signal): a player arriving
+// from another table brings tournament chips already in play, not a fresh
+// wallet-funded buy-in. It must NEVER run the stack through ClampBuyInBand —
+// that floors to MinBuyInCents unconditionally, which would mint chips for a
+// short stack below $100-equivalent (routine deep in a freezeout) and, on a
+// capped table, destroy them for a stack above MaxBuyInCents (routine for a
+// chip leader). Either direction breaks chip conservation across the merge.
+func TestSeatTransferIn_NeverClampsTheStack(t *testing.T) {
+	shortStack := int64(350) // below MinBuyInCents
+	tb := NewTable()
+	if err := tb.SeatTransferIn(0, "alice", "Alice", shortStack); err != nil {
+		t.Fatalf("SeatTransferIn: %v", err)
+	}
+	if got := tb.Seats[0].Stack; got != shortStack {
+		t.Fatalf("SeatTransferIn clamped a short stack: got %d, want %d unchanged", got, shortStack)
+	}
+
+	bigStack := int64(5_000_000) // far above MaxBuyInCents
+	tb2 := NewTable()
+	if err := tb2.SeatTransferIn(0, "bob", "Bob", bigStack); err != nil {
+		t.Fatalf("SeatTransferIn: %v", err)
+	}
+	if got := tb2.Seats[0].Stack; got != bigStack {
+		t.Fatalf("SeatTransferIn clamped a big stack: got %d, want %d unchanged", got, bigStack)
+	}
+	if tb2.Seats[0].Status != SeatSeated {
+		t.Fatalf("SeatTransferIn left seat status %v, want SeatSeated", tb2.Seats[0].Status)
+	}
+
+	tb3 := NewTable()
+	if err := tb3.SeatTransferIn(0, "carol", "Carol", 1000); err != nil {
+		t.Fatalf("SeatTransferIn: %v", err)
+	}
+	if err := tb3.SeatTransferIn(0, "dave", "Dave", 1000); err == nil {
+		t.Fatal("SeatTransferIn into an occupied seat should have failed")
+	}
+	if err := tb3.SeatTransferIn(1, "dave", "Dave", 0); err == nil {
+		t.Fatal("SeatTransferIn with a zero stack should have failed")
+	}
+}

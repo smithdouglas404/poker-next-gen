@@ -77,6 +77,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 	if tick%10 == 0 {
 		h.tickClock(ctx, logger, db, nk, dispatcher, s)
 		h.checkFinish(ctx, logger, db, nk, dispatcher, s)
+		pruneEmptyTables(ctx, db, s)
 	}
 	return s
 }
@@ -298,12 +299,19 @@ func (h *Handler) rebalance(ctx context.Context, logger runtime.Logger, db *sql.
 	// the table being broken — the old code picked a single global minIdx
 	// before knowing which table would break, so whenever the smallest table
 	// overall was also the one selected to break (the common case: that IS why
-	// it's the one being broken), mergeTable ran with fromMatch == toMatch. That
-	// merge was a no-op, but the table was still unconditionally dropped from
-	// s.TableMatches afterward — silently cutting its still-live, still-playing
-	// players off from every future blind-level advance and break signal the
-	// director sends, while the director carried on as if the table no longer
-	// existed.
+	// it's the one being broken), mergeTable ran with fromMatch == toMatch.
+	//
+	// mergeTable only QUEUES each player's live seat transfer — see
+	// match/holdem/handler.go's "tournament_seat_out"/"tournament_seat_in"
+	// signals and processPendingSeatTransfers — the broken table isn't spliced
+	// out of s.TableMatches here, because the transfers it just queued haven't
+	// necessarily happened yet (a live hand in progress defers them to that
+	// table's next between-hands safe point). Removing it immediately would
+	// reopen the exact bug this replaced: a table with still-live players
+	// silently cut off from every future blind update because the director
+	// stopped tracking it. pruneEmptyTables (called every tick alongside
+	// tickClock/checkFinish) removes it once its transfers have actually
+	// completed and it is confirmed to hold zero players.
 	seatCounts := make([]int, len(counts))
 	for i, c := range counts {
 		seatCounts[i] = c.count
@@ -316,13 +324,25 @@ func (h *Handler) rebalance(ctx context.Context, logger runtime.Logger, db *sql.
 		if targetIdx == -1 {
 			break // no other table exists to receive these players
 		}
-		payload, _ := json.Marshal(map[string]interface{}{"type": "balance_table"})
-		_, _ = nk.MatchSignal(ctx, c.matchID, string(payload))
 		_ = mergeTable(ctx, db, nk, s, c.matchID, counts[targetIdx].matchID)
-		tables = append(tables[:i], tables[i+1:]...)
-		s.TableMatches = tables
 		break
 	}
+}
+
+// pruneEmptyTables drops any table from s.TableMatches that has been
+// confirmed to hold zero 'playing' registrations — the safe, delayed
+// counterpart to rebalance() queuing a break: only once every transferred
+// player has actually left (per the DB, updated by processPendingSeatTransfers
+// only after a destination table confirms it seated them) does the director
+// stop sending that table blind updates and break signals.
+func pruneEmptyTables(ctx context.Context, db *sql.DB, s *DirectorState) {
+	var kept []string
+	for _, m := range s.TableMatches {
+		if n, _ := countAtTable(ctx, db, s.TournamentID, m); n > 0 {
+			kept = append(kept, m)
+		}
+	}
+	s.TableMatches = kept
 }
 
 // pickMergeTarget returns the index of the table with the fewest players,
@@ -356,6 +376,14 @@ func countAtTable(ctx context.Context, db *sql.DB, tournamentID, matchID string)
 	return n, nil
 }
 
+// mergeTable queues a live seat transfer, on fromMatch itself, for every
+// player currently 'playing' there — see match/holdem/handler.go's
+// MatchSignal case "tournament_seat_out" and processPendingSeatTransfers.
+// It deliberately does NOT touch poker_tournament_registration.match_id: that
+// column is only updated once fromMatch confirms toMatch actually seated the
+// player (via the "tournament_seat_in" response), which happens over on
+// fromMatch's own next between-hands safe point, not synchronously here. This
+// function only ever requests the move.
 func mergeTable(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *DirectorState, fromMatch, toMatch string) error {
 	rows, err := db.QueryContext(ctx, `
 		SELECT user_id FROM poker_tournament_registration
@@ -364,13 +392,17 @@ func mergeTable(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *Dir
 		return err
 	}
 	defer rows.Close()
-	tStore := store.NewTournamentStore(db)
 	for rows.Next() {
 		var userID string
 		if err := rows.Scan(&userID); err != nil {
 			continue
 		}
-		_ = tStore.AssignPlayerTable(ctx, s.TournamentID, userID, toMatch)
+		payload, _ := json.Marshal(map[string]interface{}{
+			"type":          "tournament_seat_out",
+			"user_id":       userID,
+			"dest_match_id": toMatch,
+		})
+		_, _ = nk.MatchSignal(ctx, fromMatch, string(payload))
 	}
 	return nil
 }

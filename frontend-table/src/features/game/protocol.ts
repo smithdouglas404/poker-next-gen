@@ -20,6 +20,7 @@ export const OpShowdown = 106;
 export const OpSeatUpdate = 107;
 export const OpError = 108;
 export const OpBlindUpdate = 109;
+export const OpTableMoved = 114;
 
 export const MIN_BUY_IN_CENTS = 10_000;
 export const MAX_BUY_IN_CENTS = 100_000;
@@ -85,6 +86,10 @@ export interface TableSnapshot {
   table_art?: string;
   host_user_id?: string;
   host_paused?: boolean;
+}
+
+export interface TableMovedMessage {
+  new_match_id: string;
 }
 
 export interface DealPrivateMessage {

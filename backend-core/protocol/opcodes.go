@@ -31,6 +31,7 @@ const (
 	OpChat            int64 = 111
 	OpSessionKey      int64 = 112
 	OpInsuranceOffer  int64 = 113 // server offers an all-in player insurance (premium/payout)
+	OpTableMoved      int64 = 114 // multi-table tournament merge: this player was seated at a new match id
 )
 
 const (
