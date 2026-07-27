@@ -8,6 +8,7 @@ import (
 	"github.com/heroiclabs/nakama-common/runtime"
 
 	"github.com/smithdouglas404/poker-next-gen/backend-core/social"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
 
 // leaderboardBoardID maps a public metric to its native Nakama leaderboard id.
@@ -106,11 +107,48 @@ func LeaderboardTop(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 	}
 	out, _ := json.Marshal(map[string]interface{}{
 		"metric":  metric,
-		"entries": entries,
+		"entries": hidePrivateEntries(ctx, db, entries),
 		"cursor":  nextCursor,
 	})
 	return string(out), nil
 }
+
+// hidePrivateEntries drops players who asked not to be listed.
+//
+// The profile's "Privacy Mode" toggle promised this and nothing enforced it, so
+// a player who turned it on was still on every public ladder. Filtering here
+// rather than at write time keeps their score accruing — turning privacy off
+// puts them back where they belong instead of starting them from zero.
+//
+// Ranks are left as Nakama assigned them: renumbering would silently claim
+// positions that are not the player's, and a gap is the honest rendering of
+// "someone is there and chose not to be named".
+func hidePrivateEntries(ctx context.Context, db *sql.DB, entries []leaderboardEntry) []leaderboardEntry {
+	if len(entries) == 0 {
+		return entries
+	}
+	ids := make([]string, 0, len(entries))
+	for _, e := range entries {
+		ids = append(ids, e.UserID)
+	}
+	private, err := store.PrivateUserIDs(ctx, db, ids)
+	if err != nil || len(private) == 0 {
+		// On a lookup failure the ladder renders unfiltered rather than empty.
+		// This is the one place privacy fails OPEN, because the alternative is a
+		// blank leaderboard for everyone whenever the query hiccups; the data
+		// exposed is a username and a score the player already published by
+		// playing ranked, not the account detail PrivacyMode guards.
+		return entries
+	}
+	out := entries[:0]
+	for _, e := range entries {
+		if !private[e.UserID] {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
 
 // SeasonCurrent reports the active bankroll season: its window (start = the
 // season board's previous reset, end = its next reset) and the season's current
@@ -161,6 +199,7 @@ func SeasonCurrent(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 			})
 		}
 	}
+	entries = hidePrivateEntries(ctx, db, entries)
 
 	out, _ := json.Marshal(map[string]interface{}{
 		"metric":    metric,

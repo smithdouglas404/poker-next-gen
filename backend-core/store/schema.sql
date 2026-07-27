@@ -903,6 +903,11 @@ CREATE TABLE IF NOT EXISTS poker_user_status (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Privacy mode is a server-side FLAG, not just account metadata. The metadata
+-- copy is what the settings screen renders; this is what the leaderboard and the
+-- opponent-stats lookup can actually filter on without an account fetch per row.
+ALTER TABLE poker_user_status ADD COLUMN IF NOT EXISTS privacy_mode BOOLEAN NOT NULL DEFAULT FALSE;
+
 CREATE TABLE IF NOT EXISTS poker_platform_setting (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL DEFAULT '',

@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 
 	"github.com/heroiclabs/nakama-common/runtime"
+
+	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
 
 // Profile metadata (#90 completeness): a durable per-account key/value store on
@@ -70,6 +72,18 @@ func ProfileMetaSet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 	// Empty strings leave username/display/timezone/etc. unchanged.
 	if err := nk.AccountUpdateId(ctx, userID, username, merged, "", "", "", "", ""); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
+	}
+
+	// Privacy mode is enforced, not just remembered. Mirror it to a column the
+	// leaderboard and the opponent-stats lookup can filter on — reading account
+	// metadata would mean an account fetch per leaderboard row. Metadata stays
+	// the source for the settings screen; this is the source for enforcement.
+	if v, ok := patch["privacy_mode"]; ok {
+		on, _ := v.(bool)
+		if err := store.SetPrivacyMode(ctx, db, userID, on); err != nil {
+			logger.Error("privacy mode saved to metadata but not enforced for %s: %v", userID, err)
+			return "", runtime.NewError("could not apply the privacy setting", 13)
+		}
 	}
 	out, _ := json.Marshal(map[string]interface{}{"ok": true, "meta": merged})
 	return string(out), nil

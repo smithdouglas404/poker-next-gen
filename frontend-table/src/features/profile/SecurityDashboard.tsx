@@ -18,8 +18,13 @@ import {
 } from "./profileRpc";
 
 const PREFS_KEY = "poker.profile.prefs";
-type Prefs = { emailNotifications: boolean; privacyMode: boolean };
-const DEFAULT_PREFS: Prefs = { emailNotifications: true, privacyMode: false };
+// Privacy mode only. An "Email Notifications" toggle sat here controlling
+// nothing: the backend has no mail sender of any kind, so the switch stored a
+// preference no code path could ever consult. A control that cannot do what it
+// says is worse than its absence — it tells the player a setting is theirs to
+// make.
+type Prefs = { privacyMode: boolean };
+const DEFAULT_PREFS: Prefs = { privacyMode: false };
 
 function readPrefs(): Prefs {
   if (typeof window === "undefined") return DEFAULT_PREFS;
@@ -137,12 +142,9 @@ export function SecurityDashboard({ notify }: { notify: (msg: string, kind?: "ok
           if (rows.length > 0) setLinked(rows);
         }
         if (meta.status === "fulfilled") {
-          const m = (meta.value as { meta?: { email_notifications?: boolean; privacy_mode?: boolean } }).meta;
-          if (m && (m.email_notifications !== undefined || m.privacy_mode !== undefined)) {
-            setPrefs({
-              emailNotifications: m.email_notifications ?? DEFAULT_PREFS.emailNotifications,
-              privacyMode: m.privacy_mode ?? DEFAULT_PREFS.privacyMode,
-            });
+          const m = (meta.value as { meta?: { privacy_mode?: boolean } }).meta;
+          if (m && m.privacy_mode !== undefined) {
+            setPrefs({ privacyMode: m.privacy_mode });
           }
         }
       } catch {
@@ -196,12 +198,25 @@ export function SecurityDashboard({ notify }: { notify: (msg: string, kind?: "ok
         } catch {
           /* private mode */
         }
-        // Persist server-side so prefs follow the player across devices.
-        void callSessionRpc("profile_meta_set", {
-          email_notifications: next.emailNotifications,
-          privacy_mode: next.privacyMode,
-        }).catch(() => {});
-        notify(`${key === "emailNotifications" ? "Email notifications" : "Privacy mode"} ${next[key] ? "on" : "off"}.`);
+        // The server ENFORCES this one, so a failed write must not leave the
+        // toggle showing a protection that isn't in effect.
+        void callSessionRpc("profile_meta_set", { privacy_mode: next.privacyMode })
+          .then(() => {
+            notify(
+              next.privacyMode
+                ? "Privacy mode on — you're hidden from the leaderboards and other players can't read your stats."
+                : "Privacy mode off — you're back on the public leaderboards.",
+            );
+          })
+          .catch(() => {
+            setPrefs(prev);
+            try {
+              window.localStorage.setItem(PREFS_KEY, JSON.stringify(prev));
+            } catch {
+              /* private mode */
+            }
+            notify("Couldn't save that setting — it hasn't changed.", "err");
+          });
         return next;
       });
     },
@@ -282,12 +297,17 @@ export function SecurityDashboard({ notify }: { notify: (msg: string, kind?: "ok
         {/* Preferences */}
         <p className="mt-5 text-[11px] uppercase tracking-[0.2em] text-neutral-500">Preferences</p>
         <div className="mt-2 space-y-2">
-          <div className="flex items-center justify-between rounded-xl border border-white/10 bg-black/30 px-4 py-2.5">
-            <span className="text-sm text-neutral-300">Email Notifications</span>
-            <Toggle on={prefs.emailNotifications} onClick={() => togglePref("emailNotifications")} label="Email notifications" />
-          </div>
-          <div className="flex items-center justify-between rounded-xl border border-white/10 bg-black/30 px-4 py-2.5">
-            <span className="text-sm text-neutral-300">Privacy Mode</span>
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-black/30 px-4 py-2.5">
+            <div className="min-w-0">
+              <span className="text-sm text-neutral-300">Privacy Mode</span>
+              {/* Say exactly what it does. A vague promise can't be checked, and
+                  this one is deliberately narrow: it is not invisibility. */}
+              <p className="mt-0.5 text-[11px] leading-snug text-neutral-500">
+                Hides you from the public leaderboards and stops other players
+                reading your statistics. You still appear at the tables you sit at
+                and in your clubs.
+              </p>
+            </div>
             <Toggle on={prefs.privacyMode} onClick={() => togglePref("privacyMode")} label="Privacy mode" />
           </div>
         </div>

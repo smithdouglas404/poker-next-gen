@@ -71,6 +71,14 @@ func PlayerStats(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 	if target == "" {
 		target = caller
 	}
+	// This accepted ANY user_id from ANY authenticated caller, so one account
+	// could pull every other player's full statistics on demand — and the
+	// "Privacy Mode" toggle on the profile screen, which is exactly the control
+	// a player would use to stop that, was never read by anything. Your own
+	// stats are always yours to read; someone else's are theirs to withhold.
+	if target != caller && store.PrivacyMode(ctx, db, target) {
+		return "", runtime.NewError("this player's statistics are private", 7)
+	}
 	agg, err := store.NewStatsStore(db).Aggregate(ctx, target, req.ClubID)
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
