@@ -9,6 +9,8 @@ import type {
   AnalyticsSeries,
   ClubAnnouncement,
   ClubChatMessage,
+  ClubPermission,
+  ClubPermissionsPayload,
   ClubStats,
   CreditRequest,
   JoinRequest,
@@ -202,8 +204,29 @@ export const ownerApi = {
       require_approval?: boolean;
       avatar_ref?: string;
       settings_json?: Record<string, unknown>;
+      // Real columns. The server validates the timezone against the IANA database
+      // and refuses to require 2FA of a club whose owner has none.
+      timezone?: string;
+      primary_language?: string;
+      twofa_required?: boolean;
     },
   ) => call<{ club: OwnerClubExt }>("club_update", { club_id: clubId, ...patch }),
+
+  // ---- Operator permission grid ----
+  permissionsList: (clubId: string) =>
+    call<ClubPermissionsPayload>("club_permissions_list", { club_id: clubId }),
+  /** Owner-only. An empty `permissions` is stored as the role's preset, not as
+   *  "" — an empty column means legacy full access server-side. */
+  permissionsSet: (
+    clubId: string,
+    userId: string,
+    role: string,
+    permissions: ClubPermission[],
+  ) =>
+    call<{ ok: boolean; role: string; permissions: ClubPermission[] }>(
+      "club_permissions_set",
+      { club_id: clubId, user_id: userId, role, permissions },
+    ),
 };
 
 /** Cents → full dollar label, e.g. 254000000 → "$2,540,000". */

@@ -54,6 +54,10 @@ const ROLE_COLOR: Record<string, string> = {
   owner: "#f5c518",
   admin: "#22c55e",
   manager: "#22c55e",
+  // Moderator holds manage_members only — no money, tables or settings. Steel
+  // rather than green so the roster reads authority at a glance.
+  moderator: "#5b6472",
+  agent: "#5b6472",
   member: "rgba(255,255,255,0.55)",
 };
 export function roleColor(role: string): string {

@@ -238,14 +238,9 @@ export interface RakeConfig {
 /** settings_json blob persisted through club_update. Client-shaped; the backend
  * stores it opaquely, so every field here is optional and defensively read. */
 export interface ClubSettingsBlob {
-  timezone?: string;
-  languages?: string;
   brand_color?: string;
   ui_theme?: "classic" | "cyber";
   max_buyin_cents?: number;
-  twofa_required?: boolean;
-  admin_role?: string;
-  moderator_role?: string;
   kyc_required?: boolean;
   geo_block?: string;
   club_type?: string;
@@ -260,4 +255,38 @@ export interface OwnerClubExt extends OwnerClub {
   require_approval?: boolean;
   currency?: string;
   settings_json?: ClubSettingsBlob;
+  // Real columns, not settings_json keys, because the server interprets them:
+  // `timezone` resolves club-night schedules, `primary_language` labels the club
+  // in the public browser, `twofa_required` is enforced in requireClubConfigurer.
+  timezone?: string;
+  primary_language?: string;
+  twofa_required?: boolean;
+}
+
+/** One capability slug from club_permissions_list's catalog. */
+export type ClubPermission =
+  | "manage_members"
+  | "manage_money"
+  | "manage_tables"
+  | "manage_settings";
+
+/** An operator seat and its capability grid (club_permissions_list). */
+export interface ClubSeat {
+  user_id: string;
+  role: string; // owner | manager | moderator | agent
+  equity_bps?: number;
+  can_configure?: boolean;
+  permissions: ClubPermission[];
+  /** No grid assigned yet, so the seat still has FULL access. Render it as such —
+   *  never as an empty row of unchecked boxes, which reads as "no permissions"
+   *  and is the exact opposite of what the server does. */
+  legacy?: boolean;
+}
+
+export interface ClubPermissionsPayload {
+  club_id: string;
+  seats: ClubSeat[];
+  catalog: ClubPermission[];
+  roles: string[];
+  role_preset: Record<string, ClubPermission[]>;
 }

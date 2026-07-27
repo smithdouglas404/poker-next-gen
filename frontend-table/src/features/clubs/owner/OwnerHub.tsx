@@ -235,6 +235,10 @@ export function OwnerHub() {
   }, [loadDemo, reloadRoster, reloadRequests, loadReport]);
 
   const canManage = role === "owner" || role === "admin";
+  // Handing out authority is owner-only — a configuring manager must not be able
+  // to grant themselves the permissions they were denied. The server enforces
+  // this independently in club_permissions_set; this just hides the controls.
+  const isOwner = role === "owner";
 
   // ---- Action handlers (live → RPC + reload; demo → local mutation) ----
 
@@ -422,7 +426,16 @@ export function OwnerHub() {
 
   const onSaveSettings = useCallback(
     async (
-      patch: { is_public?: boolean; require_approval?: boolean; avatar_ref?: string },
+      patch: {
+        is_public?: boolean;
+        require_approval?: boolean;
+        avatar_ref?: string;
+        // Real club columns, validated server-side (IANA zone; 2FA cannot be
+        // required by an owner who has none).
+        timezone?: string;
+        primary_language?: string;
+        twofa_required?: boolean;
+      },
       settings: ClubSettingsBlob,
     ) => {
       if (demo || !club) {
@@ -648,6 +661,8 @@ export function OwnerHub() {
           rake={rakeConfig}
           demo={demo}
           canManage={canManage}
+          isOwner={isOwner}
+          notify={notify}
           onSaveRake={onSaveRake}
           onSaveSettings={onSaveSettings}
         />

@@ -6,13 +6,45 @@ import Link from "next/link";
 import { Button, Select } from "@/features/ui";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
+import { PermissionGrid } from "./PermissionGrid";
 import { SectionTitle } from "./ui";
 import type { ClubSettingsBlob, OwnerClubExt, RakeConfig } from "./types";
 
-const TIMEZONES = ["UTC, GMT", "America/New_York", "America/Los_Angeles", "Europe/London", "Europe/Berlin", "Asia/Tokyo", "Australia/Sydney"];
-const LANGUAGES = ["English", "English, Spanish", "English, Chinese", "English, Portuguese", "Multi-language"];
-const ADMIN_ROLES = ["Super Admin", "Admin", "Owner"];
-const MOD_ROLES = ["Moderator", "Senior Moderator", "Support"];
+// IANA zone ids only. The old list opened with the string "UTC, GMT", which is
+// not a zone and cannot be resolved — the server now validates against the IANA
+// database and rejects anything it cannot load, because a club night firing an
+// hour off is worse than a rejected save.
+const TIMEZONES = [
+  "UTC",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "America/Sao_Paulo",
+  "Europe/London",
+  "Europe/Berlin",
+  "Europe/Moscow",
+  "Asia/Dubai",
+  "Asia/Kolkata",
+  "Asia/Shanghai",
+  "Asia/Tokyo",
+  "Australia/Sydney",
+];
+
+// A single locale, not the old "English, Spanish" / "Multi-language" combos.
+// This labels the club in the public browser; it does not translate anything.
+const LANGUAGES: { code: string; label: string }[] = [
+  { code: "en", label: "English" },
+  { code: "es", label: "Spanish" },
+  { code: "pt", label: "Portuguese" },
+  { code: "zh", label: "Chinese" },
+  { code: "ja", label: "Japanese" },
+  { code: "ko", label: "Korean" },
+  { code: "de", label: "German" },
+  { code: "fr", label: "French" },
+  { code: "ru", label: "Russian" },
+];
+
 const GEO_OPTIONS = ["None", "Block US", "Block EU", "Allowlist only"];
 
 /** Comprehensive Global Club Settings (master: detailed_private_table_setup_9).
@@ -24,6 +56,8 @@ export function GlobalSettings({
   rake,
   demo,
   canManage,
+  isOwner,
+  notify,
   onSaveRake,
   onSaveSettings,
 }: {
@@ -31,16 +65,29 @@ export function GlobalSettings({
   rake: RakeConfig | null;
   demo: boolean;
   canManage: boolean;
+  /** Only a club OWNER may hand out authority (server-enforced too). */
+  isOwner: boolean;
+  notify: (msg: string, kind?: "ok" | "err") => void;
   onSaveRake: (cfg: RakeConfig) => Promise<void>;
   onSaveSettings: (
-    patch: { is_public?: boolean; require_approval?: boolean; avatar_ref?: string },
+    patch: {
+      is_public?: boolean;
+      require_approval?: boolean;
+      avatar_ref?: string;
+      // Real columns — the server validates the zone and refuses to require 2FA
+      // of a club whose owner does not have it.
+      timezone?: string;
+      primary_language?: string;
+      twofa_required?: boolean;
+    },
     settings: ClubSettingsBlob,
   ) => Promise<void>;
 }) {
   const s0 = club?.settings_json ?? {};
 
-  const [timezone, setTimezone] = useState(s0.timezone ?? "UTC, GMT");
-  const [languages, setLanguages] = useState(s0.languages ?? "English");
+  // Real columns on the club, not settings_json keys — the server interprets both.
+  const [timezone, setTimezone] = useState(club?.timezone ?? "UTC");
+  const [language, setLanguage] = useState(club?.primary_language ?? "en");
 
   const [rakePct, setRakePct] = useState(((rake?.percent_bps ?? 500) / 100).toString());
   const [maxBuyin, setMaxBuyin] = useState(
@@ -57,9 +104,7 @@ export function GlobalSettings({
   const [noFlopNoDrop, setNoFlopNoDrop] = useState(rake?.no_flop_no_drop ?? true);
   const [rakePublic, setRakePublic] = useState(rake?.public ?? false);
 
-  const [twofa, setTwofa] = useState(s0.twofa_required ?? true);
-  const [adminRole, setAdminRole] = useState(s0.admin_role ?? "Super Admin");
-  const [modRole, setModRole] = useState(s0.moderator_role ?? "Moderator");
+  const [twofa, setTwofa] = useState(club?.twofa_required ?? false);
 
   const [uiTheme, setUiTheme] = useState<"classic" | "cyber">(s0.ui_theme ?? "classic");
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(s0.logo_data_url ?? null);
@@ -83,14 +128,9 @@ export function GlobalSettings({
 
   const mergedSettings = (): ClubSettingsBlob => ({
     ...s0,
-    timezone,
-    languages,
     ui_theme: uiTheme,
     max_buyin_cents: maxBuyin ? Math.round(Number(maxBuyin) * 100) : undefined,
     reconcile_window_hours: reconcileWindow ? Math.max(0, Math.round(Number(reconcileWindow))) : undefined,
-    twofa_required: twofa,
-    admin_role: adminRole,
-    moderator_role: modRole,
     kyc_required: kyc,
     geo_block: geo,
     logo_data_url: logoDataUrl ?? undefined,
@@ -106,7 +146,9 @@ export function GlobalSettings({
   };
 
   const savePreferences = () =>
-    run("prefs", () => onSaveSettings({}, mergedSettings()));
+    run("prefs", () =>
+      onSaveSettings({ timezone, primary_language: language }, mergedSettings()),
+    );
 
   const saveFinancials = () =>
     run("fin", async () => {
@@ -123,9 +165,7 @@ export function GlobalSettings({
     });
 
   const saveSecurity = () =>
-    run("sec", () =>
-      onSaveSettings({ is_public: isPublic, require_approval: requireApproval }, mergedSettings()),
-    );
+    run("sec", () => onSaveSettings({ twofa_required: twofa }, mergedSettings()));
 
   const saveBranding = () =>
     run("brand", () => onSaveSettings({ avatar_ref: "custom" }, mergedSettings()));
@@ -147,15 +187,22 @@ export function GlobalSettings({
                 </option>
               ))}
             </Select>
+            <p className="mt-1 text-[10px] leading-snug text-white/35">
+              Club-night schedules fire in this zone.
+            </p>
           </Labeled>
-          <Labeled label="Language">
-            <Select value={languages} onChange={(e) => setLanguages(e.target.value)} disabled={disabled}>
+          <Labeled label="Primary Language">
+            <Select value={language} onChange={(e) => setLanguage(e.target.value)} disabled={disabled}>
               {LANGUAGES.map((l) => (
-                <option key={l} value={l}>
-                  {l}
+                <option key={l.code} value={l.code}>
+                  {l.label}
                 </option>
               ))}
             </Select>
+            <p className="mt-1 text-[10px] leading-snug text-white/35">
+              Shown on your club&apos;s public listing so players know what to expect at the table.
+              It does not translate the interface.
+            </p>
           </Labeled>
           <GoldButton busy={busy === "prefs"} disabled={disabled} onClick={savePreferences}>
             Save Preferences
@@ -273,34 +320,24 @@ export function GlobalSettings({
         {/* Security */}
         <Card title="Security">
           <div>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/45">2FA</p>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/45">
+              Require 2FA for operators
+            </p>
             <div className="flex items-center gap-3">
               <Toggle on={twofa} onToggle={() => setTwofa((v) => !v)} disabled={disabled} />
               <span className={cn("text-sm", twofa ? "text-green" : "text-white/50")}>
-                {twofa ? "Enabled" : "Disabled"}
+                {twofa ? "Required" : "Not required"}
               </span>
             </div>
+            <p className="mt-2 text-[10px] leading-snug text-white/35">
+              While on, anyone without two-factor authentication on their account is refused every
+              operator action at this club — allocating chips, kicking, changing settings. Turn it
+              on only once your own 2FA is set up; the server refuses otherwise so you cannot lock
+              yourself out.
+            </p>
           </div>
-          <Labeled label="Admin Roles">
-            <Select value={adminRole} onChange={(e) => setAdminRole(e.target.value)} disabled={disabled}>
-              {ADMIN_ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </Select>
-          </Labeled>
-          <Labeled label="Moderator">
-            <Select value={modRole} onChange={(e) => setModRole(e.target.value)} disabled={disabled}>
-              {MOD_ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </Select>
-          </Labeled>
           <GoldButton busy={busy === "sec"} disabled={disabled} onClick={saveSecurity}>
-            Save Roles &amp; Visibility
+            Save Security
           </GoldButton>
         </Card>
       </div>
@@ -398,15 +435,28 @@ export function GlobalSettings({
 
         {/* Integration & API */}
         <Card title="Integration & API">
-          <div className="rounded-xl border border-gold/25 bg-gold/[0.04] px-4 py-6 text-center">
-            <p className="text-sm text-white/80">Connect External Wallets &amp; Data Services</p>
-            <p className="mt-1 text-[11px] text-white/45">
-              Link payout wallets and analytics feeds to your club.
+          {/* This card used to promise "Connect External Wallets & Data Services"
+              behind a Connect button that only navigated to /wallet. There are no
+              per-club API keys (poker_api_key is per-user and nothing
+              authenticates with it) and no outbound webhooks, so the promise had
+              nothing behind it. It now reports what is genuinely wired instead of
+              offering a connection it cannot make. */}
+          <p className="text-[11px] leading-snug text-white/45">
+            Payments, identity and payouts are configured for the whole network, not per club. Your
+            club inherits whatever is live.
+          </p>
+          <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-white/40">
+              Your payout wallets
             </p>
-            <div className="mt-4">
+            <p className="text-[11px] leading-snug text-white/45">
+              Crypto payout addresses are linked to your personal account with a signed message, so
+              only you can add or remove them.
+            </p>
+            <div className="mt-3">
               <Link href="/wallet">
-                <Button variant="gold" size="sm" disabled={disabled}>
-                  Connect
+                <Button variant="outline" size="sm">
+                  Manage linked wallets
                 </Button>
               </Link>
             </div>
@@ -421,6 +471,19 @@ export function GlobalSettings({
           )}
         </Card>
       </div>
+
+      {/* Operator permissions — one row per real seat, one column per real
+          capability. Replaces two dropdowns of role names that had no person
+          attached and granted nothing. */}
+      <Card title="Operator Permissions">
+        <PermissionGrid
+          clubId={club?.id ?? null}
+          canManage={canManage}
+          isOwner={isOwner}
+          demo={demo}
+          notify={notify}
+        />
+      </Card>
     </div>
   );
 }
