@@ -133,6 +133,16 @@ export interface DraftForm {
   lateReg: boolean;
   scheduledAt: string; // datetime-local value
   regCloseAt: string; // datetime-local value (late-reg close)
+  // Financials / Rules — every one of these maps to a real column on
+  // poker_tournament and is consumed server-side (store.TournamentMoney,
+  // store.RegistrationOpen, tournament.StartTournament). See the backend commit
+  // "make the builder's fields real".
+  adminFeePct: number; // club's % of each buy-in, ON TOP of the flat fee
+  autoAway: boolean; // sit a player out after 2 consecutive timeouts
+  timeBankSecs: number; // total banked seconds per player
+  timeBankPerHandSecs: number; // per-hand top-up
+  operatingStartMin: number; // minutes past midnight UTC (start == end => always open)
+  operatingEndMin: number;
   // Operator-authored structure. When present (non-empty) these override the
   // preset generators (structures.ts) on publish — every SB/BB/ante/duration and
   // every payout tier (incl. per-tier guaranteed_minor) is sent verbatim via

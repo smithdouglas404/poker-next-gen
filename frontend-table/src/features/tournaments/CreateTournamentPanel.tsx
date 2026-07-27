@@ -35,7 +35,29 @@ const EMPTY_DRAFT: DraftForm = {
   lateReg: true,
   scheduledAt: "",
   regCloseAt: "",
+  adminFeePct: 0,
+  autoAway: true,
+  timeBankSecs: 60,
+  timeBankPerHandSecs: 5,
+  operatingStartMin: 0,
+  operatingEndMin: 0,
 };
+
+/** Operating-hours presets. Equal start/end means "no window" — always open. */
+const HOURS_PRESETS: { id: string; label: string; start: number; end: number }[] = [
+  { id: "always", label: "24 hours (no window)", start: 0, end: 0 },
+  { id: "evening", label: "18:00 – 04:00 UTC", start: 18 * 60, end: 4 * 60 },
+  { id: "afternoon", label: "12:00 – 00:00 UTC", start: 12 * 60, end: 0 },
+  { id: "business", label: "09:00 – 17:00 UTC", start: 9 * 60, end: 17 * 60 },
+];
+
+/** Time-bank presets, matching the design's composite "total + per hand". */
+const TIMEBANK_PRESETS: { id: string; label: string; total: number; perHand: number }[] = [
+  { id: "off", label: "No time bank", total: 0, perHand: 0 },
+  { id: "30", label: "30s total, 5s per hand", total: 30, perHand: 5 },
+  { id: "60", label: "60s total, 5s per hand", total: 60, perHand: 5 },
+  { id: "120", label: "120s total, 10s per hand", total: 120, perHand: 10 },
+];
 
 const PAYOUT_LABEL: Record<string, string> = {
   top10: "Top 10% (Flat)",
@@ -146,12 +168,52 @@ export function CreateTournamentPanel({
   const payoutTotalBps = prizes.reduce((s, p) => s + (Number(p.payout_bps) || 0), 0);
   const payoutOk = payoutTotalBps === 10000;
 
-  const estPrizeMinor = useMemo(
-    () => Math.max(draft.guaranteedPrize * 100, draft.buyIn * 100 * draft.maxPlayers),
-    [draft.guaranteedPrize, draft.buyIn, draft.maxPlayers],
-  );
-  const totalBuyInMinor = (draft.buyIn + draft.fee) * 100;
-  const valid = draft.name.trim().length > 0 && draft.buyIn >= 0;
+  // ── Live economics ───────────────────────────────────────────────────────
+  // This mirrors store.TournamentMoney on the server, deliberately: the number
+  // the operator is shown while building has to be the number the winners are
+  // actually paid. The entry fee and the admin percentage come OUT of the
+  // buy-in, so the entry price the player sees never changes — the club's share
+  // is withheld from the pool.
+  const econ = useMemo(() => {
+    const buyInMinor = Math.round(draft.buyIn * 100);
+    const feeMinor = Math.round(draft.fee * 100);
+    const adminMinor = Math.round((buyInMinor * draft.adminFeePct) / 100);
+    const perEntryRake = Math.min(buyInMinor, Math.max(0, feeMinor + adminMinor));
+    const seats = Math.max(0, draft.maxPlayers);
+    const grossMinor = buyInMinor * seats;
+    const rakeMinor = perEntryRake * seats;
+    let poolMinor = grossMinor - rakeMinor;
+    const guaranteeMinor = Math.round(draft.guaranteedPrize * 100);
+    const overlayMinor = Math.max(0, guaranteeMinor - poolMinor);
+    if (overlayMinor > 0) poolMinor = guaranteeMinor;
+    return { buyInMinor, perEntryRake, grossMinor, rakeMinor, poolMinor, overlayMinor };
+  }, [draft.buyIn, draft.fee, draft.adminFeePct, draft.maxPlayers, draft.guaranteedPrize]);
+
+  // The fee + admin cut cannot swallow the whole buy-in — the server rejects it,
+  // so the form says so before the operator hits publish.
+  const rakeTooHigh = econ.buyInMinor > 0 && econ.perEntryRake >= econ.buyInMinor;
+
+  // Late-reg window in seconds, derived from the close time on the General tab.
+  const lateRegSecs = useMemo(() => {
+    if (!draft.lateReg || !draft.regCloseAt || !draft.scheduledAt) return 0;
+    const start = new Date(draft.scheduledAt).getTime();
+    const close = new Date(draft.regCloseAt).getTime();
+    if (!Number.isFinite(start) || !Number.isFinite(close) || close <= start) return 0;
+    return Math.round((close - start) / 1000);
+  }, [draft.lateReg, draft.regCloseAt, draft.scheduledAt]);
+
+  // Which preset the current values correspond to (custom values fall back to
+  // the first entry rather than showing a blank select).
+  const hoursPresetId =
+    HOURS_PRESETS.find((h) => h.start === draft.operatingStartMin && h.end === draft.operatingEndMin)?.id ??
+    HOURS_PRESETS[0].id;
+  const timeBankPresetId =
+    TIMEBANK_PRESETS.find(
+      (t) => t.total === draft.timeBankSecs && t.perHand === draft.timeBankPerHandSecs,
+    )?.id ?? TIMEBANK_PRESETS[0].id;
+
+  const totalBuyInMinor = econ.buyInMinor;
+  const valid = draft.name.trim().length > 0 && draft.buyIn >= 0 && !rakeTooHigh;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
@@ -464,17 +526,26 @@ export function CreateTournamentPanel({
                       onChange={(e) => set("guaranteedPrize", Number(e.target.value))}
                     />
                   </Field>
-                  <Field label="Admin Fee (% of buy-in)" hint="Deducted from each entry as rake">
+                  <Field
+                    label="Admin Fee (% of buy-in)"
+                    hint="The club's percentage, charged on top of the flat entry fee. Both come out of the buy-in, so the entry price does not change."
+                  >
                     <Input
                       type="number"
                       min={0}
-                      max={100}
-                      value={draft.buyIn > 0 ? Math.round((draft.fee / draft.buyIn) * 100) : 0}
-                      onChange={(e) =>
-                        set("fee", Math.round((Number(e.target.value) / 100) * draft.buyIn))
-                      }
+                      max={50}
+                      step={0.5}
+                      value={draft.adminFeePct}
+                      onChange={(e) => set("adminFeePct", Math.max(0, Math.min(50, Number(e.target.value) || 0)))}
                     />
                   </Field>
+                  {rakeTooHigh && (
+                    <p className="text-xs text-brand sm:col-span-2">
+                      The ${draft.fee.toLocaleString()} entry fee plus {draft.adminFeePct}% admin fee take
+                      the whole ${draft.buyIn.toLocaleString()} buy-in — there would be nothing left to
+                      play for. The server rejects this too.
+                    </p>
+                  )}
                 </div>
 
                 {/* Editable payout tiers — rank range, share %, and per-tier
@@ -562,26 +633,89 @@ export function CreateTournamentPanel({
 
             {tab === "rules" && (
               <div className="grid gap-5 sm:grid-cols-2">
-                <label className="flex items-center justify-between rounded-xl border border-white/10 bg-black/30 px-4 py-3 sm:col-span-2">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-                    Auto-Away on 2× Timeout
+                <label className="flex cursor-pointer items-center justify-between rounded-xl border border-white/10 bg-black/30 px-4 py-3 transition hover:border-white/20 sm:col-span-2">
+                  <span>
+                    <span className="block text-[11px] font-semibold uppercase tracking-wider text-neutral-300">
+                      Auto-Away on 2× Timeout
+                    </span>
+                    <span className="mt-0.5 block text-[11px] text-neutral-500">
+                      Two consecutive time-outs sit the player out. Their stack stays at the table —
+                      a tournament seat is never stood up.
+                    </span>
                   </span>
-                  <span className="text-[11px] text-green">Enabled</span>
+                  <input
+                    type="checkbox"
+                    checked={draft.autoAway}
+                    onChange={(e) => set("autoAway", e.target.checked)}
+                    className="h-4 w-4 shrink-0 accent-[#22c55e]"
+                  />
                 </label>
-                <Field label="Time Bank">
-                  <Select defaultValue="60">
-                    <option value="30">30s total, 5s per hand</option>
-                    <option value="60">60s total, 5s per hand</option>
-                    <option value="120">120s total, 10s per hand</option>
+
+                <Field label="Time Bank" hint="Total banked seconds, plus a top-up each hand">
+                  <Select
+                    value={timeBankPresetId}
+                    onChange={(e) => {
+                      const preset = TIMEBANK_PRESETS.find((t) => t.id === e.target.value);
+                      if (!preset) return;
+                      setDraft((d) => ({
+                        ...d,
+                        timeBankSecs: preset.total,
+                        timeBankPerHandSecs: preset.perHand,
+                      }));
+                    }}
+                  >
+                    {TIMEBANK_PRESETS.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}
+                      </option>
+                    ))}
                   </Select>
                 </Field>
-                <Field label="Operating Hours">
-                  <Select defaultValue="18-04">
-                    <option value="00-24">24 hours</option>
-                    <option value="18-04">18:00 - 04:00 UTC</option>
-                    <option value="12-00">12:00 - 00:00 UTC</option>
+
+                <Field
+                  label="Operating Hours"
+                  hint="Registration is refused outside this daily window"
+                >
+                  <Select
+                    value={hoursPresetId}
+                    onChange={(e) => {
+                      const preset = HOURS_PRESETS.find((h) => h.id === e.target.value);
+                      if (!preset) return;
+                      setDraft((d) => ({
+                        ...d,
+                        operatingStartMin: preset.start,
+                        operatingEndMin: preset.end,
+                      }));
+                    }}
+                  >
+                    {HOURS_PRESETS.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.label}
+                      </option>
+                    ))}
                   </Select>
                 </Field>
+
+                <label className="flex cursor-pointer items-center justify-between rounded-xl border border-white/10 bg-black/30 px-4 py-3 transition hover:border-white/20 sm:col-span-2">
+                  <span>
+                    <span className="block text-[11px] font-semibold uppercase tracking-wider text-neutral-300">
+                      Late Registration
+                    </span>
+                    <span className="mt-0.5 block text-[11px] text-neutral-500">
+                      {draft.lateReg
+                        ? lateRegSecs > 0
+                          ? `Open for ${Math.round(lateRegSecs / 60)} min after the scheduled start — set the close time on the General tab.`
+                          : "On, but no close time set on the General tab — registration would still shut at the start time."
+                        : "Registration closes the moment the tournament starts."}
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={draft.lateReg}
+                    onChange={(e) => set("lateReg", e.target.checked)}
+                    className="h-4 w-4 shrink-0 accent-[#22c55e]"
+                  />
+                </label>
               </div>
             )}
           </div>
@@ -592,8 +726,24 @@ export function CreateTournamentPanel({
               Tournament Summary
             </p>
             <dl className="mt-4 space-y-3 text-sm">
-              <SummaryRow label="Est. Prize Pool" value={`${dollars(estPrizeMinor, { compact: true })}+`} tone="cyan" />
-              <SummaryRow label="Total Buy-in" value={dollars(totalBuyInMinor)} />
+              <SummaryRow
+                label="Est. Prize Pool"
+                value={dollars(econ.poolMinor, { compact: true })}
+                tone="cyan"
+              />
+              <SummaryRow label="Entry Price" value={dollars(totalBuyInMinor)} />
+              <SummaryRow
+                label="Club Take"
+                value={`${dollars(econ.rakeMinor, { compact: true })} · ${dollars(econ.perEntryRake)}/entry`}
+                tone="gold"
+              />
+              {econ.overlayMinor > 0 && (
+                <SummaryRow
+                  label="Overlay Risk"
+                  value={dollars(econ.overlayMinor, { compact: true })}
+                  tone="brand"
+                />
+              )}
               <SummaryRow label="Starting Chips" value={draft.startingStack.toLocaleString()} />
               <SummaryRow
                 label="Blind Levels"
@@ -611,10 +761,15 @@ export function CreateTournamentPanel({
                 </dd>
               </div>
             </dl>
-            <p className="mt-4 text-[11px] text-neutral-500">
-              Publishing calls <span className="text-brand">tournament_create</span>, seeds the ladder via{" "}
-              <span className="text-brand">blind_level_add</span> /{" "}
-              <span className="text-brand">prize_pool_add</span>, and opens registration immediately.
+            <p className="mt-4 text-[11px] leading-relaxed text-neutral-500">
+              The estimate assumes a full {draft.maxPlayers.toLocaleString()}-player field. Entry fee and
+              admin fee are withheld from the pool, not added to the entry price
+              {econ.overlayMinor > 0 ? ", and the club funds the overlay if the field falls short" : ""}.
+            </p>
+            <p className="mt-3 text-[11px] text-neutral-600">
+              Publishing calls <span className="text-brand">tournament_create</span> and seeds the ladder
+              via <span className="text-brand">blind_level_add</span> /{" "}
+              <span className="text-brand">prize_pool_add</span>.
             </p>
           </div>
         </div>
@@ -630,12 +785,26 @@ function SummaryRow({
 }: {
   label: string;
   value: string;
-  tone?: "default" | "cyan";
+  /** cyan = money in (green), gold = the club's cut, brand = a cost/risk. */
+  tone?: "default" | "cyan" | "gold" | "brand";
 }) {
   return (
-    <div className="flex items-center justify-between">
-      <dt className="text-neutral-500">{label}</dt>
-      <dd className={cn("font-semibold", tone === "cyan" ? "text-green" : "text-white")}>{value}</dd>
+    <div className="flex items-center justify-between gap-3">
+      <dt className="shrink-0 text-neutral-500">{label}</dt>
+      <dd
+        className={cn(
+          "text-right font-semibold tabular-nums",
+          tone === "cyan"
+            ? "text-green"
+            : tone === "gold"
+              ? "text-gold"
+              : tone === "brand"
+                ? "text-brand"
+                : "text-white",
+        )}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

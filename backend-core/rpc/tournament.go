@@ -90,6 +90,35 @@ func TournamentCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk
 	} else {
 		req.BountyMinor = 0
 	}
+	// The builder's Financials/Rules fields arrive on this same payload (they are
+	// json-tagged on TournamentBracket), so they need the identical validation
+	// TournamentRulesSet applies — otherwise create is a hole around the edit gate.
+	if req.AdminFeeBps < 0 || req.AdminFeeBps > 5000 {
+		return "", runtime.NewError("admin fee must be between 0% and 50%", 3)
+	}
+	if req.GuaranteeMinor < 0 {
+		return "", runtime.NewError("guaranteed prize pool cannot be negative", 3)
+	}
+	if req.BuyInMinor > 0 {
+		perEntryRake := req.FeeMinor + req.BuyInMinor*int64(req.AdminFeeBps)/10000
+		if perEntryRake >= req.BuyInMinor {
+			return "", runtime.NewError(
+				"the entry fee plus admin fee would consume the whole buy-in — lower one of them", 3)
+		}
+	}
+	if req.OperatingStartMin < 0 || req.OperatingStartMin > 1439 ||
+		req.OperatingEndMin < 0 || req.OperatingEndMin > 1439 {
+		return "", runtime.NewError("operating hours must be minutes past midnight (0–1439)", 3)
+	}
+	if req.LateRegSecs < 0 {
+		return "", runtime.NewError("late registration window cannot be negative", 3)
+	}
+	if req.TimeBankSecs < 0 || req.TimeBankSecs > 600 {
+		return "", runtime.NewError("time bank must be between 0 and 600 seconds", 3)
+	}
+	if req.TimeBankPerHandSecs < 0 || req.TimeBankPerHandSecs > 120 {
+		return "", runtime.NewError("per-hand time bank must be between 0 and 120 seconds", 3)
+	}
 	req.Status = "registering"
 	if err := store.NewTournamentStore(db).Create(ctx, &req); err != nil {
 		return "", runtime.NewError(err.Error(), 13)

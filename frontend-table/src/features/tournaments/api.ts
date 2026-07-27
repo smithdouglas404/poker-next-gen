@@ -22,6 +22,18 @@ export async function listTournaments(): Promise<Tournament[]> {
 }
 
 /** tournament_create → creates a bracket from the draft form. Returns the row. */
+/**
+ * Late-registration window in seconds, derived from the builder's scheduled
+ * start and registration-close time. 0 means registration shuts at the start.
+ */
+function lateRegSecsOf(draft: DraftForm): number {
+  if (!draft.lateReg || !draft.regCloseAt || !draft.scheduledAt) return 0;
+  const start = new Date(draft.scheduledAt).getTime();
+  const close = new Date(draft.regCloseAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(close) || close <= start) return 0;
+  return Math.round((close - start) / 1000);
+}
+
 export async function createTournament(draft: DraftForm): Promise<Tournament> {
   const payload = {
     name: draft.name,
@@ -38,8 +50,50 @@ export async function createTournament(draft: DraftForm): Promise<Tournament> {
     knockout: draft.knockout || undefined,
     bounty_minor: draft.knockout ? Math.round((draft.bounty ?? 0) * 100) : undefined,
     scheduled_at: draft.scheduledAt ? new Date(draft.scheduledAt).toISOString() : new Date().toISOString(),
+    // Financials / Rules. These used to be collected by the builder and then
+    // dropped here — `guaranteedPrize`, `lateReg` and `regCloseAt` were on the
+    // draft and never left the browser, so the operator configured an event and
+    // got a different one. They map to real columns now and the server consumes
+    // each: admin fee and guarantee feed store.TournamentMoney, the operating
+    // window and late-reg feed store.RegistrationOpen, and the time bank and
+    // auto-away are passed to every table the tournament starts.
+    admin_fee_bps: Math.round(draft.adminFeePct * 100),
+    guarantee_minor: Math.round(draft.guaranteedPrize * 100),
+    late_reg_secs: lateRegSecsOf(draft),
+    time_bank_secs: Math.round(draft.timeBankSecs),
+    time_bank_per_hand_secs: Math.round(draft.timeBankPerHandSecs),
+    auto_away_on_timeout: draft.autoAway,
+    operating_start_min: Math.round(draft.operatingStartMin),
+    operating_end_min: Math.round(draft.operatingEndMin),
   };
   return (await callSessionRpc("tournament_create", payload)) as Tournament;
+}
+
+/**
+ * tournament_rules_set → edit the Financials/Rules of an EXISTING tournament.
+ * Authorized as a tournament mutation (creator or a configurer of the owning
+ * club), unlike the platform-admin-only `tournament_config`.
+ */
+export async function setTournamentRules(
+  tournamentId: string,
+  rules: {
+    adminFeePct: number;
+    guaranteedPrize: number;
+    autoAway: boolean;
+    timeBankPerHandSecs: number;
+    operatingStartMin: number;
+    operatingEndMin: number;
+  },
+): Promise<unknown> {
+  return callSessionRpc("tournament_rules_set", {
+    tournament_id: tournamentId,
+    admin_fee_bps: Math.round(rules.adminFeePct * 100),
+    guarantee_minor: Math.round(rules.guaranteedPrize * 100),
+    auto_away_on_timeout: rules.autoAway,
+    time_bank_per_hand_secs: Math.round(rules.timeBankPerHandSecs),
+    operating_start_min: Math.round(rules.operatingStartMin),
+    operating_end_min: Math.round(rules.operatingEndMin),
+  });
 }
 
 /** tournament_start → seat entrants and launch the director + tables. Requires
