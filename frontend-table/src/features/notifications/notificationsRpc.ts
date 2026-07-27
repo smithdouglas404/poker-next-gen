@@ -14,6 +14,11 @@ export const NOTIFICATION_CODE = {
   platformAnnouncement: 555,
   /** Club announcement (rpc/clubs_ext.go). Distinct so the two are tellable apart. */
   clubAnnouncement: 556,
+  /**
+   * Club invitation (rpc/clubs_ext.go). Its own code because it is ACTIONABLE —
+   * the recipient accepts or declines — where the announcement codes are read-only.
+   */
+  clubInvite: 557,
 } as const;
 
 export interface AppNotification {

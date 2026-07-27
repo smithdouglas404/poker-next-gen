@@ -349,11 +349,20 @@ export function ClubInvitations() {
                 boxShadow: "0 0 40px -18px rgba(245,197,24,0.5) inset",
               }}
             >
+              {/* Monogram from THIS club's name. It was a fixed "HR", so an
+                  invite to the Ivy Room was stamped with someone else's
+                  initials — and the preview no longer matched the card the
+                  invitee receives. */}
               <div
                 className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-gold/50 font-display text-xl font-bold text-gold"
                 style={{ background: "radial-gradient(circle,#1a1c1f,#0b0d0f)" }}
               >
-                HR
+                {(owned.club?.name ?? "")
+                  .split(/\s+/)
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((w) => w[0]!.toUpperCase())
+                  .join("") || "HR"}
               </div>
               <h3 className="font-display mt-4 text-lg font-bold text-gold">
                 Welcome to {owned.club?.name ?? "the High Rollers Club"}

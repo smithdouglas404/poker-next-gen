@@ -446,6 +446,41 @@ func ClubInvite(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	_ = es.LogActivity(ctx, req.ClubID, inviter, "invite", "invited "+req.UserID)
+
+	// Tell the invited player. Without this the invite was write-only: a row in
+	// poker_club_invitation that the recipient had no way to learn about, while
+	// the operator's composer showed them a "Welcome Card" preview of something
+	// nobody would ever receive. The card is what the invitee now actually gets.
+	//
+	// Best-effort: a failed notification must not roll back an invitation that is
+	// already stored and acceptable — the invitee can still find it in their
+	// invitations list.
+	clubName := req.ClubID
+	if c, cerr := store.NewClubStore(db).GetByID(ctx, req.ClubID); cerr == nil && c != nil && c.Name != "" {
+		clubName = c.Name
+	}
+	content := map[string]interface{}{
+		"kind":               "club_invite",
+		"invitation_id":      id,
+		"club_id":            req.ClubID,
+		"club_name":          clubName,
+		"role":               req.Role,
+		"credit_limit_cents": req.CreditLimitCents,
+		"message":            req.Message,
+	}
+	if expiresAt != nil {
+		content["expires_at"] = expiresAt.Format(time.RFC3339)
+	}
+	if nerr := nk.NotificationsSend(ctx, []*runtime.NotificationSend{{
+		UserID:     req.UserID,
+		Subject:    "You're invited to " + clubName,
+		Content:    content,
+		Code:       clubInviteCode,
+		Persistent: true,
+	}}); nerr != nil {
+		logger.Warn("club invite stored but notification failed: %v", nerr)
+	}
+
 	out, _ := json.Marshal(map[string]interface{}{
 		"ok": true, "invitation_id": id, "expires_at": expiresAt,
 	})
@@ -669,6 +704,22 @@ func ClubInvitationsList(ctx context.Context, logger runtime.Logger, db *sql.DB,
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
+	// Resolve club names. The row carries only club_id, and an invitation that
+	// greets its recipient by UUID is not an invitation. Cached per club so a
+	// player invited to the same club twice costs one lookup.
+	cs := store.NewClubStore(db)
+	names := map[string]string{}
+	for i := range invs {
+		id := invs[i].ClubID
+		if _, seen := names[id]; !seen {
+			if c, cerr := cs.GetByID(ctx, id); cerr == nil && c != nil {
+				names[id] = c.Name
+			} else {
+				names[id] = ""
+			}
+		}
+		invs[i].ClubName = names[id]
+	}
 	out, _ := json.Marshal(map[string]interface{}{"invitations": invs})
 	return string(out), nil
 }
@@ -789,6 +840,11 @@ func ClubAnnouncementCreate(ctx context.Context, logger runtime.Logger, db *sql.
 // 555 is already taken by the platform-wide announcement (aiproc.go), so clients
 // can tell the two apart by code alone.
 const clubAnnouncementCode = 556
+
+// clubInviteCode is the notification code for a club invitation. Distinct from
+// the broadcast code because the client renders it differently: an invitation is
+// actionable (accept / decline) where an announcement is only read.
+const clubInviteCode = 557
 
 // Per-club broadcast cooldown — see the rationale at the call site.
 const clubAnnounceCooldown = 20 * time.Second

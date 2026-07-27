@@ -88,3 +88,35 @@ func TestClubAnnouncementCode_DistinctFromPlatform(t *testing.T) {
 		t.Error("club announcements share the platform announcement code 555")
 	}
 }
+
+func TestNotificationCodes_AreAllDistinct(t *testing.T) {
+	// Every notification the client renders differently needs its own code. An
+	// invitation is ACTIONABLE (accept / decline) where the two announcement codes
+	// are read-only, so collapsing it onto either would strip the buttons off it —
+	// and the invitee would be back to having no way to accept, which is the exact
+	// defect this code was added to fix.
+	codes := map[string]int{
+		"platform announcement": 555,
+		"club announcement":     clubAnnouncementCode,
+		"club invite":           clubInviteCode,
+	}
+	seen := map[int]string{}
+	for name, code := range codes {
+		if prev, dup := seen[code]; dup {
+			t.Errorf("%q and %q share notification code %d", name, prev, code)
+		}
+		seen[code] = name
+	}
+}
+
+func TestInviteExpiryDefaults(t *testing.T) {
+	// An accepted invite immediately allocates its credit line against the club,
+	// so a pending one is an outstanding commitment. The default window must be
+	// bounded, and the cap must not be so far out that "bounded" is meaningless.
+	if defaultInviteExpiryDays <= 0 {
+		t.Error("invites default to never expiring — a stale invite would still draw its credit line")
+	}
+	if defaultInviteExpiryDays > maxInviteExpiryDays {
+		t.Errorf("default expiry %d exceeds the maximum %d", defaultInviteExpiryDays, maxInviteExpiryDays)
+	}
+}

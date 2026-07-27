@@ -7,6 +7,7 @@
 // the app, which is also why club announcements had nowhere to land even once
 // the server started sending them.
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell } from "lucide-react";
 
@@ -42,8 +43,18 @@ function relTime(iso?: string): string {
 
 function sourceLabel(n: AppNotification): string {
   if (n.code === NOTIFICATION_CODE.clubAnnouncement) return n.clubName ?? "Club";
+  if (n.code === NOTIFICATION_CODE.clubInvite) return n.clubName ?? "Club invitation";
   if (n.code === NOTIFICATION_CODE.platformAnnouncement) return "High Rollers";
   return "";
+}
+
+/** An invitation is actionable, so it gets a way through to where it is acted on.
+ *  The accept/decline buttons deliberately live on ONE surface (the dashboard's
+ *  MyInvitations card) rather than being duplicated here — two places resolving
+ *  the same invitation is two places that can disagree about whether it still
+ *  exists. */
+function isActionable(n: AppNotification): boolean {
+  return n.code === NOTIFICATION_CODE.clubInvite;
 }
 
 export function NotificationBell() {
@@ -189,6 +200,15 @@ export function NotificationBell() {
                               operator saw is what the player reads. */}
                           <InlineMarkup text={n.body} />
                         </p>
+                      )}
+                      {isActionable(n) && (
+                        <Link
+                          href="/dashboard"
+                          onClick={() => setOpen(false)}
+                          className="mt-1.5 inline-block text-[11px] font-semibold uppercase tracking-wider text-gold transition-colors hover:text-gold-lite"
+                        >
+                          Review invitation →
+                        </Link>
                       )}
                     </div>
                     <button

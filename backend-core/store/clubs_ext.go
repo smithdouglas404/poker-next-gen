@@ -247,6 +247,10 @@ type ClubInvitation struct {
 	ExpiresAt       *time.Time `json:"expires_at,omitempty"`
 	ReviewedAt      *time.Time `json:"reviewed_at,omitempty"`
 	ReviewedBy      string    `json:"reviewed_by,omitempty"`
+	// ClubName is resolved for the invitee-facing list only. It is not a column;
+	// the row carries club_id, and an invitation that greets someone by UUID is
+	// not an invitation. Filled by ClubInvitationsList, empty elsewhere.
+	ClubName string `json:"club_name,omitempty"`
 }
 
 // Expired reports whether a pending invitation is past its expiry at `now`.

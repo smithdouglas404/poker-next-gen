@@ -14,6 +14,7 @@ import {
 } from "@/features/dashboard/dashboardRpc";
 import { BTN_GOLD, GLASS_PANEL, GLASS_PANEL_HOVER, HEADING_SM, cn } from "@/features/ui/tokens";
 import { DailyMissionsWidget } from "@/features/dashboard/DailyMissionsWidget";
+import { MyInvitations } from "@/features/clubs/MyInvitations";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
 
 /* ================================================================= sidebar */
@@ -551,6 +552,10 @@ export default function DashboardPage() {
                 <OperativeProfileCard data={data} />
                 <GlobalStandingCard data={data} />
               </div>
+
+              {/* Pending club invitations. Renders nothing when there are none,
+                  so it costs the dashboard no space in the common case. */}
+              <MyInvitations />
 
               <HighStakes tables={data.tables} />
 
