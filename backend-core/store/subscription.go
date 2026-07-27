@@ -76,6 +76,29 @@ func (s *SubscriptionStore) expire(ctx context.Context, userID, fromTier string)
 // HighRollersClub's self-grant bypass, where a user could assign themselves any
 // tier with no payment.
 func (s *SubscriptionStore) Grant(ctx context.Context, userID, tier string, months int, source, reference, customerID, subscriptionID string) (Subscription, error) {
+	return s.grant(ctx, userID, tier, months, nil, source, reference, customerID, subscriptionID)
+}
+
+// GrantUntil is Grant with the expiry supplied by the payment provider rather
+// than computed from a month count.
+//
+// The renewal path needs this. A Stripe invoice states the period it paid for
+// (`lines.data[].period.end`), and that is the only correct expiry: deriving one
+// from a month count means the server and the customer's actual billing period
+// drift apart, and an annual plan renewing on a hardcoded month count silently
+// bills a year and grants a month.
+//
+// `until` in the past (or nil) falls back to the month count, so a malformed
+// invoice cannot expire a paying customer's membership on arrival.
+func (s *SubscriptionStore) GrantUntil(ctx context.Context, userID, tier string, until time.Time, fallbackMonths int, source, reference, customerID, subscriptionID string) (Subscription, error) {
+	var u *time.Time
+	if !until.IsZero() && until.After(time.Now()) {
+		u = &until
+	}
+	return s.grant(ctx, userID, tier, fallbackMonths, u, source, reference, customerID, subscriptionID)
+}
+
+func (s *SubscriptionStore) grant(ctx context.Context, userID, tier string, months int, until *time.Time, source, reference, customerID, subscriptionID string) (Subscription, error) {
 	if !billing.IsValidTier(tier) {
 		tier = "free"
 	}
@@ -87,6 +110,9 @@ func (s *SubscriptionStore) Grant(ctx context.Context, userID, tier string, mont
 	status := "inactive"
 	if billing.IsPaidTier(tier) {
 		t := time.Now().AddDate(0, months, 0)
+		if until != nil {
+			t = *until
+		}
 		expires = &t
 		status = "active"
 	}

@@ -311,7 +311,24 @@ func StripeWebhook(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 			if userID != "" {
 				cur, _ := subs.Get(ctx, userID)
 				if billing.IsPaidTier(cur.Tier) {
-					_, _ = subs.Grant(ctx, userID, cur.Tier, 1, "stripe_renewal", obj.Subscription, cur.StripeCustomerID, obj.Subscription)
+					// The invoice states the period it paid for. Use it.
+					//
+					// This block already parsed lines.data[].period.end and then
+					// ignored it, granting a hardcoded ONE month instead. For a
+					// monthly plan that is roughly right by accident. For an
+					// ANNUAL plan it is a year billed and a month granted — and
+					// because Stripe sends invoice.paid alongside
+					// checkout.session.completed on a new subscription, it also
+					// overwrote the correct 12 months set moments earlier at
+					// signup. Deriving expiry from a month count guarantees the
+					// server drifts from the customer's real billing period; the
+					// invoice does not.
+					periodEnd := time.Time{}
+					if len(obj.Lines.Data) > 0 && obj.Lines.Data[0].Period.End > 0 {
+						periodEnd = time.Unix(obj.Lines.Data[0].Period.End, 0).UTC()
+					}
+					_, _ = subs.GrantUntil(ctx, userID, cur.Tier, periodEnd, 1,
+						"stripe_renewal", obj.Subscription, cur.StripeCustomerID, obj.Subscription)
 				}
 			}
 		}
@@ -352,11 +369,28 @@ func verifyStripeSignature(payload, header, secret string) bool {
 	if ts == "" || v1 == "" {
 		return false
 	}
+	// Reject a stale timestamp before checking the MAC. The signature covers the
+	// timestamp, so a captured webhook stays valid forever without this — and the
+	// events it would replay are the ones that grant a membership tier and extend
+	// a subscription. Stripe documents this tolerance as part of verification;
+	// omitting it makes the HMAC a signature on the body alone.
+	sec, err := strconv.ParseInt(ts, 10, 64)
+	if err != nil {
+		return false
+	}
+	if age := time.Since(time.Unix(sec, 0)); age > stripeSignatureTolerance || age < -stripeSignatureTolerance {
+		return false
+	}
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(fmt.Sprintf("%s.%s", ts, payload)))
 	expected := hex.EncodeToString(mac.Sum(nil))
 	return hmac.Equal([]byte(expected), []byte(v1))
 }
+
+// stripeSignatureTolerance is how far a webhook's timestamp may be from now.
+// Five minutes is Stripe's own default. Checked in both directions so a clock
+// skewed into the future cannot be used to mint a long-lived replay either.
+const stripeSignatureTolerance = 5 * time.Minute
 
 // headerValue reads a request header (case-insensitive) from the Nakama RPC ctx.
 func headerValue(ctx context.Context, name string) string {
