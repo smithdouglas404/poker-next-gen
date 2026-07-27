@@ -59,6 +59,30 @@ func requireClubConfigurer(ctx context.Context, db *sql.DB, clubID string) (stri
 	return "", runtime.NewError("forbidden: not a club owner/configurer", 7)
 }
 
+// requireClubReader authorizes the caller to READ club-internal data: a roster
+// member, or an operator seat. Weaker than requireClubConfigurer on purpose —
+// ordinary members can see their own club's notices — but it is still a gate.
+//
+// Factored out because the same membership-or-configurer check was written
+// inline in RakeConfigGet and simply missing from ClubAnnouncementList, which
+// let any authenticated account read any club's announcement history.
+func requireClubReader(ctx context.Context, db *sql.DB, clubID string) error {
+	if clubID == "" {
+		return runtime.NewError("club_id required", 3)
+	}
+	userID, err := callerID(ctx)
+	if err != nil {
+		return err
+	}
+	if mem, _ := store.NewClubStore(db).GetMembership(ctx, clubID, userID); mem != nil {
+		return nil
+	}
+	if _, cerr := requireClubConfigurer(ctx, db, clubID); cerr != nil {
+		return runtime.NewError("this is private to the club's members", 7)
+	}
+	return nil
+}
+
 func ClubCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	var club models.Club
 	if payload != "" {
@@ -504,15 +528,8 @@ func RakeConfigGet(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 	}
 	// Gate unless the owner has opted this config into public visibility.
 	if rake == nil || !rake.Public {
-		uid, aerr := callerID(ctx)
-		if aerr != nil {
+		if rerr := requireClubReader(ctx, db, req.ClubID); rerr != nil {
 			return "", runtime.NewError("rake config is private to this club", 7)
-		}
-		mem, _ := cs.GetMembership(ctx, req.ClubID, uid)
-		if mem == nil {
-			if _, cerr := requireClubConfigurer(ctx, db, req.ClubID); cerr != nil {
-				return "", runtime.NewError("rake config is private to this club", 7)
-			}
 		}
 	}
 	out, _ := json.Marshal(rake)

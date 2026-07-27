@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/heroiclabs/nakama-common/runtime"
@@ -638,6 +640,13 @@ func ClubAnnouncementList(ctx context.Context, logger runtime.Logger, db *sql.DB
 	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" {
 		return "", runtime.NewError("club_id required", 3)
 	}
+	// This used to be completely ungated — any authenticated account could read
+	// any club's announcement history, including private-table and tournament
+	// notices it was never targeted with. Membership (or an operator seat) now
+	// required, matching the rest of the club reads.
+	if err := requireClubReader(ctx, db, req.ClubID); err != nil {
+		return "", err
+	}
 	anns, err := store.NewClubExtStore(db).ListAnnouncements(ctx, req.ClubID, req.Limit)
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
@@ -666,17 +675,114 @@ func ClubAnnouncementCreate(ctx context.Context, logger runtime.Logger, db *sql.
 	// Whitelist the targeting params so a bad value can't be stored.
 	audience := announceAudience(req.Audience)
 	channel := announceChannel(req.Channel)
+	severity := announceSeverity(req.Severity)
+
+	// Rate limit, per club. This now fans out to every member of a club rather
+	// than writing a row nobody reads, so it inherits the reasoning already
+	// applied to platform broadcasts (see aiproc.go): a compromised or careless
+	// operator account must not be able to spam a whole membership.
+	if wait, ok := clubAnnounceAllowed(req.ClubID); !ok {
+		return "", runtime.NewError(
+			fmt.Sprintf("you just broadcast to this club — wait %d seconds before sending another", wait), 9)
+	}
+
 	es := store.NewClubExtStore(db)
 	id, err := es.CreateAnnouncement(ctx, &store.ClubAnnouncement{
-		ClubID: req.ClubID, Title: req.Title, Body: req.Body, Severity: req.Severity,
+		ClubID: req.ClubID, Title: req.Title, Body: req.Body, Severity: severity,
 		Audience: audience, Channel: channel, CreatedBy: author,
 	})
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	_ = es.LogActivity(ctx, req.ClubID, author, "announcement", req.Title)
-	out, _ := json.Marshal(map[string]interface{}{"ok": true, "id": id, "audience": audience, "channel": channel})
+
+	// DELIVERY. Everything above this line is what the RPC used to be: one row
+	// and one activity-log entry. "Broadcast Now" broadcast to nobody, and the
+	// delivery-style chips were an inert tag. The announcement is now actually
+	// sent to the audience it was addressed to.
+	delivered := 0
+	if recipients, rerr := es.AnnouncementRecipients(ctx, req.ClubID, audience); rerr == nil && len(recipients) > 0 {
+		clubName := req.ClubID
+		if c, cerr := store.NewClubStore(db).GetByID(ctx, req.ClubID); cerr == nil && c != nil {
+			clubName = c.Name
+		}
+		content := map[string]interface{}{
+			"kind":         "club_announcement",
+			"id":           id,
+			"club_id":      req.ClubID,
+			"club_name":    clubName,
+			"body":         req.Body,
+			"severity":     severity,
+			"channel":      channel,
+			"audience":     audience,
+		}
+		sends := make([]*runtime.NotificationSend, 0, len(recipients))
+		for _, uid := range recipients {
+			sends = append(sends, &runtime.NotificationSend{
+				UserID:     uid,
+				Subject:    req.Title,
+				Content:    content,
+				Code:       clubAnnouncementCode,
+				Persistent: true,
+			})
+		}
+		// Best-effort: the announcement is already stored, so a delivery failure
+		// must not make the operator think nothing was posted. It is logged and
+		// reflected in the response count instead.
+		if serr := nk.NotificationsSend(ctx, sends); serr != nil {
+			logger.Warn("club announcement %s stored but delivery failed: %v", id, serr)
+		} else {
+			delivered = len(sends)
+		}
+	}
+
+	out, _ := json.Marshal(map[string]interface{}{
+		"ok": true, "id": id, "audience": audience, "channel": channel,
+		"severity": severity, "delivered": delivered,
+	})
 	return string(out), nil
+}
+
+// clubAnnouncementCode is the Nakama notification code for a club broadcast.
+// 555 is already taken by the platform-wide announcement (aiproc.go), so clients
+// can tell the two apart by code alone.
+const clubAnnouncementCode = 556
+
+// Per-club broadcast cooldown — see the rationale at the call site.
+const clubAnnounceCooldown = 20 * time.Second
+
+var (
+	clubAnnounceMu   sync.Mutex
+	clubAnnounceLast = map[string]time.Time{}
+)
+
+// clubAnnounceAllowed reports whether this club may broadcast now, and if not,
+// how many seconds remain.
+func clubAnnounceAllowed(clubID string) (int, bool) {
+	clubAnnounceMu.Lock()
+	defer clubAnnounceMu.Unlock()
+	now := time.Now()
+	if last, ok := clubAnnounceLast[clubID]; ok {
+		if elapsed := now.Sub(last); elapsed < clubAnnounceCooldown {
+			remaining := int((clubAnnounceCooldown - elapsed).Seconds()) + 1
+			return remaining, false
+		}
+	}
+	clubAnnounceLast[clubID] = now
+	return 0, true
+}
+
+// announceSeverity clamps severity to what the clients actually render. It was
+// an unvalidated passthrough, which is how "high" (written by the in-table
+// composer) ended up stored — a value no severity switch recognises, so it
+// silently rendered as the default.
+func announceSeverity(v string) string {
+	switch v {
+	case "warning", "critical":
+		return v
+	default:
+		return "info"
+	}
 }
 
 // announceAudience clamps the target-audience param to a known value.

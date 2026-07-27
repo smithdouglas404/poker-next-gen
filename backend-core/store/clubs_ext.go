@@ -750,6 +750,55 @@ func (s *ClubExtStore) ListAnnouncements(ctx context.Context, clubID string, lim
 	return out, rows.Err()
 }
 
+// AnnouncementRecipients resolves an announcement's target audience to the set
+// of user ids that should actually receive it.
+//
+// Before delivery existed, `audience` was a stored tag nothing acted on. These
+// are the three real populations behind the composer's three radio buttons:
+//
+//	all         every active member of the club
+//	private     members sitting at one of the club's tables RIGHT NOW
+//	tournament  members entered in one of the club's tournaments
+//
+// Distinct user ids, capped — a broadcast is a fan-out, and an unbounded one
+// against a large club would block the RPC while it built the list.
+func (s *ClubExtStore) AnnouncementRecipients(ctx context.Context, clubID, audience string) ([]string, error) {
+	const maxRecipients = 5000
+	var query string
+	switch audience {
+	case "private":
+		// poker_seat_session carries club_id and stays 'open' for the duration of
+		// a sitting, which is exactly "at a table of this club at this moment".
+		query = `
+			SELECT DISTINCT user_id FROM poker_seat_session
+			WHERE club_id=$1 AND status='open' AND user_id <> '' LIMIT $2`
+	case "tournament":
+		query = `
+			SELECT DISTINCT r.user_id
+			FROM poker_tournament_registration r
+			JOIN poker_tournament t ON t.id = r.tournament_id
+			WHERE t.club_id=$1 AND r.status IN ('registered','playing') AND r.user_id <> '' LIMIT $2`
+	default:
+		query = `
+			SELECT DISTINCT user_id FROM poker_club_member
+			WHERE club_id=$1 AND status='active' AND user_id <> '' LIMIT $2`
+	}
+	rows, err := s.db.QueryContext(ctx, query, clubID, maxRecipients)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
 // --- Events ---
 
 // ClubEvent is a scheduled club game/session.
