@@ -201,6 +201,11 @@ export function PrivateTableSetup({
       wallet_limit_cents: dollarsToCents(walletLimitDollars),
       auto_buy_back_cents: dollarsToCents(autoBuyBackDollars),
       no_max_buyin: isPlayMoney ? noMaxBuyIn : false,
+      // What the table plays for. Cash requires the CLUB to be licensed — an
+      // owner with a sponsor-capable plan AND verified identity. Play money
+      // (private games, home games) needs no licence, only permission to act
+      // for the club.
+      stake_mode: isPlayMoney ? "play" : "cash",
       // Owner-chosen table look (overrides each player's per-device renderMode).
       render_style: renderStyle || undefined,
       // Owner-chosen baked photoreal table plate (empty => cinematic felt).

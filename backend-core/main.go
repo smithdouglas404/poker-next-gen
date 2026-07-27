@@ -244,6 +244,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"club_requests_list":       rpc.ClubRequestsList,
 		"club_request_review":      rpc.ClubRequestReview,
 		"club_invitations_list":    rpc.ClubInvitationsList,
+		"club_licence_get":         rpc.ClubLicenceGet,
 		"club_announcement_list":   rpc.ClubAnnouncementList,
 		"club_announcement_create": rpc.ClubAnnouncementCreate,
 		"club_event_list":          rpc.ClubEventList,

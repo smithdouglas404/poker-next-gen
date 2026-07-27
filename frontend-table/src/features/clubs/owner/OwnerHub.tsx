@@ -18,6 +18,7 @@ import { SeatSessions } from "./SeatSessions";
 import { ClubNights } from "./ClubNights";
 import { MemberManagement } from "./MemberManagement";
 import { OperatorsEquity } from "./OperatorsEquity";
+import { ClubLicencePanel } from "@/features/clubs/ClubLicence";
 import { Overview } from "./Overview";
 import { OwnerShell } from "./OwnerShell";
 import { QuickStats } from "./QuickStats";
@@ -627,6 +628,15 @@ export function OwnerHub() {
             <ClubNights clubId={club?.id} canManage={canManage} />
           </div>
           <QuickStats data={emptyQuick} clubId={club?.id ?? null} />
+        </div>
+      )}
+
+      {section === "operators" && (
+        <div className="mb-6">
+          {/* The licence lives with an owner, so it belongs beside the owner
+              list — it is the one thing on this screen that depends on WHO the
+              owners are rather than what they may do. */}
+          <ClubLicencePanel clubId={club?.id ?? ""} />
         </div>
       )}
 

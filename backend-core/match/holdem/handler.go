@@ -161,6 +161,10 @@ type MatchState struct {
 	NoMaxBuyIn       bool   // unlimited buy-in (no max) — PLAY-MONEY tables only
 	RenderStyle      string // owner-chosen table look: "2.5d" | "3d" (empty => per-device)
 	TableArt         string // owner-chosen baked table plate id (empty => cinematic felt)
+	// StakeMode is what this table plays for: store.StakeCash (real money) or
+	// store.StakePlay (chips). Cash tables require the club to be licensed, and
+	// re-check at sit-down because a licence can lapse while a table is running.
+	StakeMode string
 	// Daily operating window in minutes past midnight UTC, wrap-midnight aware
 	// (see store.WithinDailyWindow). Equal values mean always-open, which is what
 	// every table created before this existed reports. Enforced at sit-down only:
@@ -323,6 +327,10 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	if v, ok := numParam(params, "time_bank_per_hand"); ok && v > 0 {
 		timeBankPerHand = v
 	}
+	stakeMode := string(store.StakePlay)
+	if v, ok := params["stake_mode"].(string); ok && v != "" {
+		stakeMode = string(store.ValidStakeMode(v))
+	}
 	autoAwayOnTimeout := false
 	if v, ok := params["auto_away_on_timeout"].(bool); ok {
 		autoAwayOnTimeout = v
@@ -471,6 +479,7 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		TimeBankPerHand:      timeBankPerHand,
 		AutoAwayOnTimeout:    autoAwayOnTimeout,
 		AutoAwayBelowPlayers: autoAwayBelowPlayers,
+		StakeMode:            stakeMode,
 		// Daily operating window (dpts_8).
 		OperatingStartMin: operatingStartMin,
 		OperatingEndMin:   operatingEndMin,
@@ -889,6 +898,17 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				sendError(dispatcher, presence, "outside_operating_hours",
 					"this table is open "+store.DailyWindowLabel(s.OperatingStartMin, s.OperatingEndMin))
 				continue
+			}
+			// A licence can lapse while a table is running — the owner's plan
+			// expires, or their KYC is revoked. Re-checked here so an unlicensed
+			// club stops seating players rather than continuing until someone
+			// notices. Seated players finish their session; only new seats stop.
+			if store.StakeMode(s.StakeMode) == store.StakeCash && s.ClubID != "" {
+				if lic := store.LicenceFor(ctx, db, s.ClubID); !lic.CanHostCash {
+					sendError(dispatcher, presence, "club_unlicensed",
+						"this club can no longer host cash games — "+lic.Reason)
+					continue
+				}
 			}
 			tier := billing.GetTierDef(store.SubscriptionTier(ctx, db, userID))
 
@@ -2676,6 +2696,7 @@ func buildLabel(s *MatchState) string {
 		"invite_only":      s.AccessType == "invite" || s.AccessType == "members",
 		"allow_spectators": s.AllowSpectators,
 		"club_id":          s.ClubID,
+		"stake_mode":       s.StakeMode,
 		// Operating window (dpts_8) so a browser can say "opens 18:00 UTC" instead
 		// of offering a seat the sit-down gate is about to refuse. Omitted entirely
 		// when the table is always open, which is the common case.

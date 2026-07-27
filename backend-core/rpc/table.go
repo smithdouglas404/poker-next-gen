@@ -160,31 +160,49 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 	if req.ClubID == "" {
 		return "", runtime.NewError("every table must be hosted by a club — pick a club to sponsor it", 3)
 	}
+	// Permission to act for this club. Required for ANY table: the licence says
+	// what the club may host, this says whether you may act on its behalf.
 	if _, err := requireClubPermission(ctx, db, req.ClubID, store.PermTables); err != nil {
 		return "", err
 	}
-	if tier := store.SubscriptionTier(ctx, db, hostUserID); !billing.CanSponsorTable(tier) {
-		return "", runtime.NewError("hosting a table requires a paid membership — upgrade to sponsor tables", 7)
+
+	// The licence, and only for real money.
+	//
+	// This used to check CanSponsorTable on whoever clicked, which was wrong in
+	// three ways at once: it asked the wrong person (a club manager could not open
+	// a friendly game though the club's owner was fully licensed), it verified
+	// nobody's identity (a paid tier alone opened a real-money table — players are
+	// KYC'd at sit-down but the HOUSE taking rake had no verified principal), and
+	// it made no distinction between a home game and a raked cash game.
+	//
+	// The licence belongs to an owner and covers the club, exactly as a liquor
+	// licence belongs to a licensee and covers the premises.
+	stakeMode := store.ValidStakeMode(req.StakeMode)
+	if stakeMode == store.StakeCash {
+		if lic := store.LicenceFor(ctx, db, req.ClubID); !lic.CanHostCash {
+			return "", runtime.NewError(
+				"this club cannot host cash games — "+lic.Reason, 7)
+		}
 	}
 
 	matchID, err := nk.MatchCreate(ctx, protocol.MatchModule, map[string]interface{}{
-		"room_id":       roomID,
-		"club_id":       req.ClubID,
-		"war_id":        req.WarID,
-		"league_id":     req.LeagueID,
-		"small_blind":   sb,
-		"big_blind":     bb,
-		"buy_in":        buyIn,
-		"max_seats":     maxSeats,
-		"min_players":   minPlayers,
-		"min_buy_in":    minBuyIn,
-		"max_buy_in":    maxBuyIn,
-		"num_bots":      numBots,
-		"variant":       variant,
-		"duration_secs": durationSecs,
-		"action_secs":   actionSecs,
+		"room_id":        roomID,
+		"club_id":        req.ClubID,
+		"war_id":         req.WarID,
+		"league_id":      req.LeagueID,
+		"small_blind":    sb,
+		"big_blind":      bb,
+		"buy_in":         buyIn,
+		"max_seats":      maxSeats,
+		"min_players":    minPlayers,
+		"min_buy_in":     minBuyIn,
+		"max_buy_in":     maxBuyIn,
+		"num_bots":       numBots,
+		"variant":        variant,
+		"duration_secs":  durationSecs,
+		"action_secs":    actionSecs,
 		"time_bank_secs": timeBankSecs,
-		"host_user_id":  hostUserID,
+		"host_user_id":   hostUserID,
 		// Optional table features (#41); default-off so a plain table is unchanged.
 		"allow_straddle":     req.AllowStraddle,
 		"allow_bomb_pot":     req.AllowBombPot,
@@ -200,6 +218,7 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		"wallet_limit_cents":  req.WalletLimitCents,
 		"auto_buy_back_cents": req.AutoBuyBackCents,
 		"no_max_buyin":        req.NoMaxBuyIn,
+		"stake_mode":          string(stakeMode),
 		"render_style":        req.RenderStyle,
 		"table_art":           req.TableArt,
 		// Operating window + auto-away (dpts_8). The setup form sent these keys

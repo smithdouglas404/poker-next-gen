@@ -3,8 +3,8 @@ package protocol
 // Wire messages shared between server and clients.
 
 type SitDownRequest struct {
-	Seat   int   `json:"seat"`
-	BuyIn  int64 `json:"buy_in"`
+	Seat  int   `json:"seat"`
+	BuyIn int64 `json:"buy_in"`
 	// Wallet the buy-in draws from at a club table that accepts both: "global"
 	// (funded global wallet) or "club" (club-issued balance). Empty => club
 	// balance at a club table, global wallet at a non-club table (the old default).
@@ -41,18 +41,18 @@ type CardView struct {
 }
 
 type SeatView struct {
-	Index    int    `json:"index"`
-	UserID   string `json:"user_id,omitempty"`
-	Username string `json:"username,omitempty"`
-	Stack    int64  `json:"stack"`
-	Status   string `json:"status"` // empty | seated | folded | all_in
+	Index      int    `json:"index"`
+	UserID     string `json:"user_id,omitempty"`
+	Username   string `json:"username,omitempty"`
+	Stack      int64  `json:"stack"`
+	Status     string `json:"status"` // empty | seated | folded | all_in
 	LastAction string `json:"last_action,omitempty"`
-	IsHero   bool   `json:"is_hero,omitempty"`
-	IsBot    bool   `json:"is_bot,omitempty"` // AI seat — always disclosed to every player
-	ModelURL string `json:"model_url,omitempty"` // equipped 3D character GLB
+	IsHero     bool   `json:"is_hero,omitempty"`
+	IsBot      bool   `json:"is_bot,omitempty"`    // AI seat — always disclosed to every player
+	ModelURL   string `json:"model_url,omitempty"` // equipped 3D character GLB
 	// Bet is the player's contribution on the current street (chips in front of
 	// the seat), 0 when they haven't acted this street.
-	Bet      int64  `json:"bet,omitempty"`
+	Bet int64 `json:"bet,omitempty"`
 	// SittingOut: the player kept their seat but is out of the game (not dealt in);
 	// OwesPost: they must post to return before their natural big blind.
 	SittingOut bool `json:"sitting_out,omitempty"`
@@ -64,35 +64,35 @@ type PotView struct {
 }
 
 type TableSnapshot struct {
-	MatchID      string     `json:"match_id"`
-	RoomID       string     `json:"room_id"`
-	Phase        string     `json:"phase"` // waiting | preflop | flop | turn | river | showdown
-	Seats        []SeatView `json:"seats"`
-	Board        []CardView `json:"board"`
-	Pot          int64      `json:"pot"`
-	CurrentBet   int64      `json:"current_bet"`
-	ActionSeat   int         `json:"action_seat"`
-	ButtonSeat   int         `json:"button_seat"`
-	SmallBlind   int64      `json:"small_blind"`
-	BigBlind     int64      `json:"big_blind"`
-	MaxSeats     int        `json:"max_seats"`
-	HeroWallet   int64      `json:"hero_wallet_cents"`
+	MatchID    string     `json:"match_id"`
+	RoomID     string     `json:"room_id"`
+	Phase      string     `json:"phase"` // waiting | preflop | flop | turn | river | showdown
+	Seats      []SeatView `json:"seats"`
+	Board      []CardView `json:"board"`
+	Pot        int64      `json:"pot"`
+	CurrentBet int64      `json:"current_bet"`
+	ActionSeat int        `json:"action_seat"`
+	ButtonSeat int        `json:"button_seat"`
+	SmallBlind int64      `json:"small_blind"`
+	BigBlind   int64      `json:"big_blind"`
+	MaxSeats   int        `json:"max_seats"`
+	HeroWallet int64      `json:"hero_wallet_cents"`
 	// Buy-in band + wallet options so the client can render a real buy-in dialog.
-	MinBuyIn            int64 `json:"min_buy_in"`
-	MaxBuyIn            int64 `json:"max_buy_in"`
-	AcceptsGlobalWallet bool  `json:"accepts_global_wallet"`
-	HeroClubBalance     int64 `json:"hero_club_balance,omitempty"` // available club-issued balance (club tables)
-	HandNo         int         `json:"hand_no"`
-	DeckCommitHash string      `json:"deck_commit_hash,omitempty"`
-	Variant        string      `json:"variant,omitempty"` // "holdem" | "plo"
+	MinBuyIn            int64  `json:"min_buy_in"`
+	MaxBuyIn            int64  `json:"max_buy_in"`
+	AcceptsGlobalWallet bool   `json:"accepts_global_wallet"`
+	HeroClubBalance     int64  `json:"hero_club_balance,omitempty"` // available club-issued balance (club tables)
+	HandNo              int    `json:"hand_no"`
+	DeckCommitHash      string `json:"deck_commit_hash,omitempty"`
+	Variant             string `json:"variant,omitempty"` // "holdem" | "plo"
 	// RenderStyle is the owner-chosen table look ("2.5d" | "3d") — every seat at the
 	// table renders in this style; empty falls back to the player's device preference.
-	RenderStyle    string      `json:"render_style,omitempty"`
+	RenderStyle string `json:"render_style,omitempty"`
 	// TableArt is the owner-chosen baked table plate id (see frontend bakedTable.ts);
 	// empty falls back to the default cinematic felt.
-	TableArt       string      `json:"table_art,omitempty"`
-	HostUserID     string      `json:"host_user_id,omitempty"`
-	HostPaused     bool        `json:"host_paused,omitempty"`
+	TableArt   string `json:"table_art,omitempty"`
+	HostUserID string `json:"host_user_id,omitempty"`
+	HostPaused bool   `json:"host_paused,omitempty"`
 	// Optional table-feature capabilities (#41) so the client only shows controls
 	// that bind to a live, enabled RPC path.
 	AllowStraddle   bool `json:"allow_straddle,omitempty"`
@@ -128,8 +128,8 @@ type ActionRequiredMessage struct {
 	// Server-authoritative shot clock: ActionSecs is the base time to act; when
 	// it lapses the server burns TimeBankSecs (the player's remaining time bank)
 	// before auto-folding. The client renders these instead of a hardcoded clock.
-	ActionSecs   int      `json:"action_secs"`
-	TimeBankSecs int      `json:"time_bank_secs"`
+	ActionSecs   int `json:"action_secs"`
+	TimeBankSecs int `json:"time_bank_secs"`
 }
 
 type ErrorMessage struct {
@@ -154,18 +154,18 @@ type ChatMessage struct {
 }
 
 type TableCreateRequest struct {
-	Name       string `json:"name" label:"Table Name" help:"Optional; a name is generated if omitted."`
-	ClubID     string `json:"club_id,omitempty" ref:"club" label:"Club" help:"Bind to a club: buy-ins draw the club-allocated balance and pots are raked to the club."`
-	SmallBlind int64  `json:"small_blind" validate:"min=0" unit:"money_minor" label:"Small Blind"`
-	BigBlind   int64  `json:"big_blind" validate:"min=0" unit:"money_minor" label:"Big Blind"`
-	BuyIn      int64  `json:"buy_in" validate:"min=0" unit:"money_minor" label:"Default Buy-in"`
-	MinBuyIn   int64  `json:"min_buy_in" validate:"min=0" unit:"money_minor" label:"Minimum Buy-in"`
-	MaxBuyIn   int64  `json:"max_buy_in" validate:"min=0" unit:"money_minor" label:"Maximum Buy-in"`
-	MaxSeats   int    `json:"max_seats" validate:"min=2,max=10" unit:"count" label:"Seats at the table"`
-	MinPlayers int    `json:"min_players" validate:"min=2,max=10" unit:"count" label:"Players needed to start"`
-	NumBots    int    `json:"num_bots" validate:"min=0,max=9" unit:"count" label:"Bots"`
-	Variant    string `json:"variant" enum:"holdem,plo" label:"Variant"`       // "holdem" | "plo"; empty => holdem
-	DurationMins int  `json:"duration_mins" validate:"min=0,max=720" unit:"minutes" label:"Auto-close (minutes)"` // auto-close after N minutes (0 = no limit)
+	Name         string `json:"name" label:"Table Name" help:"Optional; a name is generated if omitted."`
+	ClubID       string `json:"club_id,omitempty" ref:"club" label:"Club" help:"Bind to a club: buy-ins draw the club-allocated balance and pots are raked to the club."`
+	SmallBlind   int64  `json:"small_blind" validate:"min=0" unit:"money_minor" label:"Small Blind"`
+	BigBlind     int64  `json:"big_blind" validate:"min=0" unit:"money_minor" label:"Big Blind"`
+	BuyIn        int64  `json:"buy_in" validate:"min=0" unit:"money_minor" label:"Default Buy-in"`
+	MinBuyIn     int64  `json:"min_buy_in" validate:"min=0" unit:"money_minor" label:"Minimum Buy-in"`
+	MaxBuyIn     int64  `json:"max_buy_in" validate:"min=0" unit:"money_minor" label:"Maximum Buy-in"`
+	MaxSeats     int    `json:"max_seats" validate:"min=2,max=10" unit:"count" label:"Seats at the table"`
+	MinPlayers   int    `json:"min_players" validate:"min=2,max=10" unit:"count" label:"Players needed to start"`
+	NumBots      int    `json:"num_bots" validate:"min=0,max=9" unit:"count" label:"Bots"`
+	Variant      string `json:"variant" enum:"holdem,plo" label:"Variant"`                                          // "holdem" | "plo"; empty => holdem
+	DurationMins int    `json:"duration_mins" validate:"min=0,max=720" unit:"minutes" label:"Auto-close (minutes)"` // auto-close after N minutes (0 = no limit)
 	// Shot clock: per-table action seconds + per-player time bank. 0 => server
 	// defaults (30s clock, 30s bank).
 	ActionSecs   int `json:"action_secs,omitempty" validate:"min=0,max=120" unit:"seconds" label:"Shot clock (seconds)"`
@@ -198,6 +198,14 @@ type TableCreateRequest struct {
 	AutoBuyBackCents int64  `json:"auto_buy_back_cents,omitempty" validate:"min=0" unit:"money_minor" label:"Auto Buy-Back"`
 	//  - NoMaxBuyIn: unlimited buy-in (no max) — honored on PLAY-MONEY tables only.
 	NoMaxBuyIn bool `json:"no_max_buyin,omitempty" label:"Unlimited buy-in (play money)"`
+	//  - StakeMode: "cash" (real money — requires a LICENSED club) or "play"
+	//    (chips: private games, home games, freerolls). Empty => play.
+	//
+	//    Until this existed, money mode was a single platform-wide env switch and
+	//    a table could not say what it played for, so a private home game and a
+	//    raked cash game were indistinguishable to every gate. Only cash needs a
+	//    licensed owner behind the club.
+	StakeMode string `json:"stake_mode,omitempty" enum:"play,cash" label:"Plays for"`
 	//  - RenderStyle: the owner-chosen table look, "2.5d" (portrait seats) or "3d"
 	//    (GLB character bodies). Applies to EVERY seat at the table (no mixing).
 	RenderStyle string `json:"render_style,omitempty" enum:"2.5d,3d" label:"Table Style"`
