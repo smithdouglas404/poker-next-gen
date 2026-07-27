@@ -46,6 +46,13 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	} else {
 		state.BlindLevels = []models.BlindTimer{{Level: 1, SmallBlind: 50, BigBlind: 100, DurationSecs: 600}}
 	}
+	if state.BlindLevels[0].IsBreak {
+		// An operator-configured schedule that opens on a break: tables must
+		// start with dealing paused rather than only finding out once tickClock
+		// advances past level 1 (which, for a first-level break, never happens
+		// on its own — nothing else sends this signal at t=0).
+		signalBreak(ctx, nk, state, true)
+	}
 	label, _ := json.Marshal(map[string]interface{}{"module": protocol.TournamentModule, "tournament_id": tournamentID})
 	return state, 10, string(label)
 }
@@ -83,9 +90,10 @@ func (h *Handler) tickClock(ctx context.Context, logger runtime.Logger, db *sql.
 		return
 	}
 	level := s.BlindLevels[idx]
-	if level.IsBreak {
-		return
-	}
+	// A break level still has to count down and advance on its own timer — the
+	// old `if level.IsBreak { return }` here made tickClock a permanent no-op
+	// for the rest of the tournament once a break level was reached, since
+	// elapsed time was never checked and CurrentLevel never moved past it.
 	elapsed := time.Since(s.LevelStart).Seconds()
 	if elapsed < float64(level.DurationSecs) {
 		remaining := int(float64(level.DurationSecs) - elapsed)
@@ -93,12 +101,37 @@ func (h *Handler) tickClock(ctx context.Context, logger runtime.Logger, db *sql.
 		return
 	}
 	if s.CurrentLevel < len(s.BlindLevels) {
+		wasBreak := level.IsBreak
 		s.CurrentLevel++
 		s.LevelStart = time.Now().UTC()
 		_ = store.NewTournamentStore(db).AdvanceLevel(ctx, s.TournamentID, s.CurrentLevel)
 		level = s.BlindLevels[s.CurrentLevel-1]
-		signalBlinds(ctx, nk, s, level)
+		if level.IsBreak {
+			// A break level has no blinds to push to the tables — signal the
+			// dealing pause instead of signalBlinds.
+			signalBreak(ctx, nk, s, true)
+		} else {
+			if wasBreak {
+				signalBreak(ctx, nk, s, false)
+			}
+			signalBlinds(ctx, nk, s, level)
+		}
 		broadcastInfo(dispatcher, s, int(level.DurationSecs), level)
+	}
+}
+
+// signalBreak tells every table in the tournament to start or stop honoring a
+// scheduled break. Without this, entering an IsBreak blind level was purely
+// cosmetic on the info broadcast — tables kept dealing hands straight through
+// the break with only a countdown label to say otherwise.
+func signalBreak(ctx context.Context, nk runtime.NakamaModule, s *DirectorState, start bool) {
+	msgType := "tournament_break_end"
+	if start {
+		msgType = "tournament_break_start"
+	}
+	payload, _ := json.Marshal(map[string]interface{}{"type": msgType})
+	for _, matchID := range s.TableMatches {
+		_, _ = nk.MatchSignal(ctx, matchID, string(payload))
 	}
 }
 
@@ -123,6 +156,7 @@ func broadcastInfo(dispatcher runtime.MatchDispatcher, s *DirectorState, seconds
 		"big_blind":           level.BigBlind,
 		"ante":                level.Ante,
 		"seconds_remaining":   secondsRemaining,
+		"is_break":            level.IsBreak,
 	})
 	_ = dispatcher.BroadcastMessage(protocol.OpTournamentInfo, payload, nil, nil, true)
 }

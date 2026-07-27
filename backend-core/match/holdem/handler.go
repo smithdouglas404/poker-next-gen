@@ -98,6 +98,12 @@ type MatchState struct {
 	// AdminPaused is a platform-admin freeze (tables_freeze_all). Unlike HostPaused
 	// it is honored regardless of host presence — it's an operator override.
 	AdminPaused bool
+	// TournamentBreak mirrors AdminPaused's mechanics but a different source and
+	// meaning: the tournament director (match/tournament/director.go) sets it
+	// when its blind schedule enters an IsBreak level and clears it when that
+	// level ends, so dealing actually stops for the scheduled break instead of
+	// continuing through it while only a countdown display changes.
+	TournamentBreak bool
 	// DealerDown tracks the engine-math (rs_poker) sidecar being unreachable so the
 	// table pauses dealing gracefully and tells players ONCE, rather than silently
 	// failing to deal. Cleared (with a "restored" notice) on the next successful
@@ -783,7 +789,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			closeTable(ctx, logger, db, dispatcher, s, "scheduled time reached")
 			return nil // ending the match releases the handler
 		}
-		if s.AutoDeal && !s.effPaused() && !s.AdminPaused && s.Table.SeatedCount() >= s.minToStart() && len(s.Presences) >= 1 {
+		if s.AutoDeal && !s.effPaused() && !s.AdminPaused && !s.TournamentBreak && s.Table.SeatedCount() >= s.minToStart() && len(s.Presences) >= 1 {
 			if s.NextDealTick == 0 {
 				s.NextDealTick = tick + autoDealDelayTicks
 			} else if tick >= s.NextDealTick {
@@ -2775,6 +2781,20 @@ func (h *Handler) MatchSignal(ctx context.Context, logger runtime.Logger, db *sq
 	case "resume":
 		s.AdminPaused = false
 		narrate(dispatcher, s, "An administrator resumed this table.")
+		broadcastSnapshot(ctx, db, dispatcher, s, nil)
+	case "tournament_break_start":
+		// Sent by the tournament director when its blind schedule enters an
+		// IsBreak level. Distinct from "pause"/AdminPaused on purpose: a break
+		// ends on its own timer, not an operator's resume click, so conflating
+		// the two flags would mean an admin's platform-wide freeze/resume and a
+		// tournament's own break clock could clear each other's state.
+		s.TournamentBreak = true
+		s.NextDealTick = 0
+		narrate(dispatcher, s, "Tournament break — dealing will resume when it ends.")
+		broadcastSnapshot(ctx, db, dispatcher, s, nil)
+	case "tournament_break_end":
+		s.TournamentBreak = false
+		narrate(dispatcher, s, "Break's over — dealing back in.")
 		broadcastSnapshot(ctx, db, dispatcher, s, nil)
 	case "blind_update":
 		if v, ok := sig["small_blind"].(float64); ok {
