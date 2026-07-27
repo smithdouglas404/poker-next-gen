@@ -215,14 +215,32 @@ func (t *Table) SeatedCount() int {
 	return n
 }
 
+// SitDown seats a player, clamping the buy-in to [MinBuyInCents, MaxBuyInCents].
 func (t *Table) SitDown(seat int, userID, username string, buyIn int64) error {
+	return t.sitDown(seat, userID, username, buyIn, false)
+}
+
+// SitDownUnlimited is SitDown without the MaxBuyInCents cap, for tables
+// configured "Unlimited buy-in (play money)" (MatchState.NoMaxBuyIn — real-money
+// tables can never set it). The floor still applies.
+//
+// The caller (reserveBuyIn) must clamp the SAME way before debiting the wallet —
+// this function does not know what was actually charged, only what the seat
+// should show. A mismatch between the two would mean either the wallet is
+// charged more than the stack the player receives (money destroyed) or the
+// stack shows more than was ever charged (chips minted from nothing).
+func (t *Table) SitDownUnlimited(seat int, userID, username string, buyIn int64) error {
+	return t.sitDown(seat, userID, username, buyIn, true)
+}
+
+func (t *Table) sitDown(seat int, userID, username string, buyIn int64, allowUnlimited bool) error {
 	if seat < 0 || seat >= t.cap() {
 		return fmt.Errorf("invalid seat")
 	}
 	if t.Seats[seat] != nil {
 		return fmt.Errorf("seat taken")
 	}
-	buyIn = ClampBuyIn(buyIn)
+	buyIn = ClampBuyInBand(buyIn, allowUnlimited)
 	t.Seats[seat] = &Seat{
 		Index:    seat,
 		UserID:   userID,

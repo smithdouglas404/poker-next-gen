@@ -817,6 +817,24 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				sendError(dispatcher, presence, "invalid_payload", err.Error())
 				continue
 			}
+			// One seat per player, per table. Table.SitDown only refuses a seat that
+			// is already occupied — nothing stopped the SAME player from sitting a
+			// second, empty seat at this table, which hands them two hole-card
+			// hands and two actions per betting round against a field that only
+			// gets one each. A modified client could send OpSitDown twice with two
+			// different seat indices; nothing server-side ever checked for it.
+			alreadySeated := false
+			for _, seat := range s.Table.Seats {
+				if seat != nil && seat.UserID == userID {
+					alreadySeated = true
+					break
+				}
+			}
+			if alreadySeated {
+				sendError(dispatcher, presence, "already_seated", "you already have a seat at this table")
+				continue
+			}
+
 			buyIn := s.BuyIn
 			if req.BuyIn > 0 {
 				buyIn = req.BuyIn
@@ -990,9 +1008,20 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			if username == "" {
 				username = fmt.Sprintf("Player_%s", userID[:4])
 			}
-			if err := s.Table.SitDown(req.Seat, userID, username, buyIn); err != nil {
+			// Must clamp the same way reserveBuyIn just did — the stack the seat
+			// shows and the amount the wallet was actually charged have to be the
+			// same number, or the table either destroys the difference (stack
+			// under-clamped relative to the debit) or mints it from nothing
+			// (stack over-clamped relative to the debit).
+			sitErr := error(nil)
+			if s.NoMaxBuyIn {
+				sitErr = s.Table.SitDownUnlimited(req.Seat, userID, username, buyIn)
+			} else {
+				sitErr = s.Table.SitDown(req.Seat, userID, username, buyIn)
+			}
+			if sitErr != nil {
 				releaseBuyIn(ctx, logger, db, s, req.Seat, userID, buyIn)
-				sendError(dispatcher, presence, "sit_failed", err.Error())
+				sendError(dispatcher, presence, "sit_failed", sitErr.Error())
 				continue
 			}
 			s.SeatWallet[req.Seat] = wallet
@@ -2198,7 +2227,13 @@ func clubAcceptsGlobal(ctx context.Context, db *sql.DB, clubID string) bool {
 // Tournaments are director-managed (no wallet debit here). The player's `wallet`
 // preference no longer selects the source for registered players — the rule does.
 func reserveBuyIn(ctx context.Context, db *sql.DB, s *MatchState, userID string, amount int64, wallet string, guest bool) string {
-	amount = poker.ClampBuyIn(amount)
+	// s.NoMaxBuyIn, not the unconditional global cap: this used to hard-clamp
+	// every buy-in to poker.MaxBuyInCents ($1,000) regardless of the table's own
+	// "Unlimited buy-in (play money)" setting, silently downsizing every buy-in
+	// on a table configured for exactly the opposite. NoMaxBuyIn can never be
+	// true on a real-money table (gated at match init on realMoneyEnabled()), so
+	// this only relaxes the cap where the table already can't move real money.
+	amount = poker.ClampBuyInBand(amount, s.NoMaxBuyIn)
 	if s.TournamentID != "" {
 		return "tournament" // director-managed; no wallet debit
 	}
@@ -2557,7 +2592,7 @@ func standUpBusted(ctx context.Context, logger runtime.Logger, db *sql.DB, dispa
 			continue
 		}
 		if s.AutoBuyBackCents > 0 && !seat.IsBot {
-			topUp := poker.ClampBuyIn(s.AutoBuyBackCents)
+			topUp := poker.ClampBuyInBand(s.AutoBuyBackCents, s.NoMaxBuyIn)
 			// Respect the table band + any universal wallet cap on the seat.
 			if topUp < s.minBuyIn() {
 				topUp = s.minBuyIn()
