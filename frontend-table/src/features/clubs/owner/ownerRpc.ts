@@ -143,6 +143,18 @@ export const ownerApi = {
       can_configure: canConfigure,
     }),
   /**
+   * Revoke an operator seat (club_owner_remove). AddOwner had no inverse — a
+   * departed partner kept their equity and operator access permanently, and a
+   * seat granted in error could never be corrected. The server refuses to
+   * remove a club's only owner, and refuses removing an owner whose licence
+   * nothing else would cover; surface either message verbatim.
+   */
+  removeOwner: (clubId: string, userId: string) =>
+    call<{ ok: boolean; removed_role: string }>("club_owner_remove", {
+      club_id: clubId,
+      user_id: userId,
+    }),
+  /**
    * Hand primary ownership to another member (club_transfer_ownership).
    *
    * This RPC shipped with the club backend and its only caller lived in

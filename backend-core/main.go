@@ -38,6 +38,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"club_create":              rpc.ClubCreate,
 		"club_list":                rpc.ClubList,
 		"club_owner_add":           rpc.ClubOwnerAdd,
+		"club_owner_remove":        rpc.ClubOwnerRemove,
 		"club_permissions_set":     rpc.ClubPermissionsSet,
 		"club_permissions_list":    rpc.ClubPermissionsList,
 		"club_get":                 rpc.ClubGet,

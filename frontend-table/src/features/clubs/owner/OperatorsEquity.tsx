@@ -70,6 +70,37 @@ export function OperatorsEquity({
 
   useEffect(loadLicence, [loadLicence]);
 
+  // Seat removal state.
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [removeMsg, setRemoveMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const removeSeat = async (op: RosterRow) => {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        `Remove ${op.username}'s ${op.role} seat from ${clubName || "this club"}?\n\n` +
+          "They lose operator access and their equity split. This cannot be undone from here.",
+      )
+    ) {
+      return;
+    }
+    setRemovingId(op.user_id);
+    setRemoveMsg(null);
+    try {
+      const res = await ownerApi.removeOwner(clubId, op.user_id);
+      setRemoveMsg({ ok: true, text: `Removed ${op.username}'s ${res.removed_role} seat.` });
+      loadLicence();
+      onChanged();
+    } catch (e) {
+      // The server refuses to remove a club's only owner, and refuses removing
+      // an owner whose licence nothing else would cover — both messages tell
+      // the operator exactly what to do instead, so show them verbatim.
+      setRemoveMsg({ ok: false, text: e instanceof Error ? e.message : "Could not remove that seat." });
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
   // Transfer is irreversible from this side — the outgoing owner is demoted to
   // manager and cannot transfer it back. Name the consequence before the click,
   // not in a toast afterwards.
@@ -233,16 +264,32 @@ export function OperatorsEquity({
             <p className="font-display text-lg font-semibold text-white">Current Operators</p>
             {operators.length === 0 && <p className="text-sm text-white/45">No operator seats yet.</p>}
             {operators.map((op) => (
-              <div key={op.user_id} className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-black/30 px-3 py-2">
-                <div>
-                  <p className="text-sm font-medium text-white">{op.username}</p>
+              <div key={op.user_id} className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-black/30 px-3 py-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-white">{op.username}</p>
                   <p className="text-[11px] text-white/45">{op.role}{op.can_configure ? " · can configure" : ""}</p>
                 </div>
-                <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gold">
-                  {op.role}
-                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gold">
+                    {op.role}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void removeSeat(op)}
+                    disabled={disabled || removingId === op.user_id}
+                    aria-label={`Remove ${op.username}'s seat`}
+                    className="rounded-md px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-white/40 transition hover:bg-brand/10 hover:text-brand disabled:opacity-30"
+                  >
+                    {removingId === op.user_id ? "…" : "Remove"}
+                  </button>
+                </div>
               </div>
             ))}
+            {removeMsg && (
+              <p className={cn("text-[12px]", removeMsg.ok ? "text-green" : "text-brand")}>
+                {removeMsg.text}
+              </p>
+            )}
           </div>
 
           <div className={cn(GLASS_PANEL, "flex flex-col gap-3 p-5")}>

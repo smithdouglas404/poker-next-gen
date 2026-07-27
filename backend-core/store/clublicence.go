@@ -113,6 +113,49 @@ func PostTransferOwnerSeats(owners []models.Owner, fromUser, toUser string) []st
 	return out
 }
 
+// PostRemovalOwnerSeats is who would hold an owner-role seat after
+// `removedUser`'s seat is revoked. Pure and sorted for the same testability
+// reason as PostTransferOwnerSeats — unlike transfer, removal has no
+// promotion to offset the loss, so this is strictly "the others".
+func PostRemovalOwnerSeats(owners []models.Owner, removedUser string) []string {
+	seen := map[string]bool{}
+	out := []string{}
+	for _, o := range owners {
+		if o.Role != "owner" || o.UserID == removedUser || seen[o.UserID] {
+			continue
+		}
+		seen[o.UserID] = true
+		out = append(out, o.UserID)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// LicenceAfterRemoval evaluates the licence the club WOULD have if `removedUser`
+// no longer held their seat.
+//
+// Removing an owner is the same hazard transfer is: if they were the club's
+// licensee, revoking their seat can revoke the club's authority to run cash
+// games with no warning.
+func LicenceAfterRemoval(ctx context.Context, db *sql.DB, clubID, removedUser string) ClubLicence {
+	lic := ClubLicence{ClubID: clubID}
+	owners, err := NewClubStore(db).ListOwners(ctx, clubID)
+	if err != nil {
+		lic.Reason = "could not verify the club's licence"
+		return lic
+	}
+	for _, userID := range PostRemovalOwnerSeats(owners, removedUser) {
+		lic.OwnersChecked++
+		if ok, _ := QualifiesAsLicensee(ctx, db, userID); ok {
+			lic.CanHostCash = true
+			lic.LicensedBy = userID
+			return lic
+		}
+	}
+	lic.Reason = "no remaining owner would hold a membership and verified identity"
+	return lic
+}
+
 // LicenceAfterTransfer evaluates the licence the club WOULD have once primary
 // ownership moves from one member to another.
 //

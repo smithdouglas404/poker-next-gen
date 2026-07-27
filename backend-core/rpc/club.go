@@ -510,6 +510,88 @@ func ClubOwnerAdd(ctx context.Context, logger runtime.Logger, db *sql.DB, nk run
 	return string(out), nil
 }
 
+// ClubOwnerRemove revokes an operator seat (owner/manager/agent/moderator).
+//
+// AddOwner had no inverse: seats could be granted and never revoked, so a
+// departed partner kept their equity and operator access permanently, and a
+// seat added by mistake could never be corrected.
+//
+// Removing an owner-role seat is gated stricter than granting one, for the same
+// reason club_delete and club_transfer_ownership already are: it can end
+// someone's stake in the club and, if they were the licensee, the club's
+// authority to run cash games. Removing a manager/agent/moderator seat only
+// needs PermSettings, same as granting one.
+func ClubOwnerRemove(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	var req struct {
+		ClubID string `json:"club_id"`
+		UserID string `json:"user_id"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" || req.UserID == "" {
+		return "", runtime.NewError("club_id and user_id required", 3)
+	}
+	clubStore := store.NewClubStore(db)
+	owners, err := clubStore.ListOwners(ctx, req.ClubID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	var target *models.Owner
+	for i := range owners {
+		if owners[i].UserID == req.UserID {
+			target = &owners[i]
+			break
+		}
+	}
+	if target == nil {
+		return "", runtime.NewError("that user does not hold an operator seat here", 5)
+	}
+
+	var callerID2 string
+	if target.Role == "owner" {
+		// Removing a primary owner is as consequential as club_delete or
+		// club_transfer_ownership — gated the same way, not by PermSettings, which
+		// a configuring manager also holds.
+		callerID2, err = clubsextRequireOwner(ctx, db, req.ClubID)
+		if err != nil {
+			return "", err
+		}
+		ownerSeats := 0
+		for _, o := range owners {
+			if o.Role == "owner" {
+				ownerSeats++
+			}
+		}
+		if ownerSeats <= 1 {
+			return "", runtime.NewError(
+				"this is the club's only owner — transfer ownership instead of removing it, or the club would be left without one", 9)
+		}
+		// Same hazard as transfer, without transfer's promotion to offset it: if
+		// this owner is the club's licensee, removing them can revoke its
+		// authority to run cash games with no warning at all.
+		if store.LicenceFor(ctx, db, req.ClubID).CanHostCash &&
+			!store.LicenceAfterRemoval(ctx, db, req.ClubID, req.UserID).CanHostCash {
+			return "", runtime.NewError(
+				"this club runs cash games on this owner's licence and no other qualified owner remains — "+
+					"add another qualified owner first, or transfer ownership to one before removing this seat", 9)
+		}
+	} else {
+		if callerID2, err = requireClubPermission(ctx, db, req.ClubID, store.PermSettings); err != nil {
+			return "", err
+		}
+	}
+
+	removed, err := clubStore.RemoveOwner(ctx, req.ClubID, req.UserID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	if !removed {
+		return "", runtime.NewError("that user does not hold an operator seat here", 5)
+	}
+	_ = store.NewClubExtStore(db).LogActivity(ctx, req.ClubID, callerID2, "owner_seat_removed",
+		"removed "+target.Role+" seat for "+req.UserID)
+	out, _ := json.Marshal(map[string]interface{}{"ok": true, "removed_role": target.Role})
+	return string(out), nil
+}
+
 func BalanceAllocate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	var req models.PlayerAllocatedBalance
 	if err := json.Unmarshal([]byte(payload), &req); err != nil {

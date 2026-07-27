@@ -83,6 +83,23 @@ func (s *ClubStore) AddOwner(ctx context.Context, o *models.Owner) error {
 	return err
 }
 
+// RemoveOwner revokes an operator seat (owner/manager/agent). Reports whether a
+// row was actually removed, so the caller can tell "removed" from "already
+// wasn't there" — the latter must not be reported as success.
+//
+// AddOwner had no inverse: seats could be granted and never revoked, so a
+// departed partner kept their equity and operator access permanently, and
+// there was no way to correct a seat added in error.
+func (s *ClubStore) RemoveOwner(ctx context.Context, clubID, userID string) (bool, error) {
+	res, err := s.db.ExecContext(ctx,
+		`DELETE FROM poker_owner WHERE club_id=$1 AND user_id=$2`, clubID, userID)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
 // CountOwnedClubs returns how many active clubs the user owns (role='owner').
 // Used to enforce the tier's club-create limit.
 func (s *ClubStore) CountOwnedClubs(ctx context.Context, userID string) (int, error) {

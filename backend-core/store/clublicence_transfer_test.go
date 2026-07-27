@@ -86,3 +86,68 @@ func TestPostTransferOwnerSeats(t *testing.T) {
 		})
 	}
 }
+
+// Removal has no promotion to offset the loss, unlike transfer — so this is
+// strictly "the remaining owner-role seats, minus one".
+func TestPostRemovalOwnerSeats(t *testing.T) {
+	owner := func(id, role string) models.Owner {
+		return models.Owner{UserID: id, Role: role}
+	}
+
+	cases := []struct {
+		name    string
+		owners  []models.Owner
+		removed string
+		want    []string
+	}{
+		{
+			name:    "sole owner removed leaves nobody",
+			owners:  []models.Owner{owner("alice", "owner")},
+			removed: "alice",
+			want:    []string{},
+		},
+		{
+			name: "a co-owner survives removal and can still license the club",
+			owners: []models.Owner{
+				owner("alice", "owner"),
+				owner("carol", "owner"),
+			},
+			removed: "alice",
+			want:    []string{"carol"},
+		},
+		{
+			name: "managers and agents never enter the set, however senior",
+			owners: []models.Owner{
+				owner("alice", "owner"),
+				owner("bob", "owner"),
+				owner("dan", "manager"),
+				owner("erin", "agent"),
+			},
+			removed: "alice",
+			want:    []string{"bob"},
+		},
+		{
+			name: "removing a manager leaves the owner set untouched",
+			owners: []models.Owner{
+				owner("alice", "owner"),
+				owner("dan", "manager"),
+			},
+			removed: "dan",
+			want:    []string{"alice"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := PostRemovalOwnerSeats(tc.owners, tc.removed)
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("seats = %v, want %v", got, tc.want)
+			}
+			for _, id := range got {
+				if id == tc.removed {
+					t.Fatalf("removed owner %q still in the owner set", tc.removed)
+				}
+			}
+		})
+	}
+}
