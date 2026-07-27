@@ -85,6 +85,12 @@ func (s *DailyBonusStore) Claim(ctx context.Context, userID string, chips int64)
 		VALUES ($1,$2,$3,$4,'daily_bonus')`, NewID("wl"), userID, chips, after); err != nil {
 		return false, 0, err
 	}
+	// Double-entry: a promotional grant is a real cost to the house, funded from
+	// a house account so the books show what promotions are costing.
+	if err := postLedgerKind(ctx, tx, "bonus",
+		AcctHouseBonus, UserAcct(userID), chips, "daily_bonus"); err != nil {
+		return false, 0, err
+	}
 	if err := tx.Commit(); err != nil {
 		return false, 0, err
 	}

@@ -196,6 +196,7 @@ export type AdminSection =
   | "platform"
   | "cashgames"
   | "rewards"
+  | "ledger"
   | "audit";
 
 /** A pending reward redemption awaiting operator fulfilment (reward_redemptions_pending). */
@@ -211,4 +212,19 @@ export interface RewardRedemptionRow {
   voucher_code: string;
   created_at: string;
   fulfilled_at?: string | null;
+}
+
+/** One account's balance in the double-entry ledger (ledger_trial_balance). */
+export interface LedgerAccountBalance {
+  account: string;
+  balance_minor: number;
+}
+
+/** One posting in an account's audit trail (ledger_entries). */
+export interface LedgerEntryRow {
+  txn_id: string;
+  account: string;
+  amount_minor: number;
+  reason: string;
+  created_at: string;
 }

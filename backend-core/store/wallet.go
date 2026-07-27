@@ -110,16 +110,21 @@ func (s *WalletStore) Debit(ctx context.Context, userID string, amount int64, re
 // existing DB tx: `amount` moves from `from` (debited) to `to` (credited). The
 // two legs sum to zero, so the global ledger trial balance stays invariantly 0.
 func postLedgerLegs(ctx context.Context, tx *sql.Tx, from, to string, amount int64, reason string) error {
-	txnID := NewID("ltx")
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO poker_ledger_txn (id,kind,ref,memo) VALUES ($1,'wallet',$2,$3)`,
-		txnID, from, reason); err != nil {
-		return err
-	}
-	_, err := tx.ExecContext(ctx, `
-		INSERT INTO poker_ledger_entry (txn_id,account,amount_minor,reason)
-		VALUES ($1,$2,$3,$5),($1,$4,$6,$5)`,
-		txnID, from, -amount, to, reason, amount)
+	return postLedgerKind(ctx, tx, "wallet", from, to, amount, reason)
+}
+
+// postLedgerKind is postLedgerLegs with an explicit transaction kind, so a
+// trial balance can tell a deposit from a withdrawal from a trade rather than
+// seeing every movement filed as "wallet".
+//
+// It routes through PostTx rather than writing the two rows itself: the balance
+// assertion belongs in one place, and a hand-rolled INSERT is exactly how a leg
+// goes missing.
+func postLedgerKind(ctx context.Context, tx *sql.Tx, kind, from, to string, amount int64, reason string) error {
+	_, err := PostTx(ctx, tx, kind, from, reason, []Posting{
+		{Account: from, AmountMinor: -amount, Reason: reason},
+		{Account: to, AmountMinor: amount, Reason: reason},
+	})
 	return err
 }
 

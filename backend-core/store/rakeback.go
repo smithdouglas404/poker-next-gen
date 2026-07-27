@@ -76,6 +76,12 @@ func (s *RakebackStore) Claim(ctx context.Context, userID string) (int64, error)
 		VALUES ($1,$2,$3,$4,'rakeback_claim')`, NewID("wl"), userID, amount, after); err != nil {
 		return 0, err
 	}
+	// Double-entry: rakeback is the house returning a share of collected rake,
+	// so it is funded from a house account rather than appearing from nowhere.
+	if err := postLedgerKind(ctx, tx, "rakeback",
+		AcctHouseRakeback, UserAcct(userID), amount, "rakeback_claim"); err != nil {
+		return 0, err
+	}
 	if err := tx.Commit(); err != nil {
 		return 0, err
 	}

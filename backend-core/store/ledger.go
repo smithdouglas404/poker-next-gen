@@ -25,27 +25,62 @@ type Posting struct {
 // ErrUnbalanced is returned when postings do not sum to zero.
 var ErrUnbalanced = errors.New("ledger postings must sum to zero")
 
-// Post writes a balanced transaction atomically. It rejects (and writes nothing)
-// unless the postings sum to zero and there are at least two legs.
-func (s *LedgerStore) Post(ctx context.Context, kind, ref, memo string, postings []Posting) (string, error) {
+// ValidatePostings enforces the one invariant the whole ledger rests on: a
+// transaction has at least two named legs and they sum to zero.
+//
+// Separate from the write so it can be exercised without a database. Every
+// money path in the app now routes through it, so a regression here would not
+// corrupt one feature — it would make the trial balance lie, which is the one
+// number an operator has no independent way to check.
+func ValidatePostings(postings []Posting) error {
 	if len(postings) < 2 {
-		return "", errors.New("a transaction needs at least two postings")
+		return errors.New("a transaction needs at least two postings")
 	}
 	var sum int64
 	for _, p := range postings {
 		if p.Account == "" {
-			return "", errors.New("posting account is required")
+			return errors.New("posting account is required")
 		}
 		sum += p.AmountMinor
 	}
 	if sum != 0 {
-		return "", ErrUnbalanced
+		return ErrUnbalanced
 	}
+	return nil
+}
+
+// Post writes a balanced transaction atomically. It rejects (and writes nothing)
+// unless the postings sum to zero and there are at least two legs.
+func (s *LedgerStore) Post(ctx context.Context, kind, ref, memo string, postings []Posting) (string, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return "", err
 	}
 	defer func() { _ = tx.Rollback() }()
+	txnID, err := PostTx(ctx, tx, kind, ref, memo, postings)
+	if err != nil {
+		return "", err
+	}
+	if err := tx.Commit(); err != nil {
+		return "", err
+	}
+	return txnID, nil
+}
+
+// PostTx is Post inside a transaction the caller already owns.
+//
+// This exists because the callers that most need the ledger cannot use Post:
+// every wallet mutation happens inside its own transaction alongside the balance
+// update, and a ledger write that opened a second transaction would not be
+// atomic with the money it is supposed to record. Seven of the nine places that
+// move chips took the obvious way out and simply skipped the double-entry
+// ledger — which left the trial balance reporting "balanced" while blind to
+// deposits, withdrawals and every marketplace trade. Same validation, same
+// transaction as the money.
+func PostTx(ctx context.Context, tx *sql.Tx, kind, ref, memo string, postings []Posting) (string, error) {
+	if err := ValidatePostings(postings); err != nil {
+		return "", err
+	}
 	txnID := NewID("ltx")
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO poker_ledger_txn (id, kind, ref, memo) VALUES ($1,$2,$3,$4)`,
@@ -59,11 +94,33 @@ func (s *LedgerStore) Post(ctx context.Context, kind, ref, memo string, postings
 			return "", err
 		}
 	}
-	if err := tx.Commit(); err != nil {
-		return "", err
-	}
 	return txnID, nil
 }
+
+// Ledger account naming. Every posting names an account on one of three sides,
+// and keeping the prefixes fixed is what makes a trial balance readable:
+//
+//	user:<id>      a player's chip balance
+//	house:<reason> platform-side accounts (rake, fees, bonuses, pending payouts)
+//	external:<x>   the world outside the platform — the payment gateways
+//
+// The external accounts are what make deposits and withdrawals balance. Real
+// money entering is not created from nothing: it moves from external:deposit
+// into the player. Money leaving moves out to external:payout. Without those
+// legs the trial balance could only ever be reconciled by ignoring the two
+// flows that actually matter.
+const (
+	AcctExternalDeposit = "external:deposit"
+	AcctExternalPayout  = "external:payout"
+	// Funds held between a withdrawal request and its approval or rejection.
+	AcctHouseWithdrawalPending = "house:withdrawal_pending"
+	AcctHouseRakeback          = "house:rakeback"
+	AcctHouseBonus             = "house:bonus"
+	AcctHouseMarketplaceFee    = "house:marketplace_fee"
+)
+
+// UserAcct is the ledger account for a player's chip balance.
+func UserAcct(userID string) string { return "user:" + userID }
 
 // Transfer is the common 2-leg case: move amount (>0) from one account to another.
 func (s *LedgerStore) Transfer(ctx context.Context, from, to string, amountMinor int64, kind, ref, reason string) (string, error) {

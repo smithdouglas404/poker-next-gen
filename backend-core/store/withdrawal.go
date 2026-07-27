@@ -65,6 +65,14 @@ func (s *WithdrawalStore) CreateRequest(ctx context.Context, userID string, amou
 		VALUES ($1,$2,$3,$4,$5)`, NewID("wl"), userID, -amountCents, after, "withdrawal_hold:"+id); err != nil {
 		return "", err
 	}
+	// Double-entry: the funds leave the player and sit in a pending-payout
+	// account until the request is approved or rejected. Modelling the hold as a
+	// real account is what lets an operator answer "how much do we owe on
+	// unapproved withdrawals" from the books rather than by guessing.
+	if err := postLedgerKind(ctx, tx, "withdrawal",
+		UserAcct(userID), AcctHouseWithdrawalPending, amountCents, "withdrawal_hold:"+id); err != nil {
+		return "", err
+	}
 	if err := tx.Commit(); err != nil {
 		return "", err
 	}
@@ -73,16 +81,35 @@ func (s *WithdrawalStore) CreateRequest(ctx context.Context, userID string, amou
 
 // Approve marks a pending withdrawal paid (funds were already held on request).
 func (s *WithdrawalStore) Approve(ctx context.Context, id, payoutID string) error {
-	res, err := s.db.ExecContext(ctx, `
-		UPDATE poker_withdrawal SET status='paid', gateway_payout_id=$2, updated_at=NOW()
-		WHERE id=$1 AND status='pending'`, id, payoutID)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	defer tx.Rollback()
+
+	// RETURNING the amount rather than re-reading it: the status predicate is
+	// what makes this idempotent, and the row it claimed is the one to post.
+	var amount int64
+	err = tx.QueryRowContext(ctx, `
+		UPDATE poker_withdrawal SET status='paid', gateway_payout_id=$2, updated_at=NOW()
+		WHERE id=$1 AND status='pending'
+		RETURNING amount_cents`, id, payoutID).Scan(&amount)
+	if err == sql.ErrNoRows {
 		return fmt.Errorf("withdrawal not pending")
 	}
-	return nil
+	if err != nil {
+		return err
+	}
+	// Double-entry: approval is the moment the money actually leaves the
+	// platform, so it moves from the pending-payout account out to the world.
+	// The player's chips were already debited at request time (the hold), which
+	// is why this leg is house-to-external and not user-to-external — posting it
+	// against the user would debit them twice.
+	if err := postLedgerKind(ctx, tx, "withdrawal_paid",
+		AcctHouseWithdrawalPending, AcctExternalPayout, amount, "withdrawal_paid:"+id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // Reject refunds the held funds and marks the withdrawal rejected, in ONE
@@ -115,6 +142,11 @@ func (s *WithdrawalStore) Reject(ctx context.Context, id, reason string) error {
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO poker_wallet_ledger (id, user_id, delta, balance_after, reason)
 		VALUES ($1,$2,$3,$4,$5)`, NewID("wl"), userID, amount, after, "withdrawal_refund:"+id); err != nil {
+		return err
+	}
+	// The mirror of the hold: rejected funds come back out of pending-payout.
+	if err := postLedgerKind(ctx, tx, "withdrawal_refund",
+		AcctHouseWithdrawalPending, UserAcct(userID), amount, "withdrawal_refund:"+id); err != nil {
 		return err
 	}
 	return tx.Commit()

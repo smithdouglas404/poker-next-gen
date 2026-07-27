@@ -190,6 +190,28 @@ func (s *MarketplaceStore) Buy(ctx context.Context, listingID, buyerID string, f
 		}
 	}
 
+	// Double-entry: ONE transaction with three legs, not three transactions.
+	//
+	// A trade is a single economic event — the buyer's price is exactly the
+	// seller's net plus the platform's fee — and splitting it into separate
+	// two-leg postings would lose that relationship, leaving a reader unable to
+	// tell which fee belonged to which sale. The three legs sum to zero by
+	// construction (sellerNet = price - fee), and PostTx refuses the write if
+	// that ever stops being true, so a fee-rounding change cannot quietly break
+	// the books.
+	postings := []Posting{
+		{Account: UserAcct(buyerID), AmountMinor: -price, Reason: "marketplace_buy:" + listingID},
+		{Account: UserAcct(sellerID), AmountMinor: sellerNet, Reason: "marketplace_sale:" + listingID},
+	}
+	if fee > 0 {
+		postings = append(postings, Posting{
+			Account: AcctHouseMarketplaceFee, AmountMinor: fee, Reason: "marketplace_fee:" + listingID,
+		})
+	}
+	if _, err := PostTx(ctx, tx, "marketplace", listingID, "marketplace trade", postings); err != nil {
+		return 0, err
+	}
+
 	// Transfer ownership. The row counts are asserted rather than assumed: the
 	// checks above hold the listing under FOR UPDATE, but the inventory rows are
 	// not locked by that, so this is the point where a concurrent transfer would

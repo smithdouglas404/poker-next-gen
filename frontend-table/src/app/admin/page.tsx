@@ -10,6 +10,7 @@ import { AntiCheat } from "@/features/admin/sections/AntiCheat";
 import { Audit } from "@/features/admin/sections/Audit";
 import { CashGames } from "@/features/admin/sections/CashGames";
 import { Rewards } from "@/features/admin/sections/Rewards";
+import { Ledger } from "@/features/admin/sections/Ledger";
 import { Finance } from "@/features/admin/sections/Finance";
 import { Kyc } from "@/features/admin/sections/Kyc";
 import { Overview } from "@/features/admin/sections/Overview";
@@ -138,6 +139,7 @@ export default function AdminPage() {
         {section === "finance" && <Finance notify={notify} />}
         {section === "cashgames" && <CashGames notify={notify} />}
         {section === "rewards" && <Rewards notify={notify} />}
+        {section === "ledger" && <Ledger notify={notify} />}
         {section === "platform" && <Platform notify={notify} />}
         {section === "audit" && <Audit notify={notify} />}
       </AdminShell>

@@ -23,6 +23,8 @@ import type {
   SupportTicket,
   SystemLock,
   UserRow,
+  LedgerAccountBalance,
+  LedgerEntryRow,
   RewardRedemptionRow,
   WithdrawalRow,
 } from "./types";
@@ -95,6 +97,17 @@ export const adminApi = {
     call<{ redemptions: RewardRedemptionRow[] }>("reward_redemptions_pending", { limit }),
   rewardRedemptionFulfil: (id: string, status: "fulfilled" | "cancelled") =>
     call<{ status: string; points_refunded: number }>("reward_redemption_fulfil", { id, status }),
+
+  // Double-entry ledger. The audit backstop for every other money surface: if
+  // the trial balance is non-zero the books have drifted, and no other screen
+  // would show it.
+  ledgerTrialBalance: () =>
+    call<{ accounts: LedgerAccountBalance[]; total: number; balanced: boolean }>(
+      "ledger_trial_balance",
+      {},
+    ),
+  ledgerEntries: (account: string, limit = 100) =>
+    call<{ entries: LedgerEntryRow[] }>("ledger_entries", { account, limit }),
 
   // Anti-cheat: antibot / collusion / HITL / IP rules
   antibotScan: (limit = 50) =>

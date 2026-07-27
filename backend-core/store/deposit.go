@@ -93,6 +93,14 @@ func (s *DepositStore) MarkCredited(ctx context.Context, id string) (bool, error
 		VALUES ($1,$2,$3,$4,$5)`, NewID("wl"), userID, amount, after, "deposit:"+id); err != nil {
 		return false, err
 	}
+	// Double-entry: chips are not conjured on deposit, they move in from the
+	// outside world. Without this leg the deposit path was invisible to the trial
+	// balance — which still reported "balanced", because what it could see was
+	// balanced. An audit that cannot see money entering is worse than none.
+	if err := postLedgerKind(ctx, tx, "deposit",
+		AcctExternalDeposit, UserAcct(userID), amount, "deposit:"+id); err != nil {
+		return false, err
+	}
 	if err := tx.Commit(); err != nil {
 		return false, err
 	}
