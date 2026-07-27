@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 )
 
@@ -253,18 +254,61 @@ func scanRedemptions(rows *sql.Rows) ([]RewardRedemption, error) {
 
 // FulfilRedemption marks a redemption fulfilled (or cancelled). Returns false if
 // the redemption is not found or already resolved.
-func (s *RewardsStore) FulfilRedemption(ctx context.Context, id, status string) (bool, error) {
-	if status != "fulfilled" && status != "cancelled" {
-		status = "fulfilled"
+// RedemptionFulfilled / RedemptionCancelled are the only two terminal states an
+// operator may move a pending redemption to.
+const (
+	RedemptionFulfilled = "fulfilled"
+	RedemptionCancelled = "cancelled"
+)
+
+// ValidRedemptionStatus reports whether a status is one an operator may set.
+//
+// This used to be a silent coercion — anything that was not "cancelled" became
+// "fulfilled". That turned a typo into the WORST possible outcome: an operator
+// meaning to cancel and refund would instead mark the reward delivered, and the
+// player would lose the points with nothing to show. An unrecognised status is
+// now an error, so the mistake is visible instead of expensive.
+func ValidRedemptionStatus(status string) bool {
+	return status == RedemptionFulfilled || status == RedemptionCancelled
+}
+
+// It returns the resolved redemption so the caller can compensate the player on
+// a cancellation — the row carries the user, the points spent and the item, and
+// re-reading it separately would race another admin resolving the same one.
+// A nil return means the redemption was missing or already resolved.
+func (s *RewardsStore) FulfilRedemption(ctx context.Context, id, status string) (*RewardRedemption, error) {
+	if !ValidRedemptionStatus(status) {
+		return nil, errors.New("status must be fulfilled or cancelled")
 	}
-	res, err := s.db.ExecContext(ctx, `
+	// RETURNING, not ExecContext + a follow-up SELECT: the `status='pending'`
+	// predicate is what makes this idempotent under two admins clicking at once,
+	// and the returned row is the one this call actually claimed.
+	var r RewardRedemption
+	err := s.db.QueryRowContext(ctx, `
 		UPDATE poker_reward_redemption SET status=$2, fulfilled_at=NOW()
-		WHERE id=$1 AND status='pending'`, id, status)
-	if err != nil {
-		return false, err
+		WHERE id=$1 AND status='pending'
+		RETURNING id, user_id, item_id, sponsor_id, title, category, points_spent, status, voucher_code, created_at, fulfilled_at`,
+		id, status,
+	).Scan(&r.ID, &r.UserID, &r.ItemID, &r.SponsorID, &r.Title, &r.Category,
+		&r.PointsSpent, &r.Status, &r.VoucherCode, &r.CreatedAt, &r.FulfilledAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
 	}
-	n, _ := res.RowsAffected()
-	return n == 1, nil
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+// IncrementStock returns a reserved unit to a limited-stock item.
+//
+// Guarded on `stock >= 0` so it never resurrects an unlimited item: stock -1 is
+// the sentinel for "no limit", and blindly incrementing it would turn an
+// unlimited reward into one with a single unit.
+func (s *RewardsStore) IncrementStock(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE poker_reward_item SET stock = stock + 1 WHERE id=$1 AND stock >= 0`, id)
+	return err
 }
 
 // RecordPointsPurchase logs a buy-points transaction.

@@ -23,6 +23,7 @@ import type {
   SupportTicket,
   SystemLock,
   UserRow,
+  RewardRedemptionRow,
   WithdrawalRow,
 } from "./types";
 
@@ -87,6 +88,13 @@ export const adminApi = {
       withdrawal_id: withdrawalId,
       reason,
     }),
+
+  // Rewards fulfilment. Both RPCs shipped with the rewards backend and had no
+  // caller, so every redemption a player paid points for sat pending forever.
+  rewardRedemptionsPending: (limit = 100) =>
+    call<{ redemptions: RewardRedemptionRow[] }>("reward_redemptions_pending", { limit }),
+  rewardRedemptionFulfil: (id: string, status: "fulfilled" | "cancelled") =>
+    call<{ status: string; points_refunded: number }>("reward_redemption_fulfil", { id, status }),
 
   // Anti-cheat: antibot / collusion / HITL / IP rules
   antibotScan: (limit = 50) =>

@@ -195,4 +195,20 @@ export type AdminSection =
   | "finance"
   | "platform"
   | "cashgames"
+  | "rewards"
   | "audit";
+
+/** A pending reward redemption awaiting operator fulfilment (reward_redemptions_pending). */
+export interface RewardRedemptionRow {
+  id: string;
+  user_id: string;
+  item_id: string;
+  sponsor_id?: string;
+  title: string;
+  category?: string;
+  points_spent: number;
+  status: string;
+  voucher_code: string;
+  created_at: string;
+  fulfilled_at?: string | null;
+}

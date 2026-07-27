@@ -21,6 +21,7 @@ const NAV: (ConsoleNavStateItem & { id: AdminSection })[] = [
   { id: "support", label: "Support", icon: "✉", group: "Operations" },
   { id: "finance", label: "Settlements", icon: "◆", group: "Operations" },
   { id: "cashgames", label: "Cash Games", icon: "♠", group: "Operations" },
+  { id: "rewards", label: "Rewards", icon: "★", group: "Operations" },
   { id: "platform", label: "Platform", icon: "⚙", group: "System" },
   { id: "audit", label: "Audit Log", icon: "▦", group: "System" },
 ];

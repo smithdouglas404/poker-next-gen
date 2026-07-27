@@ -279,13 +279,54 @@ func RewardRedemptionFulfil(ctx context.Context, logger runtime.Logger, db *sql.
 	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ID == "" {
 		return "", runtime.NewError("id required", 3)
 	}
-	ok, err := store.NewRewardsStore(db).FulfilRedemption(ctx, req.ID, req.Status)
+	// Rejected at the boundary rather than coerced. This used to default anything
+	// that was not "cancelled" to "fulfilled", so a typo marked the reward
+	// delivered and kept the player's points — the exact opposite of the
+	// operator's intent, and unrecoverable once the row left `pending`.
+	if !store.ValidRedemptionStatus(req.Status) {
+		return "", runtime.NewError("status must be \"fulfilled\" or \"cancelled\"", 3)
+	}
+	rs := store.NewRewardsStore(db)
+	red, err := rs.FulfilRedemption(ctx, req.ID, req.Status)
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
-	if !ok {
+	if red == nil {
 		return "", runtime.NewError("redemption not found or already resolved", 5)
 	}
+
+	// Cancelling has to give the player back what redeeming took. RewardRedeem
+	// debits spendable points and reserves a unit of stock BEFORE writing the
+	// row, and it compensates both if the write fails — but cancellation used to
+	// flip the status and stop there, so an operator cancelling a redemption
+	// destroyed the player's points. Points are bought with real chips
+	// (points_purchase), so this is a refund, not a scoreboard adjustment.
+	refunded := int64(0)
+	if red.Status == "cancelled" {
+		if red.PointsSpent > 0 {
+			if rerr := store.NewLoyaltyStore(db).AddSpendable(ctx, red.UserID, red.PointsSpent); rerr != nil {
+				// Do not swallow this. The status is already flipped, so a silent
+				// failure here is a player permanently down the points with a
+				// cancelled voucher and no record of why.
+				logger.Error("redemption %s cancelled but the %d-point refund failed for %s: %v",
+					red.ID, red.PointsSpent, red.UserID, rerr)
+				return "", runtime.NewError("redemption cancelled but the point refund failed — resolve manually before retrying", 13)
+			}
+			refunded = red.PointsSpent
+		}
+		// Return the reserved unit. Best-effort and deliberately after the refund:
+		// stock is inventory, points are the player's money, and if only one can
+		// succeed it must be the player's.
+		if serr := rs.IncrementStock(ctx, red.ItemID); serr != nil {
+			logger.Warn("redemption %s refunded but stock was not restored on item %s: %v", red.ID, red.ItemID, serr)
+		}
+	}
+
 	adminAuditDetail(ctx, logger, db, admin, "reward_redemption_fulfil", req.ID, req)
-	return `{"ok":true}`, nil
+	out, _ := json.Marshal(map[string]interface{}{
+		"ok":              true,
+		"status":          red.Status,
+		"points_refunded": refunded,
+	})
+	return string(out), nil
 }
