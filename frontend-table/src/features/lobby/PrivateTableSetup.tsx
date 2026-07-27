@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 
 import { formatCents, useGame } from "@/features/game/GameProvider";
@@ -11,7 +12,7 @@ import {
 } from "@/features/game/protocol";
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { BAKED_PLATE_LIST } from "@/features/table/bakedTable";
-import { Field, Input, Select } from "@/features/ui";
+import { Button, Field, Input, Select } from "@/features/ui";
 import { BTN_GOLD, GLASS_PANEL, HEADING_SM, cn } from "@/features/ui/tokens";
 
 import {
@@ -189,14 +190,17 @@ export function PrivateTableSetup({
       render_style: renderStyle || undefined,
       // Owner-chosen baked photoreal table plate (empty => cinematic felt).
       table_art: tableArt || undefined,
+      // EVERY table is hosted by a club — table_create rejects a request without
+      // one (rpc/table.go). This used to send `sponsor_club_id`, a key
+      // TableCreateRequest does not map, and only when the table was public, so
+      // the club never reached the server at all.
+      club_id: sponsorClub,
       // ---- Still forward-compat (no backend home yet): auto-away needs orbit
-      // counting (#86); operating_hours needs a schedule/window model; public +
-      // sponsor_club_id are the club-economics path (deferred). Sent so the UI
-      // state is preserved once those land. ----
+      // counting (#86); operating_hours needs a schedule/window model. Sent so
+      // the UI state is preserved once those land. ----
       invite_only: inviteOnly,
       ante: features.ante,
       public: accessType === "public",
-      sponsor_club_id: isPublic ? sponsorClub : undefined,
       auto_away_on_timeout: autoAwayTimeout,
       auto_away_below: autoAwayBelow ? autoAwayBelowN : 0,
       operating_hours: operatingHours,
@@ -356,8 +360,15 @@ export function PrivateTableSetup({
           </div>
         </Section>
 
-        {isPublic && sponsorClubs && sponsorClubs.length > 0 && (
-          <Section title="Sponsoring Club" hint="Only clubs you operate (via me_roles) can sponsor a public game.">
+        {/* Every table is hosted by a club — the server rejects a table without
+            one — so this is required for every access type, not just public.
+            It also has to say something when the host operates no club, rather
+            than silently vanishing and leaving a Create button that fails. */}
+        <Section
+          title="Game Sponsor"
+          hint="Every table is hosted by a club. Buy-ins draw the player's club balance and pots rake to the club, so a table with no club has no ledger to settle into."
+        >
+          {sponsorClubs && sponsorClubs.length > 0 ? (
             <div className="grid gap-2 sm:grid-cols-2">
               {sponsorClubs.map((c) => (
                 <button
@@ -375,8 +386,28 @@ export function PrivateTableSetup({
                 </button>
               ))}
             </div>
-          </Section>
-        )}
+          ) : (
+            <div className="rounded-xl border border-gold/25 bg-gold/[0.05] px-4 py-4">
+              <p className="text-sm font-semibold text-gold">You don&apos;t operate a club yet</p>
+              <p className="mt-1 text-[12px] leading-snug text-white/60">
+                Hosting is a club feature: you need a club to sponsor the table and a paid
+                membership with sponsor capability. Create a club, or ask an operator to add you.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link href="/clubs/new">
+                  <Button size="sm" variant="gold">
+                    Create a club
+                  </Button>
+                </Link>
+                <Link href="/membership">
+                  <Button size="sm" variant="outline">
+                    See memberships
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
+        </Section>
 
         <Section title="Table Identity">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -788,7 +819,7 @@ export function PrivateTableSetup({
 
           <button
             type="button"
-            disabled={busy || (isPublic && !sponsorClub)}
+            disabled={busy || !sponsorClub}
             onClick={() => void create()}
             className={cn(
               BTN_GOLD,

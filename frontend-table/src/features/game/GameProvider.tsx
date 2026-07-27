@@ -50,6 +50,7 @@ import {
 import { ensureSession } from "@/lib/nakama/auth";
 import { createNakamaClient, type Session, type Socket } from "@/lib/nakama/client";
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
+import { resolveSponsorClubId } from "@/features/clubs/sponsorClub";
 import { decryptCards, importSessionKey } from "@/lib/nakama/cardCrypto";
 import { soundManager } from "@/features/sound/soundManager";
 import { tauntByKey, tauntUrls } from "@/features/sound/library";
@@ -76,6 +77,9 @@ interface GameContextValue extends GameState {
     numBots?: number;
     variant?: string;
     durationMins?: number;
+    /** Club that sponsors the table. Resolved from the caller's operator seats
+     *  when omitted; hosting without one is refused server-side. */
+    clubId?: string;
   }) => Promise<void>;
   joinRoom: (matchId: string) => Promise<void>;
   joinByCode: (code: string) => Promise<void>;
@@ -316,6 +320,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
       numBots?: number;
       variant?: string;
       durationMins?: number;
+    /** Club that sponsors the table. Resolved from the caller's operator seats
+     *  when omitted; hosting without one is refused server-side. */
+    clubId?: string;
     }) => {
       const buyIn = opts?.buyIn ?? buyInCents;
       const smallBlind = Math.max(1, Math.round(opts?.smallBlind ?? DEFAULT_SMALL_BLIND_CENTS));
@@ -324,9 +331,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const numBots = Math.min(seats - 1, Math.max(0, Math.round(opts?.numBots ?? 0)));
       const variant = opts?.variant === "plo" ? "plo" : "holdem";
       const durationMins = Math.max(0, Math.round(opts?.durationMins ?? 0));
+      // Every table is hosted by a club and table_create rejects a request
+      // without one. Resolve the caller's sponsoring club rather than omitting
+      // the field, which is what every call site used to do.
+      const clubId = await resolveSponsorClubId(opts?.clubId);
       // Use the authenticated session RPC, not the http_key proxy: table_create
       // now requires a real user session (SEC-1), so the server-key path 401s.
       const data = (await callSessionRpc("table_create", {
+        club_id: clubId,
         name: opts?.name ?? (variant === "plo" ? "PLO Table" : "Hold'em Table"),
         small_blind: smallBlind,
         big_blind: bigBlind,

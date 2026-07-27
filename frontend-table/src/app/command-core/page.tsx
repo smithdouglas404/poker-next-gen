@@ -8,6 +8,7 @@ import { Chip, NeonSection, NeonSlider, NeonToggle, PreviewTile } from "@/featur
 import { TournamentBuilderWizard } from "@/features/commands/TournamentBuilderWizard";
 import { walletApi, type NowPaymentsBalanceEntry } from "@/features/wallet/walletRpc";
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
+import { resolveSponsorClubId } from "@/features/clubs/sponsorClub";
 import { BTN_GOLD, GLASS_PANEL, cn } from "@/features/ui/tokens";
 import { RequireRole } from "@/features/auth/RequireRole";
 
@@ -75,7 +76,11 @@ function CommandCorePageInner() {
     setBusy(true);
     setMsg(null);
     try {
+      // Every table is hosted by a club; table_create refuses a request without
+      // one. Resolve it rather than omitting the field.
+      const clubId = await resolveSponsorClubId();
       const res = (await callSessionRpc("table_create", {
+        club_id: clubId,
         variant,
         small_blind: smallBlind,
         big_blind: bigBlind,
