@@ -64,6 +64,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"staking_list":             rpc.StakingList,
 		"staking_open_list":        rpc.StakingOpenList,
 		"ledger_trial_balance":     rpc.LedgerTrialBalance,
+		"ledger_reconcile_opening": rpc.LedgerReconcileOpening,
 		"ledger_balance":           rpc.LedgerBalance,
 		"ledger_entries":           rpc.LedgerEntries,
 		"ledger_transfer":          rpc.LedgerTransfer,

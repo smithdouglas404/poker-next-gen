@@ -20,7 +20,7 @@ import { Button, Input } from "@/features/ui";
 
 import { adminApi, money, relTime } from "../adminRpc";
 import { Card, Empty, GoldHeading, Mono, Row, StatTile, Table, Td, Th } from "../primitives";
-import type { LedgerAccountBalance, LedgerEntryRow } from "../types";
+import type { LedgerAccountBalance, LedgerEntryRow, ReconcileReport } from "../types";
 import type { Notify } from "./shared";
 
 /** Group accounts by their namespace prefix — user: / house: / external:. */
@@ -35,6 +35,9 @@ export function Ledger({ notify }: { notify: Notify }) {
   const [balanced, setBalanced] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+
+  const [recon, setRecon] = useState<ReconcileReport | null>(null);
+  const [reconBusy, setReconBusy] = useState(false);
 
   const [account, setAccount] = useState("");
   const [entries, setEntries] = useState<LedgerEntryRow[] | null>(null);
@@ -59,9 +62,50 @@ export function Ledger({ notify }: { notify: Notify }) {
     }
   }, [notify]);
 
+  // Drift check, on every load. "Balanced" only means the postings sum to zero —
+  // it says nothing about whether they describe reality, and on a platform where
+  // the ledger was added after money was already moving they do not. Running the
+  // dry-run reconciliation alongside the trial balance is what turns the green
+  // light into a claim worth believing.
+  const checkDrift = useCallback(async () => {
+    try {
+      setRecon(await adminApi.ledgerReconcile(false));
+    } catch {
+      setRecon(null);
+    }
+  }, []);
+
   useEffect(() => {
     void load();
-  }, [load]);
+    void checkDrift();
+  }, [load, checkDrift]);
+
+  const applyReconcile = useCallback(() => {
+    const r = recon;
+    if (!r || r.lines.length === 0) return;
+    if (
+      !window.confirm(
+        `Book opening balances for ${r.lines.length} account(s)?\n\n` +
+          "This writes one balanced transaction to the ledger so account balances match the wallet and club-balance tables. " +
+          "It does not move any player's money — it records history the ledger was not keeping. Run only after reviewing the drift below.",
+      )
+    ) {
+      return;
+    }
+    void (async () => {
+      setReconBusy(true);
+      try {
+        const res = await adminApi.ledgerReconcile(true);
+        notify(`Opening balances booked for ${res.lines.length} account(s).`);
+        await load();
+        await checkDrift();
+      } catch (err) {
+        notify(err instanceof Error ? err.message : "Reconciliation failed", "err");
+      } finally {
+        setReconBusy(false);
+      }
+    })();
+  }, [recon, notify, load, checkDrift]);
 
   const openEntries = useCallback(
     (acct: string) =>
@@ -131,6 +175,11 @@ export function Ledger({ notify }: { notify: Notify }) {
           Every posting is one leg of a balanced transaction, so the sum across all accounts must be
           exactly zero. A non-zero total means chips were created or destroyed outside a balanced
           transaction — investigate before trusting any other financial screen.
+          {" "}
+          <span className="text-neutral-400">
+            Zero on its own only proves the postings balance; the drift check below is what shows
+            they match reality.
+          </span>
         </p>
 
         {failed && (
@@ -146,6 +195,79 @@ export function Ledger({ notify }: { notify: Notify }) {
           </p>
         )}
       </Card>
+
+      {/* Drift: does the ledger describe reality? */}
+      {recon && (
+        <Card>
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <GoldHeading>Reality Check</GoldHeading>
+            {recon.lines.length > 0 && (
+              <Button size="sm" variant="gold" disabled={reconBusy} onClick={applyReconcile}>
+                {reconBusy ? "Booking…" : "Book opening balances"}
+              </Button>
+            )}
+          </div>
+
+          {recon.lines.length === 0 ? (
+            <p className="mt-3 text-[13px] text-green">
+              All {recon.accounts_read} accounts match their wallet and club-balance tables. The
+              trial balance above is describing real money.
+            </p>
+          ) : (
+            <>
+              <p className="mt-3 text-[13px] leading-snug text-neutral-300">
+                <span className="font-semibold text-gold">{recon.lines.length}</span> of{" "}
+                {recon.accounts_read} accounts do not match their authoritative table, by{" "}
+                <span className="font-semibold text-gold">{money(recon.total_drift_minor)}</span> in
+                total.
+              </p>
+              <p className="mt-2 text-[12px] leading-snug text-neutral-500">
+                This is expected once: the ledger was added after the platform had been moving
+                money, and wallet opening balances were never posted. Booking opening balances
+                writes ONE balanced transaction that makes each account match its table. It moves
+                nobody&apos;s money — it records history the ledger was not keeping. A drift that
+                reappears afterwards is a live bug, not history.
+              </p>
+              <div className="mt-4">
+                <Table
+                  head={
+                    <>
+                      <Th>Account</Th>
+                      <Th className="text-right">Ledger says</Th>
+                      <Th className="text-right">Actually holds</Th>
+                      <Th className="text-right">Drift</Th>
+                    </>
+                  }
+                >
+                  {recon.lines.slice(0, 25).map((l) => (
+                    <Row key={l.account}>
+                      <Td>
+                        <Mono>{l.account}</Mono>
+                      </Td>
+                      <Td className="text-right tabular-nums text-neutral-400">
+                        {money(l.ledger_minor)}
+                      </Td>
+                      <Td className="text-right tabular-nums text-white">{money(l.actual_minor)}</Td>
+                      <Td
+                        className={`text-right tabular-nums ${
+                          l.drift_minor < 0 ? "text-brand" : "text-gold"
+                        }`}
+                      >
+                        {money(l.drift_minor)}
+                      </Td>
+                    </Row>
+                  ))}
+                </Table>
+                {recon.lines.length > 25 && (
+                  <p className="mt-2 text-[11px] text-neutral-500">
+                    Showing 25 of {recon.lines.length} drifted accounts. Booking covers all of them.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+        </Card>
+      )}
 
       {/* Accounts, grouped by namespace */}
       {loading ? (

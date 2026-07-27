@@ -25,6 +25,7 @@ import type {
   UserRow,
   LedgerAccountBalance,
   LedgerEntryRow,
+  ReconcileReport,
   RewardRedemptionRow,
   WithdrawalRow,
 } from "./types";
@@ -108,6 +109,9 @@ export const adminApi = {
     ),
   ledgerEntries: (account: string, limit = 100) =>
     call<{ entries: LedgerEntryRow[] }>("ledger_entries", { account, limit }),
+  // Dry run by default — this writes to the books.
+  ledgerReconcile: (apply = false) =>
+    call<ReconcileReport>("ledger_reconcile_opening", { apply }),
 
   // Anti-cheat: antibot / collusion / HITL / IP rules
   antibotScan: (limit = 50) =>

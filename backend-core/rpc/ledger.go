@@ -26,9 +26,9 @@ func LedgerTrialBalance(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	out, _ := json.Marshal(map[string]interface{}{
-		"accounts":   accounts,
-		"total":      total,
-		"balanced":   total == 0,
+		"accounts": accounts,
+		"total":    total,
+		"balanced": total == 0,
 	})
 	return string(out), nil
 }
@@ -109,4 +109,43 @@ func LedgerTransfer(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 	}
 	adminAuditDetail(ctx, logger, db, admin, "ledger_transfer", id, req)
 	return `{"ok":true,"txn_id":"` + id + `"}`, nil
+}
+
+// LedgerReconcileOpening books the opening balances for accounts whose history
+// predates the ledger. Admin-only, and dry-run by default.
+//
+// The ledger was added to a platform that had already been moving money, and the
+// resulting trial balance reads a serene ZERO while describing nothing: every
+// posting that ever happened was a balanced pair, so the total is right and the
+// per-account balances are fiction. Booking opening balances is what makes the
+// numbers mean something.
+//
+// `apply` must be sent explicitly. The default is a report, because this writes
+// to the books and an operator should be able to look at the drift — and satisfy
+// themselves it is history and not a live bug — before anything is posted.
+func LedgerReconcileOpening(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	admin, err := adminCaller(ctx)
+	if err != nil {
+		return "", err
+	}
+	var req struct {
+		Apply bool `json:"apply"`
+	}
+	if payload != "" {
+		_ = json.Unmarshal([]byte(payload), &req)
+	}
+	rep, err := store.NewLedgerStore(db).ReconcileOpeningBalances(ctx, !req.Apply)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	if req.Apply {
+		adminAuditDetail(ctx, logger, db, admin, "ledger_reconcile_opening", rep.TxnID, map[string]interface{}{
+			"accounts_adjusted": len(rep.Lines),
+			"total_drift_minor": rep.TotalDrift,
+		})
+		logger.Info("ledger opening balances booked: %d accounts, %d minor units, txn %s",
+			len(rep.Lines), rep.TotalDrift, rep.TxnID)
+	}
+	out, _ := json.Marshal(rep)
+	return string(out), nil
 }

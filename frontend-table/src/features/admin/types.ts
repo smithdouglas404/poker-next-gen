@@ -228,3 +228,21 @@ export interface LedgerEntryRow {
   reason: string;
   created_at: string;
 }
+
+/** One account's drift between the ledger and its authoritative table. */
+export interface ReconcileLine {
+  account: string;
+  ledger_minor: number;
+  actual_minor: number;
+  drift_minor: number;
+}
+
+/** Result of ledger_reconcile_opening (dry run or applied). */
+export interface ReconcileReport {
+  dry_run: boolean;
+  lines: ReconcileLine[];
+  total_drift_minor: number;
+  accounts_read: number;
+  posted: boolean;
+  txn_id?: string;
+}

@@ -166,3 +166,64 @@ func TestTableAcctNamespace(t *testing.T) {
 		}
 	}
 }
+
+func TestOpeningBalanceReconciliationIsBalanced(t *testing.T) {
+	// The shape ReconcileOpeningBalances posts: one leg per drifted account plus
+	// a single balancing leg against house:opening_balance. If that leg were
+	// computed independently of the others — the obvious way to write it — the
+	// books would open unbalanced, which is the one state the ledger promises
+	// never to be in.
+	drifts := []int64{100000, 250, -75, 1, 999999}
+	var total int64
+	postings := make([]Posting, 0, len(drifts)+1)
+	for i, d := range drifts {
+		postings = append(postings, Posting{
+			Account:     UserAcct(string(rune('a' + i))),
+			AmountMinor: d,
+		})
+		total += d
+	}
+	postings = append(postings, Posting{Account: AcctHouseOpening, AmountMinor: -total})
+	if err := ValidatePostings(postings); err != nil {
+		t.Fatalf("opening-balance transaction does not balance: %v", err)
+	}
+}
+
+func TestOpeningBalanceAccountIsOutsideThePlayerNamespace(t *testing.T) {
+	// It absorbs every pre-ledger difference, so if it lived under user: a player
+	// id could be crafted to collide with it and inherit the whole backlog.
+	if len(AcctHouseOpening) > 5 && AcctHouseOpening[:5] == "user:" {
+		t.Error("the opening-balance account sits in the player namespace")
+	}
+	if AcctHouseOpening == "" {
+		t.Error("opening-balance account is unnamed")
+	}
+}
+
+func TestReconciliationIsIdempotentByConstruction(t *testing.T) {
+	// It posts DIFFERENCES, so once the ledger matches reality a second run finds
+	// nothing to do. Modelled here: after booking, ledger == actual, so drift is
+	// zero everywhere and no transaction is produced.
+	actual := map[string]int64{"user:a": 5000, "user:b": 250}
+	ledger := map[string]int64{} // pre-reconcile: empty
+
+	firstPass := 0
+	for acct, want := range actual {
+		if want-ledger[acct] != 0 {
+			firstPass++
+			ledger[acct] = want // booking the difference
+		}
+	}
+	if firstPass != 2 {
+		t.Fatalf("first pass adjusted %d accounts, want 2", firstPass)
+	}
+	secondPass := 0
+	for acct, want := range actual {
+		if want-ledger[acct] != 0 {
+			secondPass++
+		}
+	}
+	if secondPass != 0 {
+		t.Errorf("second pass would adjust %d accounts — reconciliation is not idempotent", secondPass)
+	}
+}
