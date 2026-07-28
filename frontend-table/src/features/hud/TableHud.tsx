@@ -67,7 +67,6 @@ export function TableHud({ children }: { children: React.ReactNode }) {
             <ChatPanel />
           <SpectatorBar />
           <TotalInPlay />
-            <HandHistoryPanel />
             <TauntBar />
             {/* Music + display settings are tall always-expanded panels; in a
                 cinematic idle/demo they occlude the left seats, so hold them
@@ -79,6 +78,7 @@ export function TableHud({ children }: { children: React.ReactNode }) {
             {/* Seats + board are drawn by the 3D scene in cinematic mode; SeatHud
                 still renders (avatar-preset toggle only) so 2.5D/3D/Mix stays
                 switchable. */}
+            {cinematic && <HandHistoryPanel />}
             <SeatHud />
             {/* Path to the money action while the hero isn't seated (self-hides
                 once seated) — P0-7. */}

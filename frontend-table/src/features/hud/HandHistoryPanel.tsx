@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { useGame } from "@/features/game/GameProvider";
@@ -38,14 +39,29 @@ function readableEvent(ev: AuditEvent): string {
   }
 }
 
+// Real backend-core events (backend-core/match/holdem/handler.go) carry the
+// actual street on player_action ("preflop" | "flop" | "turn" | "river"); a
+// hand_started event opens the preflop group, hand_settled is the showdown.
+const STREET_LABEL: Record<string, string> = {
+  preflop: "PRE-FLOP",
+  flop: "FLOP",
+  turn: "TURN",
+  river: "RIVER",
+};
+
+function eventGroup(ev: AuditEvent): string {
+  if (ev.event_type === "hand_settled") return "SHOWDOWN";
+  const street = (ev.payload?.street as string) || "";
+  return STREET_LABEL[street] ?? "PRE-FLOP";
+}
+
 /** Hand-history replay: step through every action of past hands at this table,
  *  reconstructed from the tamper-evident audit chain (audit_list). */
 export function HandHistoryPanel() {
   const { matchId } = useGame();
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [handNo, setHandNo] = useState<number | null>(null);
-  const [step, setStep] = useState(0);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
 
   const load = useCallback(async () => {
     if (!matchId) return;
@@ -60,8 +76,17 @@ export function HandHistoryPanel() {
   }, [matchId]);
 
   useEffect(() => {
-    if (open) void load();
-  }, [open, load]);
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   const hands = useMemo(() => {
     const set = new Set<number>();
@@ -69,102 +94,116 @@ export function HandHistoryPanel() {
     return Array.from(set).sort((a, b) => b - a);
   }, [events]);
 
-  const handEvents = useMemo(
-    () =>
-      events
-        .filter((e) => e.hand_no === handNo)
-        .slice()
-        .reverse(), // oldest → newest for replay order
-    [events, handNo],
-  );
+  // Default to the most recent hand once events load.
+  useEffect(() => {
+    if (handNo === null && hands.length > 0) setHandNo(hands[0]);
+  }, [hands, handNo]);
 
-  const selectHand = (n: number) => {
-    setHandNo(n);
-    setStep(0);
-  };
+  const groups = useMemo(() => {
+    const handEvents = events
+      .filter((e) => e.hand_no === handNo)
+      .slice()
+      .reverse(); // oldest → newest for replay order
+    const order = ["PRE-FLOP", "FLOP", "TURN", "RIVER", "SHOWDOWN"];
+    const byGroup = new Map<string, AuditEvent[]>();
+    for (const ev of handEvents) {
+      const g = eventGroup(ev);
+      if (!byGroup.has(g)) byGroup.set(g, []);
+      byGroup.get(g)!.push(ev);
+    }
+    return order
+      .filter((g) => byGroup.has(g))
+      .map((g) => ({ label: g, events: byGroup.get(g)! }));
+  }, [events, handNo]);
 
   if (!matchId) return null;
 
   return (
-    <aside className="pointer-events-auto flex w-full max-w-xs flex-col rounded-2xl border border-white/[0.06] bg-surface shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
+    <div style={{ position: "absolute", left: 8, top: 8, pointerEvents: "auto" }}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center justify-between px-4 py-3 text-left"
+        aria-expanded={open}
+        style={{
+          display: "flex", alignItems: "center", gap: 5, height: 24, padding: "0 9px",
+          borderRadius: 999, border: "1px solid #2AC6D0", background: "rgba(15,23,42,0.72)",
+          backdropFilter: "blur(10px)", color: "#4DEEEA", fontSize: 10, fontWeight: 700,
+          letterSpacing: "0.16em", textTransform: "uppercase", cursor: "pointer",
+        }}
       >
-        <span className="text-xs uppercase tracking-[0.25em] text-muted">Hand History</span>
-        <span className="text-neutral-500">{open ? "▾" : "▸"}</span>
+        <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#1CB5C9",
+          boxShadow: "0 0 8px rgba(28,181,201,0.9)" }} />
+        Hand History
+        <span style={{ opacity: 0.7 }}>{open ? "‹" : "›"}</span>
       </button>
 
-      {open && (
-        <div className="border-t border-white/10 p-3">
-          {hands.length === 0 ? (
-            <p className="text-xs text-neutral-500">No hands recorded yet.</p>
-          ) : (
-            <>
-              <div className="flex flex-wrap gap-1">
-                {hands.slice(0, 12).map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => selectHand(n)}
-                    className={`rounded px-2 py-0.5 text-[11px] font-semibold ${
-                      handNo === n ? "bg-brand text-white" : "bg-white/5 text-neutral-300"
-                    }`}
-                  >
-                    #{n}
-                  </button>
-                ))}
-              </div>
-
-              {handNo !== null && handEvents.length > 0 && (
-                <div className="mt-3">
-                  <ol className="space-y-1">
-                    {handEvents.map((ev, i) => (
-                      <li
-                        key={i}
-                        className={`rounded px-2 py-1 text-[11px] ${
-                          i === step
-                            ? "bg-gold/15 text-gold"
-                            : i < step
-                              ? "text-neutral-400"
-                              : "text-neutral-600"
-                        }`}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, x: -12, height: 0 }}
+            animate={{ opacity: 1, x: 0, height: "auto" }}
+            exit={{ opacity: 0, x: -12, height: 0 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            style={{
+              marginTop: 6, width: 200, maxHeight: 260, borderRadius: 10,
+              background: "rgba(15,23,42,0.72)", backdropFilter: "blur(10px)",
+              border: "1px solid #2AC6D0", overflow: "hidden", padding: "8px 6px 6px 0",
+              position: "relative", fontSize: 11,
+            }}
+          >
+            {hands.length === 0 ? (
+              <p style={{ paddingLeft: 10, fontSize: 11, color: "#94A3B8" }}>No hands recorded yet.</p>
+            ) : (
+              <>
+                {hands.length > 1 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, paddingLeft: 10, marginBottom: 6 }}>
+                    {hands.slice(0, 12).map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setHandNo(n)}
+                        style={{
+                          borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 700,
+                          border: "none", cursor: "pointer",
+                          background: handNo === n ? "#e01e2b" : "rgba(255,255,255,0.06)",
+                          color: handNo === n ? "#fff" : "#c2c8d0",
+                        }}
                       >
-                        {readableEvent(ev)}
-                      </li>
+                        #{n}
+                      </button>
                     ))}
-                  </ol>
-                  <div className="mt-2 flex items-center justify-between">
-                    <button
-                      type="button"
-                      onClick={() => setStep((s) => Math.max(0, s - 1))}
-                      disabled={step === 0}
-                      className="rounded border border-white/15 px-2 py-0.5 text-[11px] disabled:opacity-40"
-                    >
-                      ◀ Prev
-                    </button>
-                    <span className="text-[10px] text-neutral-500">
-                      {step + 1}/{handEvents.length}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setStep((s) => Math.min(handEvents.length - 1, s + 1))}
-                      disabled={step >= handEvents.length - 1}
-                      className="rounded border border-white/15 px-2 py-0.5 text-[11px] disabled:opacity-40"
-                    >
-                      Next ▶
-                    </button>
                   </div>
-                  <p className="mt-2 text-[9px] text-neutral-600">
-                    Reconstructed from the tamper-evident audit chain.
-                  </p>
+                )}
+
+                <div style={{ position: "absolute", left: 17, top: 10, bottom: 14, width: 2,
+                  background: "#1CB5C9", boxShadow: "0 0 8px rgba(28,181,201,0.8)" }} />
+                <div style={{ position: "relative", maxHeight: 210, overflowY: "auto" }}>
+                  {groups.length === 0 && (
+                    <p style={{ paddingLeft: 26, fontSize: 11, color: "#94A3B8" }}>No actions yet.</p>
+                  )}
+                  {groups.map((g) => (
+                    <div key={g.label} style={{ position: "relative", paddingLeft: 26, marginBottom: 7 }}>
+                      <div style={{ position: "absolute", left: 13, top: 3, width: 8, height: 8, borderRadius: "50%",
+                        background: "#1CB5C9", boxShadow: "0 0 8px rgba(28,181,201,0.9)" }} />
+                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "#4DEEEA" }}>
+                        {g.label}
+                      </div>
+                      {g.events.map((ev, i) => (
+                        <div key={i} style={{ fontSize: 10, color: "#FFFFFF", lineHeight: 1.3 }}>
+                          {readableEvent(ev)}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
                 </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
-    </aside>
+                <div style={{ position: "absolute", left: 15, bottom: 6, width: 0, height: 0,
+                  borderLeft: "6px solid transparent", borderRight: "6px solid transparent",
+                  borderTop: "10px solid #1CB5C9" }} />
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
