@@ -56,15 +56,16 @@ func (s *DepositStore) GetByID(ctx context.Context, id string) (*Deposit, error)
 
 // MarkCredited flips a deposit to 'credited' and credits the wallet in ONE
 // transaction — but only if it is not already credited. Returns true if this
-// call performed the credit (so a replayed webhook is a safe no-op).
-func (s *DepositStore) MarkCredited(ctx context.Context, id string) (bool, error) {
+// call performed the credit (so a replayed webhook is a safe no-op), plus the
+// user and amount credited so the caller can post a ledger audit event (a
+// no-op / not-yet-credited call has nothing to report).
+func (s *DepositStore) MarkCredited(ctx context.Context, id string) (credited bool, userID string, amountCents int64, err error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return false, err
+		return false, "", 0, err
 	}
 	defer tx.Rollback()
 
-	var userID string
 	var amount int64
 	// Row-lock + guard: only proceeds if the deposit is not yet credited.
 	err = tx.QueryRowContext(ctx, `
@@ -72,10 +73,10 @@ func (s *DepositStore) MarkCredited(ctx context.Context, id string) (bool, error
 		WHERE id=$1 AND status<>'credited'
 		RETURNING user_id, amount_cents`, id).Scan(&userID, &amount)
 	if err == sql.ErrNoRows {
-		return false, nil // already credited or missing — idempotent no-op
+		return false, "", 0, nil // already credited or missing — idempotent no-op
 	}
 	if err != nil {
-		return false, err
+		return false, "", 0, err
 	}
 	// Bootstrap a missing wallet row with the SAME tier-aware opening balance
 	// WalletStore.Ensure uses — a hardcoded 100000 ($1,000) here used to hand a
@@ -88,18 +89,18 @@ func (s *DepositStore) MarkCredited(ctx context.Context, id string) (bool, error
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO poker_global_wallet (user_id, balance, currency, updated_at)
 		VALUES ($1, $2, 'USD', NOW()) ON CONFLICT (user_id) DO NOTHING`, userID, opening); err != nil {
-		return false, err
+		return false, "", 0, err
 	}
 	var after int64
 	if err := tx.QueryRowContext(ctx, `
 		UPDATE poker_global_wallet SET balance=balance+$2, updated_at=NOW()
 		WHERE user_id=$1 RETURNING balance`, userID, amount).Scan(&after); err != nil {
-		return false, err
+		return false, "", 0, err
 	}
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO poker_wallet_ledger (id, user_id, delta, balance_after, reason)
 		VALUES ($1,$2,$3,$4,$5)`, NewID("wl"), userID, amount, after, "deposit:"+id); err != nil {
-		return false, err
+		return false, "", 0, err
 	}
 	// Double-entry: chips are not conjured on deposit, they move in from the
 	// outside world. Without this leg the deposit path was invisible to the trial
@@ -107,12 +108,12 @@ func (s *DepositStore) MarkCredited(ctx context.Context, id string) (bool, error
 	// balanced. An audit that cannot see money entering is worse than none.
 	if err := postLedgerKind(ctx, tx, "deposit",
 		AcctExternalDeposit, UserAcct(userID), amount, "deposit:"+id); err != nil {
-		return false, err
+		return false, "", 0, err
 	}
 	if err := tx.Commit(); err != nil {
-		return false, err
+		return false, "", 0, err
 	}
-	return true, nil
+	return true, userID, amount, nil
 }
 
 // SumRecentCents returns the total of the user's deposits (pending/waiting/

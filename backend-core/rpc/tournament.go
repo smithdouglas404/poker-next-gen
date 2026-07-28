@@ -9,6 +9,7 @@ import (
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
+	"github.com/smithdouglas404/poker-next-gen/backend-core/audit"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/billing"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/match/tournament"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/models"
@@ -236,6 +237,12 @@ func TournamentRegister(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 			if err := store.NewRakeStore(db).CreditTournament(ctx, bracket.ClubID, rake, req.TournamentID); err != nil {
 				logger.Error("tournament rake not credited tournament=%s club=%s user=%s amount_cents=%d: %v",
 					req.TournamentID, bracket.ClubID, userID, rake, err)
+			} else if aerr := audit.EmitLedger(ctx, audit.NewPostgresEmitter(db), "tournament_rake_credited", bracket.ClubID, map[string]any{
+				"tournament_id": req.TournamentID,
+				"user_id":       userID,
+				"amount_cents":  rake,
+			}); aerr != nil {
+				logger.Warn("tournament rake audit anchor failed: %v", aerr)
 			}
 		}
 	}

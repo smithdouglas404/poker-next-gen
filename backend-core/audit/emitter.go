@@ -74,3 +74,35 @@ func canonicalJSON(v any) []byte {
 type NoopEmitter struct{}
 
 func (NoopEmitter) Emit(context.Context, Event) error { return nil }
+
+// LedgerMatchID is the fixed stream key financial (non-hand) audit events
+// chain against — see EmitLedger. Never a real match id, so it can never
+// collide with an actual table's hand-event chain.
+const LedgerMatchID = "ledger"
+
+// EmitLedger records a money-movement event (deposit credited, withdrawal
+// paid out, tournament prize/bounty/rake settled, …) on the SAME
+// tamper-evident hash chain and Polygon anchoring pipeline
+// (store.AnchorStore / rpc.AnchorRun) that hand outcomes already use — it
+// just chains against LedgerMatchID/HandNo 0 instead of a specific
+// match+hand, since a deposit or a withdrawal doesn't have one. Before this,
+// only hand-level events (match/holdem/handler.go) ever reached the audit
+// chain; every deposit, withdrawal, and tournament payout posted to the
+// double-entry wallet ledger (a real, queryable record) but never to the
+// hash-chained, on-chain-anchored one — so the specific tamper-evidence
+// guarantee "anchored to Polygon" advertised on the provably-fair page never
+// actually covered real money moving in or out of the platform, only poker
+// outcomes.
+func EmitLedger(ctx context.Context, emitter Emitter, eventType, clubID string, payload map[string]any) error {
+	if emitter == nil {
+		return nil
+	}
+	return emitter.Emit(ctx, Event{
+		Type:        eventType,
+		MatchID:     LedgerMatchID,
+		HandNo:      0,
+		ClubID:      clubID,
+		Payload:     payload,
+		PayloadHash: HashPayload(payload),
+	})
+}

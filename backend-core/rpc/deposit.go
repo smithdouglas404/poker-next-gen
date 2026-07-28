@@ -10,6 +10,7 @@ import (
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
+	"github.com/smithdouglas404/poker-next-gen/backend-core/audit"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/billing"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/payments"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
@@ -223,13 +224,21 @@ func NowPaymentsWebhook(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 	deposits := store.NewDepositStore(db)
 	switch evt.PaymentStatus {
 	case "finished", "confirmed":
-		credited, err := deposits.MarkCredited(ctx, evt.OrderID)
+		credited, userID, amountCents, err := deposits.MarkCredited(ctx, evt.OrderID)
 		if err != nil {
 			logger.Error("deposit credit failed: %v", err)
 			return "", runtime.NewError("credit failed", 13)
 		}
 		if credited {
 			logger.Info("credited wallet for deposit %s", evt.OrderID)
+			if err := audit.EmitLedger(ctx, audit.NewPostgresEmitter(db), "deposit_credited", "", map[string]any{
+				"deposit_id":   evt.OrderID,
+				"user_id":      userID,
+				"amount_cents": amountCents,
+				"gateway":      "nowpayments",
+			}); err != nil {
+				logger.Warn("deposit audit anchor failed: %v", err)
+			}
 		}
 	case "failed", "expired", "refunded":
 		_ = deposits.MarkFailed(ctx, evt.OrderID)

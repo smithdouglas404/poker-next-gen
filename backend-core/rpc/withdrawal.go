@@ -9,6 +9,7 @@ import (
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
+	"github.com/smithdouglas404/poker-next-gen/backend-core/audit"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/billing"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/payments"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
@@ -152,6 +153,17 @@ func WithdrawalApproveAdmin(ctx context.Context, logger runtime.Logger, db *sql.
 
 	if err := wd.Approve(ctx, req.WithdrawalID, payoutID); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
+	}
+	if err := audit.EmitLedger(ctx, audit.NewPostgresEmitter(db), "withdrawal_paid", "", map[string]any{
+		"withdrawal_id": w.ID,
+		"user_id":       w.UserID,
+		"amount_cents":  w.AmountCents,
+		"currency":      w.Currency,
+		"gateway":       w.Gateway,
+		"payout_id":     payoutID,
+		"auto_payout":   autopaid,
+	}); err != nil {
+		logger.Warn("withdrawal audit anchor failed: %v", err)
 	}
 	out, _ := json.Marshal(map[string]interface{}{
 		"status":      "paid",

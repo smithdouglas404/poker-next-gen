@@ -7,6 +7,7 @@ import (
 
 	"github.com/heroiclabs/nakama-common/runtime"
 
+	"github.com/smithdouglas404/poker-next-gen/backend-core/audit"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
 
@@ -377,6 +378,14 @@ func TournamentFinalize(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 			}
 			if err := ts.PayWinner(ctx, req.TournamentID, f.UserID, perPlace); err != nil {
 				return "", runtime.NewError(err.Error(), 13)
+			}
+			if aerr := audit.EmitLedger(ctx, audit.NewPostgresEmitter(db), "tournament_prize_paid", "", map[string]any{
+				"tournament_id": req.TournamentID,
+				"user_id":       f.UserID,
+				"finish_place":  f.FinishPlace,
+				"amount_cents":  perPlace,
+			}); aerr != nil {
+				logger.Warn("tournament prize audit anchor failed: %v", aerr)
 			}
 			paidTotal += perPlace
 			payouts = append(payouts, map[string]interface{}{

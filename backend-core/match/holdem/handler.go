@@ -2596,6 +2596,13 @@ func processTournamentEliminations(ctx context.Context, logger runtime.Logger, d
 				if cerr := ws.CreditFrom(ctx, eliminator, amt, "tournament_bounty", "house:tournament_buyin"); cerr != nil {
 					logger.Error("BOUNTY PAYOUT FAILED tournament=%s eliminator=%s busted=%s amount_cents=%d: %v",
 						s.TournamentID, eliminator, seat.UserID, amt, cerr)
+				} else if aerr := audit.EmitLedger(ctx, audit.NewPostgresEmitter(db), "tournament_bounty_paid", "", map[string]any{
+					"tournament_id": s.TournamentID,
+					"eliminator":    eliminator,
+					"busted":        seat.UserID,
+					"amount_cents":  amt,
+				}); aerr != nil {
+					logger.Warn("bounty audit anchor failed: %v", aerr)
 				}
 			}
 		}
