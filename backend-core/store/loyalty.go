@@ -54,23 +54,6 @@ func (s *LoyaltyStore) Award(ctx context.Context, userID string, hrp, playedDelt
 	return l, err
 }
 
-// SpendPoints atomically draws down the spendable balance (rewards redemption).
-// Returns false without mutating when the balance is insufficient. Lifetime HRP
-// (rank) is untouched.
-func (s *LoyaltyStore) SpendPoints(ctx context.Context, userID string, points int64) (bool, error) {
-	if points <= 0 {
-		return false, nil
-	}
-	res, err := s.db.ExecContext(ctx, `
-		UPDATE poker_loyalty SET hrp_spendable = hrp_spendable - $2, updated_at = NOW()
-		WHERE user_id = $1 AND hrp_spendable >= $2`, userID, points)
-	if err != nil {
-		return false, err
-	}
-	n, _ := res.RowsAffected()
-	return n == 1, nil
-}
-
 // AddSpendable tops up ONLY the spendable balance (e.g. buying points with
 // chips) — never the lifetime total, so purchased points can't inflate rank.
 func (s *LoyaltyStore) AddSpendable(ctx context.Context, userID string, points int64) error {

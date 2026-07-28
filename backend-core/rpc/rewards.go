@@ -2,9 +2,7 @@ package rpc
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"strings"
 
@@ -17,14 +15,6 @@ import (
 // (so $1 buys 100 points). Earned HRP and purchased points share one balance,
 // but only earned HRP counts toward lifetime rank.
 const pointsPerCent = 1
-
-// rewardVoucher returns a human-friendly single-use voucher code.
-func rewardVoucher() string {
-	var b [4]byte
-	_, _ = rand.Read(b[:])
-	h := strings.ToUpper(hex.EncodeToString(b[:]))
-	return "HRC-" + h[:4] + "-" + h[4:8]
-}
 
 // RewardsCatalog returns the marketplace: category list, active sponsors, and
 // active reward items (optionally filtered by {category}). Auth required.
@@ -102,35 +92,21 @@ func RewardRedeem(ctx context.Context, logger runtime.Logger, db *sql.DB, nk run
 		return "", runtime.NewError("reward is out of stock", 9)
 	}
 
-	// Draw down spendable points first (atomic; refundable).
-	ok, err := ls.SpendPoints(ctx, caller, item.PointsCost)
+	// RedeemRewardAtomic spends points, reserves stock, and records the
+	// voucher in ONE database transaction — the old three-call chain
+	// (SpendPoints, DecrementStock, CreateRedemption, each compensated on
+	// failure) closed the concurrency window but not a process crash between
+	// any two calls, which left points spent with no voucher and the
+	// compensating refund never having run either.
+	red, softFail, err := rs.RedeemRewardAtomic(ctx, item, caller)
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
-	if !ok {
+	switch softFail {
+	case "insufficient_points":
 		return "", runtime.NewError("not enough points to redeem this reward", 9)
-	}
-	// Reserve a unit of limited stock; refund points if it just sold out.
-	if item.Stock > 0 {
-		got, derr := rs.DecrementStock(ctx, item.ID)
-		if derr != nil {
-			_ = ls.AddSpendable(ctx, caller, item.PointsCost)
-			return "", runtime.NewError(derr.Error(), 13)
-		}
-		if !got {
-			_ = ls.AddSpendable(ctx, caller, item.PointsCost)
-			return "", runtime.NewError("reward is out of stock", 9)
-		}
-	}
-	red := &store.RewardRedemption{
-		UserID: caller, ItemID: item.ID, SponsorID: item.SponsorID, Title: item.Title,
-		Category: item.Category, PointsSpent: item.PointsCost, Status: "pending",
-		VoucherCode: rewardVoucher(),
-	}
-	if _, err := rs.CreateRedemption(ctx, red); err != nil {
-		// Best-effort compensation: refund points + stock.
-		_ = ls.AddSpendable(ctx, caller, item.PointsCost)
-		return "", runtime.NewError(err.Error(), 13)
+	case "out_of_stock":
+		return "", runtime.NewError("reward is out of stock", 9)
 	}
 	bal, _ := ls.Get(ctx, caller)
 	out, _ := json.Marshal(map[string]interface{}{

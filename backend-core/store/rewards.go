@@ -2,8 +2,11 @@ package store
 
 import (
 	"context"
+	crand "crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -178,31 +181,73 @@ func (s *RewardsStore) GetItem(ctx context.Context, id string) (*RewardItem, err
 	return &it, nil
 }
 
-// DecrementStock reduces a limited item's stock by one (no-op for unlimited).
-// Returns false if the item is out of stock.
-func (s *RewardsStore) DecrementStock(ctx context.Context, id string) (bool, error) {
-	res, err := s.db.ExecContext(ctx,
-		`UPDATE poker_reward_item SET stock = stock - 1 WHERE id=$1 AND stock > 0`, id)
-	if err != nil {
-		return false, err
-	}
-	n, _ := res.RowsAffected()
-	return n == 1, nil
+// rewardVoucherCode returns a human-friendly single-use voucher code.
+func rewardVoucherCode() string {
+	var b [4]byte
+	_, _ = crand.Read(b[:])
+	h := strings.ToUpper(hex.EncodeToString(b[:]))
+	return "HRC-" + h[:4] + "-" + h[4:8]
 }
 
-// CreateRedemption records a voucher for a redeemed item.
-func (s *RewardsStore) CreateRedemption(ctx context.Context, r *RewardRedemption) (string, error) {
-	if r.ID == "" {
-		r.ID = NewID("rdm")
+// RedeemRewardAtomic spends points, reserves stock, and records the
+// redemption voucher in ONE database transaction — either all three happen
+// or none do.
+//
+// The RPC-level version this replaces chained three separate calls
+// (LoyaltyStore.SpendPoints, RewardsStore.DecrementStock,
+// RewardsStore.CreateRedemption), compensating with AddSpendable/stock
+// refunds on failure. That closed the CONCURRENCY window (two redeemers
+// racing the same last unit of stock) correctly, but not a process CRASH
+// between any two of the three calls — which left points spent with no
+// voucher ever created, and the compensating refund code never having run
+// either, since the request that would have run it was gone.
+//
+// Returns (nil, "insufficient_points"|"out_of_stock", nil) for the ordinary
+// "can't afford it / sold out" cases — not an error — so the caller's
+// existing message branching still applies unchanged.
+func (s *RewardsStore) RedeemRewardAtomic(ctx context.Context, item *RewardItem, userID string) (*RewardRedemption, string, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, "", err
 	}
-	if r.Status == "" {
-		r.Status = "pending"
+	defer tx.Rollback()
+
+	res, err := tx.ExecContext(ctx, `
+		UPDATE poker_loyalty SET hrp_spendable = hrp_spendable - $2, updated_at = NOW()
+		WHERE user_id = $1 AND hrp_spendable >= $2`, userID, item.PointsCost)
+	if err != nil {
+		return nil, "", err
 	}
-	_, err := s.db.ExecContext(ctx, `
+	if n, _ := res.RowsAffected(); n != 1 {
+		return nil, "insufficient_points", nil
+	}
+
+	if item.Stock > 0 {
+		res, err := tx.ExecContext(ctx,
+			`UPDATE poker_reward_item SET stock = stock - 1 WHERE id=$1 AND stock > 0`, item.ID)
+		if err != nil {
+			return nil, "", err
+		}
+		if n, _ := res.RowsAffected(); n != 1 {
+			return nil, "out_of_stock", nil
+		}
+	}
+
+	red := &RewardRedemption{
+		ID: NewID("rdm"), UserID: userID, ItemID: item.ID, SponsorID: item.SponsorID,
+		Title: item.Title, Category: item.Category, PointsSpent: item.PointsCost,
+		Status: "pending", VoucherCode: rewardVoucherCode(),
+	}
+	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO poker_reward_redemption (id, user_id, item_id, sponsor_id, title, category, points_spent, status, voucher_code)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-		r.ID, r.UserID, r.ItemID, r.SponsorID, r.Title, r.Category, r.PointsSpent, r.Status, r.VoucherCode)
-	return r.ID, err
+		red.ID, red.UserID, red.ItemID, red.SponsorID, red.Title, red.Category, red.PointsSpent, red.Status, red.VoucherCode); err != nil {
+		return nil, "", err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, "", err
+	}
+	return red, "", nil
 }
 
 // ListRedemptions returns a user's redemptions (newest first).

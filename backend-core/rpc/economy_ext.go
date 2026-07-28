@@ -87,29 +87,19 @@ func CosmeticBuy(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		return "", runtime.NewError("you already own this item", 6)
 	}
 
-	if c.PriceCents > 0 {
-		if err := store.NewWalletStore(db).Debit(ctx, userID, c.PriceCents, "cosmetic_buy"); err != nil {
+	// PurchaseCosmeticAtomic debits the wallet and grants the item in ONE
+	// database transaction — the old two-call (Debit, then GrantOnce with a
+	// compensating refund on failure) closed the concurrency window but not a
+	// process crash between the two calls, which left a charge with nothing
+	// delivered and no refund, since the refund code never got to run either.
+	granted, gerr := store.PurchaseCosmeticAtomic(ctx, db, userID, req.CosmeticID, c.PriceCents)
+	if gerr != nil {
+		if gerr.Error() == "insufficient balance" {
 			return "", runtime.NewError("purchase requires a balance of "+dollars(c.PriceCents)+" — add funds", 9)
 		}
+		return "", runtime.NewError(gerr.Error(), 13)
 	}
-	// A no-op grant used to be indistinguishable from a successful one: Grant
-	// inserts ON CONFLICT DO NOTHING and returned nil either way, so a buyer who
-	// acquired the item between the Owns check above and this line was charged
-	// full price and given nothing. Refund unless a row was genuinely created.
-	granted, gerr := cs.GrantOnce(ctx, userID, req.CosmeticID, "shop")
-	if gerr != nil || !granted {
-		if c.PriceCents > 0 {
-			// Loudly, not silently. If the refund itself fails, someone has been
-			// charged for nothing and support needs enough here to make them
-			// whole — a discarded error means nobody ever finds out.
-			if rerr := store.NewWalletStore(db).Credit(ctx, userID, c.PriceCents, "cosmetic_buy_refund"); rerr != nil {
-				logger.Error("REFUND FAILED user=%s cosmetic=%s amount_cents=%d: %v",
-					userID, req.CosmeticID, c.PriceCents, rerr)
-			}
-		}
-		if gerr != nil {
-			return "", runtime.NewError(gerr.Error(), 13)
-		}
+	if !granted {
 		return "", runtime.NewError("you already own this item", 6)
 	}
 	out, _ := json.Marshal(map[string]interface{}{"ok": true, "cosmetic_id": req.CosmeticID})

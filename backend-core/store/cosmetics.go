@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"fmt"
 )
 
 // Cosmetic is a sellable/ownable item (character model, taunt, card back, …).
@@ -85,6 +86,74 @@ func (s *CosmeticStore) ListActive(ctx context.Context, kind string) ([]Cosmetic
 func (s *CosmeticStore) Grant(ctx context.Context, userID, cosmeticID, source string) error {
 	_, err := s.GrantOnce(ctx, userID, cosmeticID, source)
 	return err
+}
+
+// PurchaseCosmeticAtomic debits the wallet and grants the cosmetic in ONE
+// database transaction — either both happen or neither does.
+//
+// The RPC-level version this replaces (WalletStore.Debit, then
+// CosmeticStore.GrantOnce, refunding on failure) closed the CONCURRENCY
+// window correctly — a second buyer racing the Owns() check still only ever
+// gets one of them charged, refunding the loser — but not a process CRASH
+// between the two calls. A crash there left the buyer debited with the grant
+// having never happened, and the refund code never having run either, since
+// the request that would have run it was gone. Returns granted=false,
+// err=nil (not an error) for the ordinary "someone else bought it first, or
+// you already own it" race — the caller's existing refund-vs-error branching
+// (based on whether err is nil) still applies unchanged.
+func PurchaseCosmeticAtomic(ctx context.Context, db *sql.DB, userID, cosmeticID string, priceCents int64) (granted bool, err error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+
+	if priceCents > 0 {
+		opening := StartingBalanceForTier(SubscriptionTier(ctx, db, userID))
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO poker_global_wallet (user_id, balance, currency, updated_at)
+			VALUES ($1, $2, 'USD', NOW()) ON CONFLICT (user_id) DO NOTHING`,
+			userID, opening); err != nil {
+			return false, err
+		}
+		var after int64
+		err = tx.QueryRowContext(ctx, `
+			UPDATE poker_global_wallet SET balance=balance-$2, updated_at=NOW()
+			WHERE user_id=$1 AND balance>=$2 RETURNING balance`, userID, priceCents).Scan(&after)
+		if err == sql.ErrNoRows {
+			return false, fmt.Errorf("insufficient balance")
+		}
+		if err != nil {
+			return false, err
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO poker_wallet_ledger (id,user_id,delta,balance_after,reason,created_at)
+			VALUES ($1,$2,$3,$4,$5,NOW())`, NewID("wl"), userID, -priceCents, after, "cosmetic_buy"); err != nil {
+			return false, err
+		}
+		if err := postLedgerLegs(ctx, tx, UserAcct(userID), "house:cosmetic_buy", priceCents, "cosmetic_buy"); err != nil {
+			return false, err
+		}
+	}
+
+	res, err := tx.ExecContext(ctx, `
+		INSERT INTO poker_inventory (user_id, cosmetic_id, source, acquired_at)
+		VALUES ($1,$2,'shop',NOW()) ON CONFLICT (user_id, cosmetic_id) DO NOTHING`,
+		userID, cosmeticID)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	if n != 1 {
+		// Already owned (someone else's concurrent purchase won) — the debit
+		// above rolls back with the rest of this transaction, so this ends up
+		// costing the buyer nothing rather than needing a compensating refund.
+		return false, nil
+	}
+	return true, tx.Commit()
 }
 
 // GrantOnce is Grant, reporting whether a row was actually inserted.
