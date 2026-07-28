@@ -1367,3 +1367,18 @@ CREATE TABLE IF NOT EXISTS poker_club_schedule (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_poker_club_schedule_club ON poker_club_schedule(club_id, created_at DESC);
+
+-- Explicit sign-off records: signup ToS/age/gambling-risk disclosure and the
+-- KYC provider's document/biometric-processing consent. One row per
+-- (user_id, kind, version) so re-accepting a bumped version is a new row, not
+-- an overwrite — the history of what a player agreed to, and when, must
+-- survive a later version change.
+CREATE TABLE IF NOT EXISTS poker_consent (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    kind        TEXT NOT NULL, -- signup_tos | kyc_document_processing
+    version     TEXT NOT NULL,
+    accepted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, kind, version)
+);
+CREATE INDEX IF NOT EXISTS idx_poker_consent_user ON poker_consent(user_id);

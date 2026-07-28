@@ -4,6 +4,8 @@
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 
 import type {
+  ConsentKind,
+  ConsentStatus,
   KycRecord,
   KycStartResult,
   MeVerification,
@@ -22,6 +24,11 @@ export const kycApi = {
   kycStart: (kind: VerificationKind) => call<KycStartResult>("kyc_start", { kind }),
   kycSubmit: (level: string, data: Record<string, unknown>) =>
     call<{ kyc: KycRecord }>("kyc_submit", { level, data }),
+
+  // Explicit consent sign-off (age/ToS disclosure, KYC document-processing).
+  consentStatus: () => call<ConsentStatus>("consent_status", {}),
+  consentRecord: (kind: ConsentKind) =>
+    call<{ ok: boolean; kind: string; version: string }>("consent_record", { kind }),
 
   // Responsible gambling
   rgLimitsGet: () => call<{ limits: RgLimits }>("rg_limits_get", {}),

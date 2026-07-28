@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button, Field, Input, Select } from "@/features/ui";
 import { GLASS_PANEL, GLASS_PANEL_HOVER, HEADING_SM, cn } from "@/features/ui/tokens";
@@ -99,6 +99,35 @@ export function VerificationSection({
   const [docId, setDocId] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // biometric/kyc_aml send a government ID and/or a live selfie to Didit — the
+  // backend refuses to open that session (kyc_start) until this consent is on
+  // record, so the checkbox here isn't decoration, it's what unblocks the call.
+  const [docConsent, setDocConsent] = useState<boolean | null>(null); // null = loading
+  useEffect(() => {
+    let cancelled = false;
+    void kycApi
+      .consentStatus()
+      .then((res) => {
+        if (!cancelled) setDocConsent(Boolean(res.accepted?.kyc_document_processing));
+      })
+      .catch(() => {
+        if (!cancelled) setDocConsent(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const giveDocConsent = () =>
+    void (async () => {
+      try {
+        await kycApi.consentRecord("kyc_document_processing");
+        setDocConsent(true);
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Could not record consent", "err");
+      }
+    })();
+
   const statusOf = (kind: VerificationKind): VerificationStatus =>
     me?.verifications?.[kind] ?? "none";
 
@@ -163,12 +192,36 @@ export function VerificationSection({
         <span className={cn(HEADING_SM, "text-neutral-500")}>Didit · KYC / AML</span>
       </div>
 
+      {/* Document/biometric-processing consent — gates Tier 2 & 3, which hand a
+          government ID and/or a live selfie to Didit, our identity-verification
+          provider. */}
+      {docConsent === false && (
+        <div className={cn(GLASS_PANEL, "flex flex-wrap items-start gap-3 border-gold/20 p-4")}>
+          <input
+            type="checkbox"
+            id="kyc-doc-consent"
+            checked={false}
+            onChange={giveDocConsent}
+            className="mt-1 h-4 w-4 shrink-0 rounded border-white/30 bg-transparent accent-gold"
+          />
+          <label htmlFor="kyc-doc-consent" className="flex-1 text-xs leading-relaxed text-neutral-300">
+            <span className="font-semibold text-foreground">Before you verify:</span> Tiers 2 and 3
+            below hand your government ID and/or a live selfie to{" "}
+            <span className="text-foreground">Didit</span>, our third-party identity-verification
+            provider, so they can confirm your identity and screen for AML compliance. Check this box
+            to consent to that processing, in accordance with our Privacy Policy, before starting
+            either tier.
+          </label>
+        </div>
+      )}
+
       {/* Tier cards */}
       <div className="space-y-3">
         {TIERS.map((t) => {
           const status = statusOf(t.kind);
           const isVerified = status === "verified";
           const isPending = status === "pending";
+          const needsDocConsent = (t.kind === "biometric" || t.kind === "kyc_aml") && !docConsent;
           return (
             <div
               key={t.kind}
@@ -201,16 +254,19 @@ export function VerificationSection({
                 <Button
                   variant={t.accent === "gold" ? "gold" : "outline"}
                   size="sm"
-                  disabled={busy !== null || isVerified}
+                  disabled={busy !== null || isVerified || needsDocConsent || docConsent === null}
                   onClick={() => start(t.kind)}
+                  title={needsDocConsent ? "Accept the consent above first" : undefined}
                 >
                   {isVerified
                     ? "Verified"
                     : busy === t.kind
                       ? "Starting…"
-                      : isPending
-                        ? "Resume"
-                        : "Verify"}
+                      : needsDocConsent
+                        ? "Accept consent above"
+                        : isPending
+                          ? "Resume"
+                          : "Verify"}
                 </Button>
               </div>
             </div>

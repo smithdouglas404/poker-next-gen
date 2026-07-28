@@ -28,6 +28,13 @@ export interface KycStartResult {
   kind?: string;
 }
 
+export type ConsentKind = "signup_tos" | "kyc_document_processing";
+
+/** Response of `consent_status`. */
+export interface ConsentStatus {
+  accepted: Record<ConsentKind, boolean>;
+}
+
 /** The RgLimit record inside `rg_limits_get` / `rg_limits_set` responses. */
 export interface RgLimits {
   user_id: string;

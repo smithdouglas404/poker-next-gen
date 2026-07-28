@@ -125,6 +125,8 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"kyc_apply":                rpc.KycApply,
 		"me_verification":          rpc.MeVerification,
 		"kyc_verify_admin":         rpc.KycVerifyAdmin,
+		"consent_record":           rpc.ConsentRecord,
+		"consent_status":           rpc.ConsentStatus,
 		"wallet_deposit_crypto":    rpc.WalletDepositCrypto,
 		"wallet_deposit_fiat":      rpc.WalletDepositFiat,
 		"nowpayments_webhook":      rpc.NowPaymentsWebhook,

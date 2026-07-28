@@ -38,6 +38,20 @@ func KycStart(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime
 	if !verificationKinds[kind] {
 		return "", runtime.NewError("kind must be one of: email, biometric, kyc_aml", 3)
 	}
+	// biometric/kyc_aml hand a government ID and/or a live selfie to Didit — that
+	// requires the player's explicit sign-off before we send anything, not just
+	// disclosure copy on the screen. "email" only confirms an inbox and carries
+	// no document/biometric capture, so it is exempt.
+	if kind == "biometric" || kind == "kyc_aml" {
+		version := consentKinds["kyc_document_processing"]
+		accepted, err := store.NewConsentStore(db).Has(ctx, userID, "kyc_document_processing", version)
+		if err != nil {
+			return "", runtime.NewError(err.Error(), 13)
+		}
+		if !accepted {
+			return "", runtime.NewError("please accept the identity-verification consent before continuing", 9)
+		}
+	}
 	if !integrations.DiditConfigured() {
 		return "", runtime.NewError("identity verification is not enabled yet (DIDIT_API_KEY unset)", 9)
 	}

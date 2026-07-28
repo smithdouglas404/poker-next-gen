@@ -4,6 +4,9 @@ import { useAuth } from "@clerk/nextjs";
 import { useEffect, useRef } from "react";
 
 import { authenticateClerk, loadPersistedSession } from "@/lib/nakama/auth";
+import { callSessionRpc } from "@/lib/nakama/sessionRpc";
+
+import { SIGNUP_CONSENT_KEY } from "./SignupConsentGate";
 
 // ClerkNakamaBridge establishes a Nakama session once a user is signed in with
 // Clerk. The whole app runs on Nakama sessions (callSessionRpc), so a Clerk
@@ -25,6 +28,19 @@ export function ClerkNakamaBridge() {
         const jwt = await getToken();
         if (jwt) {
           await authenticateClerk(jwt);
+          // The signup consent gate runs pre-auth (no Nakama session exists yet
+          // to attach a record to) — record it now that one does. Best-effort:
+          // a failure here must not block the login the player is waiting on.
+          if (
+            typeof window !== "undefined" &&
+            window.localStorage.getItem(SIGNUP_CONSENT_KEY) === "1"
+          ) {
+            try {
+              await callSessionRpc("consent_record", { kind: "signup_tos" });
+            } catch {
+              // Retried on the next bridge run (flag stays set).
+            }
+          }
           // Reload so session-dependent screens pick up the new Nakama session.
           if (typeof window !== "undefined") window.location.reload();
         }
