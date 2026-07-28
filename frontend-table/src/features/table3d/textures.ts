@@ -1,4 +1,4 @@
-// Browser-side canvas texture builders for the cinematic proof (client-only).
+// Browser-side canvas texture builders for the cinematic table (client-only).
 import * as THREE from "three";
 
 const SUIT_GLYPH: Record<string, string> = { s: "♠", h: "♥", d: "♦", c: "♣" };

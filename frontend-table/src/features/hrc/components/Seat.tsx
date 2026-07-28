@@ -262,54 +262,6 @@ const CHIP_DENOMS: { threshold: number; chip: StackChip }[] = [
   { threshold: 1,    chip: { color: "#f5f5f4", border: "#a8a29e", stripe: "#d6d3d1", inner: "#e7e5e4" } },
 ];
 
-function getPlayerChipStacks(chips: number): { chip: StackChip; count: number }[] {
-  const stacks: { chip: StackChip; count: number }[] = [];
-  let remaining = chips;
-  for (const { threshold, chip } of CHIP_DENOMS) {
-    if (remaining >= threshold) {
-      const count = Math.min(8, Math.floor(remaining / threshold));
-      stacks.push({ chip, count });
-      remaining -= count * threshold;
-    }
-    if (stacks.length >= 3) break;
-  }
-  if (stacks.length === 0 && chips > 0) {
-    stacks.push({ chip: CHIP_DENOMS[CHIP_DENOMS.length - 1].chip, count: 1 });
-  }
-  return stacks;
-}
-
-function MiniChip({ chip, yOffset }: { chip: StackChip; yOffset: number }) {
-  return (
-    <svg
-      width="22" height="22" viewBox="0 0 22 22" fill="none"
-      style={{
-        position: "absolute",
-        bottom: yOffset,
-        left: 0,
-        filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.5))",
-      }}
-    >
-      <circle cx="11" cy="11" r="10" fill={chip.color} stroke={chip.border} strokeWidth="1" />
-      {[0, 60, 120, 180, 240, 300].map(angle => {
-        const rad = (angle * Math.PI) / 180;
-        const x1 = 11 + Math.cos(rad) * 8;
-        const y1 = 11 + Math.sin(rad) * 8;
-        const x2 = 11 + Math.cos(rad) * 10;
-        const y2 = 11 + Math.sin(rad) * 10;
-        return (
-          <line key={angle} x1={x1} y1={y1} x2={x2} y2={y2}
-            stroke={chip.stripe} strokeWidth="2" strokeLinecap="round" opacity="0.5"
-          />
-        );
-      })}
-      <circle cx="11" cy="11" r="6" fill="none" stroke={chip.stripe} strokeWidth="0.6" opacity="0.25" />
-      <circle cx="11" cy="11" r="3" fill={chip.inner} opacity="0.3" />
-      <ellipse cx="9" cy="7" rx="4" ry="3" fill="white" opacity="0.08" />
-    </svg>
-  );
-}
-
 function getBetChipDenom(amount: number): StackChip {
   if (amount >= 500) return CHIP_DENOMS[0].chip; // gold
   if (amount >= 100) return CHIP_DENOMS[1].chip; // black
@@ -357,32 +309,6 @@ function BetChipStack({ amount }: { amount: number }) {
           <circle cx="11" cy="11" r="6" fill="none" stroke={chip.stripe} strokeWidth="0.6" opacity="0.25" />
           <circle cx="11" cy="11" r="3" fill={chip.inner} opacity="0.3" />
         </svg>
-      ))}
-    </div>
-  );
-}
-
-function PlayerChipStack({ chips, side }: { chips: number; side: "left" | "right" }) {
-  const stacks = getPlayerChipStacks(chips);
-  if (stacks.length === 0) return null;
-  return (
-    <div
-      className="flex pointer-events-none"
-      style={{
-        justifyContent: side === "left" ? "flex-end" : "flex-start",
-        gap: 2,
-        perspective: "100px",
-        transform: `scale(var(--seat-scale, 1)) rotateX(45deg)`,
-        transformOrigin: "bottom center",
-        marginTop: -4,
-      }}
-    >
-      {stacks.map((stack, si) => (
-        <div key={si} className="relative" style={{ width: 22, height: 22 + stack.count * 3 }}>
-          {Array.from({ length: stack.count }).map((_, ci) => (
-            <MiniChip key={ci} chip={stack.chip} yOffset={ci * 3} />
-          ))}
-        </div>
       ))}
     </div>
   );
@@ -673,35 +599,39 @@ export function Seat({ player, position, isHero = false, isWinner = false, seatI
           }}
         />
 
-        {/* ── Action status badge (positioned ABOVE avatar) ── */}
-        <AnimatePresence>
-          {statusLabel[player.status] && player.status !== "waiting" && player.status !== "thinking" && (
-            <motion.div
-              initial={{ opacity: 0, y: 8, scale: 0.7 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -6, scale: 0.7 }}
-              transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              className={cn(
-                "mb-1.5 px-3 py-1 rounded-lg font-black uppercase tracking-wider z-30 border backdrop-blur-md",
-                ACTION_BADGE_STYLES[player.status]?.bg || "bg-black/40",
-                ACTION_BADGE_STYLES[player.status]?.text || "text-gray-300",
-                ACTION_BADGE_STYLES[player.status]?.border || "border-white/10",
-              )}
-              style={{
-                fontSize: "0.6875em",
-                boxShadow: ACTION_BADGE_STYLES[player.status]?.glow
-                  ? `0 0 14px ${ACTION_BADGE_STYLES[player.status].glow}`
-                  : undefined,
-              }}
-            >
-              {statusLabel[player.status]}
-              {/* Show bet amount next to CALL/RAISE */}
-              {(player.status === "called" || player.status === "raised") && player.currentBet > 0 && (
-                <span className="ml-1.5 font-mono" style={{ fontSize: "0.9em" }}>{formatChips(player.currentBet)}</span>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* ── Action status badge — floats ABOVE the avatar as an absolute overlay,
+            not a stacked flex item, so it doesn't add to the seat's total height
+            (it used to push the seat ~27px taller than the portrait+pill spec). ── */}
+        <div className="absolute z-30" style={{ top: -30, left: "50%", transform: "translateX(-50%)" }}>
+          <AnimatePresence>
+            {statusLabel[player.status] && player.status !== "waiting" && player.status !== "thinking" && (
+              <motion.div
+                initial={{ opacity: 0, y: 8, scale: 0.7 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.7 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                className={cn(
+                  "px-3 py-1 rounded-lg font-black uppercase tracking-wider border backdrop-blur-md whitespace-nowrap",
+                  ACTION_BADGE_STYLES[player.status]?.bg || "bg-black/40",
+                  ACTION_BADGE_STYLES[player.status]?.text || "text-gray-300",
+                  ACTION_BADGE_STYLES[player.status]?.border || "border-white/10",
+                )}
+                style={{
+                  fontSize: "0.6875em",
+                  boxShadow: ACTION_BADGE_STYLES[player.status]?.glow
+                    ? `0 0 14px ${ACTION_BADGE_STYLES[player.status].glow}`
+                    : undefined,
+                }}
+              >
+                {statusLabel[player.status]}
+                {/* Show bet amount next to CALL/RAISE */}
+                {(player.status === "called" || player.status === "raised") && player.currentBet > 0 && (
+                  <span className="ml-1.5 font-mono" style={{ fontSize: "0.9em" }}>{formatChips(player.currentBet)}</span>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         {/* ── Stitch-poker-style full-body portrait card ── */}
         <div ref={avatarRef} className="relative z-10">
@@ -725,6 +655,19 @@ export function Seat({ player, position, isHero = false, isWinner = false, seatI
               <div
                 className="relative rounded-t-xl overflow-visible portrait-card"
                 style={{
+                  // `height: 100%` on the absolutely-positioned avatar <img> below only
+                  // resolves against a DEFINITE parent height — this div had none (no
+                  // aspect-ratio, no explicit height), so the image's height computed to
+                  // 0 and the portrait never painted, on every seat, even before this
+                  // fix. Width first (drives --seat-scale sizing everywhere else in this
+                  // file), height follows from a fixed aspect ratio.
+                  //
+                  // Square, not 110/135: the 110x135 in the spec is the TOTAL seat box
+                  // (portrait + name/chip pill below), not the portrait alone — giving
+                  // the portrait the full 135 tall made every seat a tall torso card
+                  // instead of the spec's tight square headshot.
+                  width: Math.round(100 * perspectiveScale),
+                  aspectRatio: "1 / 1",
                   borderTop: `3px solid ${hexToRgba(glowColor, isTurn ? 1.0 : 0.6)}`,
                   borderLeft: `3px solid ${hexToRgba(glowColor, isTurn ? 1.0 : 0.6)}`,
                   borderRight: `3px solid ${hexToRgba(glowColor, isTurn ? 1.0 : 0.6)}`,
@@ -748,14 +691,20 @@ export function Seat({ player, position, isHero = false, isWinner = false, seatI
                   }}
                 />
 
-                {/* Avatar image — full upper body, object-top */}
+                {/* Avatar image — the reference crops tight on the face; the source
+                    art is a waist-up character render, so object-position alone
+                    (which only shifts the crop window, doesn't enlarge it) still
+                    showed torso/gear. A scale on top of object-cover, anchored to
+                    the same vertical point, zooms into the head instead. */}
                 {player.avatar ? (
                   <img
                     src={fullBodyImage || player.avatar}
                     alt={player.name}
                     className="absolute inset-0 w-full h-full object-cover z-[1] rounded-t-xl"
                     style={{
-                      objectPosition: fullBodyImage ? "center 10%" : "center 15%",
+                      objectPosition: fullBodyImage ? "center 4%" : "center 6%",
+                      transform: "scale(2.6)",
+                      transformOrigin: fullBodyImage ? "center 4%" : "center 6%",
                       opacity: isFolded ? 0.3 : 1,
                       filter: isFolded ? "grayscale(1) brightness(0.6)" : "none",
                       transition: "opacity 0.4s ease, filter 0.4s ease",
@@ -937,10 +886,6 @@ export function Seat({ player, position, isHero = false, isWinner = false, seatI
             {seatIndex + 1}
           </div>
         </div>
-
-        {player.chips > 0 && !isFolded && (
-          <PlayerChipStack chips={player.chips} side={chipStackSide} />
-        )}
 
         {hudStats && hudStats.handsPlayed > 0 && (
           <div

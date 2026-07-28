@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "./Card";
 import type { CardType } from "@/features/hrc/lib/poker-types";
 import type { Player } from "@/features/hrc/lib/poker-types";
-import { TABLE_SEATS, DEALER_POSITIONS } from "@/features/hrc/lib/table-constants";
+import { TABLE_SEATS, DEALER_POSITIONS, FELT_BOUNDS } from "@/features/hrc/lib/table-constants";
 import { useGameUI } from "@/features/hrc/lib/game-ui-context";
 import { useAnimatedCounter } from "@/features/hrc/hooks/useAnimatedCounter";
 
@@ -14,6 +14,12 @@ interface ImageTableProps {
   playerCount: number;
   maxSeats?: number;
   players?: Player[];
+  /** Visual seat indices (post hero-rotation, same space as TABLE_SEATS) that
+   *  actually hold a player — NOT just the first N slots. A sparse table
+   *  (e.g. seats 0-4,6,7,9 filled, 5 and 8 empty) needs the real occupancy
+   *  per index, or empty seats in the middle render as dead space and a
+   *  seat that IS occupied (e.g. 9) gets a stray "join" circle drawn over it. */
+  occupiedSeatIndices?: number[];
   dealerSeatIndex?: number;
   /** Number of community cards to visually show (from dealing sequence) */
   visibleCommunityCards?: number;
@@ -109,6 +115,7 @@ export function ImageTable({
   playerCount,
   maxSeats = 10,
   players,
+  occupiedSeatIndices,
   dealerSeatIndex = -1,
   visibleCommunityCards,
   communityFlipped = true,
@@ -119,6 +126,10 @@ export function ImageTable({
 }: ImageTableProps) {
   const { compactMode, feltPreset } = useGameUI();
   const occupiedCount = players?.length || playerCount;
+  // Real per-index occupancy when the caller has it (sparse tables — seats
+  // filled out of order); falls back to the old "first N slots" approximation
+  // only if the caller doesn't pass it.
+  const occupiedSet = occupiedSeatIndices ? new Set(occupiedSeatIndices) : null;
   const dealerPos = dealerSeatIndex >= 0 && dealerSeatIndex < DEALER_POSITIONS.length
     ? DEALER_POSITIONS[dealerSeatIndex]
     : null;
@@ -154,13 +165,7 @@ export function ImageTable({
   return (
     <>
       {/* ══ Poker Table — image-based (GGPoker-style) ══ */}
-      <div className="absolute z-[1]" style={{
-        left: "50%", top: "50%",
-        transform: "translate(-50%, -50%)",
-        width: "97%",
-        aspectRatio: "1408 / 768",
-        maxHeight: "92%",
-      }}>
+      <div className="z-[1]" style={FELT_BOUNDS}>
         <img
           src="/images/poker-table-felt.webp"
           alt=""
@@ -173,20 +178,13 @@ export function ImageTable({
       </div>
 
       {/* ── Game elements overlay — matches table image position exactly ── */}
-      <div className="absolute pointer-events-none" style={{
-        left: "50%", top: "50%",
-        transform: "translate(-50%, -50%)",
-        width: "97%",
-        aspectRatio: "1408 / 768",
-        maxHeight: "92%",
-        zIndex: 10,
-      }}>
+      <div className="pointer-events-none" style={{ ...FELT_BOUNDS, zIndex: 10 }}>
 
         {/* Seat slots — rendered as HTML squares (never misalign on resize) */}
         {Array.from({ length: maxSeats }).map((_, i) => {
           const seat = TABLE_SEATS[i];
           if (!seat) return null;
-          const isOccupied = i < occupiedCount;
+          const isOccupied = occupiedSet ? occupiedSet.has(i) : i < occupiedCount;
           // Empty seats are clickable
           if (!isOccupied) {
             const s = seat.scale;
@@ -275,7 +273,7 @@ export function ImageTable({
                 className="absolute flex gap-2.5"
                 style={{
                   left: "50%",
-                  top: "44%",
+                  top: "45%",
                   transform: "translate(-50%, -50%)",
                   filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.7))",
                 }}
@@ -284,7 +282,7 @@ export function ImageTable({
                   <Card
                     key={`cc-${i}-${card.suit}-${card.rank}`}
                     card={card}
-                    size={compactMode ? "lg" : (window.innerWidth < 1440 ? "xl" : "2xl")}
+                    size={compactMode ? "sm" : "md"}
                     delay={compactMode ? 0 : i * 0.12}
                     dealFrom={compactMode ? undefined : { x: 200, y: -100 }}
                     faceDown={!communityFlipped && !compactMode}
@@ -306,8 +304,19 @@ export function ImageTable({
               exit={{ opacity: 0, scale: 0.85 }}
               transition={compactMode ? { duration: 0 } : undefined}
               className="absolute flex flex-col items-center gap-1"
-              style={{ left: "50%", top: "33%", transform: "translate(-50%, -50%)" }}
+              style={{ left: "50%", top: "22%", transform: "translate(-50%, -50%)" }}
             >
+              {/* Hand / pot text header — sits above the chip stacks so they never
+                  overlap the community card row below (top:45%). */}
+              {handNumber != null && (
+                <span
+                  className="font-mono font-bold uppercase tracking-[0.1em] text-white/70"
+                  style={{ fontSize: "0.625rem", textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}
+                >
+                  Hand {handNumber.toLocaleString()} | Pot: ${animatedPot.toLocaleString()}
+                </span>
+              )}
+
               {/* Phase label */}
               {dealPhase && (
                 <span

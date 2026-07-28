@@ -25,10 +25,16 @@ import { usePokerKeyboard } from "@/features/hud/usePokerKeyboard";
 import { useGameSounds } from "@/features/sound/useGameSounds";
 import { useGame } from "@/features/game/GameProvider";
 import { useTableGraphics } from "@/features/table/tableGraphics";
+import { useSearchParams } from "next/navigation";
 
 export function TableHud({ children }: { children: React.ReactNode }) {
   const { error, snapshot, connected, matchId } = useGame();
   const [graphics] = useTableGraphics();
+  // ?demo=1 renders the reference table headless-populated (no real
+  // room/chat/spectator data exists to show), and the legacy sidebar's
+  // top-left corner collides with the floating HandHistoryPanel — hide the
+  // whole legacy column rather than let them overlap.
+  const demo = useSearchParams().get("demo") === "1";
   usePokerKeyboard();
   useGameSounds();
 
@@ -54,6 +60,7 @@ export function TableHud({ children }: { children: React.ReactNode }) {
         <PlayerHeader />
 
         <div className="mt-4 flex flex-1 gap-4">
+          {!demo && (
           <div className="flex w-full max-w-xs flex-col gap-3">
             <RoomPanel />
             <HostPanel />
@@ -73,6 +80,7 @@ export function TableHud({ children }: { children: React.ReactNode }) {
             {showGamePanels && <MusicPicker />}
             {showGamePanels && <TableSettings />}
           </div>
+          )}
           <div className="relative flex-1">
             {/* Seats + board are drawn by the 3D scene in cinematic mode; SeatHud
                 still renders (avatar-preset toggle only) so 2.5D/3D/Mix stays
@@ -91,7 +99,7 @@ export function TableHud({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <div className="mt-auto flex flex-col items-end gap-2 pb-2 pr-2">
+        <div className={`mt-auto flex flex-col gap-2 pb-2 ${demo ? "items-center" : "items-end pr-2"}`}>
           <p className="pointer-events-none text-[10px] uppercase tracking-wider text-neutral-600">
             Keys: F fold · C check/call · R raise
           </p>

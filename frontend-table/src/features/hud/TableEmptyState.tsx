@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { formatCents, useGame } from "@/features/game/GameProvider";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
@@ -14,6 +15,7 @@ import { BuyInDialog } from "@/features/hud/BuyInDialog";
 
 export function TableEmptyState() {
   const { snapshot, matchId, createRoom, joinByCode, profile, buyInCents } = useGame();
+  const demo = useSearchParams().get("demo") === "1";
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -24,8 +26,12 @@ export function TableEmptyState() {
   ).length;
   const iAmSeated = (snapshot?.seats ?? []).some((s) => s.user_id === profile.userId);
 
-  // Once the player is seated, the scene takes over — hide the overlay.
-  if (iAmSeated) return null;
+  // Once the player is seated, the scene takes over — hide the overlay. In
+  // ?demo=1 there's no real matchId/socket for this component to detect that
+  // seating, so it's suppressed outright — the demo felt is already fully
+  // populated (DEMO_SNAPSHOT), there is nothing for this "take a seat" path
+  // to offer.
+  if (iAmSeated || demo) return null;
 
   const maxSeats = snapshot?.max_seats ?? 6;
 

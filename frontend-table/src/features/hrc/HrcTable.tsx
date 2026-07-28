@@ -19,11 +19,13 @@ import { useGame } from "@/features/game/GameProvider";
 import { ImageTable } from "./components/ImageTable";
 import { PokerSceneCanvas } from "./scene/canvas/PokerSceneCanvas";
 import { GameUIProvider } from "./lib/game-ui-context";
-import { adaptSnapshot } from "./adapter";
+import { adaptSnapshot, toCards } from "./adapter";
+import type { CardType } from "./lib/poker-types";
 import { useSceneSync } from "./useSceneSync";
 import { avatarSrc } from "@/features/table/avatars";
 import { Seat } from "./components/Seat";
-import { TABLE_SEATS } from "./lib/table-constants";
+import { HeroHoleCards } from "./components/HeroHoleCards";
+import { TABLE_SEATS, FELT_BOUNDS } from "./lib/table-constants";
 import { seatId } from "./adapter";
 import { DEMO_HOLE, DEMO_SNAPSHOT } from "@/features/table3d/demoSnapshot";
 
@@ -66,6 +68,23 @@ export default function HrcTable({
   const seatIndexOf = (snap: typeof snapshot, id: string): number =>
     (snap?.seats ?? []).find((s) => seatId(s) === id)?.index ?? 0;
   const heroSeatIdx = (snapshot.seats ?? []).find((s) => s.is_hero)?.index ?? 0;
+  // `holeCards` (above) is unconditionally the hero's own cards — the private
+  // channel only ever carries the viewer's hand — so convert it directly
+  // rather than going through the adapter's `is_hero`-gated Player.cards
+  // (which is empty for demo data, since DEMO_SNAPSHOT never sets is_hero).
+  // Seat.tsx deliberately skips rendering the hero's own cards on their
+  // avatar, so this is the one place they surface.
+  const heroHole = toCards(holeCards);
+  const heroCardsPair: [CardType, CardType] | undefined =
+    heroHole.length >= 2 ? [heroHole[0], heroHole[1]] : undefined;
+
+  // Visual (post hero-rotation) seat indices that actually hold a player —
+  // ImageTable's vacant-slot layer needs this per-index, not a headcount, or
+  // a sparse table (occupied seats out of order) leaves real seats blank and
+  // draws a stray "join" circle over an already-occupied seat.
+  const occupiedSeatIndices = adapted.players.map(
+    (player) => (seatIndexOf(snapshot, player.id) - heroSeatIdx + adapted.maxSeats) % adapted.maxSeats,
+  );
 
   const style: HrcRenderStyle = override ?? (snapshot.render_style === "3d" ? "3d" : "2.5d");
 
@@ -85,6 +104,7 @@ export default function HrcTable({
             playerCount={adapted.players.length}
             maxSeats={adapted.maxSeats}
             players={adapted.players}
+            occupiedSeatIndices={occupiedSeatIndices}
             dealerSeatIndex={adapted.dealerSeatIndex}
             visibleCommunityCards={adapted.gameState.communityCards.length}
             communityFlipped
@@ -100,20 +120,11 @@ export default function HrcTable({
                 "Occupied seats rendered by Seat component" — so without this the table
                 renders with no players at all.
 
-                The wrapper geometry must match ImageTable's inner overlay exactly or the
-                percentage coordinates drift off the painted rail. */}
-            <div
-              className="absolute"
-              style={{
-                left: "50%",
-                top: "50%",
-                transform: "translate(-50%, -50%)",
-                width: "92%",
-                aspectRatio: "1408 / 768",
-                maxHeight: "88%",
-                zIndex: 20,
-              }}
-            >
+                Bounds come from the SAME FELT_BOUNDS constant ImageTable's two layers
+                use — previously this was a separately-duplicated copy of the same
+                style, which is exactly how the three layers could drift out of sync
+                with each other. */}
+            <div style={{ ...FELT_BOUNDS, zIndex: 20 }}>
               {adapted.players.map((player) => {
                 // Rotate so the hero is always at visual seat 0 (bottom centre).
                 // HRC rotates over players.length; we rotate over SEAT index and
@@ -134,6 +145,8 @@ export default function HrcTable({
                 );
               })}
             </div>
+
+            <HeroHoleCards cards={heroCardsPair} communityCards={adapted.gameState.communityCards} />
           </>
         )}
       </div>

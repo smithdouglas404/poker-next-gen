@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { formatCents, useGame } from "@/features/game/GameProvider";
 import { usePreAction } from "@/features/hud/preAction";
+import type { ActionRequiredMessage } from "@/features/game/protocol";
 
 /** Snap a cent value to the nearest chip (100) and clamp into [min, max]. */
 function clampToBounds(value: number, min: number, max: number): number {
@@ -11,11 +13,29 @@ function clampToBounds(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, snapped));
 }
 
+// ?demo=1 has no live socket, so the real actionRequired never arrives —
+// this stub mirrors DEMO_SNAPSHOT (hero at seat 0, current_bet 250,000,
+// pot 1,865,000) so the action dock renders for headless verification the
+// same way DEMO_SNAPSHOT/DEMO_HOLE already populate the felt.
+const DEMO_ACTION_REQUIRED: ActionRequiredMessage = {
+  seat: 0,
+  valid_actions: ["fold", "check", "call", "raise"],
+  to_call: 250_000,
+  min_raise: 500_000,
+  max_raise: 5_250_000,
+  pot: 1_865_000,
+  deadline_tick: 0,
+};
+
 export function ActionBar() {
-  const { actionRequired, sendAction, profile, snapshot } = useGame();
+  const live = useGame();
+  const demo = useSearchParams().get("demo") === "1";
+  const actionRequired = demo ? DEMO_ACTION_REQUIRED : live.actionRequired;
+  const sendAction = demo ? async () => {} : live.sendAction;
+  const { profile, snapshot } = live;
   const [raiseAmount, setRaiseAmount] = useState(0);
 
-  const heroSeat = snapshot?.seats.find((s) => s.user_id === profile.userId)?.index ?? -1;
+  const heroSeat = demo ? 0 : (snapshot?.seats.find((s) => s.user_id === profile.userId)?.index ?? -1);
   const isMyTurn = actionRequired?.seat === heroSeat;
 
   const pot = actionRequired?.pot ?? snapshot?.pot ?? 0;
@@ -77,75 +97,72 @@ export function ActionBar() {
   ];
 
   return (
-    <div className="pointer-events-auto w-full max-w-md rounded-2xl border border-white/[0.06] bg-surface p-4 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
-      <p className="text-xs uppercase tracking-[0.25em] text-muted">Your Action</p>
-      <p className="mt-1 text-sm text-neutral-300">
+    <div className="pointer-events-auto w-full max-w-2xl rounded-2xl border border-white/[0.06] bg-surface px-4 py-3 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
+      <p className="text-[10px] uppercase tracking-[0.2em] text-muted">
         Pot {formatCents(pot)} · To call {formatCents(actionRequired.to_call)}
       </p>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      {/* Single full-width button row — matches the reference dock: one row of
+          action buttons, no stacked title block above it. */}
+      <div className="mt-1.5 grid grid-cols-4 gap-2">
         <button
           type="button"
           onClick={() => void sendAction("fold", 0)}
-          className="rounded-xl border border-brand/50 bg-brand/15 px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-[#ff9ba1] hover:bg-brand/25"
+          className="rounded-xl border border-brand/50 bg-brand/15 py-2.5 text-sm font-bold uppercase tracking-wider text-[#ff9ba1] hover:bg-brand/25"
         >
           Fold
         </button>
-        {canCheck && (
-          <button
-            type="button"
-            onClick={() => void sendAction("check", 0)}
-            className="rounded-xl border border-white/15 bg-white/[0.04] px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-neutral-200 hover:bg-white/10"
-          >
-            Check
-          </button>
-        )}
-        {canCall && (
-          <button
-            type="button"
-            onClick={() => void sendAction("call", 0)}
-            className="rounded-xl border border-green/50 bg-green/15 px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-[#bff5d3] hover:bg-green/25"
-          >
-            Call {formatCents(actionRequired.to_call)}
-          </button>
-        )}
-        {canRaise && (
-          <button
-            type="button"
-            onClick={() => void sendAction("raise", raiseAmount)}
-            className="rounded-xl border border-gold/50 bg-gold/15 px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-gold hover:bg-gold/25"
-          >
-            Raise {formatCents(raiseAmount)}
-          </button>
-        )}
+        <button
+          type="button"
+          disabled={!canCheck}
+          onClick={() => void sendAction("check", 0)}
+          className="rounded-xl border border-white/15 bg-white/[0.04] py-2.5 text-sm font-bold uppercase tracking-wider text-neutral-200 hover:bg-white/10 disabled:opacity-30"
+        >
+          Check
+        </button>
+        <button
+          type="button"
+          disabled={!canCall}
+          onClick={() => void sendAction("call", 0)}
+          className="rounded-xl border border-green/50 bg-green/15 py-2.5 text-sm font-bold uppercase tracking-wider text-[#bff5d3] hover:bg-green/25 disabled:opacity-30"
+        >
+          {canCall ? `Call ${formatCents(actionRequired.to_call)}` : "Call"}
+        </button>
+        <button
+          type="button"
+          disabled={!canRaise}
+          onClick={() => void sendAction("raise", raiseAmount)}
+          className="rounded-xl border border-gold/50 bg-gold/15 py-2.5 text-sm font-bold uppercase tracking-wider text-gold hover:bg-gold/25 disabled:opacity-30"
+        >
+          {canRaise ? `Raise ${formatCents(raiseAmount)}` : "Raise"}
+        </button>
       </div>
 
       {canRaise && (
-        <div className="mt-4">
-          <div className="flex items-center justify-between text-xs text-neutral-400">
-            <span>{formatCents(min)}</span>
-            <span className="font-semibold text-gold">{formatCents(raiseAmount)}</span>
-            <span>{formatCents(max)}</span>
+        <div className="mt-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-neutral-500">{formatCents(min)}</span>
+            <input
+              type="range"
+              min={min}
+              max={max}
+              step={100}
+              value={raiseAmount}
+              onChange={(e) => setClamped(Number(e.target.value))}
+              className="w-full accent-[#f5c518]"
+            />
+            <span className="text-[10px] text-neutral-500">{formatCents(max)}</span>
           </div>
 
-          <input
-            type="range"
-            min={min}
-            max={max}
-            step={100}
-            value={raiseAmount}
-            onChange={(e) => setClamped(Number(e.target.value))}
-            className="mt-2 w-full accent-[#f5c518]"
-          />
-
-          <div className="mt-3 flex items-center gap-2">
-            <label className="text-[10px] uppercase tracking-wider text-neutral-500" htmlFor="raise-amount">
-              Amount
-            </label>
-            <div className="flex items-center rounded-lg border border-white/10 bg-black/40 px-2">
+          {/* Amount input + pot-fraction presets on one row — the reference dock
+              keeps the whole raise control to two compact rows (buttons, slider),
+              so the numeric entry and presets share a row instead of stacking. */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <div className="flex items-center rounded-lg border border-white/10 bg-black/40 px-2 py-1">
               <span className="text-xs text-neutral-500">$</span>
               <input
                 id="raise-amount"
+                aria-label="Raise amount"
                 type="number"
                 inputMode="numeric"
                 min={min / 100}
@@ -153,12 +170,9 @@ export function ActionBar() {
                 step={1}
                 value={Math.round(raiseAmount / 100)}
                 onChange={(e) => setClamped(Number(e.target.value) * 100)}
-                className="w-20 bg-transparent px-1 py-1 text-sm text-gold outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-16 bg-transparent px-1 text-sm text-gold outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
-          </div>
-
-          <div className="mt-2 flex flex-wrap gap-2">
             {presetButtons.map(({ key, label, amount }) => {
               const active = raiseAmount === amount;
               return (
@@ -166,7 +180,7 @@ export function ActionBar() {
                   key={key}
                   type="button"
                   onClick={() => setClamped(amount)}
-                  className={`rounded-lg border px-3 py-1 text-[10px] font-semibold uppercase tracking-wider transition ${
+                  className={`rounded-lg border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider transition ${
                     active
                       ? "border-brand/60 bg-brand/15 text-white"
                       : "border-white/10 text-neutral-300 hover:bg-white/5"

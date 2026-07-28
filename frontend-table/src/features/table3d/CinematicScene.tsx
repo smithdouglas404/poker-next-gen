@@ -15,7 +15,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { Environment, Lightformer, Html, useTexture, useGLTF, useAnimations, Clone, ContactShadows } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 
-import { cardBackArt, cardFaceArt, feltTexture } from "@/app/proof/textures";
+import { cardBackArt, cardFaceArt, feltTexture } from "./textures";
 import { avatarSrc } from "@/features/table/avatars";
 import type { BakedConfig } from "@/features/table/bakedTable";
 
