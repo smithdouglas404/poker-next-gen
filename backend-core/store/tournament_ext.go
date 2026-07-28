@@ -149,25 +149,34 @@ type ClubTournamentFeesRow struct {
 	Name        string `json:"name"`
 	Status      string `json:"status"`
 	FeeMinor    int64  `json:"fee_minor"`
+	AdminFeeBps int32  `json:"admin_fee_bps"`
 	BuyInMinor  int64  `json:"buy_in_minor"`
 	Entries     int64  `json:"entries"`
 	FeeTotal    int64  `json:"fee_total"`
 	BuyInTotal  int64  `json:"buy_in_total"`
 }
 
-// ClubTournamentFees sums the club's real tournament-fee revenue — the entry fee
-// (fee_minor) charged per registration, over every tournament owned by the club,
-// optionally within a trailing window. This is the authoritative replacement for
-// the client-side "≈25% of rake" model. Returns the grand total plus a per-
-// tournament breakdown (newest first). `interval` is a fixed Postgres literal
-// chosen by the caller (never user-supplied); empty means all-time.
+// ClubTournamentFees sums the club's real tournament-fee revenue — the club's
+// full per-entry rake (flat fee_minor PLUS the admin_fee_bps percentage of the
+// buy-in), over every tournament owned by the club, optionally within a
+// trailing window. This is the authoritative replacement for the client-side
+// "≈25% of rake" model. Returns the grand total plus a per-tournament
+// breakdown (newest first). `interval` is a fixed Postgres literal chosen by
+// the caller (never user-supplied); empty means all-time.
+//
+// Per-entry rake MUST use the exact same formula as TournamentMoney (the
+// director's and TournamentFinalize's actual settlement math) — this used to
+// be `fee_minor × entries` alone, silently dropping admin_fee_bps (allowed up
+// to 50% of the buy-in) entirely, so any tournament with a percentage-based
+// admin fee showed a correctly-computed rake everywhere else but an
+// understated (sometimes zero) figure on this specific dashboard revenue report.
 func (s *TournamentExtStore) ClubTournamentFees(ctx context.Context, clubID, interval string) (int64, int64, int64, []ClubTournamentFeesRow, error) {
 	where := "t.club_id=$1"
 	if interval != "" {
 		where += " AND t.created_at >= NOW() - INTERVAL '" + interval + "'"
 	}
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT t.id, t.name, t.status, t.fee_minor, t.buy_in_minor,
+		SELECT t.id, t.name, t.status, t.fee_minor, t.admin_fee_bps, t.buy_in_minor,
 		       COALESCE(r.cnt, 0) AS entries
 		FROM poker_tournament t
 		LEFT JOIN (
@@ -184,10 +193,20 @@ func (s *TournamentExtStore) ClubTournamentFees(ctx context.Context, clubID, int
 	out := []ClubTournamentFeesRow{}
 	for rows.Next() {
 		var r ClubTournamentFeesRow
-		if err := rows.Scan(&r.ID, &r.Name, &r.Status, &r.FeeMinor, &r.BuyInMinor, &r.Entries); err != nil {
+		if err := rows.Scan(&r.ID, &r.Name, &r.Status, &r.FeeMinor, &r.AdminFeeBps, &r.BuyInMinor, &r.Entries); err != nil {
 			return 0, 0, 0, nil, err
 		}
-		r.FeeTotal = r.FeeMinor * r.Entries
+		// Same clamp TournamentMoney applies: never negative, never more than
+		// the buy-in itself (a misconfigured 100%+ admin fee must not report
+		// more rake per entry than the entry actually cost).
+		perEntryRake := r.FeeMinor + r.BuyInMinor*int64(r.AdminFeeBps)/10000
+		if perEntryRake < 0 {
+			perEntryRake = 0
+		}
+		if perEntryRake > r.BuyInMinor {
+			perEntryRake = r.BuyInMinor
+		}
+		r.FeeTotal = perEntryRake * r.Entries
 		r.BuyInTotal = r.BuyInMinor * r.Entries
 		feeTotal += r.FeeTotal
 		buyInTotal += r.BuyInTotal

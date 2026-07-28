@@ -1020,7 +1020,15 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			// overloads 0 to mean BOTH "play chips only" (free) and "unlimited"
 			// (platinum), so reading it directly hands the free tier unlimited
 			// stakes — precisely backwards.
-			if maxBB := billing.EffectiveMaxBigBlindCents(tier.ID); s.BigBlind > maxBB && !isGuest(ctx, nk, userID) {
+			//
+			// No guest exemption: SubscriptionTier resolves a guest (no
+			// subscription row) to "free" the same as anyone else, so this cap
+			// already applies to guests correctly — a `!isGuest(...)` carve-out
+			// here would exempt them from it entirely, letting a trivially-created
+			// guest account sit at unlimited-stakes tables the actual free tier
+			// (and CLAUDE.md's own "guests reach only the table-code path" intent)
+			// never allows.
+			if maxBB := billing.EffectiveMaxBigBlindCents(tier.ID); s.BigBlind > maxBB {
 				sendError(dispatcher, presence, "stake_limit", fmt.Sprintf(
 					"this table's big blind is above your plan's limit of $%d — upgrade to sit here",
 					maxBB/100))
@@ -2590,27 +2598,30 @@ func isGuest(ctx context.Context, nk runtime.NakamaModule, userID string) bool {
 	return strings.TrimSpace(acct.GetEmail()) == "" && !strings.HasPrefix(acct.GetCustomId(), "clerk:")
 }
 
-// guests without a pick, or on any error — attribution is best-effort and must
-// never break a hand.
-func equippedAvatarID(ctx context.Context, nk runtime.NakamaModule, userID string) string {
+// equippedAvatarID reads the player's currently-equipped avatar from
+// poker_equipped (CosmeticStore.Equipped) — the same ownership-checked table
+// CosmeticEquip writes and AvatarPanel reads (equipped["avatar"], falling
+// back to equipped["portrait"]) — never from account metadata's "avatar" key.
+// That key is a different, legacy field: profile_meta_set's whitelist lets a
+// caller set it to ANY string with no ownership check at all, and the real
+// equip flow (studio.equip -> cosmetic_equip) never writes it, so reading it
+// here both attributed battle stats to an item nobody verified the player
+// owns AND was disconnected from what a player actually equips through the
+// real UI (poker_equipped) — stats were being attributed nowhere real.
+// Returns "" for guests without a pick, or on any error — attribution is
+// best-effort and must never break a hand.
+func equippedAvatarID(ctx context.Context, db *sql.DB, userID string) string {
 	if userID == "" {
 		return ""
 	}
-	acct, err := nk.AccountGetId(ctx, userID)
-	if err != nil || acct.GetUser() == nil {
+	equipped, err := store.NewCosmeticStore(db).Equipped(ctx, userID)
+	if err != nil {
 		return ""
 	}
-	meta := acct.GetUser().GetMetadata()
-	if meta == "" {
-		return ""
+	if av := equipped["avatar"]; av != "" {
+		return av
 	}
-	var m struct {
-		Avatar string `json:"avatar"`
-	}
-	if err := json.Unmarshal([]byte(meta), &m); err != nil {
-		return ""
-	}
-	return m.Avatar
+	return equipped["portrait"]
 }
 
 // achievements. HRP is earned by PLAYING, so losers still progress. Called before
@@ -2651,7 +2662,7 @@ func accrueLoyalty(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *
 		}
 		// Attribute this hand to the character the player has equipped, so every
 		// avatar accrues its own battle record (rounds played + win rate).
-		if av := equippedAvatarID(ctx, nk, seat.UserID); av != "" {
+		if av := equippedAvatarID(ctx, db, seat.UserID); av != "" {
 			_ = store.NewAvatarStatsStore(db).Increment(ctx, seat.UserID, av, won)
 		}
 		// Ledger the HRP event (loyalty_history) and feed the native HRP + hands

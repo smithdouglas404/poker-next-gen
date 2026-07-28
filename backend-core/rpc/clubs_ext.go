@@ -252,6 +252,13 @@ func ClubRoster(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" {
 		return "", runtime.NewError("club_id required", 3)
 	}
+	// Every other member's balance/locked_amount/can_configure flag is
+	// operator-facing financial data, not something a fellow member (let alone
+	// an unauthenticated caller) should be able to pull for any club_id —
+	// this had no auth check at all.
+	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+		return "", err
+	}
 	roster, err := store.NewClubExtStore(db).Roster(ctx, req.ClubID)
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
@@ -381,6 +388,12 @@ func ClubQuickStats(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 	}
 	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" {
 		return "", runtime.NewError("club_id required", 3)
+	}
+	// The activity feed's detail strings include exact chip-allocation amounts
+	// and target user ids (see BalanceAllocate) — operator-only, like ClubRoster.
+	// This had no auth check at all.
+	if _, err := requireClubConfigurer(ctx, db, req.ClubID); err != nil {
+		return "", err
 	}
 	es := store.NewClubExtStore(db)
 	stats, err := es.GetClubStats(ctx, req.ClubID)

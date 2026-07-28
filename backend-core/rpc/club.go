@@ -327,6 +327,12 @@ func ClubMembers(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" {
 		return "", runtime.NewError("club_id required", 3)
 	}
+	// No auth check at all previously — any authenticated (or unauthenticated,
+	// since requireClubReader/callerID is what actually enforces a session)
+	// caller could list any club's full membership by club_id alone.
+	if err := requireClubReader(ctx, db, req.ClubID); err != nil {
+		return "", err
+	}
 	members, err := store.NewClubStore(db).ListMembers(ctx, req.ClubID)
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
