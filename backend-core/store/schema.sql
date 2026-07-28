@@ -362,7 +362,7 @@ CREATE TABLE IF NOT EXISTS poker_generation (
     user_id TEXT NOT NULL,
     prompt TEXT NOT NULL DEFAULT '',
     tripo_task_id TEXT NOT NULL DEFAULT '',
-    status TEXT NOT NULL DEFAULT 'pending', -- pending | running | success | failed
+    status TEXT NOT NULL DEFAULT 'pending', -- pending | running | minting | success | failed
     fee_cents BIGINT NOT NULL DEFAULT 0,
     cosmetic_id TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

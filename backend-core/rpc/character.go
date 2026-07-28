@@ -214,10 +214,26 @@ func refundGeneration(ctx context.Context, logger runtime.Logger, db *sql.DB, ge
 }
 
 // mintCharacter creates the model cosmetic, grants it, and completes the job.
+//
+// Status is polled by the client, so two concurrent CharacterGenerationStatus
+// calls can both observe Tripo's task as done and both reach this function for
+// the SAME generation — without ClaimMinting, both would call
+// CosmeticStore.Create (no dedup on generation id) and mint two "legendary"
+// model cosmetics for one character_generate_fee. Only the caller that wins
+// the claim mints; the loser reports "still running" and the client's next
+// poll picks up the real terminal state (with the winner's cosmetic id).
 func mintCharacter(ctx context.Context, logger runtime.Logger, db *sql.DB, gens *store.GenerationStore, g *store.Generation, userID, modelURL, previewURL string) string {
 	if modelURL == "" {
 		refundGeneration(ctx, logger, db, gens, g)
 		return generationResult(&store.Generation{ID: g.ID, Status: "failed"})
+	}
+	claimed, cerr := gens.ClaimMinting(ctx, g.ID)
+	if cerr != nil {
+		logger.Error("generation %s: claiming mint: %v", g.ID, cerr)
+		return runningStatus(g.Stage, overallProgress(g.Stage, 99))
+	}
+	if !claimed {
+		return runningStatus(g.Stage, overallProgress(g.Stage, 99))
 	}
 	cs := store.NewCosmeticStore(db)
 	cid, err := cs.Create(ctx, &store.Cosmetic{

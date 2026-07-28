@@ -69,10 +69,36 @@ func (s *GenerationStore) AdvanceToRetarget(ctx context.Context, id, riggedModel
 	return err
 }
 
-// Complete marks the job successful and records the minted cosmetic id.
+// ClaimMinting atomically transitions a generation from a non-terminal state
+// to 'minting', reporting whether THIS call won the claim. Status is polled by
+// the client, so two concurrent polls can both observe Tripo's task as
+// "success" and both reach the mint step — without this claim, both would
+// call CosmeticStore.Create (which has no dedup on generation id) and mint TWO
+// cosmetics for one character_generate_fee. Only the caller that wins the
+// claim may mint; the loser reports "still running" and picks up the real
+// terminal state (with the winner's cosmetic id) on its next poll.
+func (s *GenerationStore) ClaimMinting(ctx context.Context, id string) (bool, error) {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE poker_generation SET status='minting', updated_at=NOW()
+		 WHERE id=$1 AND status NOT IN ('minting','success','failed')`, id)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return n == 1, nil
+}
+
+// Complete marks the job successful and records the minted cosmetic id. Only
+// transitions a row this same flow already claimed via ClaimMinting — a
+// no-op guard, since ClaimMinting is what actually prevents the double-mint,
+// but it keeps this call honest about what state it expects to be finishing.
 func (s *GenerationStore) Complete(ctx context.Context, id, cosmeticID string) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE poker_generation SET status='success', cosmetic_id=$2, updated_at=NOW() WHERE id=$1`, id, cosmeticID)
+		`UPDATE poker_generation SET status='success', cosmetic_id=$2, updated_at=NOW()
+		 WHERE id=$1 AND status='minting'`, id, cosmeticID)
 	return err
 }
 
