@@ -19,6 +19,7 @@ import { DEFAULT_MAX_SEATS, MAX_SEATS, MIN_SEATS } from "@/features/game/protoco
 import type { CardView, SeatView, ShowdownMessage, TableSnapshot } from "@/features/game/protocol";
 import { CinematicScene, type SceneSeat, type FeltControls } from "./CinematicScene";
 import { TableAdminOverlay } from "./TableAdminOverlay";
+import { HandHistoryPanel } from "@/features/hud/HandHistoryPanel";
 import { BuyInDialog } from "@/features/hud/BuyInDialog";
 import { DEMO_HERO_ID, DEMO_HOLE, DEMO_SHOWDOWN, DEMO_SNAPSHOT } from "./demoSnapshot";
 
@@ -273,7 +274,12 @@ export default function LiveCinematicTable() {
         announce={scene.announce}
         feltControls={feltControls}
         backdrop={bakedPlate(snapshot?.table_art)}
-        overlay={<TableAdminOverlay demo={demo} />}
+        overlay={
+          <>
+            <HandHistoryPanel />
+            <TableAdminOverlay demo={demo} />
+          </>
+        }
       />
     </>
   );

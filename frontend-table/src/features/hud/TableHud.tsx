@@ -17,7 +17,6 @@ import { TotalInPlay } from "@/features/hud/TotalInPlay";
 import { BuyInSlider, TableLog } from "@/features/hud/TableLog";
 import { TableEmptyState } from "@/features/hud/TableEmptyState";
 import { ChatPanel } from "@/features/hud/ChatPanel";
-import { HandHistoryPanel } from "@/features/hud/HandHistoryPanel";
 import { HostPanel } from "@/features/hud/HostPanel";
 import { MusicPicker } from "@/features/sound/MusicPicker";
 import { TableSettings } from "@/features/hud/TableSettings";
@@ -78,7 +77,6 @@ export function TableHud({ children }: { children: React.ReactNode }) {
             {/* Seats + board are drawn by the 3D scene in cinematic mode; SeatHud
                 still renders (avatar-preset toggle only) so 2.5D/3D/Mix stays
                 switchable. */}
-            {cinematic && <HandHistoryPanel />}
             <SeatHud />
             {/* Path to the money action while the hero isn't seated (self-hides
                 once seated) — P0-7. */}
