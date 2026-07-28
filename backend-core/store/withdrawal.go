@@ -36,10 +36,21 @@ func (s *WithdrawalStore) CreateRequest(ctx context.Context, userID string, amou
 	}
 	defer tx.Rollback()
 
-	// Ensure wallet row, then debit with a balance guard.
+	// Ensure wallet row (SAME tier-aware opening balance WalletStore.Ensure
+	// uses), then debit with a balance guard. A hardcoded 100000 ($1,000) here
+	// used to hand a paid account's very first wallet touch the free-tier
+	// guest stipend — StartingBalanceForTier says a paid account in
+	// real-money mode starts at zero, since it's the only kind that can move
+	// real money. Getting this wrong meant a brand-new paid+KYC'd account
+	// whose first-ever wallet interaction was a withdrawal request could debit
+	// up to $1,000 that was never deposited, and if approved without an
+	// independent deposit-history check, real payout money would leave the
+	// platform for funds that never existed. ON CONFLICT DO NOTHING means this
+	// never rewrites an existing balance either way.
+	opening := StartingBalanceForTier(SubscriptionTier(ctx, s.db, userID))
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO poker_global_wallet (user_id, balance, currency, updated_at)
-		VALUES ($1, 100000, 'USD', NOW()) ON CONFLICT (user_id) DO NOTHING`, userID); err != nil {
+		VALUES ($1, $2, 'USD', NOW()) ON CONFLICT (user_id) DO NOTHING`, userID, opening); err != nil {
 		return "", err
 	}
 	var after int64

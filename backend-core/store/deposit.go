@@ -77,9 +77,17 @@ func (s *DepositStore) MarkCredited(ctx context.Context, id string) (bool, error
 	if err != nil {
 		return false, err
 	}
+	// Bootstrap a missing wallet row with the SAME tier-aware opening balance
+	// WalletStore.Ensure uses — a hardcoded 100000 ($1,000) here used to hand a
+	// paid account's very first wallet touch the free-tier guest stipend,
+	// which StartingBalanceForTier says must be zero in real-money mode
+	// (a paid account's ledger has to start clean; the stipend is play money
+	// that can never become or come from real funds). ON CONFLICT DO NOTHING
+	// means this never rewrites an existing balance either way.
+	opening := StartingBalanceForTier(SubscriptionTier(ctx, s.db, userID))
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO poker_global_wallet (user_id, balance, currency, updated_at)
-		VALUES ($1, 100000, 'USD', NOW()) ON CONFLICT (user_id) DO NOTHING`, userID); err != nil {
+		VALUES ($1, $2, 'USD', NOW()) ON CONFLICT (user_id) DO NOTHING`, userID, opening); err != nil {
 		return false, err
 	}
 	var after int64

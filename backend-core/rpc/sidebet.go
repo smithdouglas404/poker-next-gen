@@ -24,6 +24,25 @@ func SidebetOffer(ctx context.Context, logger runtime.Logger, db *sql.DB, nk run
 	if err != nil {
 		return "", err
 	}
+	// A side bet stakes real wallet money on a hand outcome — the same entry
+	// gates every other new-money-at-risk action on the platform applies
+	// (table sit-down, deposits) were entirely absent here: a self-excluded,
+	// jurisdiction-blocked, or (in real-money mode) unverified account could
+	// escrow and win real money peer-to-peer through this path alone. Not
+	// requireRealMoney() — that's the deposit/withdrawal-only kill switch;
+	// side bets, like cash-table buy-ins, still function on play-money wallet
+	// stipends when real money is off.
+	if err := blockedByRG(ctx, db, caller); err != nil {
+		return "", err
+	}
+	if err := guardJurisdiction(ctx, db); err != nil {
+		return "", err
+	}
+	if realMoneyEnabled() {
+		if err := requireVerified(ctx, db, caller, "kyc_aml", "placing a side bet"); err != nil {
+			return "", err
+		}
+	}
 	var req struct {
 		MatchID     string `json:"match_id"`
 		HandNo      int    `json:"hand_no"`
@@ -57,6 +76,20 @@ func SidebetAccept(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 	caller, err := callerID(ctx)
 	if err != nil {
 		return "", err
+	}
+	// Same new-money-at-risk gates as SidebetOffer — see that function's
+	// comment. An acceptor takes on exactly the same real-money exposure as a
+	// proposer, so the gate has to be here too, not only on the offer side.
+	if err := blockedByRG(ctx, db, caller); err != nil {
+		return "", err
+	}
+	if err := guardJurisdiction(ctx, db); err != nil {
+		return "", err
+	}
+	if realMoneyEnabled() {
+		if err := requireVerified(ctx, db, caller, "kyc_aml", "accepting a side bet"); err != nil {
+			return "", err
+		}
 	}
 	var req struct {
 		SidebetID string `json:"sidebet_id"`

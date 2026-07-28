@@ -1040,7 +1040,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			// Certification rule: registered players buy in from the certified
 			// global wallet; only guests use club-allocated comp chips.
 			guest := isGuest(ctx, nk, userID)
-			wallet := reserveBuyIn(ctx, db, s, userID, buyIn, req.Wallet, guest)
+			wallet, reserved := reserveBuyIn(ctx, db, s, userID, buyIn, req.Wallet, guest)
 			if wallet == "" {
 				msg := "not enough funds in the selected wallet"
 				if !guest && s.ClubID != "" {
@@ -1053,19 +1053,29 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			if username == "" {
 				username = fmt.Sprintf("Player_%s", userID[:4])
 			}
-			// Must clamp the same way reserveBuyIn just did — the stack the seat
-			// shows and the amount the wallet was actually charged have to be the
-			// same number, or the table either destroys the difference (stack
-			// under-clamped relative to the debit) or mints it from nothing
-			// (stack over-clamped relative to the debit).
+			// Use `reserved` (reserveBuyIn's actual post-clamp amount), not the raw
+			// `buyIn` argument, for everything below — the seat stack, SeatLocked,
+			// and any failure-path release all have to agree with what was
+			// actually reserved, or the table either destroys the difference
+			// (recording less than was taken) or mints it from nothing (recording
+			// more).
 			sitErr := error(nil)
 			if s.NoMaxBuyIn {
-				sitErr = s.Table.SitDownUnlimited(req.Seat, userID, username, buyIn)
+				sitErr = s.Table.SitDownUnlimited(req.Seat, userID, username, reserved)
 			} else {
-				sitErr = s.Table.SitDown(req.Seat, userID, username, buyIn)
+				sitErr = s.Table.SitDown(req.Seat, userID, username, reserved)
 			}
 			if sitErr != nil {
-				releaseBuyIn(ctx, logger, db, s, req.Seat, userID, buyIn)
+				// releaseBuyInAs, not releaseBuyIn: this reservation was never
+				// recorded into SeatWallet/SeatLocked (we're bailing out before
+				// that happens a few lines down), so releaseBuyIn's usual lookup
+				// of those seat-indexed maps would see whatever stale value they
+				// already held for this seat index — never "club", since this
+				// attempt never got that far — and credit the wrong wallet
+				// entirely. A club guest's reservation would sit stuck in
+				// locked_amount forever while their global wallet was minted the
+				// same amount from nothing.
+				releaseBuyInAs(ctx, logger, db, s, userID, wallet, reserved, reserved)
 				sendError(dispatcher, presence, "sit_failed", sitErr.Error())
 				continue
 			}
@@ -1077,7 +1087,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				if s.SeatLocked == nil {
 					s.SeatLocked = map[int]int64{}
 				}
-				s.SeatLocked[req.Seat] = buyIn
+				s.SeatLocked[req.Seat] = reserved
 			}
 			if s.TimeBank == nil {
 				s.TimeBank = map[string]int64{}
@@ -2293,9 +2303,10 @@ func clubAcceptsGlobal(ctx context.Context, db *sql.DB, clubID string) bool {
 }
 
 // reserveBuyIn debits the chosen wallet and returns which wallet was used
-// ("global" | "club" | "tournament"), or "" on failure (insufficient funds).
-// At a club table the club-issued balance is used unless the player picked
-// "global" AND the club accepts it.
+// ("global" | "club" | "tournament") plus the EXACT amount actually reserved
+// (post-ClampBuyInBand — never the raw `amount` argument), or ("", 0) on
+// failure (insufficient funds). At a club table the club-issued balance is
+// used unless the player picked "global" AND the club accepts it.
 // reserveBuyIn reserves a player's buy-in. HRC certification rule: CASH GAMES are
 // GLOBAL-WALLET ONLY — every registered player buys into a cash table with their
 // funded, KYC-verified global wallet, never club-allocated chips, whether the
@@ -2303,7 +2314,18 @@ func clubAcceptsGlobal(ctx context.Context, db *sql.DB, clubID string) bool {
 // for GUESTS / comps at coded tables (tracked for operator reconciliation, #P7).
 // Tournaments are director-managed (no wallet debit here). The player's `wallet`
 // preference no longer selects the source for registered players — the rule does.
-func reserveBuyIn(ctx context.Context, db *sql.DB, s *MatchState, userID string, amount int64, wallet string, guest bool) string {
+//
+// Callers MUST use the returned amount (not their own raw `amount` argument)
+// for anything downstream that has to match what was actually reserved —
+// the seat stack, MatchState.SeatLocked, and any failure-path release. Passing
+// the raw argument back to those instead diverges from what this function
+// actually reserved whenever it fell below MinBuyInCents (only enforced on
+// NoMaxBuyIn tables, since capped tables pre-clamp the raw amount before it
+// ever reaches here) — mismatched by exactly that shortfall, either destroying
+// it (a failure-path refund of the raw, smaller amount) or stranding it forever
+// (a club lock recorded at the raw, smaller amount that a later release can
+// never fully unwind).
+func reserveBuyIn(ctx context.Context, db *sql.DB, s *MatchState, userID string, amount int64, wallet string, guest bool) (string, int64) {
 	// s.NoMaxBuyIn, not the unconditional global cap: this used to hard-clamp
 	// every buy-in to poker.MaxBuyInCents ($1,000) regardless of the table's own
 	// "Unlimited buy-in (play money)" setting, silently downsizing every buy-in
@@ -2312,14 +2334,14 @@ func reserveBuyIn(ctx context.Context, db *sql.DB, s *MatchState, userID string,
 	// this only relaxes the cap where the table already can't move real money.
 	amount = poker.ClampBuyInBand(amount, s.NoMaxBuyIn)
 	if s.TournamentID != "" {
-		return "tournament" // director-managed; no wallet debit
+		return "tournament", amount // director-managed; no wallet debit
 	}
 	if s.ClubID != "" && guest {
 		// Guest / comp seat only: club-allocated chips, under the operator's limit.
 		if err := store.NewClubStore(db).LockBalanceForTable(ctx, s.ClubID, userID, amount, matchIDForAudit(s)); err != nil {
-			return ""
+			return "", 0
 		}
-		return "club"
+		return "club", amount
 	}
 	// Registered player (club or non-club table) = certified cash game → the
 	// global wallet only. No club-chip fallback; a funded global wallet is required.
@@ -2328,9 +2350,9 @@ func reserveBuyIn(ctx context.Context, db *sql.DB, s *MatchState, userID string,
 	// is in play and returns to zero when the last seat empties.
 	if err := store.NewWalletStore(db).DebitTo(ctx, userID, amount, "table_buyin",
 		store.TableAcct(matchIDForAudit(s))); err != nil {
-		return ""
+		return "", 0
 	}
-	return "global"
+	return "global", amount
 }
 
 // releaseBuyIn returns chips to the SAME wallet the seat bought in from.
@@ -2345,23 +2367,37 @@ func reserveBuyIn(ctx context.Context, db *sql.DB, s *MatchState, userID string,
 // is the least this can do; it is what makes the loss findable and
 // compensable instead of just gone.
 func releaseBuyIn(ctx context.Context, logger runtime.Logger, db *sql.DB, s *MatchState, seat int, userID string, amount int64) {
-	if amount <= 0 || s.TournamentID != "" {
-		return
-	}
 	wallet := ""
 	if s.SeatWallet != nil {
 		wallet = s.SeatWallet[seat]
+	}
+	locked := amount
+	if s.SeatLocked != nil {
+		if v, ok := s.SeatLocked[seat]; ok {
+			locked = v
+		}
+	}
+	releaseBuyInAs(ctx, logger, db, s, userID, wallet, locked, amount)
+}
+
+// releaseBuyInAs is releaseBuyIn's actual implementation, taking the wallet
+// type and locked amount explicitly instead of reading them from
+// MatchState.SeatWallet/SeatLocked. Use this directly (not releaseBuyIn) at
+// any point where a reservation is being released BEFORE it was ever recorded
+// into those seat-indexed maps — e.g. OpSitDown's own sitErr-!=-nil path,
+// which used to call releaseBuyIn and silently read whatever stale/empty
+// value SeatWallet[seat] already held (never "club", since this attempt never
+// got that far), crediting the wrong wallet — the player's global balance was
+// minted from nothing while their real club-locked reservation stayed stuck
+// in locked_amount forever, un-owned by any seat.
+func releaseBuyInAs(ctx context.Context, logger runtime.Logger, db *sql.DB, s *MatchState, userID, wallet string, locked, amount int64) {
+	if amount <= 0 || s.TournamentID != "" {
+		return
 	}
 	if wallet == "club" && s.ClubID != "" {
 		// Unlock what was reserved; credit what is actually leaving. Passing the
 		// stack for both — the old behaviour — pinned a losing player's shortfall
 		// in locked_amount permanently.
-		locked := amount
-		if s.SeatLocked != nil {
-			if v, ok := s.SeatLocked[seat]; ok {
-				locked = v
-			}
-		}
 		if err := store.NewClubStore(db).SettleSeatAtTable(ctx, s.ClubID, userID, locked, amount, matchIDForAudit(s)); err != nil {
 			logger.Error("CASHOUT FAILED match=%s club=%s user=%s amount_cents=%d: %v",
 				matchIDForAudit(s), s.ClubID, userID, amount, err)
@@ -2768,11 +2804,18 @@ func standUpBusted(ctx context.Context, logger runtime.Logger, db *sql.DB, dispa
 				topUp = s.WalletLimitCents
 			}
 			if topUp > 0 {
-				if w := reserveBuyIn(ctx, db, s, seat.UserID, topUp, s.SeatWallet[i], s.SeatWallet[i] == "club"); w != "" {
-					seat.Stack += topUp
+				// s.minBuyIn() is an operator-configured value that can legally sit
+				// below poker.MinBuyInCents; when it does, reserveBuyIn's own
+				// ClampBuyInBand floor reserves MORE than topUp. Crediting the
+				// stack with the pre-clamp `topUp` instead of what was actually
+				// reserved (`reserved`) would destroy that difference — debited
+				// from the wallet/club lock, never appearing on the stack, never
+				// returned to anyone.
+				if w, reserved := reserveBuyIn(ctx, db, s, seat.UserID, topUp, s.SeatWallet[i], s.SeatWallet[i] == "club"); w != "" {
+					seat.Stack += reserved
 					s.SeatWallet[i] = w
-					s.SeatBuyIn[i] += topUp // count the auto-rebuy toward this sitting's buy-in (Tier-1 C)
-					narrate(dispatcher, s, fmt.Sprintf("%s auto-bought back in for $%d.", seat.Username, topUp/100))
+					s.SeatBuyIn[i] += reserved // count the auto-rebuy toward this sitting's buy-in (Tier-1 C)
+					narrate(dispatcher, s, fmt.Sprintf("%s auto-bought back in for $%d.", seat.Username, reserved/100))
 					continue
 				}
 			}
