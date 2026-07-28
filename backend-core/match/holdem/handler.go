@@ -879,6 +879,19 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				sendError(dispatcher, presence, "already_seated", "you already have a seat at this table")
 				continue
 			}
+			// Tournament seats are director-managed: reserveBuyIn returns
+			// "tournament" unconditionally for any TournamentID table (no wallet
+			// debit — the buy-in was already taken at registration), which meant
+			// nothing here ever checked the sitter actually WAS a registered
+			// entrant. Registration-time gates (tier cap, and now club
+			// membership for a club-owned event) meant nothing if anyone who
+			// discovered the table's match_id could just sit down directly.
+			if s.TournamentID != "" {
+				if ok, err := store.NewTournamentStore(db).IsRegistered(ctx, s.TournamentID, userID); err != nil || !ok {
+					sendError(dispatcher, presence, "not_registered", "you are not registered for this tournament")
+					continue
+				}
+			}
 
 			buyIn := s.BuyIn
 			if req.BuyIn > 0 {
@@ -2574,7 +2587,13 @@ func processTournamentEliminations(ctx context.Context, logger runtime.Logger, d
 			// this bounty again, which means a failed Credit here has no retry:
 			// the bounty reads claimed and the eliminator is simply never paid.
 			if amt, err := bs.Claim(ctx, s.TournamentID, seat.UserID, eliminator); err == nil && amt > 0 {
-				if cerr := ws.Credit(ctx, eliminator, amt, "tournament_bounty"); cerr != nil {
+				// CreditFrom, not Credit: a bounty is carved out of the busted
+				// player's OWN buy-in (armed at registration via BountyStore.SetBounty,
+				// funded from the same house:tournament_buyin debit every entrant's
+				// buy-in lands in) — not new money. Crediting via the default
+				// house:tournament_bounty counter-account would post this payout
+				// against a bucket nothing ever funds.
+				if cerr := ws.CreditFrom(ctx, eliminator, amt, "tournament_bounty", "house:tournament_buyin"); cerr != nil {
 					logger.Error("BOUNTY PAYOUT FAILED tournament=%s eliminator=%s busted=%s amount_cents=%d: %v",
 						s.TournamentID, eliminator, seat.UserID, amt, cerr)
 				}

@@ -51,6 +51,47 @@ func (s *RakeStore) Credit(ctx context.Context, clubID string, amount int64, mat
 	return tx.Commit()
 }
 
+// CreditTournament credits a club's rake balance from ONE tournament entry's
+// fee (TournamentPerEntryRake — flat fee_minor plus the admin_fee_bps
+// percentage). Unlike cash-table rake (taken out of a table's own pot via
+// Credit), a tournament buy-in is debited whole into house:tournament_buyin
+// at registration (rpc/tournament.go TournamentRegister) — nothing ever
+// pulled the club's cut back out of it, so every tournament-fee figure the
+// dashboard/analytics computed was a number with no corresponding ledger
+// movement backing it. This posts the club's cut out of that SAME account,
+// keeping the double-entry ledger honest, and is called once per
+// registration (not once per tournament) so it fails the individual
+// registration rather than silently under-crediting the club if it errors.
+func (s *RakeStore) CreditTournament(ctx context.Context, clubID string, amount int64, tournamentID string) error {
+	if amount <= 0 || clubID == "" {
+		return nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	id := NewID("rake")
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO poker_rake_ledger (id, club_id, amount, match_id, hand_no, created_at)
+		VALUES ($1, $2, $3, $4, 0, NOW())`,
+		id, clubID, amount, "tournament:"+tournamentID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO poker_club_house_balance (club_id, balance, updated_at)
+		VALUES ($1, $2, NOW())
+		ON CONFLICT (club_id) DO UPDATE SET balance = poker_club_house_balance.balance + $2, updated_at = NOW()`,
+		clubID, amount); err != nil {
+		return err
+	}
+	if err := postLedgerKind(ctx, tx, "rake", "house:tournament_buyin", AcctHouseRake, amount, "tournament_rake:"+clubID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func (s *RakeStore) HouseBalance(ctx context.Context, clubID string) (int64, error) {
 	var bal int64
 	err := s.db.QueryRowContext(ctx, `SELECT balance FROM poker_club_house_balance WHERE club_id=$1`, clubID).Scan(&bal)

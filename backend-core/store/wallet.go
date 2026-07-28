@@ -367,6 +367,21 @@ type TournamentPlayer struct {
 	Status   string
 }
 
+// IsRegistered reports whether userID has a live (registered or playing)
+// entry in this tournament — the table-level counterpart to TournamentRegister's
+// own gates. Nothing previously stopped an arbitrary player from sitting
+// straight down at a tournament's table via OpSitDown (reserveBuyIn returns
+// "tournament" — no wallet debit, no registration check either) even though
+// they never registered at all.
+func (s *TournamentStore) IsRegistered(ctx context.Context, tournamentID, userID string) (bool, error) {
+	var exists bool
+	err := s.db.QueryRowContext(ctx, `
+		SELECT EXISTS(SELECT 1 FROM poker_tournament_registration
+			WHERE tournament_id=$1 AND user_id=$2 AND status IN ('registered','playing'))`,
+		tournamentID, userID).Scan(&exists)
+	return exists, err
+}
+
 func (s *TournamentStore) ListRegistered(ctx context.Context, tournamentID string) ([]TournamentPlayer, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT user_id, username, stack, COALESCE(match_id,''), status

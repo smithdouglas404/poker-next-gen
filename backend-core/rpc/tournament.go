@@ -164,6 +164,18 @@ func TournamentRegister(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 	if open, why := store.RegistrationOpen(bracket, time.Now().UTC()); !open {
 		return "", runtime.NewError(why, 9)
 	}
+	// Club-owned tournaments are private to that club's membership. Nothing
+	// previously checked this at all — any authenticated user could register
+	// for any club's tournament, member or not. There is no separate
+	// public/private flag on TournamentBracket; a club_id being set IS what
+	// scopes a tournament to that club, the same way a club-owned table
+	// scopes seating.
+	if bracket.ClubID != "" {
+		m, _ := store.NewClubStore(db).GetMembership(ctx, bracket.ClubID, userID)
+		if m == nil || m.Status != "active" {
+			return "", runtime.NewError("this tournament is limited to club members", 7)
+		}
+	}
 	// Tier gate: the tournament buy-in cap. Advertised per tier on the membership
 	// page ("Up to $X") and enforced nowhere, so the cap bought nothing. Checked
 	// BEFORE the wallet is debited — a rejection after taking the money would be
@@ -210,6 +222,21 @@ func TournamentRegister(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 		if err := store.NewBountyStore(db).SetBounty(ctx, req.TournamentID, userID, bounty); err != nil {
 			logger.Error("bounty not armed tournament=%s user=%s amount_cents=%d: %v",
 				req.TournamentID, userID, bounty, err)
+		}
+	}
+	// Credit the club's rake balance for this entrant's share — the entry fee
+	// plus the admin-fee percentage, via the SAME formula (TournamentPerEntryRake)
+	// every other tournament-money figure uses. Registration debits the FULL
+	// buy-in into house:tournament_buyin; nothing had ever pulled the club's
+	// cut back out of it, so every "tournament fees" figure the dashboard
+	// showed was a number with no corresponding ledger movement or club
+	// balance behind it.
+	if bracket.ClubID != "" {
+		if rake := store.TournamentPerEntryRake(bracket); rake > 0 {
+			if err := store.NewRakeStore(db).CreditTournament(ctx, bracket.ClubID, rake, req.TournamentID); err != nil {
+				logger.Error("tournament rake not credited tournament=%s club=%s user=%s amount_cents=%d: %v",
+					req.TournamentID, bracket.ClubID, userID, rake, err)
+			}
 		}
 	}
 	return `{"ok":true}`, nil

@@ -33,7 +33,15 @@ type TournamentEconomics struct {
 	// RakeMinor is the club's total take: the flat fee plus the admin
 	// percentage, per entrant.
 	RakeMinor int64 `json:"rake_minor"`
-	// PoolMinor is what is actually paid out — gross minus rake, raised to the
+	// BountyPoolMinor is the total carved out for knockout bounty payouts —
+	// entrants × BountyMinor, clamped alongside RakeMinor so the two together
+	// never exceed the buy-in. This money goes to eliminators, not the club;
+	// it is withheld from PoolMinor for the same reason RakeMinor is — paying
+	// it AND the full gross as placement prizes would pay out more than the
+	// tournament ever collected.
+	BountyPoolMinor int64 `json:"bounty_pool_minor"`
+	// PoolMinor is the PLACEMENT prize pool actually paid out for finishing
+	// position — gross minus rake minus the bounty pool, raised to the
 	// guarantee when there is one.
 	PoolMinor int64 `json:"pool_minor"`
 	// OverlayMinor is the shortfall the club covers to meet a guarantee (0 when
@@ -42,11 +50,38 @@ type TournamentEconomics struct {
 	OverlayMinor int64 `json:"overlay_minor"`
 }
 
-// TournamentMoney computes the pool/rake breakdown for `entrants` entries.
+// TournamentPerEntryRake is the club's cut of ONE entrant's buy-in: the flat
+// fee_minor plus the admin_fee_bps percentage, clamped to [0, buy_in] so a
+// misconfigured 100%+ admin fee can never take more than the entry cost.
 //
-// Per entrant the club takes `fee_minor + buy_in × admin_fee_bps / 10000`,
-// clamped so it can never exceed the buy-in (a misconfigured 100% admin fee
-// must not produce a negative prize pool).
+// This is the single formula every tournament-money surface must agree on —
+// TournamentMoney's pool/rake breakdown (director settlement,
+// TournamentFinalize, TournamentAnalytics), the club revenue report
+// (ClubTournamentFees), and the actual rake credit at registration
+// (TournamentRegister) all call this, not their own copy. It used to be
+// duplicated with the admin_fee_bps term silently missing in one of those
+// places — a real bug (ClubTournamentFees undercounted revenue for any
+// tournament with a nonzero admin_fee_bps) that a second copy could
+// reintroduce just as easily.
+func TournamentPerEntryRake(t *models.TournamentBracket) int64 {
+	if t == nil {
+		return 0
+	}
+	buyIn := t.BuyInMinor
+	if buyIn < 0 {
+		buyIn = 0
+	}
+	rake := t.FeeMinor + buyIn*int64(t.AdminFeeBps)/10000
+	if rake < 0 {
+		rake = 0
+	}
+	if rake > buyIn {
+		rake = buyIn
+	}
+	return rake
+}
+
+// TournamentMoney computes the pool/rake breakdown for `entrants` entries.
 func TournamentMoney(t *models.TournamentBracket, entrants int) TournamentEconomics {
 	if t == nil || entrants < 0 {
 		entrants = 0
@@ -59,17 +94,30 @@ func TournamentMoney(t *models.TournamentBracket, entrants int) TournamentEconom
 	if buyIn < 0 {
 		buyIn = 0
 	}
-	perEntryRake := t.FeeMinor + buyIn*int64(t.AdminFeeBps)/10000
-	if perEntryRake < 0 {
-		perEntryRake = 0
-	}
-	if perEntryRake > buyIn {
-		perEntryRake = buyIn
+	perEntryRake := TournamentPerEntryRake(t)
+	perEntryBounty := int64(0)
+	if t.Knockout {
+		perEntryBounty = t.BountyMinor
+		if perEntryBounty < 0 {
+			perEntryBounty = 0
+		}
+		// Rake and bounty are both carved from the same buy-in and must never
+		// together exceed it. TournamentCreate only validates bounty alone
+		// against buy-in, not combined with fee/admin_fee_bps — clamp here
+		// too, defensively, rather than let a misconfigured combination
+		// produce a negative placement pool.
+		if room := buyIn - perEntryRake; perEntryBounty > room {
+			perEntryBounty = room
+		}
+		if perEntryBounty < 0 {
+			perEntryBounty = 0
+		}
 	}
 
 	e.GrossMinor = int64(entrants) * buyIn
 	e.RakeMinor = int64(entrants) * perEntryRake
-	e.PoolMinor = e.GrossMinor - e.RakeMinor
+	e.BountyPoolMinor = int64(entrants) * perEntryBounty
+	e.PoolMinor = e.GrossMinor - e.RakeMinor - e.BountyPoolMinor
 
 	// A guarantee raises the pool; the club funds the difference.
 	if t.GuaranteeMinor > e.PoolMinor {

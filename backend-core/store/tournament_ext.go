@@ -196,16 +196,9 @@ func (s *TournamentExtStore) ClubTournamentFees(ctx context.Context, clubID, int
 		if err := rows.Scan(&r.ID, &r.Name, &r.Status, &r.FeeMinor, &r.AdminFeeBps, &r.BuyInMinor, &r.Entries); err != nil {
 			return 0, 0, 0, nil, err
 		}
-		// Same clamp TournamentMoney applies: never negative, never more than
-		// the buy-in itself (a misconfigured 100%+ admin fee must not report
-		// more rake per entry than the entry actually cost).
-		perEntryRake := r.FeeMinor + r.BuyInMinor*int64(r.AdminFeeBps)/10000
-		if perEntryRake < 0 {
-			perEntryRake = 0
-		}
-		if perEntryRake > r.BuyInMinor {
-			perEntryRake = r.BuyInMinor
-		}
+		perEntryRake := TournamentPerEntryRake(&models.TournamentBracket{
+			FeeMinor: r.FeeMinor, AdminFeeBps: r.AdminFeeBps, BuyInMinor: r.BuyInMinor,
+		})
 		r.FeeTotal = perEntryRake * r.Entries
 		r.BuyInTotal = r.BuyInMinor * r.Entries
 		feeTotal += r.FeeTotal
