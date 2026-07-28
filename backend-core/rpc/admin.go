@@ -407,11 +407,25 @@ func HitlReview(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 	if item == nil {
 		return "", runtime.NewError("queue item not found", 5)
 	}
+	if item.Status != "pending" {
+		return "", runtime.NewError("this item has already been reviewed", 9)
+	}
 	if err := as.ReviewHitl(ctx, req.ID, req.Status, req.Note, adminID); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
+	// club_ban_reauth is the reauthorization step itself, not just a record of
+	// one: a club owner's ban is a platform-wide lock (ClubBanMember ->
+	// SetBan), and per policy only the platform administrator approving THIS
+	// queue item may lift it — there is no separate "now go call AdminUnban
+	// too" step for the admin to remember or skip.
+	if item.Kind == "club_ban_reauth" && req.Status == "approved" {
+		if err := as.SetBan(ctx, item.SubjectUserID, false, "", adminID); err != nil {
+			logger.Error("hitl %s approved but ban not lifted for user=%s: %v", req.ID, item.SubjectUserID, err)
+			return "", runtime.NewError("approved, but the ban could not be lifted — try again", 13)
+		}
+	}
 	adminAuditDetail(ctx, logger, db, adminID, "hitl_review", req.ID, map[string]interface{}{
-		"status": req.Status, "note": req.Note,
+		"status": req.Status, "note": req.Note, "kind": item.Kind, "subject_user_id": item.SubjectUserID,
 	})
 	out, _ := json.Marshal(map[string]interface{}{"id": req.ID, "status": req.Status})
 	return string(out), nil

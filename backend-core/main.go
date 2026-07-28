@@ -73,6 +73,8 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"club_members":             rpc.ClubMembers,
 		"club_member_role":         rpc.ClubMemberRole,
 		"club_kick":                rpc.ClubKick,
+		"club_member_admit":       rpc.ClubMemberAdmit,
+		"club_ban_member":         rpc.ClubBanMember,
 		"balance_allocate":         rpc.BalanceAllocate,
 		"balance_get":              rpc.BalanceGet,
 		"rake_config_set":          rpc.RakeConfigSet,

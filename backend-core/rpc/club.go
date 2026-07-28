@@ -167,7 +167,10 @@ func ClubCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		return "", runtime.NewError("failed to create club", 13)
 	}
 	username, _ := ctx.Value(runtime.RUNTIME_CTX_USERNAME).(string)
-	if err := clubStore.AddMember(ctx, club.ID, userID, username, "owner"); err != nil {
+	// AdmitMember, not AddMember: this is the creator's OWN brand-new club, not
+	// a self-service join into someone else's — an outstanding kick at an
+	// unrelated club must not block founding a club.
+	if err := clubStore.AdmitMember(ctx, club.ID, userID, username, "owner"); err != nil {
 		// Less severe — the owner seat exists, so the club is governable — but it
 		// must not pass silently: the creator would be absent from their own
 		// roster, and roster membership is what several club reads gate on.
@@ -359,7 +362,15 @@ func ClubMemberRole(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 	return `{"ok":true}`, nil
 }
 
-// ClubKick removes a member from a club (owner/configurer only; cannot kick an owner).
+// ClubKick removes a member from a club (owner/configurer only; cannot kick an
+// owner). This is a status change, not a deletion: the member's row is kept
+// with status='kicked', which is what blocks them from self-service rejoining
+// THIS club (ClubJoin/invitation-accept both route through
+// ClubStore.AddMember, which refuses a 'kicked' row) and from self-service
+// joining ANY OTHER club (AddMember also checks HasAnyActiveKick). Getting
+// back in — to this club or a different one — requires an owner/configurer to
+// explicitly call ClubMemberAdmit; see that function's comment for why a
+// delete-based kick couldn't express any of this policy.
 func ClubKick(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	var req struct {
 		ClubID string `json:"club_id"`
@@ -375,9 +386,89 @@ func ClubKick(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime
 	if m, _ := clubStore.GetMembership(ctx, req.ClubID, req.UserID); m != nil && m.Role == "owner" {
 		return "", runtime.NewError("cannot remove an owner", 9)
 	}
-	if err := clubStore.RemoveMember(ctx, req.ClubID, req.UserID); err != nil {
+	if err := clubStore.KickMember(ctx, req.ClubID, req.UserID); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
+	_ = store.NewClubExtStore(db).LogActivity(ctx, req.ClubID, req.UserID, "member_kicked", "removed from the club")
+	return `{"ok":true}`, nil
+}
+
+// ClubMemberAdmit is the owner/configurer action that clears an outstanding
+// kick and (re)admits a member — the only way back in once ClubKick has set a
+// 'kicked' status, at this club or, for a DIFFERENT club's owner willing to
+// vouch for them, elsewhere. A delete-based kick (the old ClubKick behavior)
+// couldn't express "requires explicit re-approval" at all: RemoveMember just
+// erased the row, so a re-join looked identical to a first-time join and
+// ClubStore.AddMember happily reactivated it — nothing ever actually blocked
+// anyone kicked from getting straight back in, or, since there was no
+// cross-club record either, from hopping to a different club with a clean
+// slate. ClubMemberAdmit uses ClubStore.AdmitMember, the one privileged path
+// that bypasses both of AddMember's kick checks — deliberately: this IS the
+// human decision the policy requires before either check should be waived.
+func ClubMemberAdmit(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	var req struct {
+		ClubID string `json:"club_id"`
+		UserID string `json:"user_id"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" || req.UserID == "" {
+		return "", runtime.NewError("club_id and user_id required", 3)
+	}
+	if _, err := requireClubPermission(ctx, db, req.ClubID, store.PermMembers); err != nil {
+		return "", err
+	}
+	username := req.UserID
+	if acct, aerr := nk.AccountGetId(ctx, req.UserID); aerr == nil && acct.GetUser() != nil && acct.GetUser().GetUsername() != "" {
+		username = acct.GetUser().GetUsername()
+	}
+	if err := store.NewClubStore(db).AdmitMember(ctx, req.ClubID, req.UserID, username, "member"); err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	_ = store.NewClubExtStore(db).LogActivity(ctx, req.ClubID, req.UserID, "member_admitted", "admitted despite an outstanding kick")
+	return `{"ok":true}`, nil
+}
+
+// ClubBanMember escalates past a kick to a PLATFORM-WIDE lock — the member
+// loses access to the entire platform (SetBan / denyIfBanned already enforces
+// this on every login path), not just this one club. Deliberately one-way
+// from a club owner's side: only the platform administrator can lift it
+// (AdminUnban, or approving the HITL queue item this creates), so a club
+// cannot both lock a problem account out platform-wide AND be the one that
+// lets them back in — reauthorization is centralized, not left to whichever
+// club banned them.
+func ClubBanMember(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	var req struct {
+		ClubID string `json:"club_id"`
+		UserID string `json:"user_id"`
+		Reason string `json:"reason"`
+	}
+	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" || req.UserID == "" {
+		return "", runtime.NewError("club_id and user_id required", 3)
+	}
+	configurerID, err := requireClubPermission(ctx, db, req.ClubID, store.PermMembers)
+	if err != nil {
+		return "", err
+	}
+	clubStore := store.NewClubStore(db)
+	if m, _ := clubStore.GetMembership(ctx, req.ClubID, req.UserID); m != nil && m.Role == "owner" {
+		return "", runtime.NewError("cannot ban an owner", 9)
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		reason = "banned by a club operator"
+	}
+	if err := store.NewAdminStore(db).SetBan(ctx, req.UserID, true, reason, "club:"+req.ClubID+":"+configurerID); err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	if _, err := store.NewAdminStore(db).CreateHitl(ctx, "club_ban_reauth", req.UserID, map[string]interface{}{
+		"club_id": req.ClubID, "banned_by": configurerID, "reason": reason,
+	}); err != nil {
+		// The ban itself already took effect and is the actual security
+		// action; a failed queue insert must not un-ban them, but it does mean
+		// this ban is invisible to the admin's review queue until someone
+		// notices — log loudly so it's findable.
+		logger.Error("club ban HITL entry not created club=%s user=%s: %v", req.ClubID, req.UserID, err)
+	}
+	_ = store.NewClubExtStore(db).LogActivity(ctx, req.ClubID, req.UserID, "member_banned", reason)
 	return `{"ok":true}`, nil
 }
 

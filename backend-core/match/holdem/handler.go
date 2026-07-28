@@ -1813,6 +1813,7 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 			s.Table.ResetBetweenHands()
 			standUpBusted(ctx, logger, db, dispatcher, s)
 			evictExcluded(ctx, logger, db, dispatcher, s)
+			evictBannedOrKicked(ctx, logger, db, dispatcher, s)
 			s.Phase = poker.PhaseWaiting
 			return true
 		}
@@ -1858,6 +1859,7 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		reportTournamentBusts(ctx, db, nk, s)
 		standUpBusted(ctx, logger, db, dispatcher, s) // cash tables: clear felted players so the table stays playable
 		evictExcluded(ctx, logger, db, dispatcher, s) // RG: remove players who self-excluded mid-session (#95)
+		evictBannedOrKicked(ctx, logger, db, dispatcher, s)
 		s.Phase = poker.PhaseWaiting
 		return true
 	default:
@@ -2864,6 +2866,51 @@ func evictExcluded(ctx context.Context, logger runtime.Logger, db *sql.DB, dispa
 		closeSeatSession(ctx, db, s, i)
 		s.Table.StandUp(i)
 		narrate(dispatcher, s, fmt.Sprintf("%s was removed (%s) and their chips returned.", name, strings.ReplaceAll(kind, "_", "-")))
+	}
+}
+
+// evictBannedOrKicked stands up any seated human whose access has been
+// revoked since they sat down — the club-membership check at OpSitDown was
+// previously a one-shot gate: a member banned or kicked WHILE seated kept
+// playing indefinitely, since nothing re-checked their status until they
+// voluntarily stood up. Two independent checks, run at the same safe
+// between-hands point evictExcluded uses (never mid-hand):
+//
+//   - Platform ban (store.IsBanned) evicts from EVERY table, regardless of
+//     access type — a platform-wide lock means no access to anything.
+//   - Club membership status evicts only at THIS club's members-only tables
+//     (AccessType=="members") — a public or invite-coded table was never
+//     gated on club membership in the first place, so losing it changes
+//     nothing there; only a members-only table's whole premise is broken by
+//     an unnoticed loss of membership.
+func evictBannedOrKicked(ctx context.Context, logger runtime.Logger, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
+	if s.TournamentID != "" {
+		return // tournament seats can't be pulled mid-event by a club-side action
+	}
+	membersOnly := s.AccessType == "members" && s.ClubID != ""
+	for i, seat := range s.Table.Seats {
+		if seat == nil || seat.IsBot {
+			continue
+		}
+		reason := ""
+		if banned, _, err := store.IsBanned(ctx, db, seat.UserID); err == nil && banned {
+			reason = "account suspended"
+		} else if membersOnly {
+			if m, _ := store.NewClubStore(db).GetMembership(ctx, s.ClubID, seat.UserID); m == nil || m.Status != "active" {
+				reason = "no longer a club member"
+			}
+		}
+		if reason == "" {
+			continue
+		}
+		name := seat.Username
+		releaseBuyIn(ctx, logger, db, s, i, seat.UserID, seat.Stack)
+		delete(s.SeatWallet, i)
+		delete(s.SeatLocked, i)
+		_ = store.NewActiveSeatStore(db).Unregister(ctx, seat.UserID, matchIDForAudit(s))
+		closeSeatSession(ctx, db, s, i)
+		s.Table.StandUp(i)
+		narrate(dispatcher, s, fmt.Sprintf("%s was removed (%s) and their chips returned.", name, reason))
 	}
 }
 

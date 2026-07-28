@@ -230,8 +230,57 @@ type ClubMember struct {
 	Status   string `json:"status"`
 }
 
-// AddMember adds (or reactivates) a club member with the given role.
+// ErrKicked is returned by AddMember when the caller (self-service join) is
+// blocked by an active kick — either at the target club itself, or at any
+// OTHER club, per policy: a kicked member cannot rejoin the club that kicked
+// them without that club's owner clearing it, and cannot self-join ANY new
+// club while a kick is outstanding anywhere — a new club's owner has to
+// explicitly admit them (AdmitMember) to waive it. Distinguished from a plain
+// error so callers can surface a specific, actionable message.
+var ErrKicked = fmt.Errorf("blocked by an outstanding kick status")
+
+// AddMember adds a NEW member, or reactivates one whose status is something
+// recoverable (e.g. they left and are rejoining) — but refuses outright,
+// returning ErrKicked, when either this club's own row for them is 'kicked',
+// or they carry an active kick at ANY other club. This is the self-service
+// join choke point (ClubJoin, ClubRequestReview's accept) — every self-service
+// path routes through here, so the gate only has to live in one place. An
+// owner/configurer who wants to admit a kicked member anyway (their own club
+// re-approving, or another club vouching for them) uses AdmitMember instead,
+// which bypasses this check deliberately — it is the explicit human decision
+// the policy requires, not a bug in this one.
 func (s *ClubStore) AddMember(ctx context.Context, clubID, userID, username, role string) error {
+	var existingStatus string
+	err := s.db.QueryRowContext(ctx,
+		`SELECT status FROM poker_club_member WHERE club_id=$1 AND user_id=$2`, clubID, userID).Scan(&existingStatus)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	if existingStatus == "kicked" {
+		return ErrKicked
+	}
+	if err == sql.ErrNoRows {
+		if kicked, kerr := s.HasAnyActiveKick(ctx, userID); kerr != nil {
+			return kerr
+		} else if kicked {
+			return ErrKicked
+		}
+	}
+	_, err = s.db.ExecContext(ctx, `
+		INSERT INTO poker_club_member (club_id, user_id, username, role, status, joined_at)
+		VALUES ($1,$2,$3,$4,'active',NOW())
+		ON CONFLICT (club_id, user_id) DO UPDATE SET username=EXCLUDED.username, status='active'`,
+		clubID, userID, username, role)
+	return err
+}
+
+// AdmitMember is the privileged counterpart to AddMember: an owner/configurer
+// action that adds or reactivates a member REGARDLESS of any outstanding kick
+// status, at this club or elsewhere. This is the explicit "we vouch for them"
+// decision the kick policy requires before a kicked member can rejoin the
+// club that kicked them, or join a different club while still carrying a kick
+// flag elsewhere.
+func (s *ClubStore) AdmitMember(ctx context.Context, clubID, userID, username, role string) error {
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO poker_club_member (club_id, user_id, username, role, status, joined_at)
 		VALUES ($1,$2,$3,$4,'active',NOW())
@@ -240,7 +289,40 @@ func (s *ClubStore) AddMember(ctx context.Context, clubID, userID, username, rol
 	return err
 }
 
-// RemoveMember removes a member from a club.
+// HasAnyActiveKick reports whether userID carries a 'kicked' status at any
+// club — the cross-club join gate AddMember enforces.
+func (s *ClubStore) HasAnyActiveKick(ctx context.Context, userID string) (bool, error) {
+	var exists bool
+	err := s.db.QueryRowContext(ctx,
+		`SELECT EXISTS(SELECT 1 FROM poker_club_member WHERE user_id=$1 AND status='kicked')`, userID).Scan(&exists)
+	return exists, err
+}
+
+// KickMember sets a member's status to 'kicked' rather than deleting their
+// row. Deleting (the old RemoveMember behavior for this action) lost the
+// record that they were ever removed, which is exactly the information the
+// re-approval and cross-club gating policy needs: the row itself IS the
+// outstanding kick flag AddMember/HasAnyActiveKick check.
+func (s *ClubStore) KickMember(ctx context.Context, clubID, userID string) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE poker_club_member SET status='kicked' WHERE club_id=$1 AND user_id=$2`, clubID, userID)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return fmt.Errorf("not a member of this club")
+	}
+	return nil
+}
+
+// RemoveMember removes a member from a club outright — used only for a
+// voluntary leave (ClubLeave), which is not a kick and must not leave a
+// 'kicked'-shaped row behind that would (incorrectly) block the player from
+// freely rejoining or joining elsewhere later.
 func (s *ClubStore) RemoveMember(ctx context.Context, clubID, userID string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM poker_club_member WHERE club_id=$1 AND user_id=$2`, clubID, userID)
 	return err

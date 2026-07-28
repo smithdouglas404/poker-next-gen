@@ -478,6 +478,26 @@ type AdminHitlItem struct {
 	CreatedAt     time.Time       `json:"created_at"`
 }
 
+// CreateHitl files a new item into the centralized human-in-the-loop review
+// queue — the one bucket every "needs a human decision" flow is meant to land
+// in (a club escalating a ban to the platform administrator is the first
+// concrete producer; ListHitl/ReviewHitl already existed as pure read/resolve
+// scaffolding with nothing ever writing to it).
+func (s *AdminStore) CreateHitl(ctx context.Context, kind, subjectUserID string, payload map[string]interface{}) (string, error) {
+	if payload == nil {
+		payload = map[string]interface{}{}
+	}
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+	id := NewID("hitl")
+	_, err = s.db.ExecContext(ctx, `
+		INSERT INTO poker_hitl_queue (id, kind, subject_user_id, payload, status)
+		VALUES ($1,$2,$3,$4,'pending')`, id, kind, subjectUserID, b)
+	return id, err
+}
+
 // ListHitl returns queue items, optionally filtered by status (empty = all),
 // oldest first for pending review.
 func (s *AdminStore) ListHitl(ctx context.Context, status string, limit int) ([]AdminHitlItem, error) {
