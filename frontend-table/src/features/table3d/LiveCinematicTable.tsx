@@ -19,7 +19,6 @@ import { DEFAULT_MAX_SEATS, MAX_SEATS, MIN_SEATS } from "@/features/game/protoco
 import type { CardView, SeatView, ShowdownMessage, TableSnapshot } from "@/features/game/protocol";
 import { CinematicScene, type SceneSeat, type FeltControls } from "./CinematicScene";
 import { TableAdminOverlay } from "./TableAdminOverlay";
-import { SeatProfileCard, type SeatProfileTarget } from "./overlays";
 import { BuyInDialog } from "@/features/hud/BuyInDialog";
 import { DEMO_HERO_ID, DEMO_HOLE, DEMO_SHOWDOWN, DEMO_SNAPSHOT } from "./demoSnapshot";
 
@@ -99,8 +98,6 @@ export default function LiveCinematicTable() {
   const [deviceMode] = useRenderMode();
   // Seat the player clicked on an empty tile; opens the existing buy-in dialog.
   const [buyInSeat, setBuyInSeat] = useState<number | null>(null);
-  // Seat the player clicked on an OCCUPIED tile; opens the stat-card popover.
-  const [profileTarget, setProfileTarget] = useState<SeatProfileTarget | null>(null);
 
   const snapshot = demo ? DEMO_SNAPSHOT : live.snapshot;
 
@@ -130,7 +127,6 @@ export default function LiveCinematicTable() {
         announce: "",
         handLive: false,
         dealNonce: 0,
-        deckCommitHash: undefined as string | undefined,
         potMinor: 0,
         winnerSeat: -1,
         winNonce: 0,
@@ -155,7 +151,6 @@ export default function LiveCinematicTable() {
         const isHero = s.index === heroIdx;
         return {
           index: sceneIndex,
-          userId: s.user_id,
           name: s.username ?? `Seat ${s.index + 1}`,
           stack: formatCents(s.stack),
           ringColor: ringForState(state),
@@ -210,7 +205,6 @@ export default function LiveCinematicTable() {
       announce,
       handLive,
       dealNonce: snapshot.hand_no ?? 0,
-      deckCommitHash: snapshot.deck_commit_hash,
       potMinor: snapshot.pot ?? 0,
       winnerSeat,
       winNonce,
@@ -263,7 +257,6 @@ export default function LiveCinematicTable() {
       {/* Clicking an empty seat opens the existing two-wallet buy-in dialog, which
           owns the real sitDown() call and the min/max + wallet-balance guards. */}
       {buyInSeat !== null && <BuyInDialog seat={buyInSeat} onClose={() => setBuyInSeat(null)} />}
-      {profileTarget && <SeatProfileCard target={profileTarget} onClose={() => setProfileTarget(null)} />}
       <CinematicScene
         seats={scene.seats}
         board={scene.board}
@@ -274,7 +267,6 @@ export default function LiveCinematicTable() {
         showPot={scene.showPot}
         handLive={scene.handLive}
         dealNonce={scene.dealNonce}
-        deckCommitHash={scene.deckCommitHash}
         potMinor={scene.potMinor}
         winnerSeat={scene.winnerSeat}
         winNonce={scene.winNonce}
@@ -282,10 +274,6 @@ export default function LiveCinematicTable() {
         feltControls={feltControls}
         backdrop={bakedPlate(snapshot?.table_art)}
         overlay={<TableAdminOverlay demo={demo} />}
-        onSeatProfile={(seat) => {
-          if (!seat.userId) return;
-          setProfileTarget({ userId: seat.userId, username: seat.name, avatar: seat.avatar, isBot: seat.isBot });
-        }}
       />
     </>
   );

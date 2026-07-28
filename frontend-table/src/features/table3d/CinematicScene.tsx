@@ -10,11 +10,10 @@
 // [0,6.9,7.9] fov 42) are the binding contract in CLAUDE.md — do not "improve".
 
 import * as THREE from "three";
-import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Environment, Lightformer, Html, useTexture, useGLTF, useAnimations, Clone, ContactShadows } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
-import gsap from "gsap";
 
 import { cardBackArt, cardFaceArt, feltTexture } from "@/app/proof/textures";
 import { avatarSrc } from "@/features/table/avatars";
@@ -29,9 +28,6 @@ export type SeatState = "idle" | "active" | "allin" | "folded" | "winner";
 
 export interface SceneSeat {
   index: number;
-  /** Server user id — absent for demo/proof seats. Powers the seat-click
-   *  profile popover; a seat with no userId is not clickable. */
-  userId?: string;
   name: string;
   /** Pre-formatted stack label, e.g. "$52,500". */
   stack: string;
@@ -113,10 +109,6 @@ export interface CinematicSceneProps {
   handLive?: boolean;
   /** Changes each new hand (the hand number) — triggers the deck's shuffle riffle. */
   dealNonce?: number;
-  /** Server's pre-deal SHA-256 deck commitment for the CURRENT hand — shown
-   *  briefly over the deck while it shuffles (the live provably-fair moment).
-   *  Omitted => the shuffle plays with no commit badge. */
-  deckCommitHash?: string;
   /** Raw pot minor units — scales the central pot chip pile. */
   potMinor?: number;
   /** Scene index of the winning seat at showdown (-1 = none) — the pot sweeps here. */
@@ -142,11 +134,6 @@ export interface CinematicSceneProps {
    * Omitted by the proof, so its render stays byte-identical.
    */
   overlay?: ReactNode;
-  /** Tapping a SEATED player's nameplate/portrait calls this with their seat
-   *  (across all three avatar modes). Omitted (proof) => seats are not
-   *  clickable; the live table renders a stat-card popover from it. Vacant
-   *  seats keep their own separate "sit here" click path (feltControls). */
-  onSeatProfile?: (seat: SceneSeat) => void;
 }
 
 // The cinematic table is a STADIUM (racetrack) oval built to REAL casino spec.
@@ -385,101 +372,49 @@ function CardBack({ w = 0.2675, h = 0.3745 }: { w?: number; h?: number }) {
   );
 }
 
-// The deck by the dealer — a neat stack of thin cards with a card-back top.
-// Whenever `nonce` (the hand number) changes, GSAP runs a real riffle-shuffle
-// choreography (CLAUDE.md: GSAP drives orchestrated sequences, not a per-frame
-// sine wobble on one rigid mesh): the stack splits into two staggered piles,
-// riffles back together card-by-card, then a short "cut" flourish settles it.
-// The animation is a stylized signal that shuffling is happening — the actual
-// fairness comes from the server-committed shuffle that already ran before
-// this ever plays, so there's nothing to literally re-order here. `commitHash`
-// (server's pre-deal SHA-256 commitment for this hand, already broadcast on
-// every snapshot as deck_commit_hash) surfaces alongside it, so the
-// provably-fair "deck committed" moment is visible at the table instead of
-// only on the separate /provably-fair page.
-const CARD_COUNT = 9;
-const CARD_Y_STEP = 0.016;
-
-function Deck({ nonce, commitHash }: { nonce: number; commitHash?: string }) {
-  const groupRef = useRef<THREE.Group>(null);
-  const cardRefs = useRef<(THREE.Group | null)[]>([]);
+// The deck by the dealer — a neat stack of thin cards with a card-back top. Riffle-
+// wiggles for ~0.5s whenever `nonce` (the hand number) changes: the visible shuffle.
+function Deck({ nonce }: { nonce: number }) {
+  const ref = useRef<THREE.Group>(null);
   const prev = useRef(nonce);
-  const [shuffling, setShuffling] = useState(false);
-
-  useEffect(() => {
-    if (nonce === prev.current) return;
-    prev.current = nonce;
-    const cards = cardRefs.current.filter((c): c is THREE.Group => c !== null);
-    if (cards.length === 0) return;
-
-    setShuffling(true);
-    const ctx = gsap.context(() => {
-      const tl = gsap.timeline({ onComplete: () => setShuffling(false) });
-      const SPLIT_DUR = 0.32;
-      const MERGE_DUR = 0.28;
-      const MERGE_STAGGER = 0.032;
-      cards.forEach((card, i) => {
-        // Split: alternate cards peel off to the left/right pile, lifted and
-        // fanned — the two-pile read a riffle shuffle needs before it can merge.
-        const side = i % 2 === 0 ? -1 : 1;
-        tl.to(card.position, { x: side * 0.32, y: 0.05 + i * CARD_Y_STEP, z: -0.1, duration: SPLIT_DUR, ease: "power2.out" }, 0)
-          .to(card.rotation, { z: side * 0.16, y: side * 0.1, duration: SPLIT_DUR, ease: "power2.out" }, 0);
-      });
-      const mergeStart = SPLIT_DUR + 0.06;
-      cards.forEach((card, i) => {
-        // Merge: cards drop back onto the stack in a staggered cascade — the
-        // visible "riffle" as the two piles interleave back into one deck.
-        tl.to(card.position, { x: 0, y: i * CARD_Y_STEP, z: 0, duration: MERGE_DUR, ease: "power1.inOut" }, mergeStart + i * MERGE_STAGGER)
-          .to(card.rotation, { z: 0, y: 0, duration: MERGE_DUR, ease: "power1.inOut" }, mergeStart + i * MERGE_STAGGER);
-      });
-      // Cut flourish once the deck is whole again.
-      const cutStart = mergeStart + (cards.length - 1) * MERGE_STAGGER + MERGE_DUR + 0.04;
-      if (groupRef.current) {
-        tl.to(groupRef.current.rotation, { z: 0.1, duration: 0.12, ease: "power1.out", yoyo: true, repeat: 1 }, cutStart);
-      }
-    }, groupRef);
-    return () => ctx.revert();
-  }, [nonce]);
-
+  const animAt = useRef<number | null>(null);
+  useFrame((state) => {
+    const now = state.clock.getElapsedTime() * 1000;
+    if (nonce !== prev.current) {
+      prev.current = nonce;
+      animAt.current = now;
+    }
+    const g = ref.current;
+    if (!g) return;
+    if (animAt.current === null) return;
+    const local = now - animAt.current;
+    const DUR = 520;
+    if (local > DUR) {
+      animAt.current = null;
+      g.rotation.z = 0;
+      g.position.set(DECK_POS[0], DECK_POS[1], DECK_POS[2]);
+      return;
+    }
+    const k = local / DUR;
+    g.rotation.z = Math.sin(k * Math.PI * 3) * 0.22;
+    g.position.set(DECK_POS[0], DECK_POS[1] + Math.sin(k * Math.PI) * 0.14, DECK_POS[2]);
+  });
   const cards = [];
-  for (let i = 0; i < CARD_COUNT; i++) {
-    const isTop = i === CARD_COUNT - 1;
+  for (let i = 0; i < 9; i++) {
     cards.push(
-      <group
-        key={i}
-        ref={(el) => {
-          cardRefs.current[i] = el;
-        }}
-        position={[0, i * CARD_Y_STEP, 0]}
-      >
-        <mesh castShadow>
-          <boxGeometry args={[0.413, 0.012, 0.6195]} />
-          <meshStandardMaterial color="#eef2f6" roughness={0.5} />
-        </mesh>
-        {/* real card-back texture on the top of the deck */}
-        {isTop && <CardBack />}
-      </group>,
+      <mesh key={i} position={[0, i * 0.016, 0]} castShadow>
+        <boxGeometry args={[0.413, 0.012, 0.6195]} />
+        <meshStandardMaterial color="#eef2f6" roughness={0.5} />
+      </mesh>,
     );
   }
   return (
-    <group ref={groupRef} position={DECK_POS} rotation={[0, -0.3, 0]}>
+    <group ref={ref} position={DECK_POS} rotation={[0, -0.3, 0]}>
       {cards}
-      {shuffling && commitHash && (
-        <Html position={[0, 0.62, 0]} center zIndexRange={[25, 0]} style={{ pointerEvents: "none" }}>
-          <div
-            className="whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide"
-            style={{
-              background: "rgba(8,10,14,0.85)",
-              border: "1px solid rgba(212,175,55,0.5)",
-              color: "#f3e2ad",
-              boxShadow: "0 0 16px rgba(212,175,55,0.35)",
-              animation: "seatWinPulse 0.4s ease-out",
-            }}
-          >
-            Deck committed · {commitHash.slice(0, 10)}…
-          </div>
-        </Html>
-      )}
+      {/* real card-back texture on the top of the deck */}
+      <group position={[0, 9 * 0.02, 0]}>
+        <CardBack />
+      </group>
     </group>
   );
 }
@@ -804,30 +739,13 @@ function BetFlight({ seat, total }: { seat: SceneSeat; total: number }) {
 
 /* ---------------- avatars ---------------- */
 
-function SeatPill({ seat, onClick }: { seat: SceneSeat; onClick?: () => void }) {
+function SeatPill({ seat }: { seat: SceneSeat }) {
   const dim = seat.state === "folded";
   return (
     <div style={{ width: 148, transform: "translateY(16px)", opacity: dim ? 0.5 : 1, pointerEvents: "none" }} className="flex flex-col items-center gap-1">
       <div
         className="rounded-md px-2 py-0.5 text-center"
-        style={{
-          background: "rgba(8,10,14,0.82)", border: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(6px)",
-          pointerEvents: onClick ? "auto" : "none", cursor: onClick ? "pointer" : undefined,
-        }}
-        role={onClick ? "button" : undefined}
-        tabIndex={onClick ? 0 : undefined}
-        aria-label={onClick ? `View ${seat.name}'s profile` : undefined}
-        onClick={onClick}
-        onKeyDown={
-          onClick
-            ? (e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onClick();
-                }
-              }
-            : undefined
-        }
+        style={{ background: "rgba(8,10,14,0.82)", border: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(6px)" }}
       >
         <div className="flex items-center justify-center gap-1 leading-tight">
           <span className="text-[11px] font-semibold text-white">{seat.name}</span>
@@ -956,7 +874,7 @@ function SeatChair({ ring }: { ring: string }) {
   );
 }
 
-function GlbFigure({ seat, total, onSeatProfile }: { seat: SceneSeat; total: number; onSeatProfile?: (seat: SceneSeat) => void }) {
+function GlbFigure({ seat, total }: { seat: SceneSeat; total: number }) {
   const p = seatPoint(seat.index, total);
   const gltf = useGLTF(seat.model_url ?? GLB_URL);
   // face the table center
@@ -1010,7 +928,7 @@ function GlbFigure({ seat, total, onSeatProfile }: { seat: SceneSeat; total: num
         </group>
       </group>
       <Html position={[p[0], 0.55, p[2]]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none", opacity: dim ? 0.5 : 1 }}>
-        <SeatPill seat={seat} onClick={onSeatProfile && seat.userId ? () => onSeatProfile(seat) : undefined} />
+        <SeatPill seat={seat} />
       </Html>
     </group>
   );
@@ -1140,12 +1058,10 @@ function SeatLayer3D({
   seats,
   maxSeats,
   felt,
-  onSeatProfile,
 }: {
   seats: SceneSeat[];
   maxSeats: number;
   felt?: FeltControls;
-  onSeatProfile?: (seat: SceneSeat) => void;
 }) {
   const bySeat = new Map(seats.map((s) => [s.index, s]));
   return (
@@ -1154,24 +1070,16 @@ function SeatLayer3D({
         const p = seatPoint(i, maxSeats);
         const s = seatDepthScale(i, maxSeats);
         const seat = bySeat.get(i);
-        // An empty seat is clickable only when the viewer can actually take it;
-        // an occupied seat is clickable to open its owner's stat card — the two
-        // are mutually exclusive states of the same tile.
+        // An empty seat is clickable only when the viewer can actually take it.
         const canSit = !seat && !!felt?.onSit;
-        const canView = !!seat && !!seat.userId && !!onSeatProfile;
         const serverIndex = felt?.serverIndexFor?.(i) ?? i;
-        const handleClick = canSit
-          ? () => felt!.onSit!(serverIndex)
-          : canView
-            ? () => onSeatProfile!(seat!)
-            : undefined;
         return (
           <Html
             key={i}
             position={[p[0], 0.42, p[2]]}
             center
             zIndexRange={[20, 0]}
-            style={{ pointerEvents: handleClick ? "auto" : "none" }}
+            style={{ pointerEvents: canSit ? "auto" : "none" }}
           >
             {/* Nearer seats also stack above farther ones, so an overlap resolves the
                 way depth implies rather than by DOM order. */}
@@ -1179,20 +1087,18 @@ function SeatLayer3D({
               style={{
                 transform: `scale(${s.toFixed(3)})`,
                 zIndex: Math.round(s * 1000),
-                cursor: handleClick ? "pointer" : undefined,
+                cursor: canSit ? "pointer" : undefined,
               }}
-              role={handleClick ? "button" : undefined}
-              tabIndex={handleClick ? 0 : undefined}
-              aria-label={
-                canSit ? `Take seat ${serverIndex + 1}` : canView ? `View ${seat!.name}'s profile` : undefined
-              }
-              onClick={handleClick}
+              role={canSit ? "button" : undefined}
+              tabIndex={canSit ? 0 : undefined}
+              aria-label={canSit ? `Take seat ${serverIndex + 1}` : undefined}
+              onClick={canSit ? () => felt!.onSit!(serverIndex) : undefined}
               onKeyDown={
-                handleClick
+                canSit
                   ? (e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        handleClick();
+                        felt!.onSit!(serverIndex);
                       }
                     }
                   : undefined
@@ -1209,7 +1115,7 @@ function SeatLayer3D({
 
 /* ---------------- scene ---------------- */
 
-function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, deckCommitHash, potMinor, winnerSeat, winNonce, feltControls, backdrop, feltText, onSeatProfile }: {
+function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, potMinor, winnerSeat, winNonce, feltControls, backdrop, feltText }: {
   seats: SceneSeat[];
   board: string[];
   mode: AvatarMode;
@@ -1217,14 +1123,12 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, dec
   showPot: boolean;
   handLive: boolean;
   dealNonce: number;
-  deckCommitHash?: string;
   potMinor: number;
   winnerSeat: number;
   winNonce: number;
   feltControls?: FeltControls;
   backdrop?: BakedConfig;
   feltText?: [string, string];
-  onSeatProfile?: (seat: SceneSeat) => void;
 }) {
   // Set the active seat ellipse BEFORE any seatPoint() call this render. A baked
   // plate supplies its own ellipse so seats land on the painted chairs; the
@@ -1281,7 +1185,7 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, dec
       <Board board={board} />
       {showPot && <Pot potMinor={potMinor} />}
       <ChipSweep target={winTarget} nonce={winNonce} />
-      {handLive && <Deck nonce={dealNonce} commitHash={deckCommitHash} />}
+      {handLive && <Deck nonce={dealNonce} />}
 
       {/* Each seated player's own chip pile beside their seat, sized to their stack. */}
       {seats.map((s) => (
@@ -1303,7 +1207,7 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, dec
         // only true 3D seats need an in-scene figure.
         return is3d ? (
           <Suspense key={s.index} fallback={null}>
-            <GlbFigure seat={s} total={maxSeats} onSeatProfile={onSeatProfile} />
+            <GlbFigure seat={s} total={maxSeats} />
           </Suspense>
         ) : null;
       })}
@@ -1321,7 +1225,7 @@ function Scene({ seats, board, mode, maxSeats, showPot, handLive, dealNonce, dec
       )}
 
       {/* Seat tiles anchored in 3D (engineering: avatars are gameplay, not flat HUD). */}
-      {mode !== "3d" && <SeatLayer3D seats={seats} maxSeats={maxSeats} felt={feltControls} onSeatProfile={onSeatProfile} />}
+      {mode !== "3d" && <SeatLayer3D seats={seats} maxSeats={maxSeats} felt={feltControls} />}
 
       {/* Per-seat committed bets as physical chips on the felt (real geometry). */}
       {seats.map((s) => (
@@ -1457,7 +1361,6 @@ export function CinematicScene({
   showPot = true,
   handLive = false,
   dealNonce = 0,
-  deckCommitHash,
   potMinor = 0,
   winnerSeat = -1,
   winNonce = 0,
@@ -1467,7 +1370,6 @@ export function CinematicScene({
   feltText,
   children,
   overlay,
-  onSeatProfile,
 }: CinematicSceneProps) {
   // Baked plate: show the empty table image behind the transparent Canvas (cover,
   // centered) and give the Canvas the plate's art-matched camera. Cinematic (default):
@@ -1496,7 +1398,7 @@ export function CinematicScene({
         }}
       >
         <Suspense fallback={null}>
-          <Scene seats={seats} board={board} mode={mode} maxSeats={maxSeats} showPot={showPot} handLive={handLive} dealNonce={dealNonce} deckCommitHash={deckCommitHash} potMinor={potMinor} winnerSeat={winnerSeat} winNonce={winNonce} feltControls={feltControls} backdrop={backdrop} feltText={feltText} onSeatProfile={onSeatProfile} />
+          <Scene seats={seats} board={board} mode={mode} maxSeats={maxSeats} showPot={showPot} handLive={handLive} dealNonce={dealNonce} potMinor={potMinor} winnerSeat={winnerSeat} winNonce={winNonce} feltControls={feltControls} backdrop={backdrop} feltText={feltText} />
         </Suspense>
       </Canvas>
       {children ?? <SceneHud potLabel={potLabel} heroHole={heroHole} announce={announce} />}

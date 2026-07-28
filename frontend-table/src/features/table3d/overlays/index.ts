@@ -6,5 +6,4 @@ export { PlayerGameReportModal } from "./PlayerGameReportModal";
 export { PlayerKickBanModal } from "./PlayerKickBanModal";
 export { BreakingNewsModal, BreakingNewsComposeModal } from "./BreakingNewsModal";
 export { OverlayDevControl, type OverlayDemoState } from "./OverlayDevControl";
-export { SeatProfileCard, type SeatProfileTarget } from "./SeatProfileCard";
 export { useTableOverlays, type TableOverlays, type KickTarget } from "./overlaySession";
