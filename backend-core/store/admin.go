@@ -543,6 +543,20 @@ func (s *AdminStore) ReviewHitl(ctx context.Context, id, status, note, adminUser
 	return err
 }
 
+// ResolveHitlByRef closes out the still-pending queue entry a domain flow
+// filed for itself (support ticket, collusion flag, credit request, …), keyed
+// by the "ref_id" every CreateHitl caller is expected to put in its payload.
+// This is how the domain's OWN resolve action (ticket reply, flag review,
+// credit approve/deny) keeps the centralized inbox in sync without a second,
+// separate "close this HITL item" step an operator could forget.
+func (s *AdminStore) ResolveHitlByRef(ctx context.Context, kind, refID, status, note, adminUserID string) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE poker_hitl_queue SET status=$3, note=$4, reviewed_by=$5, reviewed_at=NOW()
+		WHERE kind=$1 AND payload->>'ref_id'=$2 AND status='pending'`,
+		kind, refID, status, note, adminUserID)
+	return err
+}
+
 func adminScanHitl(rows *sql.Rows) ([]AdminHitlItem, error) {
 	out := []AdminHitlItem{}
 	for rows.Next() {

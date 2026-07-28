@@ -44,6 +44,11 @@ func CreditRequestCreate(ctx context.Context, logger runtime.Logger, db *sql.DB,
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
+	if _, herr := store.NewAdminStore(db).CreateHitl(ctx, "credit_request", caller, map[string]interface{}{
+		"ref_id": id, "club_id": req.ClubID, "amount_minor": req.AmountMinor, "reason": req.Reason,
+	}); herr != nil {
+		logger.Warn("hitl mirror failed for credit request %s: %v", id, herr)
+	}
 	return `{"ok":true,"id":"` + id + `"}`, nil
 }
 
@@ -112,6 +117,13 @@ func CreditRequestReview(ctx context.Context, logger runtime.Logger, db *sql.DB,
 		}, "credit request "+cr.ID); err != nil {
 			return "", runtime.NewError("approved but allocation failed: "+err.Error(), 13)
 		}
+	}
+	hitlStatus := "rejected"
+	if req.Approve {
+		hitlStatus = "approved"
+	}
+	if herr := store.NewAdminStore(db).ResolveHitlByRef(ctx, "credit_request", req.ID, hitlStatus, "", reviewer); herr != nil {
+		logger.Warn("hitl resolve failed for credit request %s: %v", req.ID, herr)
 	}
 	return `{"ok":true,"status":"` + status + `"}`, nil
 }

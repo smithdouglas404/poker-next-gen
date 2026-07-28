@@ -207,8 +207,15 @@ func CollusionScan(ctx context.Context, logger runtime.Logger, db *sql.DB, nk ru
 		if exists, _ := as.CollusionFlagExists(ctx, p.UserA, p.UserB); exists {
 			continue
 		}
-		if _, err := as.FlagCollusion(ctx, p.UserA, p.UserB, p.MatchID, strings.Join(reasons, ", "), score); err != nil {
+		flagID, err := as.FlagCollusion(ctx, p.UserA, p.UserB, p.MatchID, strings.Join(reasons, ", "), score)
+		if err != nil {
 			return "", runtime.NewError(err.Error(), 13)
+		}
+		if _, herr := store.NewAdminStore(db).CreateHitl(ctx, "collusion_flag", p.UserA, map[string]interface{}{
+			"ref_id": flagID, "user_a": p.UserA, "user_b": p.UserB, "match_id": p.MatchID,
+			"score": score, "reason": strings.Join(reasons, ", "),
+		}); herr != nil {
+			logger.Warn("hitl mirror failed for collusion flag %s: %v", flagID, herr)
 		}
 		flagged++
 	}
@@ -256,6 +263,13 @@ func CollusionFlagReview(ctx context.Context, logger runtime.Logger, db *sql.DB,
 	}
 	if err := store.NewAiprocStore(db).ReviewCollusion(ctx, req.FlagID, adminID, req.Status, req.Note); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
+	}
+	hitlStatus := "rejected" // dismissed
+	if req.Status == "confirmed" {
+		hitlStatus = "approved"
+	}
+	if herr := store.NewAdminStore(db).ResolveHitlByRef(ctx, "collusion_flag", req.FlagID, hitlStatus, req.Note, adminID); herr != nil {
+		logger.Warn("hitl resolve failed for collusion flag %s: %v", req.FlagID, herr)
 	}
 	return `{"ok":true}`, nil
 }
@@ -417,6 +431,15 @@ func SupportTicketCreate(ctx context.Context, logger runtime.Logger, db *sql.DB,
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
+	// Mirror into the centralized human-in-the-loop inbox so an operator has one
+	// place to see every "needs a decision" item, not a separate ticket queue no
+	// one remembers to check on its own. Best-effort: the ticket itself already
+	// exists and is reachable via support_ticket_list either way.
+	if _, herr := store.NewAdminStore(db).CreateHitl(ctx, "support_ticket", userID, map[string]interface{}{
+		"ref_id": id, "subject": req.Subject, "category": req.Category, "priority": req.Priority,
+	}); herr != nil {
+		logger.Warn("hitl mirror failed for support ticket %s: %v", id, herr)
+	}
 	out, _ := json.Marshal(map[string]interface{}{"id": id})
 	return string(out), nil
 }
@@ -548,6 +571,14 @@ func SupportTicketAdminRespond(ctx context.Context, logger runtime.Logger, db *s
 	if err := as.AddTicketMessage(ctx, req.ID, msg, status); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
+	// A reply that settles the ticket (anything but leaving it open/pending)
+	// clears it from the centralized inbox too — an operator working the HITL
+	// queue directly must not see a ticket that was already closed elsewhere.
+	if status != "" && status != "open" && status != "pending" {
+		if herr := store.NewAdminStore(db).ResolveHitlByRef(ctx, "support_ticket", req.ID, "approved", "resolved via ticket reply", adminID); herr != nil {
+			logger.Warn("hitl resolve failed for support ticket %s: %v", req.ID, herr)
+		}
+	}
 	if t.UserID != "" {
 		_ = nk.NotificationSend(ctx, t.UserID, "Support replied to your ticket", map[string]interface{}{
 			"kind":      "support_reply",
@@ -596,6 +627,11 @@ func SupportContact(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 	id, err := store.NewAiprocStore(db).CreateTicket(ctx, t)
 	if err != nil {
 		return "", runtime.NewError(err.Error(), 13)
+	}
+	if _, herr := store.NewAdminStore(db).CreateHitl(ctx, "support_ticket", userID, map[string]interface{}{
+		"ref_id": id, "subject": req.Subject, "category": req.Category, "email": req.Email,
+	}); herr != nil {
+		logger.Warn("hitl mirror failed for support ticket %s: %v", id, herr)
 	}
 	out, _ := json.Marshal(map[string]interface{}{"id": id, "ok": true})
 	return string(out), nil

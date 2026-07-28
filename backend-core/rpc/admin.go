@@ -410,6 +410,20 @@ func HitlReview(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 	if item.Status != "pending" {
 		return "", runtime.NewError("this item has already been reviewed", 9)
 	}
+	// credit_request is a CLUB-scoped money decision (requireClubPermission —
+	// the club's own configurer, not necessarily this platform admin) and
+	// support_ticket needs a reply body the generic approve/reject here has no
+	// field for. Resolving either one from this screen would either silently
+	// escalate a platform admin into a club money decision they may not be
+	// authorized for, or clear the queue entry while the ticket itself stays
+	// open. Both route through their own RPC, which mirrors the resolution
+	// back here (ResolveHitlByRef) once actually handled.
+	if item.Kind == "credit_request" {
+		return "", runtime.NewError("review this from the club's credit request queue (credit_request_review) — it requires that club's money permission", 9)
+	}
+	if item.Kind == "support_ticket" {
+		return "", runtime.NewError("reply to the ticket (support_ticket_admin_respond) to resolve it — a reply is required either way", 9)
+	}
 	if err := as.ReviewHitl(ctx, req.ID, req.Status, req.Note, adminID); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
@@ -422,6 +436,24 @@ func HitlReview(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		if err := as.SetBan(ctx, item.SubjectUserID, false, "", adminID); err != nil {
 			logger.Error("hitl %s approved but ban not lifted for user=%s: %v", req.ID, item.SubjectUserID, err)
 			return "", runtime.NewError("approved, but the ban could not be lifted — try again", 13)
+		}
+	}
+	// collusion_flag: same authority level as collusion_flag_review
+	// (isAdmin both ways), so resolving it here is safe — it just performs the
+	// identical action collusion_flag_review would.
+	if item.Kind == "collusion_flag" {
+		var p struct {
+			RefID string `json:"ref_id"`
+		}
+		_ = json.Unmarshal(item.Payload, &p)
+		if p.RefID != "" {
+			collusionStatus := "dismissed"
+			if req.Status == "approved" {
+				collusionStatus = "confirmed"
+			}
+			if err := store.NewAiprocStore(db).ReviewCollusion(ctx, p.RefID, adminID, collusionStatus, req.Note); err != nil {
+				logger.Error("hitl %s reviewed but collusion flag %s not updated: %v", req.ID, p.RefID, err)
+			}
 		}
 	}
 	adminAuditDetail(ctx, logger, db, adminID, "hitl_review", req.ID, map[string]interface{}{
