@@ -328,8 +328,9 @@ export function ShowdownOverlay({ visible, results, players, pot, onDismiss, aut
                     transition={{ delay: 0.45, type: "spring" }}
                     className="flex gap-4 justify-center mb-5"
                   >
-                    <Card card={{ ...player.cards[0], hidden: false }} size="3xl" delay={0.5} />
-                    <Card card={{ ...player.cards[1], hidden: false }} size="3xl" delay={0.65} />
+                    {player.cards.map((c, i) => (
+                      <Card key={i} card={{ ...c, hidden: false }} size="3xl" delay={0.5 + i * 0.15} />
+                    ))}
                   </motion.div>
 
                   {/* Winning hand name — BIG and glowing */}
@@ -412,17 +413,13 @@ export function ShowdownOverlay({ visible, results, players, pot, onDismiss, aut
                           {player.name}
                         </div>
                         <div className="flex gap-1.5 justify-center mb-1.5">
-                          {cardsHidden ? (
-                            <>
-                              <Card faceDown size="lg" delay={1.0 + i * 0.1} />
-                              <Card faceDown size="lg" delay={1.1 + i * 0.1} />
-                            </>
-                          ) : (
-                            <>
-                              <Card card={{ ...player.cards[0], hidden: false }} size="lg" delay={1.0 + i * 0.1} />
-                              <Card card={{ ...player.cards[1], hidden: false }} size="lg" delay={1.1 + i * 0.1} />
-                            </>
-                          )}
+                          {cardsHidden
+                            ? player.cards.map((_, ci) => (
+                                <Card key={ci} faceDown size="lg" delay={1.0 + i * 0.1 + ci * 0.1} />
+                              ))
+                            : player.cards.map((c, ci) => (
+                                <Card key={ci} card={{ ...c, hidden: false }} size="lg" delay={1.0 + i * 0.1 + ci * 0.1} />
+                              ))}
                         </div>
                         <div className="text-xs font-mono text-gray-400">
                           {cardsHidden ? "Mucked" : result.hand.description}

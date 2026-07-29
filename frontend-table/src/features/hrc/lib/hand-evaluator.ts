@@ -210,6 +210,53 @@ export function evaluateHand(holeCards: CardType[], communityCards: CardType[]):
   return bestHand!;
 }
 
+// PLO/Omaha hands MUST use exactly 2 of the hole cards and exactly 3 of the
+// board — freely combining all cards (the Hold'em `evaluateHand` above) gives
+// a wrong description for a 4-card hand. This is purely a client-side
+// display label (the server's real Omaha evaluator, engine-math's
+// rs_poker::omaha::OmahaHand, is the actual source of truth for who wins —
+// see backend-core/poker/enginemath/omaha.go) but it should still describe
+// the hand correctly rather than mislead the player under their own cards.
+export function evaluateOmahaHand(holeCards: CardType[], communityCards: CardType[]): EvaluatedHand {
+  if (holeCards.length < 2 || communityCards.length < 3) {
+    const allCards = [...holeCards, ...communityCards];
+    if (allCards.length === 0) {
+      return { rank: 'High Card', rankValue: 0, kickers: [], bestCards: [], description: 'No cards' };
+    }
+    const sorted = [...allCards].sort((a, b) => RANK_VALUES[b.rank] - RANK_VALUES[a.rank]);
+    return {
+      rank: 'High Card',
+      rankValue: 0,
+      kickers: sorted.map(c => RANK_VALUES[c.rank]),
+      bestCards: sorted,
+      description: `${sorted[0].rank} high (${allCards.length} cards)`,
+    };
+  }
+
+  const holePairs = combinations(holeCards, 2);
+  const boardTriples = combinations(communityCards, 3);
+  let bestHand: EvaluatedHand | null = null;
+
+  for (const pair of holePairs) {
+    for (const triple of boardTriples) {
+      const hand = evaluate5([...pair, ...triple]);
+      if (!bestHand || compareHands(hand, bestHand) > 0) {
+        bestHand = hand;
+      }
+    }
+  }
+
+  return bestHand!;
+}
+
+// Dispatches by hole-card count — the backend always deals exactly 2 for
+// Hold'em and exactly 4 for PLO (backend-core/poker/table.go holeCount()),
+// so the count itself is a reliable variant signal without threading a
+// separate variant prop through every caller.
+export function evaluateHandForVariant(holeCards: CardType[], communityCards: CardType[]): EvaluatedHand {
+  return holeCards.length === 4 ? evaluateOmahaHand(holeCards, communityCards) : evaluateHand(holeCards, communityCards);
+}
+
 // Compare two evaluated hands. Returns >0 if a wins, <0 if b wins, 0 if tie
 export function compareHands(a: EvaluatedHand, b: EvaluatedHand): number {
   if (a.rankValue !== b.rankValue) return a.rankValue - b.rankValue;

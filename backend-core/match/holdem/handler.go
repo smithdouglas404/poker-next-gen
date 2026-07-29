@@ -142,6 +142,17 @@ type MatchState struct {
 	// would be corrupted by a seat appearing mid-hand). See
 	// processPendingSeatIn.
 	PendingSeatIn map[string]pendingTournamentSeat
+	// PendingKickSeats queues an admin "kick" issued while the seat was still
+	// live in a hand (SeatSeated/SeatAllIn, Phase != PhaseWaiting). The
+	// host_action handler narrates that the kick "will apply once it
+	// finishes" but, before this field existed, nothing actually reapplied
+	// it — the kick was silently dropped the moment that hand resolved, and
+	// the seat stayed occupied indefinitely unless the host noticed and
+	// re-issued the command at exactly the right (unlive) moment. Set here
+	// instead, and drained at MatchLoop's PhaseWaiting safe point (the same
+	// between-hands checkpoint PendingSeatOut/PendingSeatIn already use for
+	// "can't mutate a live hand's seat array") by processPendingKicks.
+	PendingKickSeats map[int]bool
 	// DealerDown tracks the engine-math (rs_poker) sidecar being unreachable so the
 	// table pauses dealing gracefully and tells players ONCE, rather than silently
 	// failing to deal. Cleared (with a "restored" notice) on the next successful
@@ -824,6 +835,9 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 		}
 		if len(s.PendingSeatOut) > 0 {
 			processPendingSeatTransfers(ctx, logger, db, nk, dispatcher, s)
+		}
+		if len(s.PendingKickSeats) > 0 {
+			processPendingKicks(ctx, logger, db, dispatcher, s)
 		}
 		if s.HostClosed {
 			closeTable(ctx, logger, db, dispatcher, s, "closed by host")
@@ -2119,19 +2133,16 @@ func handleHostAction(ctx context.Context, logger runtime.Logger, db *sql.DB, di
 			// PhaseResolvingSidePots gate that blocks a kick once resolution has
 			// already started.
 			if s.Phase != poker.PhaseWaiting && (seat.Status == poker.SeatSeated || seat.Status == poker.SeatAllIn) {
+				if s.PendingKickSeats == nil {
+					s.PendingKickSeats = map[int]bool{}
+				}
+				s.PendingKickSeats[req.Seat] = true
 				narrate(dispatcher, s, fmt.Sprintf(
 					"Host tried to remove %s, but they're still live in this hand — the kick will apply once it finishes.",
 					seat.Username))
 				break
 			}
-			releaseBuyIn(ctx, logger, db, s, req.Seat, seat.UserID, seat.Stack)
-			delete(s.SeatWallet, req.Seat)
-			delete(s.SeatLocked, req.Seat)
-			_ = store.NewActiveSeatStore(db).Unregister(ctx, seat.UserID, matchIDForAudit(s))
-			name := seat.Username
-			closeSeatSession(ctx, db, s, req.Seat)
-			s.Table.StandUp(req.Seat)
-			narrate(dispatcher, s, fmt.Sprintf("Host removed %s from the table.", name))
+			applyKick(ctx, logger, db, dispatcher, s, req.Seat)
 		}
 	case "set_blinds":
 		if req.SmallBlind > 0 && req.BigBlind >= req.SmallBlind {
@@ -2840,6 +2851,48 @@ func processPendingSeatIn(ctx context.Context, logger runtime.Logger, db *sql.DB
 	}
 	if moved {
 		dispatcher.MatchLabelUpdate(buildLabel(s))
+		broadcastSnapshot(ctx, db, dispatcher, s, nil)
+	}
+}
+
+// applyKick performs the actual removal for a "kick" host action: return the
+// buy-in, clear per-seat bookkeeping, close the session, and stand the seat
+// up. Shared by the immediate path (host_action "kick" when the seat is
+// already safe to touch) and processPendingKicks (the deferred path for a
+// seat that was still live in a hand when the kick was issued).
+func applyKick(ctx context.Context, logger runtime.Logger, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, seatIdx int) {
+	seat := s.Table.Seats[seatIdx]
+	if seat == nil {
+		return
+	}
+	releaseBuyIn(ctx, logger, db, s, seatIdx, seat.UserID, seat.Stack)
+	delete(s.SeatWallet, seatIdx)
+	delete(s.SeatLocked, seatIdx)
+	_ = store.NewActiveSeatStore(db).Unregister(ctx, seat.UserID, matchIDForAudit(s))
+	name := seat.Username
+	closeSeatSession(ctx, db, s, seatIdx)
+	s.Table.StandUp(seatIdx)
+	narrate(dispatcher, s, fmt.Sprintf("Host removed %s from the table.", name))
+}
+
+// processPendingKicks drains PendingKickSeats, called only from MatchLoop's
+// PhaseWaiting safe point (see the "kick" host_action case: a kick issued
+// while the seat was SeatSeated/SeatAllIn mid-hand is queued here rather than
+// applied immediately, and — before this existed — rather than ever). A
+// queued seat may have already emptied on its own (voluntary stand-up,
+// disconnect) by the time this runs; skip it silently rather than double
+// -removing.
+func processPendingKicks(ctx context.Context, logger runtime.Logger, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState) {
+	kicked := false
+	for seatIdx := range s.PendingKickSeats {
+		delete(s.PendingKickSeats, seatIdx)
+		if seatIdx < 0 || seatIdx >= poker.MaxSeats || s.Table.Seats[seatIdx] == nil {
+			continue
+		}
+		applyKick(ctx, logger, db, dispatcher, s, seatIdx)
+		kicked = true
+	}
+	if kicked {
 		broadcastSnapshot(ctx, db, dispatcher, s, nil)
 	}
 }

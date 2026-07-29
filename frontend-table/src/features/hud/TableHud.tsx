@@ -18,6 +18,7 @@ import { TotalInPlay } from "@/features/hud/TotalInPlay";
 import { BuyInSlider, TableLog } from "@/features/hud/TableLog";
 import { TableEmptyState } from "@/features/hud/TableEmptyState";
 import { ChatPanel } from "@/features/hud/ChatPanel";
+import { ChipAnimation } from "@/features/hrc/components/ChipAnimation";
 import { MusicPicker } from "@/features/sound/MusicPicker";
 import { TableSettings } from "@/features/hud/TableSettings";
 import { TauntBar } from "@/features/sound/TauntBar";
@@ -55,6 +56,12 @@ export function TableHud({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-background">
       {children}
+
+      {/* Bet-to-pot chip flights — Seat.tsx's triggerChipFlight() computes
+          viewport-relative coordinates via getBoundingClientRect(), so this
+          must live directly in this full-viewport `relative` root, not
+          nested deeper where a positioned ancestor would offset it. */}
+      <ChipAnimation />
 
       <div className="pointer-events-none absolute inset-0 z-20 flex flex-col p-4">
         <PlayerHeader />

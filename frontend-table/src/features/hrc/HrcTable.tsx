@@ -96,8 +96,10 @@ export default function HrcTable({
   // Seat.tsx deliberately skips rendering the hero's own cards on their
   // avatar, so this is the one place they surface.
   const heroHole = toCards(holeCards);
-  const heroCardsPair: [CardType, CardType] | undefined =
-    heroHole.length >= 2 ? [heroHole[0], heroHole[1]] : undefined;
+  // All dealt hole cards, not truncated to 2 — the backend deals 4 for PLO
+  // (backend-core/poker/table.go holeCount()); HeroHoleCards renders however
+  // many it's given.
+  const heroCards: CardType[] | undefined = heroHole.length >= 2 ? heroHole : undefined;
 
   // Visual (post hero-rotation) seat indices that actually hold a player —
   // ImageTable's vacant-slot layer needs this per-index, not a headcount, or
@@ -183,7 +185,7 @@ export default function HrcTable({
               })}
             </div>
 
-            <HeroHoleCards cards={heroCardsPair} communityCards={adapted.gameState.communityCards} />
+            <HeroHoleCards cards={heroCards} communityCards={adapted.gameState.communityCards} />
           </>
         )}
       </div>

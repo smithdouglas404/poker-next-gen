@@ -11,11 +11,6 @@ interface ChipFlight {
   color: string;
 }
 
-interface ChipAnimationProps {
-  /** Container dimensions for coordinate mapping */
-  containerRef: React.RefObject<HTMLDivElement | null>;
-}
-
 // Chip colors based on amount
 function chipColor(amount: number): string {
   if (amount >= 500) return "linear-gradient(135deg, #ffd700, #c9a84c)";
@@ -24,7 +19,12 @@ function chipColor(amount: number): string {
   return "linear-gradient(135deg, #2ecc71, #27ae60)";
 }
 
-export function ChipAnimation({ containerRef }: ChipAnimationProps) {
+// Mounted once at the TableHud root (position: absolute against that
+// full-viewport `relative` container) so its coordinates line up with the
+// viewport-relative getBoundingClientRect() values Seat.tsx computes when it
+// calls triggerChipFlight — mounting it anywhere with a smaller/offset
+// positioned ancestor would misalign the flight path.
+export function ChipAnimation() {
   const [flights, setFlights] = useState<ChipFlight[]>([]);
 
   const addFlight = useCallback((flight: Omit<ChipFlight, 'id'>) => {
