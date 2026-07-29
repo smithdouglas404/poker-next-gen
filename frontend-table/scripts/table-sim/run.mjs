@@ -366,6 +366,7 @@ async function main() {
   let reconnectAtHand = -1;
   let standUpBot = null;
   let standUpWalletBefore = null;
+  let standUpAttempted = false;
   let reBuyDone = false;
   let adminPauseDone = false;
   let adminBlindsDone = false;
@@ -467,17 +468,37 @@ async function main() {
       // exactly the live stack, whatever its sign, and that credit is
       // available to rebuy with — holds regardless of profit/loss, so any
       // seated bot with a nonzero stack is a valid candidate.
-      if (!standUpBot && handsObserved >= 70) {
+      if (!standUpBot && !standUpAttempted && handsObserved >= 70) {
         const candidate = immediate.find((b) => {
           const s = b.mySeat();
           return s && s.status !== "empty" && s.stack > 0 && b !== sitOutBot && b !== disconnectBot;
         });
         if (candidate) {
+          standUpAttempted = true;
           standUpBot = candidate;
           const seat = standUpBot.mySeat();
           standUpWalletBefore = seat.stack;
-          await standUpBot.standUp();
-          log(`${standUpBot.name} stood up with ${standUpWalletBefore}c at the seat at hand ${handsObserved}.`);
+          // The server rejects OpStandUp outright (a real cashout-lock, not a
+          // bug) if the bot happens to be mid-hand at the exact instant this
+          // fires — unlike a host "kick", there's no server-side deferred
+          // retry for a self-service stand-up, so the client has to retry.
+          // Confirm the seat actually emptied before trusting the stand-up
+          // happened at all; otherwise the wallet-credit check below is
+          // checking a player who never left, which reads as a false
+          // "profit not credited" bug.
+          let stoodUp = false;
+          for (let attempt = 0; attempt < 15 && !stoodUp; attempt++) {
+            await standUpBot.standUp();
+            await sleep(1000);
+            const after = standUpBot.mySeat();
+            stoodUp = !after || after.status === "empty";
+          }
+          if (!stoodUp) {
+            finding("MEDIUM", `${standUpBot.name} never actually stood up after 15 retries (likely stuck mid-hand repeatedly) — skipping the wallet-credit/re-buy assertions this run.`);
+            standUpBot = null;
+          } else {
+            log(`${standUpBot.name} stood up with ${standUpWalletBefore}c at the seat at hand ${handsObserved}.`);
+          }
         }
       }
       if (standUpBot && !reBuyDone && handsObserved >= 80) {
@@ -553,9 +574,9 @@ async function main() {
       finding("INFO", `Scenario "${label}" never triggered within the ${handsObserved}-hand run — not covered by this run.`);
     }
   }
-  if (!standUpBot) {
+  if (!standUpBot && !standUpAttempted) {
     finding("INFO", `Stand-up/re-buy scenario never triggered (no eligible seated bot found from hand 70 onward) — not covered by this run.`);
-  } else if (!reBuyDone) {
+  } else if (!reBuyDone && standUpBot) {
     finding("INFO", `${standUpBot.name} stood up but the run ended before hand 80 — re-buy leg not covered by this run.`);
   }
 
