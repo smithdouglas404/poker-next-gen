@@ -1,8 +1,8 @@
-# Pin versions when deploying — these are current-as-of-writing but pipecat-ai
-# moves fast; confirm against PyPI before deploying (`pipecat cloud deploy`).
+# Deliberately not pinning aiohttp/loguru/pipecatcloud here — two attempts at
+# guessing their versions both conflicted with what pipecat-ai actually
+# requires (aiohttp~=3.11.12, loguru~=0.7.3), and pipecatcloud + aiohttp are
+# already present in the dailyco/pipecat-base image this builds on top of
+# (confirmed in the build log: "Requirement already satisfied"). bot.py
+# imports both aiohttp and loguru directly — they're guaranteed present
+# either way, just not re-pinned to a version that might not exist.
 pipecat-ai[daily,anthropic,deepgram,cartesia,silero]==0.0.66
-pipecatcloud
-# No version pin — pipecat-ai 0.0.66 requires aiohttp~=3.11.12 itself; pinning
-# an older version here (3.10.11) conflicted with that and broke the build.
-aiohttp
-loguru==0.7.2
