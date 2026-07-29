@@ -11,6 +11,7 @@ const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/login',
+  '/join',             // public plan picker, reached before account creation
   '/table(.*)',        // live game — guests with a table code play here
   '/lobby(.*)',        // access-code entry (room_resolve) — the guest code path
   '/diag',             // deploy self-check

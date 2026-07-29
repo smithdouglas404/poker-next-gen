@@ -82,7 +82,7 @@ export function GuestGate({
         <Button variant="outline" onClick={() => void load()}>
           Search
         </Button>
-        <Link href="/hub">
+        <Link href="/clubs/new">
           <Button variant="ghost">Start a club</Button>
         </Link>
       </div>

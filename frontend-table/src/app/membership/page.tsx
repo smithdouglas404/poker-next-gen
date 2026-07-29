@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { POP, RISE, STAGGER, STAGGER_ITEM } from "@/features/ui/motion";
@@ -106,6 +106,22 @@ export default function MembershipPage() {
     },
     [interval, notify],
   );
+
+  // A plan picked pre-signup on /join arrives back here as ?upgrade=&interval= —
+  // finish that intent automatically instead of dropping the new member into a
+  // bare tier grid they already chose from once.
+  const autoUpgradeRef = useRef(false);
+  useEffect(() => {
+    if (autoUpgradeRef.current || loading || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const upgradeId = params.get("upgrade");
+    if (!upgradeId) return;
+    const wantInterval = params.get("interval");
+    if (wantInterval === "year" || wantInterval === "month") setIntervalChoice(wantInterval);
+    autoUpgradeRef.current = true;
+    if (upgradeId === "free") return;
+    void upgrade(upgradeId);
+  }, [loading, upgrade]);
 
   const cancelSub = useCallback(async () => {
     if (typeof window !== "undefined" && !window.confirm("Cancel your membership? You keep your benefits until the end of the current billing period, then downgrade to Free.")) {

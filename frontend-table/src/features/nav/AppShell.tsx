@@ -95,7 +95,7 @@ const ADMIN: NavItem = { icon: Shield, label: "Admin", href: "/admin" };
 // Surfaces that own the full viewport or run before sign-in. The table and proof
 // are immersive by design (CLAUDE.md: chrome stays out of the felt's way); the
 // marketing and auth pages have their own chrome.
-const HIDE_ON = ["/", "/login", "/table", "/proof", "/sign-in", "/sign-up", "/hrc"];
+const HIDE_ON = ["/", "/login", "/join", "/table", "/proof", "/sign-in", "/sign-up", "/hrc"];
 
 /** Cents → a compact chip label for the rail footer. */
 function balanceLabel(cents: number | null): string {

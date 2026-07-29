@@ -13,24 +13,24 @@ import { landingApi, type SiteSettings } from "./landingRpc";
 const PILLARS = [
   {
     title: "Provably Fair",
-    body: "Every deck is committed before the deal, your cards are encrypted and never shared, and the record is anchored on-chain. Verify any hand yourself.",
+    body: "Every deck is committed before the deal, your cards are encrypted and never shared, and the record is anchored on-chain. Verify any hand yourself — nobody has to take our word for it.",
     href: "/provably-fair",
-    cta: "See how it works",
+    cta: "Verify a hand",
     accent: "#22c55e",
+  },
+  {
+    title: "Licensed Real Money",
+    body: "Identity verification (KYC/AML) gates every deposit and withdrawal. Real cash, real payouts, transparent limits by tier — not a play-chip site pretending otherwise.",
+    href: "/membership",
+    cta: "View plans",
+    accent: "#f5c518",
   },
   {
     title: "Own Your Club",
     body: "Run your own room. Set your rake 0–10%, invite your community, manage members, and earn. Club owners are entrepreneurs here.",
     href: "/clubs",
-    cta: "Start a club",
+    cta: "Learn more",
     accent: "#e01e2b",
-  },
-  {
-    title: "Crypto & Card",
-    body: "Fund your wallet with 200+ cryptocurrencies or card. Withdraw with AML review and automated payout. Membership tiers with real perks.",
-    href: "/membership",
-    cta: "View plans",
-    accent: "#f5c518",
   },
 ];
 
@@ -97,7 +97,7 @@ export function LandingClient() {
               Sign in
             </Link>
             <Link
-              href="/sign-up"
+              href="/join"
               className={cn(BTN_GOLD, "rounded-lg px-4 py-2 text-sm uppercase tracking-wide")}
             >
               Join
@@ -120,31 +120,26 @@ export function LandingClient() {
           </span>
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-neutral-400">
-          A provably-fair, community-first poker network. Own your club, play on a real GPU table
-          with 3D characters, and move money in crypto or card — all on an engine you can verify.
+          Every deck is cryptographically committed before the deal and every hand can be verified
+          after it — no trust required, just math you can check yourself. Real money moves only
+          through identity-verified accounts, with transparent limits at every tier.
         </p>
         <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
           <Link
-            href="/login"
+            href="/join"
             className={cn(BTN_GOLD, "rounded-xl px-7 py-3.5 text-sm uppercase tracking-wide")}
           >
-            Play now
+            Join {siteName}
           </Link>
           <Link
-            href="/table"
+            href="/provably-fair"
             className={cn(
               GLASS_PANEL,
               GLASS_PANEL_HOVER,
               "rounded-xl px-7 py-3.5 text-sm font-bold text-white",
             )}
           >
-            Enter a table
-          </Link>
-          <Link
-            href="/hub"
-            className="rounded-xl px-7 py-3.5 text-sm font-semibold text-neutral-300 transition hover:text-white"
-          >
-            Command Center →
+            See how fairness works
           </Link>
         </div>
       </section>
@@ -175,48 +170,48 @@ export function LandingClient() {
         </div>
       </section>
 
-      {/* Feature grid */}
-      <section className="mx-auto max-w-6xl px-6 pb-16 pt-10">
+      {/* Production quality — a narrative strip, not another grid of squares */}
+      <section className="mx-auto max-w-6xl px-6 pb-20 pt-10">
         <p className={cn(HEADING_SM, "text-center text-gold/70")}>Built different</p>
         <h2 className="font-display mb-8 mt-2 text-center text-3xl font-bold uppercase tracking-wide">
-          The whole table, reimagined
+          Not another Zoom-call poker site
         </h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map(([title, body, accent]) => (
-            <div key={title} className={cn(GLASS_PANEL, GLASS_PANEL_HOVER, "p-5")}>
-              <div className="mb-3 h-8 w-8 rounded-lg" style={{ background: `linear-gradient(135deg, ${accent}, transparent)` }} />
-              <h3 className="font-display text-base font-bold uppercase tracking-wide text-white">{title}</h3>
-              <p className="mt-1.5 text-xs leading-relaxed text-neutral-400">{body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="mx-auto max-w-4xl px-6 pb-20 text-center">
-        <div className={cn(GLASS_PANEL, "relative overflow-hidden border-gold/25 p-10")}>
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(245,197,24,0.10),transparent_60%)]" />
-          <h2 className="font-display text-3xl font-bold uppercase tracking-wide">
-            Ready to run your own room?
-          </h2>
-          <p className="mx-auto mt-3 max-w-xl text-neutral-400">
-            Spin up a private club, set your rake, and bring your players to a table that plays fair
-            and looks unreal.
-          </p>
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link
-              href="/clubs"
-              className={cn(BTN_GOLD, "rounded-xl px-6 py-3 text-sm uppercase tracking-wide")}
-            >
-              Start a club
-            </Link>
+        <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
+          <div className={cn(GLASS_PANEL, GLASS_PANEL_HOVER, "relative overflow-hidden p-8")}>
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(224,30,43,0.10),transparent_60%)]" />
+            <h3 className="font-display text-2xl font-bold uppercase tracking-wide text-white">
+              A real GPU table
+            </h3>
+            <p className="mt-3 max-w-md text-sm leading-relaxed text-neutral-400">
+              Cinematic felt, chip, and showdown animation rendered live — with rigged 3D characters
+              at every seat, or generate your own with AI. Every card rank, side pot, and equity
+              calculation runs through a Rust poker engine, not a JavaScript approximation.
+            </p>
             <Link
               href="/capabilities"
-              className={cn(GLASS_PANEL, GLASS_PANEL_HOVER, "rounded-xl px-6 py-3 text-sm font-bold text-white")}
+              className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-gold transition hover:gap-2"
             >
-              See all capabilities
+              See all capabilities →
             </Link>
           </div>
+          <ul className="flex flex-col gap-3">
+            {FEATURES.filter(([title]) => title !== "GPU poker table" && title !== "3D characters" && title !== "Rust engine").map(
+              ([title, body, accent]) => (
+                <li key={title} className={cn(GLASS_PANEL, GLASS_PANEL_HOVER, "flex gap-3 p-4")}>
+                  <span
+                    className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: accent, boxShadow: `0 0 8px ${accent}` }}
+                  />
+                  <div className="min-w-0">
+                    <h4 className="font-display text-sm font-bold uppercase tracking-wide text-white">
+                      {title}
+                    </h4>
+                    <p className="mt-1 text-xs leading-relaxed text-neutral-400">{body}</p>
+                  </div>
+                </li>
+              ),
+            )}
+          </ul>
         </div>
       </section>
 
