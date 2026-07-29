@@ -29,12 +29,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
 
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: ai-host
+          # Pipecat Cloud requires linux/arm64 images — GitHub's runners are
+          # amd64 by default, so this cross-builds via the QEMU step above.
+          platforms: linux/arm64
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/poker-ai-host:latest
