@@ -86,7 +86,7 @@ export default defineRailway(() => {
       // it's how the bot calls back to ai_host_narration_poll/ai_host_chat_post).
       // The one real secret — PIPECAT_API_KEY — must be set in the Railway
       // dashboard on backend-core once you've created a Pipecat Cloud account
-      // and run `pcc deploy` from ai-host/ (see ai-host/pcc-deploy.toml). Until
+      // and run `pipecat cloud deploy` from ai-host/ (see ai-host/pcc-deploy.toml). Until
       // it's set, the AI host toggle reports "not currently available"
       // instead of failing.
       PIPECAT_SERVICE_NAME: "poker-ai-host",

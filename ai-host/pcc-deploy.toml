@@ -1,4 +1,6 @@
-# Pipecat Cloud deploy config (`pcc deploy`). Fill in / confirm every value
+# Pipecat Cloud deploy config (read by `pipecat cloud deploy`, run from this
+# directory, after `uv tool install "pipecat-ai[cli]" --with pipecatcloud`).
+# Fill in / confirm every value
 # below against your own Pipecat Cloud account and container registry before
 # deploying — placeholders only, matching the "confirm at deploy time" caveat
 # already on bot.py and backend-core/integrations/pipecat.go.

@@ -16,7 +16,7 @@ Three first-class services live in their own top-level directories:
 - `oddslingers/` — git submodule for reference; not deployed on Railway yet.
 - `ai-host/` — Python Pipecat Cloud agent (optional, per-table AI voice/text
   host). **Not deployed on Railway** — it's a separate agent image pushed to
-  Pipecat Cloud via `pcc deploy` (see `ai-host/pcc-deploy.toml`), started/
+  Pipecat Cloud via `pipecat cloud deploy` (see `ai-host/pcc-deploy.toml`), started/
   stopped by `backend-core/integrations/pipecat.go` against a table's own
   Daily.co room. Off by default per table (`rpc/ai_host.go` `ai_host_toggle`).
   Talks to `backend-core` outbound-only over Nakama's HTTP RPC endpoint

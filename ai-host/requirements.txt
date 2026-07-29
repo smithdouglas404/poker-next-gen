@@ -1,6 +1,6 @@
 # Pin versions when deploying — these are current-as-of-writing but pipecat-ai
-# moves fast; confirm against PyPI before `pcc deploy`.
+# moves fast; confirm against PyPI before deploying (`pipecat cloud deploy`).
 pipecat-ai[daily,anthropic,deepgram,cartesia,silero]==0.0.66
-pipecat-cloud
+pipecatcloud
 aiohttp==3.10.11
 loguru==0.7.2

@@ -1,7 +1,7 @@
 """AI table host — a Pipecat Cloud voice/text agent for a live poker table.
 
 Deployed separately from Railway (this is a Python service, the rest of this
-monorepo is Go/Next.js/Rust) to Pipecat Cloud via their CLI (`pcc deploy`),
+monorepo is Go/Next.js/Rust) to Pipecat Cloud via their CLI (`pipecat cloud deploy`),
 using this repo's own Daily.co room per table (backend-core/integrations/
 daily.go) rather than letting Pipecat Cloud provision its own — see
 "bring your own room" in Pipecat Cloud's session-start API.
