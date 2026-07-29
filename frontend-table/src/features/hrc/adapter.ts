@@ -88,7 +88,7 @@ export function toPlayers(snap: TableSnapshot, opts: AdaptOptions = {}): Player[
         name: seat.username || `Seat ${seat.index + 1}`,
         chips: seat.stack ?? 0,
         avatar: opts.avatarFor?.(seat),
-        cards: hole.length >= 2 ? ([hole[0], hole[1]] as [CardType, CardType]) : undefined,
+        cards: hole.length >= 2 ? hole : undefined,
         isActive,
         isDealer: seat.index === snap.button_seat,
         isBot: seat.is_bot === true,

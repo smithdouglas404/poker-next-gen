@@ -14,7 +14,7 @@ export interface Player {
   name: string;
   chips: number;
   avatar?: string;
-  cards?: [CardType, CardType];
+  cards?: CardType[];
   isActive: boolean;
   isDealer: boolean;
   isSmallBlind?: boolean;

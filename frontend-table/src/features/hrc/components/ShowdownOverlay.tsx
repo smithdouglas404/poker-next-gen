@@ -1,15 +1,26 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, Sparkles, Crown } from "lucide-react";
-import { PlayerResult } from "@/features/hrc/lib/hand-evaluator";
 import { Player } from "@/features/hrc/lib/poker-types";
 import { Card } from "./Card";
 import { useEffect, useRef } from "react";
 import { useSoundEngine } from "@/features/hrc/lib/sound-context";
 import confetti from "canvas-confetti";
 
+// A real winner's hand category comes straight from the server (rs_poker,
+// via ShowdownMessage.winners — see showdownAdapter.ts). There is no
+// equivalent server-computed category for a hand that was shown but lost
+// (the server's "show or muck" rule only ranks actual winners) — golden
+// rule 4 (no math fallbacks) means this overlay never computes one client-
+// side, so `description` is only ever present for isWinner results.
+export interface ShowdownResult {
+  playerId: string;
+  hand?: { description: string };
+  isWinner: boolean;
+}
+
 interface ShowdownOverlayProps {
   visible: boolean;
-  results: PlayerResult[];
+  results: ShowdownResult[];
   players: Player[];
   pot: number;
   onDismiss?: () => void;
@@ -352,7 +363,7 @@ export function ShowdownOverlay({ visible, results, players, pot, onDismiss, aut
                         filter: "drop-shadow(0 0 12px rgba(255,215,0,0.5))",
                       }}
                     >
-                      {winner.hand.description}
+                      {winner.hand?.description ?? "Winner"}
                     </span>
                   </motion.div>
 
@@ -422,7 +433,12 @@ export function ShowdownOverlay({ visible, results, players, pot, onDismiss, aut
                               ))}
                         </div>
                         <div className="text-xs font-mono text-gray-400">
-                          {cardsHidden ? "Mucked" : result.hand.description}
+                          {/* The server only computes a hand-category string for
+                              actual winners (its real "show or muck" rule) — a
+                              shown-but-losing hand has no server-provided
+                              description, so say "Shown" rather than compute
+                              one client-side (golden rule 4: no math fallbacks). */}
+                          {cardsHidden ? "Mucked" : (result.hand?.description ?? "Shown")}
                         </div>
                       </motion.div>
                     );

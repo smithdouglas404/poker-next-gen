@@ -14,7 +14,7 @@
 // Client-only: framer-motion, three and drei all touch the DOM/WebGL, so mount this
 // via next/dynamic with ssr:false (CLAUDE.md golden rule 3).
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useGame } from "@/features/game/GameProvider";
 import { ImageTable } from "./components/ImageTable";
 import { PokerSceneCanvas } from "./scene/canvas/PokerSceneCanvas";
@@ -25,6 +25,8 @@ import { useSceneSync } from "./useSceneSync";
 import { avatarSrc } from "@/features/table/avatars";
 import { Seat } from "./components/Seat";
 import { HeroHoleCards } from "./components/HeroHoleCards";
+import { ShowdownOverlay } from "./components/ShowdownOverlay";
+import { adaptShowdown } from "./lib/showdownAdapter";
 import { TABLE_SEATS, FELT_BOUNDS } from "./lib/table-constants";
 import { seatId } from "./adapter";
 import { DEMO_HOLE, DEMO_SNAPSHOT } from "@/features/table3d/demoSnapshot";
@@ -79,6 +81,20 @@ export default function HrcTable({
           })
         : null,
     [snapshot, holeCards],
+  );
+
+  // Real showdown reveal (ShowdownOverlay), built entirely from the server's
+  // own OpShowdown payload (see showdownAdapter.ts) — never a client-side
+  // hand recomputation. No demo fixture exists for this, so ?demo=1 simply
+  // never shows it (CLAUDE.md: demo data is opt-in, never a fallback).
+  const showdown = demo ? null : live.showdown;
+  const [showdownDismissed, setShowdownDismissed] = useState(false);
+  useEffect(() => {
+    if (showdown) setShowdownDismissed(false);
+  }, [showdown]);
+  const showdownData = useMemo(
+    () => (showdown && adapted && snapshot ? adaptShowdown(showdown, snapshot, adapted.players) : null),
+    [showdown, adapted, snapshot],
   );
 
   // No snapshot = not connected/seated. Render nothing rather than a fake table: the
@@ -186,6 +202,16 @@ export default function HrcTable({
             </div>
 
             <HeroHoleCards cards={heroCards} communityCards={adapted.gameState.communityCards} />
+
+            {showdownData && (
+              <ShowdownOverlay
+                visible={!showdownDismissed}
+                results={showdownData.results}
+                players={showdownData.players}
+                pot={showdown?.pot ?? 0}
+                onDismiss={() => setShowdownDismissed(true)}
+              />
+            )}
           </>
         )}
       </div>

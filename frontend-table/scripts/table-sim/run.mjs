@@ -316,7 +316,7 @@ async function main() {
     buy_in: GUEST_STIPEND_CENTS,
     max_seats: 10,
     num_bots: 0,
-    variant: "holdem",
+    variant: process.env.SIM_VARIANT || "holdem",
   });
   const matchId = table.match_id;
   if (!matchId) {
