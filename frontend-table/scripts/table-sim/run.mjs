@@ -457,18 +457,27 @@ async function main() {
         }
       }
 
-      // Stand up net-positive, verify wallet credit, re-buy at hand 70 -> re-sit at 80.
+      // Stand up and verify wallet credit + re-buy at hand 70 -> re-sit at 80.
+      // Deliberately NOT gated on being net-positive vs the starting $1,000
+      // stipend: at these blinds (deep-stack, rake-dragged) a clear profit
+      // above the FULL starting stipend can take far longer than one run's
+      // hand budget to occur by chance, silently starving this scenario of
+      // any candidate ever (confirmed: a 173-hand run never found one). The
+      // actual invariant worth testing — stand-up credits the wallet with
+      // exactly the live stack, whatever its sign, and that credit is
+      // available to rebuy with — holds regardless of profit/loss, so any
+      // seated bot with a nonzero stack is a valid candidate.
       if (!standUpBot && handsObserved >= 70) {
         const candidate = immediate.find((b) => {
           const s = b.mySeat();
-          return s && s.status !== "empty" && s.stack > GUEST_STIPEND_CENTS && b !== sitOutBot && b !== disconnectBot;
+          return s && s.status !== "empty" && s.stack > 0 && b !== sitOutBot && b !== disconnectBot;
         });
         if (candidate) {
           standUpBot = candidate;
           const seat = standUpBot.mySeat();
           standUpWalletBefore = seat.stack;
           await standUpBot.standUp();
-          log(`${standUpBot.name} stood up net-positive with ${standUpWalletBefore}c at hand ${handsObserved}.`);
+          log(`${standUpBot.name} stood up with ${standUpWalletBefore}c at the seat at hand ${handsObserved}.`);
         }
       }
       if (standUpBot && !reBuyDone && handsObserved >= 80) {
@@ -530,6 +539,24 @@ async function main() {
 
   if (handsObserved < TARGET_HANDS) {
     finding("INFO", `Only reached ${handsObserved}/${TARGET_HANDS} hands within the ${WALLCLOCK_TIMEOUT_MS / 1000}s wall-clock budget.`);
+  }
+
+  // A scenario that silently never finds a candidate looks identical to "ran
+  // clean" in the findings summary — flag every scripted scenario that never
+  // actually triggered, so a clean run always means "asserted," not "never
+  // attempted."
+  for (const [key, label] of [
+    ["sitout_return", "sit-out/return"],
+    ["reconnect", "disconnect/reconnect"],
+  ]) {
+    if (!scenariosRun.has(key)) {
+      finding("INFO", `Scenario "${label}" never triggered within the ${handsObserved}-hand run — not covered by this run.`);
+    }
+  }
+  if (!standUpBot) {
+    finding("INFO", `Stand-up/re-buy scenario never triggered (no eligible seated bot found from hand 70 onward) — not covered by this run.`);
+  } else if (!reBuyDone) {
+    finding("INFO", `${standUpBot.name} stood up but the run ended before hand 80 — re-buy leg not covered by this run.`);
   }
 
   console.log("\n=== FINDINGS SUMMARY ===");
