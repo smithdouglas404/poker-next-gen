@@ -2,5 +2,7 @@
 # moves fast; confirm against PyPI before deploying (`pipecat cloud deploy`).
 pipecat-ai[daily,anthropic,deepgram,cartesia,silero]==0.0.66
 pipecatcloud
-aiohttp==3.10.11
+# No version pin — pipecat-ai 0.0.66 requires aiohttp~=3.11.12 itself; pinning
+# an older version here (3.10.11) conflicted with that and broke the build.
+aiohttp
 loguru==0.7.2
