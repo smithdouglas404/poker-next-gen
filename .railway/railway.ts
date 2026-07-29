@@ -57,6 +57,16 @@ export default defineRailway(() => {
       // Until they are set, billing stays dormant (checkout/deposit report
       // "not configured"). See docs/MEMBERSHIP-BILLING.md.
       //
+      // ── Nakama unauthenticated-RPC key (webhooks + server-to-server) ────
+      // NAKAMA_HTTP_KEY must also be set on the backend-core service in the
+      // Railway dashboard (any long random string — never commit it). Read by
+      // docker-entrypoint.sh (--runtime.http_key) so Nakama actually enforces
+      // it instead of its insecure built-in default, and by the AI-host bot
+      // (ai-host/) to authenticate its ai_host_narration_poll/ai_host_chat_post
+      // calls. The line below used to hardcode a stray "defaulthttpkey" that
+      // never matched Nakama's real default ("defaultkey") or anything this
+      // repo ever configured — fixed to reference the real secret.
+      //
       // ── Identity / KYC (Didit) ──────────────────────────────────────────
       // Set on backend-core (verification) AND frontend-table (webhook receiver):
       //   DIDIT_API_KEY, DIDIT_WEBHOOK_SECRET, KYC_APPLY_SECRET,
@@ -68,7 +78,7 @@ export default defineRailway(() => {
       // enabled yet"). See docs/KYC-DIDIT.md.
       APP_BASE_URL: "https://${{frontend-table.RAILWAY_PUBLIC_DOMAIN}}",
       NOWPAYMENTS_IPN_CALLBACK_URL:
-        "https://${{backend-core.RAILWAY_PUBLIC_DOMAIN}}/v2/rpc/nowpayments_webhook?http_key=defaulthttpkey&unwrap",
+        "https://${{backend-core.RAILWAY_PUBLIC_DOMAIN}}/v2/rpc/nowpayments_webhook?http_key=${{backend-core.NAKAMA_HTTP_KEY}}&unwrap",
     },
   });
 

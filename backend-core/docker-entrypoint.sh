@@ -60,4 +60,5 @@ exec /nakama/nakama \
   --database.address "${DB_ADDR}" \
   --name "${NAKAMA_NODE_NAME:-nakama-node}" \
   --logger.level "${NAKAMA_LOG_LEVEL:-INFO}" \
-  --runtime.path "${RUNTIME_PATH}"
+  --runtime.path "${RUNTIME_PATH}" \
+  --runtime.http_key "${NAKAMA_HTTP_KEY:-defaultkey}"
