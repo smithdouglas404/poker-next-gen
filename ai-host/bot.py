@@ -26,14 +26,11 @@ import re
 import aiohttp
 from loguru import logger
 
-from pipecat.frames.frames import (
-    LLMMessagesAppendFrame,
-    LLMRunFrame,
-    TextFrame,
-)
+from pipecat.frames.frames import LLMFullResponseEndFrame, TextFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.services.anthropic.llm import AnthropicLLMService
@@ -84,26 +81,26 @@ PROACTIVE_TRIGGERS = re.compile(
 POLL_INTERVAL_SECS = 1.5
 
 
-class NarrationBridge(FrameProcessor):
+class NarrationBridge:
     """Polls backend-core for new public narration lines and injects them into
-    the running LLM context. Most lines are added silently (background
-    knowledge); lines matching PROACTIVE_TRIGGERS also queue a short
-    unprompted comment, so the host feels alive without narrating every
-    single betting action out loud.
+    the running LLM context via the user context aggregator directly (its
+    `add_messages`/`push_context_frame` — the pipecat-ai 0.0.66 way to update
+    context and, when warranted, trigger a completion off it; there is no
+    separate "run" frame in this version). Most lines are added silently
+    (background knowledge); lines matching PROACTIVE_TRIGGERS also queue a
+    short unprompted comment, so the host feels alive without narrating every
+    single betting action out loud. Not a FrameProcessor — it talks to the
+    aggregator directly rather than sitting in the frame pipeline.
     """
 
-    def __init__(self, backend_base_url: str, http_key: str, match_id: str, webhook_secret: str):
-        super().__init__()
+    def __init__(self, user_aggregator, backend_base_url: str, http_key: str, match_id: str, webhook_secret: str):
+        self._user_aggregator = user_aggregator
         self._backend_base_url = backend_base_url.rstrip("/")
         self._http_key = http_key
         self._match_id = match_id
         self._webhook_secret = webhook_secret
         self._since_seq = 0
         self._task: asyncio.Task | None = None
-
-    async def process_frame(self, frame, direction: FrameDirection):
-        await super().process_frame(frame, direction)
-        await self.push_frame(frame, direction)
 
     def start(self):
         if self._task is None:
@@ -149,22 +146,18 @@ class NarrationBridge(FrameProcessor):
     async def _handle_narration(self, text: str):
         if not text:
             return
-        await self.push_frame(
-            LLMMessagesAppendFrame([{"role": "system", "content": f"[table] {text}"}])
-        )
+        self._user_aggregator.add_messages([{"role": "system", "content": f"[table] {text}"}])
         if PROACTIVE_TRIGGERS.search(text):
-            await self.push_frame(
-                LLMMessagesAppendFrame(
-                    [
-                        {
-                            "role": "system",
-                            "content": "Give a brief, upbeat one-line reaction to what just "
-                            "happened, or stay quiet if it's not worth commenting on.",
-                        }
-                    ]
-                )
+            self._user_aggregator.add_messages(
+                [
+                    {
+                        "role": "system",
+                        "content": "Give a brief, upbeat one-line reaction to what just "
+                        "happened, or stay quiet if it's not worth commenting on.",
+                    }
+                ]
             )
-            await self.push_frame(LLMRunFrame())
+            await self._user_aggregator.push_context_frame()
 
     async def post_reply(self, text: str):
         async with aiohttp.ClientSession() as session:
@@ -192,9 +185,11 @@ class ReplyMirror(FrameProcessor):
         await super().process_frame(frame, direction)
         if isinstance(frame, TextFrame):
             self._buffer += frame.text
+        elif isinstance(frame, LLMFullResponseEndFrame):
+            await self._flush()
         await self.push_frame(frame, direction)
 
-    async def flush(self):
+    async def _flush(self):
         text = self._buffer.strip()
         self._buffer = ""
         if text:
@@ -228,7 +223,6 @@ async def bot(args):
         DailyParams(
             audio_out_enabled=True,
             audio_in_enabled=True,
-            vad_enabled=True,
             vad_analyzer=SileroVADAnalyzer(),
         ),
     )
@@ -243,10 +237,12 @@ async def bot(args):
         voice_id=os.getenv("CARTESIA_VOICE_ID", ""),
     )
 
-    context = llm.create_context(messages=[{"role": "system", "content": SYSTEM_PROMPT}])
+    context = OpenAILLMContext(messages=[{"role": "system", "content": SYSTEM_PROMPT}])
     context_aggregator = llm.create_context_aggregator(context)
 
-    narration = NarrationBridge(backend_base_url, http_key, match_id, webhook_secret)
+    narration = NarrationBridge(
+        context_aggregator.user(), backend_base_url, http_key, match_id, webhook_secret
+    )
     reply_mirror = ReplyMirror(narration)
 
     pipeline = Pipeline(
@@ -270,7 +266,15 @@ async def bot(args):
 
     @transport.event_handler("on_participant_left")
     async def on_participant_left(_transport, participant, _reason):
-        remaining = _transport.participant_counts().get("num", 0) if hasattr(_transport, "participant_counts") else 1
+        # participant_counts()'s exact return shape isn't confirmed against a
+        # live Daily session from here — never let a shape mismatch here take
+        # the whole bot down; worst case it just doesn't self-clean up until
+        # the table itself closes and StopAgentSession is called.
+        try:
+            counts = _transport.participant_counts()
+            remaining = counts.get("present", counts.get("num", 1))
+        except Exception:
+            remaining = 1
         if remaining <= 1:  # only the bot itself is left
             await narration.stop()
             await task.cancel()
