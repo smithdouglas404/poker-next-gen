@@ -79,6 +79,18 @@ export default defineRailway(() => {
       APP_BASE_URL: "https://${{frontend-table.RAILWAY_PUBLIC_DOMAIN}}",
       NOWPAYMENTS_IPN_CALLBACK_URL:
         "https://${{backend-core.RAILWAY_PUBLIC_DOMAIN}}/v2/rpc/nowpayments_webhook?http_key=${{backend-core.NAKAMA_HTTP_KEY}}&unwrap",
+
+      // ── AI table host (ai-host/, deployed separately to Pipecat Cloud) ──
+      // PIPECAT_SERVICE_NAME must match ai-host/pcc-deploy.toml's agent_name.
+      // PIPECAT_BACKEND_BASE_URL is derived (this service's own public URL —
+      // it's how the bot calls back to ai_host_narration_poll/ai_host_chat_post).
+      // The one real secret — PIPECAT_API_KEY — must be set in the Railway
+      // dashboard on backend-core once you've created a Pipecat Cloud account
+      // and run `pcc deploy` from ai-host/ (see ai-host/pcc-deploy.toml). Until
+      // it's set, the AI host toggle reports "not currently available"
+      // instead of failing.
+      PIPECAT_SERVICE_NAME: "poker-ai-host",
+      PIPECAT_BACKEND_BASE_URL: "https://${{backend-core.RAILWAY_PUBLIC_DOMAIN}}",
     },
   });
 
