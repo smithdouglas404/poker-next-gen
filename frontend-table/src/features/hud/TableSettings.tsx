@@ -4,7 +4,14 @@ import { useEffect, useState } from "react";
 
 import { useDeckStyle } from "@/features/table/deckStyle";
 import { useStackUnit } from "@/features/table/stackDisplay";
+import { useRenderMode } from "@/features/table/renderMode";
 import { soundManager, type SoundPack } from "@/features/sound/soundManager";
+
+const RENDER_MODES = [
+  { key: "2d", label: "2.5D" },
+  { key: "3d", label: "3D" },
+  { key: "mix", label: "Mix" },
+] as const;
 
 const SUIT_SWATCH = [
   { suit: "♠", two: "text-neutral-100", four: "text-neutral-100" },
@@ -21,6 +28,8 @@ export function TableSettings() {
 
   const [stackUnit, setStackUnit] = useStackUnit();
   const inBB = stackUnit === "bb";
+
+  const [renderMode, setRenderMode] = useRenderMode();
 
   const [pack, setPack] = useState<SoundPack>("studio");
   useEffect(() => {
@@ -81,6 +90,26 @@ export function TableSettings() {
             {s.suit}
           </span>
         ))}
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-[11px] text-neutral-300">Avatar render mode</span>
+        <div className="grid grid-cols-3 gap-1">
+          {RENDER_MODES.map((m) => (
+            <button
+              key={m.key}
+              type="button"
+              onClick={() => setRenderMode(m.key)}
+              className={`rounded-lg border px-2 py-1 text-xs font-semibold transition ${
+                renderMode === m.key
+                  ? "border-brand/60 bg-brand/15 text-white"
+                  : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25"
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="mt-1 flex flex-col gap-1">

@@ -95,6 +95,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"balancing_rule_set":       rpc.BalancingRuleSet,
 		"wallet_get":               rpc.WalletGet,
 		"wallet_ledger":            rpc.WalletLedger,
+		"video_token_get":          rpc.VideoTokenGet,
 		"profile_get":              rpc.ProfileGet,
 		"profile_meta_get":         rpc.ProfileMetaGet,
 		"profile_meta_set":         rpc.ProfileMetaSet,

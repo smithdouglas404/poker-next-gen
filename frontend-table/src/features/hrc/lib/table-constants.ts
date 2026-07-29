@@ -27,29 +27,42 @@ export const FELT_BOUNDS: CSSProperties = {
 // (X,Y) from the spec is converted to a % of that felt bbox. Every seat
 // renders at the same size (scale 1.0) — the spec gives one fixed avatar
 // size (110x135), no per-seat perspective shrink.
+// 10 seats, symmetric oval (mirror pairs: 1<->9, 2<->8, 3<->7, 4<->6; hero(0)
+// and the dealer slot(5) sit alone on the vertical centerline). This used to
+// be a 9-entry array — max_seats is 10, so seat index 9 (via the hero-relative
+// `visual` rotation in HrcTable.tsx: `TABLE_SEATS[visual % TABLE_SEATS.length]`)
+// wrapped back onto TABLE_SEATS[0], landing a real 10th player directly on
+// top of the hero's own slot (hidden behind the action dock). The array was
+// also asymmetric even at 9: the right side had 4 seats between top-center
+// and hero (TopRight/RightTop/RightBottom/BottomRight) but the left side only
+// had 3 — no mirror of TopRight. Added "Top Left" to fix both at once.
 export const TABLE_SEATS = [
   { x: 50.0,   y: 93.0,   scale: 1.0 },  // 0: Hero (6 o'clock, no avatar box — hole cards + action dock only)
-  { x: 15.0,   y: 98.53,  scale: 1.0 },  // 1: Bottom Left
-  { x: -3.57,  y: 66.18,  scale: 1.0 },  // 2: Left Bottom
-  { x: -3.57,  y: 26.47,  scale: 1.0 },  // 3: Left Top
-  { x: 50.0,   y: -11.76, scale: 1.0 },  // 4: Top Center (Dealer)
-  { x: 85.0,   y: 4.41,   scale: 1.0 },  // 5: Top Right
-  { x: 103.57, y: 26.47,  scale: 1.0 },  // 6: Right Top
-  { x: 103.57, y: 66.18,  scale: 1.0 },  // 7: Right Bottom
-  { x: 85.0,   y: 98.53,  scale: 1.0 },  // 8: Bottom Right
+  { x: 11.0,   y: 90.0,   scale: 1.0 },  // 1: Bottom Left — split the real gap between the chat panel (right edge ~240px) and the action dock (left edge ~464px); y pulled up so the gold ring meets the rail instead of floating below it
+  { x: -0.8,   y: 66.18,  scale: 1.0 },  // 2: Left Bottom — pulled in further, closer to the rail
+  { x: -0.8,   y: 26.47,  scale: 1.0 },  // 3: Left Top — pulled in further, closer to the rail
+  { x: 15.0,   y: 4.0,    scale: 1.0 },  // 4: Top Left — NEW, mirrors Top Right (was missing entirely)
+  { x: 50.0,   y: -2.0,   scale: 1.0 },  // 5: Top Center (Dealer) — pulled in further, closer to the rail
+  { x: 85.0,   y: 4.0,    scale: 1.0 },  // 6: Top Right
+  { x: 100.8,  y: 26.47,  scale: 1.0 },  // 7: Right Top — pulled in further, closer to the rail
+  { x: 100.8,  y: 66.18,  scale: 1.0 },  // 8: Right Bottom — pulled in further, closer to the rail
+  { x: 89.0,   y: 90.0,   scale: 1.0 },  // 9: Bottom Right — mirrors seat 1
 ];
 
-// Dealer button sits between the seat and the felt center
+// Dealer button sits between the seat and the felt center — indices line up
+// with TABLE_SEATS above (also extended from 9 to 10 entries for the same
+// reason: max_seats is 10).
 export const DEALER_POSITIONS = [
-  { x: 50.0, y: 82 },
-  { x: 23,   y: 74 },
-  { x: 12,   y: 50 },
-  { x: 20,   y: 26 },
-  { x: 36,   y: 13 },
-  { x: 50,   y: 10 },
-  { x: 64,   y: 13 },
-  { x: 80,   y: 26 },
-  { x: 88,   y: 50 },
+  { x: 50.0, y: 82 },   // 0: Hero
+  { x: 23,   y: 74 },   // 1: Bottom Left
+  { x: 12,   y: 50 },   // 2: Left Bottom
+  { x: 20,   y: 26 },   // 3: Left Top
+  { x: 28,   y: 19 },   // 4: Top Left — NEW, interpolated
+  { x: 36,   y: 13 },   // 5: Top Center
+  { x: 50,   y: 10 },   // 6: Top Right
+  { x: 64,   y: 13 },   // 7: Right Top
+  { x: 80,   y: 26 },   // 8: Right Bottom
+  { x: 88,   y: 50 },   // 9: Bottom Right
 ];
 
 export type QualityLevel = "low" | "medium" | "high";

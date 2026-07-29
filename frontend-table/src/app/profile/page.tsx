@@ -117,11 +117,16 @@ function ProfileBody() {
       )}
 
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:py-12">
-        <div className="flex items-center justify-between">
-          <p className={cn(HEADING_SM, "text-gold/80")}>Command Center</p>
-          <Link href="/hub" className="text-xs uppercase tracking-widest text-neutral-500 hover:text-foreground">
-            ← Back to hub
-          </Link>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className={cn(HEADING_SM, "text-gold/80")}>Player Profile</p>
+          <div className="flex items-center gap-4">
+            <Link href="/lobby" className="text-xs uppercase tracking-widest text-neutral-500 hover:text-foreground">
+              🎲 Lobby
+            </Link>
+            <Link href="/rewards" className="text-xs uppercase tracking-widest text-neutral-500 hover:text-foreground">
+              🎁 Rewards
+            </Link>
+          </div>
         </div>
 
         {/* Identity header */}

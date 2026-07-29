@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
 import { cn } from "@/features/hrc/lib/utils";
 import { CardType, Suit } from "@/features/hrc/lib/poker-types";
@@ -146,14 +146,24 @@ export function Card({
     }
   }, [faceDown, hasFlipped, flipDelay, rotateY, card, sound]);
 
-  const dealAnimation = compactMode
-    ? {
+  // Memoized on the underlying values (not the `dealFrom` object itself,
+  // which callers like ImageTable recreate as a fresh literal every render):
+  // framer-motion restarts an in-flight spring whenever it receives a new
+  // `transition`/`animate` object identity, so an unmemoized dealAnimation
+  // here made every parent re-render re-trigger the deal-in tween from
+  // wherever it currently was — cards could get caught mid-flight, frozen at
+  // a random offset/rotation forever once re-renders settled, instead of
+  // ever reaching their resting (0,0,0) position.
+  const dealAnimation = useMemo(() => {
+    if (compactMode) {
+      return {
         initial: { scale: 1, opacity: 1, x: 0, y: 0, rotate: 0 },
         animate: { scale: 1, opacity: 1, x: 0, y: 0, rotate: 0 },
         transition: { duration: 0 },
-      }
-    : dealFrom
-    ? {
+      };
+    }
+    if (dealFrom) {
+      return {
         initial: { x: dealFrom.x, y: dealFrom.y, scale: 0.2, opacity: 0, rotate: -20 },
         animate: { x: 0, y: 0, scale: 1, opacity: 1, rotate: 0 },
         transition: {
@@ -162,12 +172,15 @@ export function Card({
           damping: 20,
           delay,
         },
-      }
-    : {
-        initial: { scale: 0.4, opacity: 0, y: -40 },
-        animate: { scale: 1, opacity: 1, y: 0 },
-        transition: { type: "spring" as const, stiffness: 200, damping: 20, delay },
       };
+    }
+    return {
+      initial: { scale: 0.4, opacity: 0, y: -40 },
+      animate: { scale: 1, opacity: 1, y: 0 },
+      transition: { type: "spring" as const, stiffness: 200, damping: 20, delay },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compactMode, dealFrom?.x, dealFrom?.y, delay]);
 
   // ── Branch 1: Face-down with 3D flip animation ──
   if ((faceDown || !hasFlipped) && card && !card.hidden && !compactMode) {

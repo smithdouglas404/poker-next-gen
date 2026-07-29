@@ -36,6 +36,8 @@ import {
   OpStandUp,
   OpStartHand,
   OpHostAction,
+  OpUseTimeBank,
+  OpAddChips,
   OpActionRequired,
   OpTableMoved,
   type ActionRequiredMessage,
@@ -93,6 +95,11 @@ interface GameContextValue extends GameState {
   startHand: () => Promise<void>;
   sendAction: (type: string, amount: number) => Promise<void>;
   hostAction: (payload: Record<string, unknown>) => Promise<void>;
+  /** Spend the hero's remaining time bank now to extend their own current turn
+   *  (only accepted server-side while it's actually their turn). */
+  useTimeBank: () => Promise<void>;
+  /** Top up the hero's live stack from their wallet, between hands. */
+  addChips: (amountCents: number) => Promise<void>;
   findMatch: () => Promise<void>;
   setBuyInCents: (cents: number) => void;
   setPreviewSeats: (n: number) => void;
@@ -470,6 +477,17 @@ export function GameProvider({ children }: { children: ReactNode }) {
     [sendMatch],
   );
 
+  const useTimeBank = useCallback(async () => {
+    await sendMatch(OpUseTimeBank, {});
+  }, [sendMatch]);
+
+  const addChips = useCallback(
+    async (amountCents: number) => {
+      await sendMatch(OpAddChips, { amount_cents: amountCents });
+    },
+    [sendMatch],
+  );
+
   const sendAction = useCallback(
     async (type: string, amount: number) => {
       await sendMatch(OpAction, { type, amount, nonce: turnNonceRef.current });
@@ -589,6 +607,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       startHand,
       sendAction,
       hostAction,
+      useTimeBank,
+      addChips,
       findMatch,
       setBuyInCents,
       setPreviewSeats,
@@ -627,6 +647,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       startHand,
       sendAction,
       hostAction,
+      useTimeBank,
+      addChips,
       findMatch,
       setBuyInCents,
       setPreviewSeats,

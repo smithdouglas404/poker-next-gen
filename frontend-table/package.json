@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^7.6.1",
+    "@daily-co/daily-js": "^0.87.0",
     "@heroiclabs/nakama-js": "^2.8.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",

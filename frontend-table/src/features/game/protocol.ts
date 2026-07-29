@@ -6,6 +6,8 @@ export const OpChatSend = 5;
 export const OpHostAction = 6;
 export const OpMoveSeat = 10;
 export const OpSitOut = 11;
+export const OpUseTimeBank = 12;
+export const OpAddChips = 13;
 
 export const OpChat = 111;
 export const OpSessionKey = 112;

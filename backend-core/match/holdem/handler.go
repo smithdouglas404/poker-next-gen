@@ -21,6 +21,7 @@ import (
 	"github.com/smithdouglas404/poker-next-gen/backend-core/billing"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/bot"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/geo"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/integrations"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/loyalty"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/poker"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/poker/enginemath"
@@ -849,7 +850,7 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 		if !s.Phase.AllowsPlayerActions() &&
 			msg.GetOpCode() != protocol.OpSitDown && msg.GetOpCode() != protocol.OpStandUp &&
 			msg.GetOpCode() != protocol.OpChatSend && msg.GetOpCode() != protocol.OpMoveSeat &&
-			msg.GetOpCode() != protocol.OpSitOut &&
+			msg.GetOpCode() != protocol.OpSitOut && msg.GetOpCode() != protocol.OpAddChips &&
 			msg.GetOpCode() != protocol.OpPostStraddle && msg.GetOpCode() != protocol.OpRunItTwice {
 			sendError(dispatcher, presence, "hand_busy", "showdown in progress")
 			continue
@@ -1269,11 +1270,80 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			})
 
 		case protocol.OpHostAction:
-			if s.HostUserID == "" || userID != s.HostUserID {
-				sendError(dispatcher, presence, "not_host", "only the table host can do that")
+			if s.HostUserID == "" || (userID != s.HostUserID && !isClubAdminForTable(ctx, db, s, userID)) {
+				sendError(dispatcher, presence, "not_host", "only the table host or a club admin of the sponsoring club can do that")
 				continue
 			}
-			handleHostAction(ctx, logger, db, dispatcher, s, msg.GetData())
+			handleHostAction(ctx, logger, db, dispatcher, s, userID, msg.GetData())
+
+		case protocol.OpUseTimeBank:
+			seatIdx := seatForUser(s, userID)
+			if seatIdx < 0 || seatIdx != s.Table.ActionSeat || s.ActionDeadlineSeat != seatIdx || s.ActionDeadlineTick == 0 {
+				sendError(dispatcher, presence, "not_your_turn", "you can only extend time on your own turn")
+				continue
+			}
+			bank := s.TimeBank[userID]
+			if bank <= 0 {
+				sendError(dispatcher, presence, "no_time_bank", "no time bank remaining to extend with")
+				continue
+			}
+			s.TimeBank[userID] = 0
+			s.ActionDeadlineTick += bank * 10 // ticks run 10/sec
+			narrate(dispatcher, s, fmt.Sprintf("%s used their time bank to extend the clock.", displayName(s, userID)))
+			broadcastActionRequired(ctx, db, dispatcher, s)
+
+		case protocol.OpAddChips:
+			seatIdx := seatForUser(s, userID)
+			if seatIdx < 0 {
+				sendError(dispatcher, presence, "not_seated", "sit down before adding chips")
+				continue
+			}
+			seat := s.Table.Seats[seatIdx]
+			// Table-stakes rule: a player may only add to their stack between hands,
+			// not after seeing live action in a hand they're still part of — the same
+			// "still live in the hand" idiom already used elsewhere in this file (e.g.
+			// the kick/move-seat gates) for exactly this reason.
+			if s.Phase != poker.PhaseWaiting && (seat.Status == poker.SeatSeated || seat.Status == poker.SeatAllIn) {
+				sendError(dispatcher, presence, "hand_in_progress", "you can only add chips between hands")
+				continue
+			}
+			var req struct {
+				AmountCents int64 `json:"amount_cents"`
+			}
+			if err := json.Unmarshal(msg.GetData(), &req); err != nil || req.AmountCents <= 0 {
+				sendError(dispatcher, presence, "invalid_payload", "amount_cents must be positive")
+				continue
+			}
+			amount := req.AmountCents
+			if !s.NoMaxBuyIn {
+				room := s.maxBuyIn() - seat.Stack
+				if room <= 0 {
+					sendError(dispatcher, presence, "buyin_cap", "your stack is already at the table maximum")
+					continue
+				}
+				if amount > room {
+					amount = room
+				}
+			}
+			if s.WalletLimitCents > 0 {
+				room := s.WalletLimitCents - seat.Stack
+				if room <= 0 {
+					sendError(dispatcher, presence, "wallet_limit", "you're already at this table's wallet limit")
+					continue
+				}
+				if amount > room {
+					amount = room
+				}
+			}
+			w, reserved := reserveBuyIn(ctx, db, s, userID, amount, "global", false)
+			if w == "" {
+				sendError(dispatcher, presence, "insufficient_funds", "not enough in your wallet to add that many chips")
+				continue
+			}
+			seat.Stack += reserved
+			s.SeatBuyIn[seatIdx] += reserved
+			narrate(dispatcher, s, fmt.Sprintf("%s added $%d to their stack.", seat.Username, reserved/100))
+			broadcastSnapshot(ctx, db, dispatcher, s, nil)
 
 		case protocol.OpPostStraddle:
 			if !s.Table.AllowStraddle {
@@ -1959,11 +2029,14 @@ func dealAndBeginBetting(ctx context.Context, logger runtime.Logger, db *sql.DB,
 	broadcastActionRequired(ctx, db, dispatcher, s)
 }
 
-// handleHostAction applies a host-only table control. Blind/close changes take
-// effect between hands; pause stops new hands being auto-dealt; kick stands a
-// player up (refunding their stack). The caller has already verified the sender
-// is the host.
-func handleHostAction(ctx context.Context, logger runtime.Logger, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, data []byte) {
+// handleHostAction applies a host-or-club-admin table control. Blind changes
+// take effect between hands; pause stops new hands being auto-dealt; kick stands
+// a player up (refunding their stack). The caller has already verified the sender
+// is the host or a club admin of the sponsoring club (dispatch gate above,
+// isClubAdminForTable); "close" is further restricted to the host alone
+// (callerID check below) — a club admin shouldn't be able to shut down someone
+// else's table.
+func handleHostAction(ctx context.Context, logger runtime.Logger, db *sql.DB, dispatcher runtime.MatchDispatcher, s *MatchState, callerID string, data []byte) {
 	var req struct {
 		Action     string `json:"action"`
 		Seat       int    `json:"seat"`
@@ -2007,6 +2080,12 @@ func handleHostAction(ctx context.Context, logger runtime.Logger, db *sql.DB, di
 		s.HostPaused = false
 		narrate(dispatcher, s, "Host resumed the table.")
 	case "close":
+		// Ending the whole table is reserved for the actual table host, not any
+		// club admin who happens to also pass the OpHostAction gate above — a
+		// delegate shouldn't be able to shut down someone else's table.
+		if callerID != s.HostUserID {
+			return
+		}
 		s.HostClosed = true
 		narrate(dispatcher, s, "Host is closing the table…")
 	case "kick":
@@ -2148,6 +2227,9 @@ func closeTable(ctx context.Context, logger runtime.Logger, db *sql.DB, dispatch
 	}
 	narrate(dispatcher, s, "Table closed — "+reason+". Remaining chips returned to your wallet.")
 	broadcastSnapshot(ctx, db, dispatcher, s, nil)
+	if integrations.DailyConfigured() {
+		integrations.DeleteRoom(ctx, matchIDForAudit(s))
+	}
 }
 
 func matchIDForAudit(s *MatchState) string {
@@ -3015,6 +3097,16 @@ func (h *Handler) MatchSignal(ctx context.Context, logger runtime.Logger, db *sq
 		return s, ""
 	}
 	switch sig["type"] {
+	case "is_host":
+		// Authoritative host check for rpc.VideoTokenGet — the caller's isOwner
+		// flag for a Daily.co meeting token must never come from a client
+		// self-report (Daily grants recording permission off it), so the RPC
+		// asks the match itself rather than trusting the request payload.
+		userID, _ := sig["user_id"].(string)
+		if userID != "" && userID == s.HostUserID {
+			return s, "true"
+		}
+		return s, "false"
 	case "pause":
 		// Platform-admin freeze (tables_freeze_all) — no host socket required.
 		s.AdminPaused = true
@@ -3240,6 +3332,27 @@ func equippedModelURL(ctx context.Context, db *sql.DB, userID string, isBot bool
 		return ""
 	}
 	return c.AssetRef
+}
+
+// isClubAdminForTable reports whether userID administers the club sponsoring
+// this table (owner, or an operator with can_configure) — the same
+// ClubsAdministeredBy lookup the me_roles RPC and the host-under-a-club table
+// creation flow already use, so a delegate's authority here matches exactly
+// what the Owner Hub already considers "a club admin", not a separate concept.
+func isClubAdminForTable(ctx context.Context, db *sql.DB, s *MatchState, userID string) bool {
+	if s.ClubID == "" {
+		return false
+	}
+	clubs, err := store.NewClubStore(db).ClubsAdministeredBy(ctx, userID)
+	if err != nil {
+		return false
+	}
+	for _, id := range clubs {
+		if id == s.ClubID {
+			return true
+		}
+	}
+	return false
 }
 
 func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) protocol.TableSnapshot {

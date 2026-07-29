@@ -541,12 +541,17 @@ export function Seat({ player, position, isHero = false, isWinner = false, seatI
       }
     : undefined;
 
-  // Compute bet chip offset — push the bet badge toward the table center
-  const betOffsetX = (50 - position.x) * 0.4; // positive = toward center
-  const betOffsetY = (50 - position.y) * 0.35;
-
-  // Chip stack side — place chips on the side closest to the table edge (away from center)
-  const chipStackSide: "left" | "right" = position.x < 50 ? "left" : "right";
+  // Compute bet chip offset — push the bet stack a fixed distance toward the
+  // table center (not proportional to distance-from-center) so it clears the
+  // ~130x139px seat card even for seats that sit close to the centerline
+  // (hero, dealer slot) where the old distance-scaled offset shrank to near
+  // zero and the chip stack rendered directly on top of the name/stack pill.
+  const betDx = 50 - position.x;
+  const betDy = 50 - position.y;
+  const betDist = Math.hypot(betDx, betDy) || 1;
+  const BET_PUSH_PX = 85 * perspectiveScale;
+  const betOffsetX = (betDx / betDist) * BET_PUSH_PX;
+  const betOffsetY = (betDy / betDist) * BET_PUSH_PX;
 
   // Build hex-to-rgba helper for glowColor
   const hexToRgba = (hex: string, alpha: number) => {
@@ -677,7 +682,7 @@ export function Seat({ player, position, isHero = false, isWinner = false, seatI
                     ? `0 0 30px ${hexToRgba(glowColor, 0.8)}, 0 0 60px ${hexToRgba(glowColor, 0.4)}, 0 0 90px ${hexToRgba(glowColor, 0.15)}, inset 0 0 20px ${hexToRgba(glowColor, 0.25)}`
                     : isWinner
                     ? `0 0 25px rgba(212,175,55,0.5), 0 0 50px rgba(212,175,55,0.2)`
-                    : `0 0 18px ${hexToRgba(glowColor, 0.5)}, 0 6px 30px rgba(0,0,0,0.7)`,
+                    : `0 0 4px ${hexToRgba(glowColor, 0.3)}, 0 2px 8px rgba(0,0,0,0.4)`,
                   transition: "all 0.3s ease",
                   animation: isTurn ? "seatTurnPulse 2s ease-in-out infinite" : undefined,
                 }}
@@ -687,24 +692,26 @@ export function Seat({ player, position, isHero = false, isWinner = false, seatI
                   className="absolute top-0 left-0 right-0 h-[3px] z-20 rounded-t-xl"
                   style={{
                     background: `linear-gradient(90deg, transparent, ${glowColor}, transparent)`,
-                    boxShadow: `0 0 10px ${hexToRgba(glowColor, 0.7)}`,
+                    boxShadow: isTurn ? `0 0 10px ${hexToRgba(glowColor, 0.7)}` : `0 0 3px ${hexToRgba(glowColor, 0.35)}`,
                   }}
                 />
 
-                {/* Avatar image — the reference crops tight on the face; the source
-                    art is a waist-up character render, so object-position alone
-                    (which only shifts the crop window, doesn't enlarge it) still
-                    showed torso/gear. A scale on top of object-cover, anchored to
-                    the same vertical point, zooms into the head instead. */}
+                {/* Avatar image. `public/avatars/*.webp` is now pre-cropped to a
+                    consistent square headshot by `scripts/crop_avatar_headshot.py`
+                    (face-detection based, run once over the whole catalog — see that
+                    script for why: source art wasn't composed consistently enough for
+                    a single hardcoded CSS zoom to crop it correctly across all 24
+                    characters). The image is already framed correctly, so no extra
+                    scale/anchor is needed here — plain object-cover on the
+                    same-aspect-ratio square box. Any newly added avatar (player pick,
+                    Tripo3D-generated) must go through that same script before landing
+                    in this directory, or it will show shoulders/gear like the old set did. */}
                 {player.avatar ? (
                   <img
                     src={fullBodyImage || player.avatar}
                     alt={player.name}
                     className="absolute inset-0 w-full h-full object-cover z-[1] rounded-t-xl"
                     style={{
-                      objectPosition: fullBodyImage ? "center 4%" : "center 6%",
-                      transform: "scale(2.6)",
-                      transformOrigin: fullBodyImage ? "center 4%" : "center 6%",
                       opacity: isFolded ? 0.3 : 1,
                       filter: isFolded ? "grayscale(1) brightness(0.6)" : "none",
                       transition: "opacity 0.4s ease, filter 0.4s ease",
@@ -805,30 +812,6 @@ export function Seat({ player, position, isHero = false, isWinner = false, seatI
                 </div>
               </div>
             </div>
-
-            {/* ── Bet amount — floats between avatar and table center ── */}
-            {player.currentBet > 0 && !isFolded && (() => {
-              const isTop = seatIndex >= 3 && seatIndex <= 6;
-              const isLeft = seatIndex === 1 || seatIndex === 2 || seatIndex === 3;
-              const isRight = seatIndex === 7 || seatIndex === 8 || seatIndex === 9;
-              const betStyle: React.CSSProperties = {
-                position: "absolute",
-                zIndex: 25,
-                ...(seatIndex === 0 ? { top: "-20px", left: "50%", transform: "translateX(-50%)" } : {}),
-                ...(seatIndex === 5 ? { bottom: "-20px", left: "50%", transform: "translateX(-50%)" } : {}),
-                ...(isTop && seatIndex !== 5 ? { bottom: "-18px", left: "50%", transform: "translateX(-50%)" } : {}),
-                ...(!isTop && seatIndex !== 0 && isLeft ? { right: "-8px", top: "50%", transform: "translateY(-50%) translateX(100%)" } : {}),
-                ...(!isTop && seatIndex !== 0 && isRight ? { left: "-8px", top: "50%", transform: "translateY(-50%) translateX(-100%)" } : {}),
-              };
-              return (
-                <div style={betStyle} className="flex items-center gap-1 px-1.5 py-0.5 rounded-full">
-                  <span className="text-[#d4af37] font-bold font-mono"
-                    style={{ fontSize: "0.5em", background: "rgba(10,10,12,0.85)", border: "1px solid rgba(212,175,55,0.3)", borderRadius: "9999px", padding: "1px 6px" }}>
-                    {formatChips(player.currentBet)}
-                  </span>
-                </div>
-              );
-            })()}
 
             {/* Face-down cards now rendered inside portrait card (stitch-poker style) */}
           </div>

@@ -117,7 +117,7 @@ export function SeatHud() {
   const { snapshot, sitDown, profile, buyInCents, maxSeats, showdown } = useGame();
   const buyInLabel = formatCents(buyInCents);
 
-  const [mode, setMode] = useRenderMode();
+  const [mode] = useRenderMode();
   const [graphics] = useTableGraphics();
   const cinematic = graphics === "cinematic";
   const [stackUnit] = useStackUnit();
@@ -155,31 +155,12 @@ export function SeatHud() {
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10">
-      <div className="pointer-events-auto absolute right-4 top-20 z-20 flex overflow-hidden rounded-full border border-white/[0.08] bg-surface text-[11px] font-bold shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
-        <button
-          type="button"
-          onClick={() => setMode("2d")}
-          className={`px-3 py-1 ${mode === "2d" ? "bg-brand text-white" : "text-neutral-300"}`}
-        >
-          2.5D
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("3d")}
-          className={`px-3 py-1 ${mode === "3d" ? "bg-brand text-white" : "text-neutral-300"}`}
-        >
-          3D
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("mix")}
-          className={`px-3 py-1 ${mode === "mix" ? "bg-brand text-white" : "text-neutral-300"}`}
-        >
-          Mix
-        </button>
-      </div>
-      {/* Cinematic mode: the R3F scene draws seats/avatars/stacks; only the
-          avatar-preset toggle above stays. Classic mode: full seat plaques. */}
+      {/* The render-mode (2.5D/3D/Mix) switcher used to float here — moved into
+          TableSettings.tsx (still the only place to change it; CLAUDE.md
+          requires all three modes stay switchable) so this top-right corner is
+          free for GameStatusRail's Current Bet / Hand Strength pills.
+          Cinematic mode: the R3F scene draws seats/avatars/stacks, so nothing
+          else renders here. Classic mode: full seat plaques. */}
       {!cinematic &&
         positions.length > 0 &&
         seats.slice(0, seatCount).map((seat) => {

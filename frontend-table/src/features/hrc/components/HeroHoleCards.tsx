@@ -37,7 +37,9 @@ export function HeroHoleCards({
       >
         {hand.description}
       </div>
-      <div className="flex">
+      {/* Scaled down slightly from the "lg" preset (90x135) rather than
+          jumping to "md" (70x105, a ~22% drop) — a smaller, deliberate nudge. */}
+      <div className="flex" style={{ transform: "scale(0.88)", transformOrigin: "top center" }}>
         <div style={{ transform: "rotate(-8deg) translateX(10px)", zIndex: 1 }}>
           <Card card={cards[0]} size="lg" isHero />
         </div>

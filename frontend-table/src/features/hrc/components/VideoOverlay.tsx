@@ -14,23 +14,28 @@ export function VideoThumbnail({ userId, isLocal = false }: VideoThumbnailProps)
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasStream, setHasStream] = useState(false);
 
+  // Two effects, not one: the <video> element only mounts once hasStream is
+  // true, so attaching srcObject inside the SAME check that sets hasStream
+  // reads videoRef.current before it exists — a self-deadlock where hasStream
+  // can never flip true. This split lets the attach effect run AFTER the
+  // element has actually mounted.
   useEffect(() => {
     const check = () => {
       const stream = isLocal ? videoManager.getLocalStream() : videoManager.getRemoteStream(userId);
-      if (videoRef.current && stream) {
-        if (videoRef.current.srcObject !== stream) {
-          videoRef.current.srcObject = stream;
-        }
-        setHasStream(true);
-      } else {
-        setHasStream(false);
-      }
+      setHasStream(!!stream);
     };
-
     check();
     const unsub = videoManager.onStateChange(check);
     return () => { unsub(); };
   }, [userId, isLocal]);
+
+  useEffect(() => {
+    if (!hasStream || !videoRef.current) return;
+    const stream = isLocal ? videoManager.getLocalStream() : videoManager.getRemoteStream(userId);
+    if (stream && videoRef.current.srcObject !== stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [hasStream, userId, isLocal]);
 
   if (!hasStream) return null;
 
@@ -71,22 +76,24 @@ function VideoFeed({ userId, playerName, isLocal = false }: VideoFeedProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasStream, setHasStream] = useState(false);
 
+  // Same split-effect fix as VideoThumbnail — see its comment.
   useEffect(() => {
     const check = () => {
       const stream = isLocal ? videoManager.getLocalStream() : videoManager.getRemoteStream(userId);
-      if (videoRef.current && stream) {
-        if (videoRef.current.srcObject !== stream) {
-          videoRef.current.srcObject = stream;
-        }
-        setHasStream(true);
-      } else {
-        setHasStream(false);
-      }
+      setHasStream(!!stream);
     };
     check();
     const unsub = videoManager.onStateChange(check);
     return () => { unsub(); };
   }, [userId, isLocal]);
+
+  useEffect(() => {
+    if (!hasStream || !videoRef.current) return;
+    const stream = isLocal ? videoManager.getLocalStream() : videoManager.getRemoteStream(userId);
+    if (stream && videoRef.current.srcObject !== stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [hasStream, userId, isLocal]);
 
   return (
     <div

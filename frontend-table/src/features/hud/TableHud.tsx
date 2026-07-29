@@ -8,6 +8,7 @@ import { ActionBar } from "@/features/hud/ActionBar";
 import { PreActionBar } from "@/features/hud/PreActionBar";
 import { ActionTimer } from "@/features/hud/ActionTimer";
 import { GameStatusRail } from "@/features/hud/GameStatusRail";
+import { HeroControlsDock } from "@/features/hud/HeroControlsDock";
 import { EquityPanel } from "@/features/hud/EquityPanel";
 import { SidebetPanel } from "@/features/hud/SidebetPanel";
 import { HandVerifyPanel } from "@/features/hud/HandVerifyPanel";
@@ -17,7 +18,6 @@ import { TotalInPlay } from "@/features/hud/TotalInPlay";
 import { BuyInSlider, TableLog } from "@/features/hud/TableLog";
 import { TableEmptyState } from "@/features/hud/TableEmptyState";
 import { ChatPanel } from "@/features/hud/ChatPanel";
-import { HostPanel } from "@/features/hud/HostPanel";
 import { MusicPicker } from "@/features/sound/MusicPicker";
 import { TableSettings } from "@/features/hud/TableSettings";
 import { TauntBar } from "@/features/sound/TauntBar";
@@ -63,7 +63,6 @@ export function TableHud({ children }: { children: React.ReactNode }) {
           {!demo && (
           <div className="flex w-full max-w-xs flex-col gap-3">
             <RoomPanel />
-            <HostPanel />
             {showGamePanels && <BuyInSlider />}
             <EquityPanel />
             {showGamePanels && <SidebetPanel />}
@@ -83,8 +82,9 @@ export function TableHud({ children }: { children: React.ReactNode }) {
           )}
           <div className="relative flex-1">
             {/* Seats + board are drawn by the 3D scene in cinematic mode; SeatHud
-                still renders (avatar-preset toggle only) so 2.5D/3D/Mix stays
-                switchable. */}
+                still renders classic-mode seat plaques when not cinematic. The
+                2.5D/3D/Mix render-mode switcher itself lives in TableSettings
+                now, not here. */}
             <SeatHud />
             {/* Path to the money action while the hero isn't seated (self-hides
                 once seated) — P0-7. */}
@@ -105,6 +105,11 @@ export function TableHud({ children }: { children: React.ReactNode }) {
           </p>
           <PreActionBar />
           <ActionBar />
+          {/* Below the action panel, not above it — above collided with the
+              hero's own floating bet-chip indicator and the keyboard-hint
+              caption, both of which sit in the felt-adjacent band right over
+              PreActionBar. Below the solid ActionBar panel is clear of both. */}
+          <HeroControlsDock />
         </div>
 
         {/* The offline "Failed to fetch" toast is noise on the demo/cinematic

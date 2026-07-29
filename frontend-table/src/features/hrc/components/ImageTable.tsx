@@ -7,6 +7,11 @@ import { TABLE_SEATS, DEALER_POSITIONS, FELT_BOUNDS } from "@/features/hrc/lib/t
 import { useGameUI } from "@/features/hrc/lib/game-ui-context";
 import { useAnimatedCounter } from "@/features/hrc/hooks/useAnimatedCounter";
 
+// Hoisted module-level so it's the SAME object reference on every render —
+// Card's dealAnimation is memoized on this, and a fresh literal here would
+// still defeat that memoization every time ImageTable re-renders.
+const COMMUNITY_DEAL_FROM = { x: 200, y: -100 };
+
 
 interface ImageTableProps {
   communityCards: CardType[];
@@ -188,6 +193,11 @@ export function ImageTable({
           // Empty seats are clickable
           if (!isOccupied) {
             const s = seat.scale;
+            // Match an occupied seat's FULL footprint, not just the portrait
+            // square — a real seat is the 100px portrait PLUS the attached
+            // name/chip pill below it (~139px total, per measured DOM). A
+            // 100x100 vacant box is shorter than that, so it still reads as
+            // undersized next to a real seat even though it's now visible.
             return (
               <div
                 key={`empty-${i}`}
@@ -199,13 +209,25 @@ export function ImageTable({
                 }}
               >
                 <div
-                  className="w-[44px] h-[44px] rounded-full border border-dashed flex items-center justify-center transition-all group-hover:border-amber-400/50 group-hover:scale-115"
+                  className="flex flex-col items-center justify-center gap-2.5 rounded-xl border-2 border-dashed transition-all group-hover:scale-105"
                   style={{
-                    borderColor: "rgba(212,175,55,0.18)",
-                    background: "rgba(212,175,55,0.03)",
+                    width: 130,
+                    height: 139,
+                    borderColor: "rgba(212,175,55,0.55)",
+                    background: "rgba(212,175,55,0.1)",
+                    boxShadow: "0 0 14px rgba(212,175,55,0.15)",
                   }}
                 >
-                  <span className="text-[0.625rem] text-amber-400/30 font-bold group-hover:text-amber-400/60 transition-colors">+</span>
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.75 }}>
+                    <circle cx="12" cy="8" r="4" stroke="#f5c518" strokeWidth="1.8" />
+                    <path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7" stroke="#f5c518" strokeWidth="1.8" strokeLinecap="round" />
+                  </svg>
+                  <span
+                    className="font-bold uppercase tracking-[0.15em]"
+                    style={{ fontSize: "0.6875rem", color: "rgba(245,197,24,0.85)" }}
+                  >
+                    Vacant
+                  </span>
                 </div>
               </div>
             );
@@ -284,7 +306,7 @@ export function ImageTable({
                     card={card}
                     size={compactMode ? "sm" : "md"}
                     delay={compactMode ? 0 : i * 0.12}
-                    dealFrom={compactMode ? undefined : { x: 200, y: -100 }}
+                    dealFrom={compactMode ? undefined : COMMUNITY_DEAL_FROM}
                     faceDown={!communityFlipped && !compactMode}
                     flipDelay={compactMode ? 0 : 0.15 * i}
                   />
@@ -304,14 +326,14 @@ export function ImageTable({
               exit={{ opacity: 0, scale: 0.85 }}
               transition={compactMode ? { duration: 0 } : undefined}
               className="absolute flex flex-col items-center gap-1"
-              style={{ left: "50%", top: "22%", transform: "translate(-50%, -50%)" }}
+              style={{ left: "50%", top: "25%", transform: "translate(-50%, -50%)" }}
             >
               {/* Hand / pot text header — sits above the chip stacks so they never
                   overlap the community card row below (top:45%). */}
               {handNumber != null && (
                 <span
                   className="font-mono font-bold uppercase tracking-[0.1em] text-white/70"
-                  style={{ fontSize: "0.625rem", textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}
+                  style={{ fontSize: "0.8125rem", textAlign: "center", textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}
                 >
                   Hand {handNumber.toLocaleString()} | Pot: ${animatedPot.toLocaleString()}
                 </span>
@@ -429,12 +451,12 @@ export function ImageTable({
               style={{ transform: "translate(-50%, -50%)", zIndex: 15 }}
             >
               <div
-                className="w-8 h-8 rounded-full flex items-center justify-center font-black text-xs text-gray-900"
+                className="w-11 h-11 rounded-full flex items-center justify-center font-black text-base text-gray-900"
                 data-testid="dealer-button"
                 style={{
                   background: "white",
-                  border: "2.5px solid #d4af37",
-                  boxShadow: "0 2px 10px rgba(0,0,0,0.5), 0 0 12px rgba(212,175,55,0.3)",
+                  border: "3px solid #d4af37",
+                  boxShadow: "0 2px 12px rgba(0,0,0,0.55), 0 0 16px rgba(212,175,55,0.35)",
                 }}
               >
                 D

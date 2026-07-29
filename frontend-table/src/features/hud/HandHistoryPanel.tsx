@@ -66,6 +66,26 @@ function eventGroup(ev: AuditEvent): string {
   return STREET_LABEL[street] ?? "PRE-FLOP";
 }
 
+// Folds are the one action with no amount attached — they're also the bulk of
+// what makes pre-flop with a full table long (up to 10 players, most of whom
+// just fold). Collapsing them into one summary line keeps the raises/calls
+// that actually matter ("who bet what") readable without the list ballooning
+// 1:1 with the number of players at the table.
+const FOLD_LINE = /^(.+?)[:\s]+fold\.?$/i;
+
+function compressFolds(lines: string[]): string[] {
+  const folded: string[] = [];
+  const rest: string[] = [];
+  for (const line of lines) {
+    const m = line.match(FOLD_LINE);
+    if (m) folded.push(m[1].trim());
+    else rest.push(line);
+  }
+  if (folded.length === 0) return rest;
+  if (folded.length === 1) return [...rest, `${folded[0]}: Fold`];
+  return [...rest, `${folded.join(", ")}: Fold`];
+}
+
 /** Hand-history replay: step through every action of past hands at this table,
  *  reconstructed from the tamper-evident audit chain (audit_list). */
 export function HandHistoryPanel() {
@@ -130,13 +150,15 @@ export function HandHistoryPanel() {
 
   if (!matchId && !demo) return null;
 
-  const displayGroups = demo
-    ? DEMO_GROUPS.map((g) => ({ label: g.label, events: g.lines }))
-    : groups.map((g) => ({ label: g.label, events: g.events.map(readableEvent) }));
+  const displayGroups = (
+    demo
+      ? DEMO_GROUPS.map((g) => ({ label: g.label, events: g.lines }))
+      : groups.map((g) => ({ label: g.label, events: g.events.map(readableEvent) }))
+  ).map((g) => ({ ...g, events: compressFolds(g.events) }));
   const hasHands = demo || hands.length > 0;
 
   return (
-    <div style={{ position: "absolute", left: 20, top: 20, pointerEvents: "auto" }}>
+    <div style={{ position: "absolute", left: 20, top: 96, pointerEvents: "auto" }}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -162,7 +184,14 @@ export function HandHistoryPanel() {
             exit={{ opacity: 0, x: -12, height: 0 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
             style={{
-              marginTop: 6, width: 220, maxHeight: 230, borderRadius: 10,
+              // maxHeight capped well short of Shadow King's seat card (was 196,
+              // leaving only ~4px of real clearance at his seat position) —
+              // the panel already can't grow past this regardless of hand
+              // length (overflow hidden + the inner scroll region below), but
+              // that near-zero margin read as "about to collide" — 176 buys
+              // real breathing room without moving his seat (which would break
+              // the documented mirror-pair seat symmetry with Chrome Siren).
+              marginTop: 6, width: 184, maxHeight: 176, borderRadius: 10,
               background: "rgba(15,23,42,0.72)", backdropFilter: "blur(10px)",
               border: "1px solid #2AC6D0", overflow: "hidden", padding: "8px 6px 6px 0",
               position: "relative", fontSize: 11,
@@ -194,19 +223,19 @@ export function HandHistoryPanel() {
 
                 <div style={{ position: "absolute", left: 17, top: 10, bottom: 14, width: 2,
                   background: "#1CB5C9", boxShadow: "0 0 8px rgba(28,181,201,0.8)" }} />
-                <div style={{ position: "relative", maxHeight: 210, overflowY: "auto" }}>
+                <div style={{ position: "relative", maxHeight: 142, overflowY: "auto" }}>
                   {displayGroups.length === 0 && (
                     <p style={{ paddingLeft: 26, fontSize: 11, color: "#94A3B8" }}>No actions yet.</p>
                   )}
                   {displayGroups.map((g) => (
-                    <div key={g.label} style={{ position: "relative", paddingLeft: 26, marginBottom: 7 }}>
-                      <div style={{ position: "absolute", left: 13, top: 3, width: 8, height: 8, borderRadius: "50%",
+                    <div key={g.label} style={{ position: "relative", paddingLeft: 26, marginBottom: 3 }}>
+                      <div style={{ position: "absolute", left: 13, top: 2, width: 8, height: 8, borderRadius: "50%",
                         background: "#1CB5C9", boxShadow: "0 0 8px rgba(28,181,201,0.9)" }} />
-                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "#4DEEEA" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "#4DEEEA", lineHeight: 1.15 }}>
                         {g.label}
                       </div>
                       {g.events.map((ev, i) => (
-                        <div key={i} style={{ fontSize: 10, color: "#FFFFFF", lineHeight: 1.3 }}>
+                        <div key={i} style={{ fontSize: 10, color: "#FFFFFF", lineHeight: 1.15 }}>
                           {ev}
                         </div>
                       ))}

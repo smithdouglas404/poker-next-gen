@@ -1,20 +1,23 @@
 "use client";
 
-// Live-hand status chrome (HRC full_body master 6 — the flop-dealt polish). Three
-// small DOM overlays that sit at the right edge over the cinematic felt without
-// touching the 3D scene:
+// Live-hand status chrome (HRC full_body master 6 — the flop-dealt polish).
+// Top-right DOM overlays, sitting where the "2.5D / 3D / Mix" render-mode
+// pill used to (that switcher moved into TableSettings.tsx per the same
+// request — it's still the only place to change render mode, just relocated,
+// not removed, since CLAUDE.md requires all three modes stay switchable):
 //
 //   • Current Bet     — read-only projection of snapshot.current_bet (rule #3).
 //   • Hand Strength   — the hero's live made-hand category, sourced from the SAME
 //                       engine-math RPC as EquityPanel (hand_rank → rs_poker), so
 //                       there is no local hand-eval fallback (rule #4).
-//   • Sit Out / Away  — a real control: it toggles the pre-action queue to auto-
-//                       fold every hand (fires sendAction("fold") on the hero's
-//                       turn), i.e. genuinely sitting out — never a dead button.
+//
+// Sit Out / Extend Time / Exit Table live in HeroControlsDock.tsx now, docked
+// to the action bar instead of floating over the felt (see that file).
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
-import { formatCents, useGame } from "@/features/game/GameProvider";
+import { useGame, formatCents } from "@/features/game/GameProvider";
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
@@ -25,7 +28,7 @@ function formatCategory(raw: string): string {
     .toUpperCase();
 }
 
-function HandStrengthPill() {
+function HandStrengthPill({ demo }: { demo: boolean }) {
   const { snapshot, holeCards } = useGame();
   const [category, setCategory] = useState<string | null>(null);
 
@@ -33,6 +36,13 @@ function HandStrengthPill() {
   const board = (snapshot?.board ?? []).map((c) => c.code).join("");
 
   useEffect(() => {
+    if (demo) {
+      // DEMO_SNAPSHOT deals Ah/Ad with As on the board — trip aces — so this
+      // stays an honest label for what's actually on the felt rather than an
+      // arbitrary placeholder. No RPC call in demo (no local math fallback).
+      setCategory("THREE OF A KIND");
+      return;
+    }
     if (hole.length < 4) {
       setCategory(null);
       return;
@@ -49,7 +59,7 @@ function HandStrengthPill() {
     return () => {
       cancelled = true;
     };
-  }, [hole, board]);
+  }, [demo, hole, board]);
 
   if (!category) return null;
   return (
@@ -63,10 +73,10 @@ function HandStrengthPill() {
   );
 }
 
-function CurrentBetPill() {
+function CurrentBetPill({ demo }: { demo: boolean }) {
   const { snapshot } = useGame();
-  const bet = snapshot?.current_bet ?? 0;
-  if (!snapshot || bet <= 0) return null;
+  const bet = demo ? 250_000 : (snapshot?.current_bet ?? 0);
+  if ((!demo && !snapshot) || bet <= 0) return null;
   return (
     <div
       className={cn(GLASS_PANEL, "pointer-events-none border-white/12 px-4 py-1.5 text-right")}
@@ -78,53 +88,14 @@ function CurrentBetPill() {
   );
 }
 
-function SitOutToggle() {
-  const { snapshot, profile, sitOut } = useGame();
-
-  // Only meaningful once the hero is actually seated at a live table.
-  const heroSeat = snapshot?.seats.find((s) => s.user_id === profile.userId && s.status !== "empty");
-  if (!heroSeat) return null;
-  // Real server-side sit-out (keeps the seat, held out of the next hand) — the same
-  // op the on-felt control uses, so the two stay consistent.
-  const away = heroSeat.sitting_out ?? false;
-
-  return (
-    <button
-      type="button"
-      onClick={() => void sitOut(!away)}
-      className={cn(
-        GLASS_PANEL,
-        "pointer-events-auto flex items-center gap-3 px-4 py-2 text-sm transition-colors",
-        away ? "border-gold/50 text-gold" : "border-white/12 text-neutral-300 hover:border-white/25",
-      )}
-      style={{ background: "#262d38" }}
-      aria-pressed={away}
-    >
-      <span className="font-semibold uppercase tracking-wider">Sit Out / Away</span>
-      <span
-        className={cn(
-          "relative h-5 w-9 flex-shrink-0 rounded-full transition-colors",
-          away ? "bg-gold/70" : "bg-white/15",
-        )}
-      >
-        <span
-          className={cn(
-            "absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all",
-            away ? "left-[18px]" : "left-0.5",
-          )}
-        />
-      </span>
-    </button>
-  );
-}
-
-/** Bottom-right cluster of live-hand status chrome (master 6). */
+/** Top-right cluster of live-hand status chrome (master 6), where the
+ *  render-mode switcher pill used to sit. */
 export function GameStatusRail() {
+  const demo = useSearchParams().get("demo") === "1";
   return (
-    <div className="pointer-events-none absolute bottom-24 right-4 z-20 flex flex-col items-end gap-2">
-      <CurrentBetPill />
-      <HandStrengthPill />
-      <SitOutToggle />
+    <div className="pointer-events-none absolute right-4 top-20 z-20 flex flex-col items-end gap-2">
+      <CurrentBetPill demo={demo} />
+      <HandStrengthPill demo={demo} />
     </div>
   );
 }

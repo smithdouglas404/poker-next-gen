@@ -28,8 +28,29 @@ import { HeroHoleCards } from "./components/HeroHoleCards";
 import { TABLE_SEATS, FELT_BOUNDS } from "./lib/table-constants";
 import { seatId } from "./adapter";
 import { DEMO_HOLE, DEMO_SNAPSHOT } from "@/features/table3d/demoSnapshot";
+import type { TableSnapshot } from "@/features/game/protocol";
 
 export type HrcRenderStyle = "2.5d" | "3d";
+
+// DEMO_SNAPSHOT (features/table3d, shared/frozen) doesn't carry per-seat
+// `bet` — it predates the bet-chip-stack rendering in Seat.tsx, so the demo
+// table currently shows chips only in the center pot, never on the felt in
+// front of a player. Rather than edit the frozen file, overlay demo-only bet
+// amounts here, on the hrc side of the seam, matching each seat's
+// last_action/status from DEMO_SNAPSHOT (call/raise -> the street's current
+// bet of 250,000; all-in -> a larger shove; no action yet / folded -> 0).
+const DEMO_BETS: Record<number, number> = {
+  0: 250_000, // You — raise
+  1: 250_000, // Neon Viper — call
+  3: 250_000, // Shadow King — call
+  4: 900_000, // Void Witch — all-in
+  7: 250_000, // Chrome Siren — call
+};
+
+const DEMO_SNAPSHOT_WITH_BETS: TableSnapshot = {
+  ...DEMO_SNAPSHOT,
+  seats: DEMO_SNAPSHOT.seats.map((seat) => ({ ...seat, bet: DEMO_BETS[seat.index] ?? 0 })),
+};
 
 export default function HrcTable({
   override,
@@ -41,7 +62,7 @@ export default function HrcTable({
   demo?: boolean;
 }) {
   const live = useGame();
-  const snapshot = demo ? DEMO_SNAPSHOT : live.snapshot;
+  const snapshot = demo ? DEMO_SNAPSHOT_WITH_BETS : live.snapshot;
   const holeCards = demo ? DEMO_HOLE : live.holeCards;
 
   // Keep the 3D store in step regardless of which branch renders, so toggling mid-hand
@@ -86,6 +107,18 @@ export default function HrcTable({
     (player) => (seatIndexOf(snapshot, player.id) - heroSeatIdx + adapted.maxSeats) % adapted.maxSeats,
   );
 
+  // DEALER_POSITIONS is indexed in the same hero-rotated "visual" space as
+  // TABLE_SEATS (0 = hero, 1 = bottom-left, ...), but adapted.dealerSeatIndex
+  // is the raw snapshot.button_seat — un-rotated. Passing it straight through
+  // only happened to line up because every prior demo/test had the hero
+  // seated at index 0; for any real hand where the hero isn't literally seat
+  // 0, the dealer chip would render at the wrong seat. Rotate it the same way
+  // occupiedSeatIndices and each Seat's position already are.
+  const dealerVisualIndex =
+    adapted.dealerSeatIndex >= 0
+      ? (adapted.dealerSeatIndex - heroSeatIdx + adapted.maxSeats) % adapted.maxSeats
+      : -1;
+
   const style: HrcRenderStyle = override ?? (snapshot.render_style === "3d" ? "3d" : "2.5d");
 
   return (
@@ -105,7 +138,7 @@ export default function HrcTable({
             maxSeats={adapted.maxSeats}
             players={adapted.players}
             occupiedSeatIndices={occupiedSeatIndices}
-            dealerSeatIndex={adapted.dealerSeatIndex}
+            dealerSeatIndex={dealerVisualIndex}
             visibleCommunityCards={adapted.gameState.communityCards.length}
             communityFlipped
             dealPhase={adapted.gameState.phase}
@@ -141,6 +174,10 @@ export default function HrcTable({
                     isHero={seatIdx === heroSeatIdx}
                     seatIndex={visual}
                     perspectiveScale={pose.scale}
+                    // Real players only, live tables only — matches the
+                    // reference (`showVideo={isMultiplayer && !player.isBot}`);
+                    // demo has no real match to join a video room for.
+                    showVideo={!demo && !player.isBot}
                   />
                 );
               })}

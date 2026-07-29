@@ -13,6 +13,8 @@ const (
 	OpInsuranceAccept int64 = 9 // accept a previously offered all-in insurance policy
 	OpMoveSeat        int64 = 10 // player self-move to an empty seat (between hands, chip-conserving)
 	OpSitOut          int64 = 11 // player toggle: sit out in place / I'm back (kept seat)
+	OpUseTimeBank     int64 = 12 // player: spend their remaining time bank now to extend their own turn
+	OpAddChips        int64 = 13 // player: top up their live stack from their wallet, between hands
 )
 
 // Server → client match op codes.
