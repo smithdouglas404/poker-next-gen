@@ -1,15 +1,22 @@
 # Pipecat Cloud deploy config (read by `pipecat cloud deploy`, run from this
 # directory, after `uv tool install "pipecat-ai[cli]" --with pipecatcloud`).
-# Fill in / confirm every value
-# below against your own Pipecat Cloud account and container registry before
-# deploying — placeholders only, matching the "confirm at deploy time" caveat
-# already on bot.py and backend-core/integrations/pipecat.go.
+#
+# `image` points at .github/workflows/ai-host-image.yml's build output — that
+# workflow builds this folder's Dockerfile on GitHub's own servers and pushes
+# it to GitHub Container Registry, so nobody needs Docker installed locally.
+# It runs automatically on every push that touches ai-host/. The package
+# defaults to private on GHCR — either make it public once (on GitHub:
+# your profile > Packages > poker-ai-host > Package settings > Change
+# visibility), which lets `pipecat cloud deploy ... --no-credentials` pull it
+# with no further setup, or set up an image-pull-secret
+# (`pipecat cloud secrets image-pull-secret`) with a GitHub token instead if
+# you'd rather keep it private.
 #
 # PIPECAT_SERVICE_NAME (backend-core env var) must match agent_name below —
 # that's what "{service}" in StartAgentSession's URL resolves to.
 
 agent_name = "poker-ai-host"
-image = "<your-registry>/poker-ai-host:0.1"
+image = "ghcr.io/smithdouglas404/poker-ai-host:latest"
 secret_set = "poker-ai-host-secrets"
 
 [scaling]
