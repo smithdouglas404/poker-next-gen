@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 
 // Table graphics preset:
-//   "cinematic" — the R3F cinematic scene (default)
-//   "classic"   — the Pixi.js table renderer (fallback)
+//   "classic"   — the HRC Pixi.js image-based table (default)
+//   "cinematic" — the R3F cinematic scene (deferred)
 // Persisted per-device.
 
 export type TableGraphics = "cinematic" | "classic";
@@ -14,7 +14,7 @@ let current: TableGraphics | null = null;
 
 function read(): TableGraphics {
   if (current) return current;
-  let v: TableGraphics = "cinematic";
+  let v: TableGraphics = "classic";
   try {
     if (typeof window !== "undefined") {
       const stored = window.localStorage.getItem(KEY);
