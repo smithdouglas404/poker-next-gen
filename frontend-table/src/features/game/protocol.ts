@@ -88,6 +88,7 @@ export interface TableSnapshot {
   table_art?: string;
   host_user_id?: string;
   host_paused?: boolean;
+  ai_host_enabled?: boolean;
 }
 
 export interface TableMovedMessage {
@@ -144,7 +145,7 @@ export interface ChatMessage {
   user_id: string;
   username: string;
   text: string;
-  kind: "player" | "dealer";
+  kind: "player" | "dealer" | "ai_host";
   seat: number;
   hand_no: number;
 }

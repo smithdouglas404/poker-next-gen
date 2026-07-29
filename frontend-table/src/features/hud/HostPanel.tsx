@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { formatCents, useGame } from "@/features/game/GameProvider";
+import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { GLASS_PANEL, BTN_GOLD, cn } from "@/features/ui/tokens";
 // Read-only reuse of the already-built, already-audited live-table admin
 // hook — this is the real spec (see plan doc): canAdmin = host OR
@@ -213,7 +214,7 @@ function TableSettingsSection({
  *  `canAdmin` is false for — matching how the reference `TableAdminOverlay`
  *  already works — rather than a grayed-out preview. */
 export function HostPanel() {
-  const { snapshot, profile, hostAction } = useGame();
+  const { snapshot, profile, hostAction, matchId } = useGame();
   const demo = useSearchParams().get("demo") === "1";
   const admin = useTableAdmin(demo);
   const overlays = useTableOverlays(demo, admin);
@@ -222,6 +223,8 @@ export function HostPanel() {
   const [sb, setSb] = useState<number>(0);
   const [bb, setBb] = useState<number>(0);
   const [modal, setModal] = useState<"settings" | "summary" | "news" | null>(null);
+  const [aiHostBusy, setAiHostBusy] = useState(false);
+  const [aiHostMessage, setAiHostMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (admin.canAdmin) void admin.loadWaiting();
@@ -362,6 +365,29 @@ export function HostPanel() {
           <button type="button" onClick={() => setModal("news")} className="rounded-lg border border-white/10 px-2 py-1.5 text-left text-xs text-neutral-200 hover:border-white/25">
             📣 Broadcast News
           </button>
+
+          <div className="flex flex-col gap-1 rounded-lg border border-cyan/20 px-2 py-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-neutral-200">🤖 AI Table Host</span>
+              <Toggle
+                value={demo ? false : !!snapshot?.ai_host_enabled}
+                onChange={(next) => {
+                  if (demo || !matchId) return;
+                  setAiHostBusy(true);
+                  setAiHostMessage(null);
+                  void callSessionRpc("ai_host_toggle", { match_id: matchId, enabled: next })
+                    .then((res) => {
+                      const r = res as { enabled?: boolean; message?: string };
+                      if (r.message) setAiHostMessage(r.message);
+                    })
+                    .catch(() => setAiHostMessage("Could not reach the AI host — try again."))
+                    .finally(() => setAiHostBusy(false));
+                }}
+              />
+            </div>
+            {aiHostBusy && <span className="text-[9px] text-neutral-500">Updating…</span>}
+            {aiHostMessage && <span className="text-[9px] text-amber-300">{aiHostMessage}</span>}
+          </div>
 
           {isHost && (
             <button

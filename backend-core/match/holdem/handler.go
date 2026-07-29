@@ -5,6 +5,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	crand "crypto/rand"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -106,6 +107,19 @@ type MatchState struct {
 	// AdminPaused is a platform-admin freeze (tables_freeze_all). Unlike HostPaused
 	// it is honored regardless of host presence — it's an operator override.
 	AdminPaused bool
+	// AI table host (Pipecat Cloud voice/text agent) — off by default, toggled by
+	// rpc.AIHostToggle (a real host/club-admin action, resolved server-side; see
+	// isClubAdminForTable). AIHostWebhookSecret authenticates the bot's own
+	// outbound polls/replies (MatchSignal cases "ai_host_poll"/"ai_host_reply") —
+	// the bot isn't a real player so it can't use a Nakama session for this.
+	// AINarrationLog is a small ring buffer of public narrate() lines the bot
+	// polls for commentary context; it never carries hole cards or solver output
+	// (narrate() only ever describes what's already broadcast to everyone).
+	AIHostEnabled       bool
+	AIHostSessionID     string
+	AIHostWebhookSecret string
+	AINarrationSeq      int64
+	AINarrationLog      []aiNarrationEntry
 	// TournamentBreak mirrors AdminPaused's mechanics but a different source and
 	// meaning: the tournament director (match/tournament/director.go) sets it
 	// when its blind schedule enters an IsBreak level and clears it when that
@@ -2230,6 +2244,9 @@ func closeTable(ctx context.Context, logger runtime.Logger, db *sql.DB, dispatch
 	if integrations.DailyConfigured() {
 		integrations.DeleteRoom(ctx, matchIDForAudit(s))
 	}
+	if s.AIHostSessionID != "" {
+		_ = integrations.StopAgentSession(ctx, s.AIHostSessionID)
+	}
 }
 
 func matchIDForAudit(s *MatchState) string {
@@ -3107,6 +3124,74 @@ func (h *Handler) MatchSignal(ctx context.Context, logger runtime.Logger, db *sq
 			return s, "true"
 		}
 		return s, "false"
+	case "can_admin":
+		// Same authorization rpc.AIHostToggle needs, reusing the exact check
+		// OpHostAction's dispatch gate already applies (host OR a club admin of
+		// the sponsoring club) — a single source of truth for "who may administer
+		// this table" rather than a second, possibly-drifted copy in rpc/.
+		userID, _ := sig["user_id"].(string)
+		if userID != "" && (userID == s.HostUserID || isClubAdminForTable(ctx, db, s, userID)) {
+			return s, "true"
+		}
+		return s, "false"
+	case "ai_host_get":
+		out, _ := json.Marshal(map[string]interface{}{"session_id": s.AIHostSessionID, "enabled": s.AIHostEnabled})
+		return s, string(out)
+	case "ai_host_set":
+		// Only ever called by rpc.AIHostToggle after it has already verified the
+		// caller via "can_admin" above and (when enabling) already started the
+		// real Pipecat Cloud session — this just records the outcome on match
+		// state. Blocking Daily/Pipecat HTTP calls stay in rpc/ai_host.go, never
+		// here, matching how VideoTokenGet already keeps external calls out of
+		// the match loop.
+		enabled, _ := sig["enabled"].(bool)
+		s.AIHostEnabled = enabled
+		if enabled {
+			sessionID, _ := sig["session_id"].(string)
+			secret, _ := sig["webhook_secret"].(string)
+			s.AIHostSessionID = sessionID
+			s.AIHostWebhookSecret = secret
+			narrate(dispatcher, s, "An AI table host has joined — say hello, or just enjoy the commentary.")
+		} else {
+			s.AIHostSessionID = ""
+			s.AIHostWebhookSecret = ""
+			s.AINarrationLog = nil
+			narrate(dispatcher, s, "The AI table host has been turned off.")
+		}
+		broadcastSnapshot(ctx, db, dispatcher, s, nil)
+		return s, "ok"
+	case "ai_host_poll":
+		// Called (indirectly, via rpc.AIHostNarrationPoll) by the bot process
+		// itself, not a player — authenticated by the per-table secret minted in
+		// rpc.AIHostToggle rather than a Nakama session.
+		secret, _ := sig["secret"].(string)
+		if s.AIHostWebhookSecret == "" || subtle.ConstantTimeCompare([]byte(secret), []byte(s.AIHostWebhookSecret)) != 1 {
+			return s, `{"error":"unauthorized"}`
+		}
+		sinceF, _ := sig["since_seq"].(float64)
+		since := int64(sinceF)
+		entries := make([]aiNarrationEntry, 0, len(s.AINarrationLog))
+		for _, e := range s.AINarrationLog {
+			if e.Seq > since {
+				entries = append(entries, e)
+			}
+		}
+		out, _ := json.Marshal(map[string]interface{}{"entries": entries, "latest_seq": s.AINarrationSeq})
+		return s, string(out)
+	case "ai_host_reply":
+		// The bot's own spoken/typed line, posted back into the same chat
+		// channel narrate()'s dealer lines use — see rpc.AIHostChatPost.
+		secret, _ := sig["secret"].(string)
+		if s.AIHostWebhookSecret == "" || subtle.ConstantTimeCompare([]byte(secret), []byte(s.AIHostWebhookSecret)) != 1 {
+			return s, `{"error":"unauthorized"}`
+		}
+		text, _ := sig["text"].(string)
+		text = sanitizeChat(text)
+		if text == "" {
+			return s, `{"error":"empty"}`
+		}
+		broadcastChat(dispatcher, s, protocol.ChatMessage{Username: "AI Host", Text: text, Kind: "ai_host", HandNo: s.Table.HandNo})
+		return s, `{"ok":true}`
 	case "pause":
 		// Platform-admin freeze (tables_freeze_all) — no host socket required.
 		s.AdminPaused = true
@@ -3418,6 +3503,7 @@ func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) 
 		TableArt:            s.TableArt,
 		HostUserID:          s.HostUserID,
 		HostPaused:          s.effPaused() || s.AdminPaused,
+		AIHostEnabled:       s.AIHostEnabled,
 		AllowStraddle:       s.Table.AllowStraddle,
 		AllowBombPot:        s.Table.AllowBombPot,
 		AllowInsurance:      s.Table.AllowInsurance,
@@ -3676,7 +3762,23 @@ func broadcastChat(dispatcher runtime.MatchDispatcher, s *MatchState, msg protoc
 	_ = dispatcher.BroadcastMessage(protocol.OpChat, data, nil, nil, true)
 }
 
-// narrate emits a dealer play-by-play line to everyone at the table.
+// aiNarrationEntry is one line of the AI host's narration feed — see
+// AINarrationLog on MatchState. Seq is monotonic per match so the bot's poll
+// can ask "anything after N".
+type aiNarrationEntry struct {
+	Seq  int64  `json:"seq"`
+	Text string `json:"text"`
+}
+
+// aiNarrationLogCap bounds AINarrationLog — the bot polls every ~1-2s, so a
+// couple minutes of history is more than enough context and keeps this off
+// the per-match memory footprint otherwise.
+const aiNarrationLogCap = 40
+
+// narrate emits a dealer play-by-play line to everyone at the table. When the
+// AI host is enabled, the exact same public text also lands in its narration
+// feed — it never sees anything narrate() doesn't already broadcast to every
+// player (no hole cards, no solver output; see rpc/ai_host.go).
 func narrate(dispatcher runtime.MatchDispatcher, s *MatchState, text string) {
 	broadcastChat(dispatcher, s, protocol.ChatMessage{
 		Username: "Dealer",
@@ -3684,6 +3786,13 @@ func narrate(dispatcher runtime.MatchDispatcher, s *MatchState, text string) {
 		Kind:     "dealer",
 		HandNo:   s.Table.HandNo,
 	})
+	if s.AIHostEnabled {
+		s.AINarrationSeq++
+		s.AINarrationLog = append(s.AINarrationLog, aiNarrationEntry{Seq: s.AINarrationSeq, Text: text})
+		if len(s.AINarrationLog) > aiNarrationLogCap {
+			s.AINarrationLog = s.AINarrationLog[len(s.AINarrationLog)-aiNarrationLogCap:]
+		}
+	}
 }
 
 // narrateAction describes a player's action for the play-by-play feed. Call it

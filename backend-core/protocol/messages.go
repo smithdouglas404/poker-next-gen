@@ -93,6 +93,10 @@ type TableSnapshot struct {
 	TableArt   string `json:"table_art,omitempty"`
 	HostUserID string `json:"host_user_id,omitempty"`
 	HostPaused bool   `json:"host_paused,omitempty"`
+	// AIHostEnabled reflects real match state (MatchState.AIHostEnabled) — the
+	// client renders the toggle from this, never a local optimistic guess, so
+	// it can never drift from what the server actually did.
+	AIHostEnabled bool `json:"ai_host_enabled,omitempty"`
 	// Optional table-feature capabilities (#41) so the client only shows controls
 	// that bind to a live, enabled RPC path.
 	AllowStraddle   bool `json:"allow_straddle,omitempty"`

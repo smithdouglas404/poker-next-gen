@@ -1,0 +1,15 @@
+# Pipecat Cloud deploy config (`pcc deploy`). Fill in / confirm every value
+# below against your own Pipecat Cloud account and container registry before
+# deploying — placeholders only, matching the "confirm at deploy time" caveat
+# already on bot.py and backend-core/integrations/pipecat.go.
+#
+# PIPECAT_SERVICE_NAME (backend-core env var) must match agent_name below —
+# that's what "{service}" in StartAgentSession's URL resolves to.
+
+agent_name = "poker-ai-host"
+image = "<your-registry>/poker-ai-host:0.1"
+secret_set = "poker-ai-host-secrets"
+
+[scaling]
+min_agents = 0
+max_agents = 10

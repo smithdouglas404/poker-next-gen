@@ -14,6 +14,16 @@ Three first-class services live in their own top-level directories:
 - `backend-core/` — Go module compiled as a Nakama runtime **plugin**.
 - `engine-math/` — Rust library wrapping `rs_poker`.
 - `oddslingers/` — git submodule for reference; not deployed on Railway yet.
+- `ai-host/` — Python Pipecat Cloud agent (optional, per-table AI voice/text
+  host). **Not deployed on Railway** — it's a separate agent image pushed to
+  Pipecat Cloud via `pcc deploy` (see `ai-host/pcc-deploy.toml`), started/
+  stopped by `backend-core/integrations/pipecat.go` against a table's own
+  Daily.co room. Off by default per table (`rpc/ai_host.go` `ai_host_toggle`).
+  Talks to `backend-core` outbound-only over Nakama's HTTP RPC endpoint
+  (`ai_host_narration_poll` / `ai_host_chat_post`) — never handed hole cards,
+  a real player session, or the solver RPCs (`hand_rank`/`equity_estimate`/
+  `gto_advise`/`gto_solve`/`coaching_tip`); its only game-state input is the
+  same public `narrate()` text every spectator already sees.
 
 ## Golden rules
 

@@ -38,6 +38,14 @@ export function ChatPanel() {
               </li>
             );
           }
+          if (msg.kind === "ai_host") {
+            return (
+              <li key={i} className="mb-1.5 flex items-start gap-1.5 rounded-lg bg-cyan/[0.06] px-1.5 py-1">
+                <span className="mt-0.5 text-[9px] font-bold uppercase tracking-wider text-cyan">AI</span>
+                <span className="text-neutral-200">{msg.text}</span>
+              </li>
+            );
+          }
           const isHero = msg.user_id !== "" && msg.user_id === profile.userId;
           return (
             <li
