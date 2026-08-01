@@ -67,10 +67,12 @@ function ringForState(state: SceneSeat["state"]): string {
   }
 }
 
-function actionPill(seat: SeatView, snapshot: TableSnapshot): SceneSeat["action"] {
+function actionPill(seat: SeatView): SceneSeat["action"] {
   const last = (seat.last_action ?? "").toLowerCase();
   if (!last) return undefined;
-  const bet = snapshot.current_bet ? formatCents(snapshot.current_bet) : undefined;
+  // The pill shows what THIS seat committed (seat.bet), not the table-wide
+  // current_bet — otherwise a later raise retro-relabels everyone's pill.
+  const bet = (seat.bet ?? 0) > 0 ? formatCents(seat.bet ?? 0) : undefined;
   switch (last) {
     case "fold":
     case "folded":
@@ -85,7 +87,7 @@ function actionPill(seat: SeatView, snapshot: TableSnapshot): SceneSeat["action"
       return { label: "RAISE", amount: bet, tone: "raise" };
     case "all-in":
     case "allin":
-      return { label: "ALL-IN", amount: formatCents(seat.stack), tone: "allin" };
+      return { label: "ALL-IN", amount: bet, tone: "allin" };
     default:
       return { label: last.toUpperCase(), tone: "call" };
   }
@@ -156,7 +158,7 @@ export default function LiveCinematicTable() {
           stack: formatCents(s.stack),
           ringColor: ringForState(state),
           state,
-          action: actionPill(s, snapshot),
+          action: actionPill(s),
           hole: isHero && heroHole ? heroHole : undefined,
           avatar: avatarDef(s.user_id || `seat-${s.index}`).id,
           model_url: s.model_url,

@@ -85,7 +85,9 @@ function ExitTableButton({ demo }: { demo: boolean }) {
 const EXTEND_URGENT_MS = 5_000;
 
 function ExtendTimeButton({ demo }: { demo: boolean }) {
-  const { actionRequired: liveActionRequired, profile, snapshot, useTimeBank } = useGame();
+  // `useTimeBank` is a plain GameProvider action, not a React hook — alias it
+  // so it is never mistaken for one (calling it in a handler is correct).
+  const { actionRequired: liveActionRequired, profile, snapshot, useTimeBank: requestTimeBank } = useGame();
   const actionRequired = demo ? DEMO_ACTION_REQUIRED : liveActionRequired;
   const heroSeat = demo ? 0 : (snapshot?.seats.find((s) => s.user_id === profile.userId)?.index ?? -1);
   const isMyTurn = actionRequired?.seat === heroSeat;
@@ -106,7 +108,7 @@ function ExtendTimeButton({ demo }: { demo: boolean }) {
   }, [isMyTurn, actionRequired]);
 
   if (!isMyTurn || !actionRequired || bankSecs <= 0) return null;
-  const onClick = demo ? async () => {} : () => void useTimeBank();
+  const onClick = demo ? async () => {} : () => void requestTimeBank();
 
   return (
     <button

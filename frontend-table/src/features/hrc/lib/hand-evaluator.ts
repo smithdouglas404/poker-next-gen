@@ -279,7 +279,7 @@ export function determineWinners(
 ): PlayerResult[] {
   const results: PlayerResult[] = players.map(p => ({
     playerId: p.id,
-    hand: evaluateHand(p.cards, communityCards),
+    hand: evaluateHandForVariant(p.cards, communityCards),
     isWinner: false,
   }));
 
@@ -312,7 +312,7 @@ export function getHandStrength(holeCards: CardType[], communityCards: CardType[
     return { percentage: 0, label: 'No Hand', color: '#666' };
   }
 
-  const hand = evaluateHand(holeCards, communityCards);
+  const hand = evaluateHandForVariant(holeCards, communityCards);
 
   // Map hand rank to approximate strength percentage
   const strengthMap: Record<number, { min: number; max: number }> = {
