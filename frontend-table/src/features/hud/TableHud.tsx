@@ -20,6 +20,7 @@ import { ChipAnimation } from "@/features/hrc/components/ChipAnimation";
 import { MusicPicker } from "@/features/sound/MusicPicker";
 import { TableSettings } from "@/features/hud/TableSettings";
 import { TauntBar } from "@/features/sound/TauntBar";
+import { EmotePicker } from "@/features/hrc/components/EmoteSystem";
 import { usePokerKeyboard } from "@/features/hud/usePokerKeyboard";
 import { useGameSounds } from "@/features/sound/useGameSounds";
 import { useGame } from "@/features/game/GameProvider";

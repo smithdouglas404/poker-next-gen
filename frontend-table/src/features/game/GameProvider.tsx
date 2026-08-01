@@ -58,6 +58,7 @@ import { resolveSponsorClubId } from "@/features/clubs/sponsorClub";
 import { decryptCards, importSessionKey } from "@/lib/nakama/cardCrypto";
 import { soundManager } from "@/features/sound/soundManager";
 import { tauntByKey, tauntUrls } from "@/features/sound/library";
+import { EMOTE_MAP, triggerEmote } from "@/features/hrc/components/EmoteSystem";
 import { avatarForKey } from "@/features/table/avatars";
 
 /** Voice taunts ride the chat channel using a printable marker (control chars
@@ -66,6 +67,14 @@ const TAUNT_MARKER = /^::taunt:([a-z0-9-]{1,32})::$/;
 function parseTauntMarker(text: string): { key: string } | null {
   const m = TAUNT_MARKER.exec(text.trim());
   return m ? { key: m[1] } : null;
+}
+
+/** Emotes ride the same chat channel with their own marker — same reasoning
+ *  as taunts (survives server-side text sanitization). */
+const EMOTE_MARKER = /^::emote:([a-z0-9-]{1,32})::$/;
+function parseEmoteMarker(text: string): { id: string } | null {
+  const m = EMOTE_MARKER.exec(text.trim());
+  return m ? { id: m[1] } : null;
 }
 
 interface GameContextValue extends GameState {
@@ -105,6 +114,7 @@ interface GameContextValue extends GameState {
   setPreviewSeats: (n: number) => void;
   sendChat: (text: string) => Promise<void>;
   sendTaunt: (key: string) => Promise<void>;
+  sendEmote: (id: string) => Promise<void>;
   addBot: () => Promise<void>;
   /** True once the coded-guest gate has parked this player pending approval. */
   guestApprovalPending: boolean;
@@ -278,6 +288,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
           }
           case OpChat: {
             const chat = payload as ChatMessage;
+            const emote = parseEmoteMarker(chat.text);
+            if (emote) {
+              // A reaction emote piggybacked on chat — same transport as
+              // taunts, but purely visual: no chat line, no sound, just the
+              // floating bubble over the sender's seat (EmoteSystem.tsx).
+              const def = EMOTE_MAP.get(emote.id);
+              if (def) triggerEmote(chat.user_id || `seat-${chat.seat}`, def);
+              break;
+            }
             const taunt = parseTauntMarker(chat.text);
             if (taunt) {
               // A voice taunt piggybacked on chat: play the sender's character
@@ -557,6 +576,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
     [sendMatch, matchId],
   );
 
+  const sendEmote = useCallback(
+    async (id: string) => {
+      if (!matchId || !EMOTE_MAP.has(id)) return;
+      await sendMatch(OpChatSend, { text: `::emote:${id}::` });
+    },
+    [sendMatch, matchId],
+  );
+
   const findMatch = useCallback(async () => {
     const socket = socketRef.current;
     if (!socket) return;
@@ -657,6 +684,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setPreviewSeats,
       sendChat,
       sendTaunt,
+      sendEmote,
       addBot,
       guestApprovalPending,
       clearGuestApprovalPending: () => setGuestApprovalPending(false),
@@ -699,6 +727,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setPreviewSeats,
       sendChat,
       sendTaunt,
+      sendEmote,
       addBot,
       guestApprovalPending,
     ],
