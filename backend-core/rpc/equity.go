@@ -23,6 +23,11 @@ type handRankRequest struct {
 
 // EquityEstimate proxies Monte Carlo equity to engine-math (rs_poker).
 func EquityEstimate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	// A user session, not just the server HTTP key — the AI host reaches this
+	// server with that key and must never get solver access (CLAUDE.md).
+	if _, err := callerID(ctx); err != nil {
+		return "", err
+	}
 	var req equityRequest
 	if payload != "" {
 		_ = json.Unmarshal([]byte(payload), &req)
@@ -48,6 +53,9 @@ func EquityEstimate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 
 // HandRank returns rs_poker category for a concatenated card string.
 func HandRank(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	if _, err := callerID(ctx); err != nil { // see EquityEstimate
+		return "", err
+	}
 	var req handRankRequest
 	if payload != "" {
 		_ = json.Unmarshal([]byte(payload), &req)

@@ -12,6 +12,9 @@ import (
 // Tickets are added client-side via socket.addMatchmaker; the server handles
 // matching through RegisterMatchmakerMatched in main.go.
 func MatchmakerEnqueue(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	if _, err := callerID(ctx); err != nil {
+		return "", err
+	}
 	var req struct {
 		MinPlayers int    `json:"min_players"`
 		MaxPlayers int    `json:"max_players"`
