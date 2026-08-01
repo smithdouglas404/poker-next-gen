@@ -11,6 +11,7 @@ import (
 	"github.com/heroiclabs/nakama-common/runtime"
 
 	"github.com/smithdouglas404/poker-next-gen/backend-core/audit"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/loyalty"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/models"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/protocol"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/social"
@@ -163,6 +164,26 @@ func broadcastInfo(dispatcher runtime.MatchDispatcher, s *DirectorState, seconds
 	_ = dispatcher.BroadcastMessage(protocol.OpTournamentInfo, payload, nil, nil, true)
 }
 
+// awardTournamentChampion unlocks the tournament_champ achievement (a
+// one-time, threshold-free unlock — winning any tournament at all earns it)
+// the moment a champion's finish_place=1 is recorded. Mirrored in
+// rpc/tournament_ext.go's TournamentFinalize, the other place a champion gets
+// determined; best-effort — never blocks the payout it runs alongside.
+func awardTournamentChampion(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, userID, username string) {
+	ls := store.NewLoyaltyStore(db)
+	newly, err := ls.UnlockAchievement(ctx, userID, "tournament_champ")
+	if err != nil || !newly {
+		return
+	}
+	a, ok := loyalty.Catalog["tournament_champ"]
+	if !ok || a.HRP <= 0 {
+		return
+	}
+	_, _ = ls.Award(ctx, userID, a.HRP, 0, 0, 0, 0)
+	_ = store.NewStatsStore(db).RecordHRP(ctx, userID, a.HRP, "achievement:tournament_champ", nil)
+	social.RecordHRP(ctx, nk, userID, username, a.HRP)
+}
+
 func (h *Handler) checkFinish(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, s *DirectorState) {
 	tStore := store.NewTournamentStore(db)
 	playing, err := tStore.CountPlaying(ctx, s.TournamentID)
@@ -191,6 +212,7 @@ func (h *Handler) checkFinish(ctx context.Context, logger runtime.Logger, db *sq
 				logger.Error("champion finish place not recorded tournament=%s user=%s: %v",
 					s.TournamentID, p.UserID, serr)
 			}
+			awardTournamentChampion(ctx, db, nk, p.UserID, p.Username)
 		}
 	}
 

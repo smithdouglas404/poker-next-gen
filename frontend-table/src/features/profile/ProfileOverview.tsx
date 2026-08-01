@@ -112,14 +112,19 @@ function AvatarBattleRecord({ avatarId }: { avatarId: string }) {
 }
 
 // Real HRC badge art for the achievement codes whose criteria genuinely match
-// the art's concept (loyalty.go's Catalog codes → /public/badges). Codes with
-// no honest match (e.g. "century", "quad_squad") intentionally fall back to
-// the plain rarity dot below rather than wearing a mismatched badge.
+// the art's concept (loyalty.go's Catalog codes → /public/badges). "century"
+// and "quad_squad" have no honest match among the 8 HRC badges and
+// intentionally fall back to the plain rarity dot below rather than wearing
+// one that means something else.
 const ACHIEVEMENT_BADGE_IMG: Record<string, string> = {
   first_blood: "/badges/badge_first_win.webp",
   millennium: "/badges/badge_club_legend.webp",
   iron_player: "/badges/badge_iron_player.webp",
   straight_flush: "/badges/badge_royal_flush.webp",
+  high_roller: "/badges/badge_high_roller.webp",
+  bluff_master: "/badges/badge_bluff_master.webp",
+  streak_fire: "/badges/badge_streak_fire.webp",
+  tournament_champ: "/badges/badge_tournament_champ.webp",
 };
 
 function AchievementBadge({ a }: { a: Achievement }) {

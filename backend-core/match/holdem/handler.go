@@ -2869,10 +2869,16 @@ func equippedAvatarID(ctx context.Context, db *sql.DB, userID string) string {
 // achievements. HRP is earned by PLAYING, so losers still progress. Called before
 // ResetBetweenHands, while seats still carry the hand's state.
 func accrueLoyalty(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *MatchState, res poker.ShowdownResult) {
-	winners := map[int]string{} // seat -> winning hand category
+	winners := map[int]string{}    // seat -> winning hand category ("" = won uncontested/no showdown)
+	winnings := map[int]int64{}    // seat -> this hand's total cents won (split evenly across a pot's winners)
 	for _, r := range res.Resolutions {
+		if len(r.Winners) == 0 {
+			continue
+		}
+		share := r.Amount / int64(len(r.Winners))
 		for _, seat := range r.Winners {
 			winners[seat] = r.HandCats[seat]
+			winnings[seat] += share
 		}
 	}
 	ls := store.NewLoyaltyStore(db)
@@ -2895,10 +2901,14 @@ func accrueLoyalty(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *
 			hrp = 1
 		}
 		wonDelta := int64(0)
+		noShowdownWinDelta := int64(0)
 		if won {
 			wonDelta = 1
+			if cat == "" { // won without reaching a real showdown (e.g. everyone else folded)
+				noShowdownWinDelta = 1
+			}
 		}
-		l, err := ls.Award(ctx, seat.UserID, hrp, 1, wonDelta)
+		l, err := ls.Award(ctx, seat.UserID, hrp, 1, wonDelta, winnings[seat.Index], noShowdownWinDelta)
 		if err != nil {
 			continue
 		}
@@ -2912,10 +2922,11 @@ func accrueLoyalty(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *
 		_ = ss.RecordHRP(ctx, seat.UserID, hrp, "hand_played", nil)
 		social.RecordHRP(ctx, nk, seat.UserID, seat.Username, hrp)
 		social.RecordHands(ctx, nk, seat.UserID, seat.Username, 1)
-		for _, code := range loyalty.AchievementsForResult(l.HandsPlayed, l.HandsWon, won, cat) {
+		codes := loyalty.AchievementsForResult(l.HandsPlayed, l.HandsWon, l.TotalWinningsCents, l.NoShowdownWins, l.CurrentWinStreak, won, cat)
+		for _, code := range codes {
 			if newly, _ := ls.UnlockAchievement(ctx, seat.UserID, code); newly {
 				if a, ok := loyalty.Catalog[code]; ok && a.HRP > 0 {
-					_, _ = ls.Award(ctx, seat.UserID, a.HRP, 0, 0)
+					_, _ = ls.Award(ctx, seat.UserID, a.HRP, 0, 0, 0, 0)
 					_ = ss.RecordHRP(ctx, seat.UserID, a.HRP, "achievement:"+code, nil)
 					social.RecordHRP(ctx, nk, seat.UserID, seat.Username, a.HRP)
 				}
