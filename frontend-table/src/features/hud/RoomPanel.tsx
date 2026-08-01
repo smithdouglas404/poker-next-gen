@@ -216,6 +216,19 @@ export function RoomPanel() {
           {!blindsValid && (
             <p className="mt-2 text-[10px] text-[#ff9ba1]">Big blind must be ≥ small blind.</p>
           )}
+
+          {/* This quick form only exposes blinds/variant/seats/duration.
+              PrivateTableSetup (the /lobby builder) covers everything else
+              TableCreateRequest actually supports — access control, KYC,
+              geo-restriction, spectators, wallet limits, auto buy-back,
+              straddle/bomb-pot/insurance, club/tournament binding — so send
+              players there instead of duplicating that form here. */}
+          <Link
+            href="/lobby?view=private"
+            className="mt-2 flex items-center justify-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-gold/80 hover:text-gold"
+          >
+            More options →
+          </Link>
         </div>
 
         <div className="mt-4 flex flex-col gap-2">
