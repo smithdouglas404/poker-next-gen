@@ -292,7 +292,7 @@ func DeductRakeFromWinners(t *Table, resolutions []PotResolution, rake int64) {
 			take = t.Seats[best].Stack
 		}
 		t.Seats[best].Stack -= take
-		break
+		rem -= take
 	}
 }
 

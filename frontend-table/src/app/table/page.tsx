@@ -31,13 +31,13 @@ function TableSurface() {
 
 export default function TablePage() {
   return (
-    <GameProvider>
-      <JurisdictionGate />
-      <TableHud>
-        <Suspense fallback={null}>
+    <Suspense fallback={null}>
+      <GameProvider>
+        <JurisdictionGate />
+        <TableHud>
           <TableSurface />
-        </Suspense>
-      </TableHud>
-    </GameProvider>
+        </TableHud>
+      </GameProvider>
+    </Suspense>
   );
 }
