@@ -285,7 +285,7 @@ func awardTournamentChampionAchievement(ctx context.Context, db *sql.DB, nk runt
 	if !ok || a.HRP <= 0 {
 		return
 	}
-	_, _ = ls.Award(ctx, userID, a.HRP, 0, 0, 0, 0)
+	_, _ = ls.AwardBonus(ctx, userID, a.HRP)
 	_ = store.NewStatsStore(db).RecordHRP(ctx, userID, a.HRP, "achievement:tournament_champ", nil)
 	social.RecordHRP(ctx, nk, userID, username, a.HRP)
 }
