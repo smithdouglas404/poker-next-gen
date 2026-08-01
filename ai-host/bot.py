@@ -20,6 +20,8 @@ the Go backend, whatever Pipecat Cloud's session networking model is.
 """
 
 import asyncio
+import contextlib
+import json
 import os
 import re
 
@@ -107,16 +109,30 @@ class NarrationBridge:
             self._task = asyncio.create_task(self._poll_loop())
 
     async def stop(self):
-        if self._task:
-            self._task.cancel()
+        task, self._task = self._task, None
+        if task:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
 
     async def _rpc(self, session: aiohttp.ClientSession, rpc_id: str, payload: dict):
+        # Nakama's HTTP RPC endpoint takes the payload as a JSON *string* (the
+        # body is a quoted, escaped document, not the object itself) and returns
+        # it wrapped as {"payload": "<json string>"} — posting/reading the bare
+        # object silently yields nothing.
         url = f"{self._backend_base_url}/v2/rpc/{rpc_id}?http_key={self._http_key}"
-        async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+        async with session.post(
+            url, json=json.dumps(payload), timeout=aiohttp.ClientTimeout(total=10)
+        ) as resp:
             if resp.status >= 300:
                 logger.warning(f"ai_host rpc {rpc_id} failed: {resp.status}")
                 return None
             data = await resp.json(content_type=None)
+            if isinstance(data, dict) and isinstance(data.get("payload"), str):
+                try:
+                    data = json.loads(data["payload"])
+                except json.JSONDecodeError:
+                    return None
             return data
 
     async def _poll_loop(self):
@@ -132,9 +148,11 @@ class NarrationBridge:
                             "since_seq": self._since_seq,
                         },
                     )
-                    if resp:
+                    if isinstance(resp, dict):
                         entries = resp.get("entries") or []
-                        self._since_seq = resp.get("latest_seq", self._since_seq)
+                        latest_seq = resp.get("latest_seq")
+                        if isinstance(latest_seq, int):
+                            self._since_seq = latest_seq
                         for entry in entries:
                             await self._handle_narration(entry.get("text", ""))
                 except asyncio.CancelledError:
@@ -183,10 +201,14 @@ class ReplyMirror(FrameProcessor):
 
     async def process_frame(self, frame, direction: FrameDirection):
         await super().process_frame(frame, direction)
-        if isinstance(frame, TextFrame):
-            self._buffer += frame.text
-        elif isinstance(frame, LLMFullResponseEndFrame):
-            await self._flush()
+        # Only the LLM's own downstream output is the host's utterance; upstream
+        # frames (e.g. transcriptions travelling back) must not be mirrored into
+        # table chat as if the host had said them.
+        if direction == FrameDirection.DOWNSTREAM:
+            if isinstance(frame, TextFrame):
+                self._buffer += frame.text
+            elif isinstance(frame, LLMFullResponseEndFrame):
+                await self._flush()
         await self.push_frame(frame, direction)
 
     async def _flush(self):
