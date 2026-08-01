@@ -96,6 +96,15 @@ func (s *RewardsStore) UpsertItem(ctx context.Context, it *RewardItem) (string, 
 		it.ID = NewID("rwd")
 	}
 	it.Category = ValidRewardCategory(it.Category)
+	// A negative price would MINT points on redemption: the atomic redeem
+	// subtracts points_cost from hrp_spendable, so a mistyped "-5000" hands the
+	// redeemer 5000 points and a voucher.
+	if it.PointsCost < 0 || it.CashValueCents < 0 {
+		return "", errors.New("points_cost and cash_value_cents must not be negative")
+	}
+	if it.Stock < -1 {
+		return "", errors.New("stock must be -1 (unlimited) or a non-negative count")
+	}
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO poker_reward_item (id, sponsor_id, category, title, description, image_url, points_cost, cash_value_cents, stock, active)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)

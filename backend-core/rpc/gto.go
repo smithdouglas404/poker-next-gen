@@ -23,6 +23,13 @@ type gtoAdviseRequest struct {
 
 // GtoAdvise proxies equity-based GTO approximation to engine-math (rs_poker CFR-lite).
 func GtoAdvise(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	// A user session, not just the server HTTP key. The AI host calls this
+	// server over the HTTP RPC endpoint with that key and must never be able to
+	// reach the solver (CLAUDE.md) — without a caller check it could, and so
+	// could anyone else holding the key.
+	if _, err := callerID(ctx); err != nil {
+		return "", err
+	}
 	if err := guardRTA(payload); err != nil { // S-1: no live assistance at stakes tables
 		return "", err
 	}
@@ -61,6 +68,9 @@ type gtoSolveRequest struct {
 // heads-up spot — real counterfactual regret minimization, not the equity
 // heuristic behind GtoAdvise.
 func GtoSolve(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	if _, err := callerID(ctx); err != nil { // see GtoAdvise
+		return "", err
+	}
 	if err := guardRTA(payload); err != nil { // S-1
 		return "", err
 	}
@@ -99,6 +109,9 @@ func GtoSolve(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime
 
 // CoachingTip returns Smart HUD coaching alerts (MCP-ready analysis surface).
 func CoachingTip(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	if _, err := callerID(ctx); err != nil { // see GtoAdvise
+		return "", err
+	}
 	if err := guardRTA(payload); err != nil { // S-1
 		return "", err
 	}

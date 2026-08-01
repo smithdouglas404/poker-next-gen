@@ -239,6 +239,16 @@ func (s *MarketplaceStore) Buy(ctx context.Context, listingID, buyerID string, f
 		return 0, fmt.Errorf("you already own this item")
 	}
 
+	// A fee outside 0..100% is a misconfiguration, not a trade: above 10000 bps
+	// the seller's net goes negative, and creditWallet skips non-positive
+	// amounts, so the seller would be paid nothing while the buyer still paid in
+	// full and the books still balanced.
+	if feeBps < 0 {
+		feeBps = 0
+	}
+	if feeBps > 10000 {
+		feeBps = 10000
+	}
 	fee := price * int64(feeBps) / 10000
 	sellerNet := price - fee
 

@@ -23,6 +23,9 @@ type omahaShowdownRequest struct {
 
 // OmahaRank returns rs_poker Omaha category for hole + board.
 func OmahaRank(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	if _, err := callerID(ctx); err != nil { // see EquityEstimate
+		return "", err
+	}
 	var req omahaRankRequest
 	if payload != "" {
 		_ = json.Unmarshal([]byte(payload), &req)
@@ -40,6 +43,9 @@ func OmahaRank(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtim
 
 // OmahaShowdown resolves Omaha side-by-side hands via rs_poker.
 func OmahaShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	if _, err := callerID(ctx); err != nil { // see EquityEstimate
+		return "", err
+	}
 	var req omahaShowdownRequest
 	if payload != "" {
 		_ = json.Unmarshal([]byte(payload), &req)

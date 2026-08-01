@@ -69,9 +69,14 @@ func (s *DailyBonusStore) Claim(ctx context.Context, userID string, chips int64)
 		userID, newStreak); err != nil {
 		return false, 0, err
 	}
+	// Bootstrap a missing wallet row with the SAME tier-aware opening balance
+	// WalletStore.Ensure uses (see DepositStore.MarkCredited): a hardcoded
+	// 100000 handed a paid account's first wallet touch the free-tier guest
+	// stipend, which StartingBalanceForTier says must be zero in real-money mode.
+	opening := StartingBalanceForTier(SubscriptionTier(ctx, s.db, userID))
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO poker_global_wallet (user_id, balance, currency, updated_at)
-		VALUES ($1, 100000, 'USD', NOW()) ON CONFLICT (user_id) DO NOTHING`, userID); err != nil {
+		VALUES ($1, $2, 'USD', NOW()) ON CONFLICT (user_id) DO NOTHING`, userID, opening); err != nil {
 		return false, 0, err
 	}
 	var after int64

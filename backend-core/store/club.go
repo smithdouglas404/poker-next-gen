@@ -466,16 +466,27 @@ func (s *ClubStore) AllocateBalance(ctx context.Context, b *models.PlayerAllocat
 	// than a member holds would leave them owing chips they never had, and the
 	// seating code reads this balance as spendable — a negative would be treated
 	// as a very large unsigned budget by any comparison that forgets the sign.
+	// A clawback is an UPDATE, never an upsert: the insert branch has no balance
+	// to guard against, so upserting a negative delta for a member who holds no
+	// chips yet would open the very negative balance the guard exists to prevent.
 	var after int64
-	err = tx.QueryRowContext(ctx, `
-		INSERT INTO poker_player_balance (id,club_id,user_id,balance,locked_amount,currency,created_at,updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-		ON CONFLICT (club_id,user_id) DO UPDATE
-			SET balance=poker_player_balance.balance+$4, updated_at=$8
-			WHERE poker_player_balance.balance + $4 >= 0
-		RETURNING balance`,
-		b.ID, b.ClubID, b.UserID, b.Balance, b.LockedAmount, b.Currency, b.CreatedAt, b.UpdatedAt,
-	).Scan(&after)
+	if b.Balance < 0 {
+		err = tx.QueryRowContext(ctx, `
+			UPDATE poker_player_balance SET balance=balance+$3, updated_at=$4
+			WHERE club_id=$1 AND user_id=$2 AND balance + $3 >= 0
+			RETURNING balance`,
+			b.ClubID, b.UserID, b.Balance, b.UpdatedAt,
+		).Scan(&after)
+	} else {
+		err = tx.QueryRowContext(ctx, `
+			INSERT INTO poker_player_balance (id,club_id,user_id,balance,locked_amount,currency,created_at,updated_at)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+			ON CONFLICT (club_id,user_id) DO UPDATE
+				SET balance=poker_player_balance.balance+$4, updated_at=$8
+			RETURNING balance`,
+			b.ID, b.ClubID, b.UserID, b.Balance, b.LockedAmount, b.Currency, b.CreatedAt, b.UpdatedAt,
+		).Scan(&after)
+	}
 	if err == sql.ErrNoRows {
 		return fmt.Errorf("that would take the member's club balance below zero")
 	}
