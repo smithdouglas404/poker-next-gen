@@ -197,7 +197,7 @@ export function PokerControls({ onAction, minBet, maxBet, callCost, pot = 0, pha
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isPending, needsToCall, isAllIn, showRaiseSlider, handleFoldKeyboard, handleCall, handleCheck, handleRaise, handleAllIn]);
+  }, [isPending, isHeroTurn, needsToCall, isAllIn, showRaiseSlider, handleFoldKeyboard, handleCall, handleCheck, handleRaise, handleAllIn]);
 
   useEffect(() => {
     return () => { if (foldTimerRef.current) clearTimeout(foldTimerRef.current); };

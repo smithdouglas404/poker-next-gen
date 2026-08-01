@@ -3,16 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, Zap, Shield, Crown, Star, Trophy, Flame, User } from "lucide-react";
 
 
-
-// Full-body 3D avatar imports (premium tiers only: 6 legendary + 2 epic)
-import fullBody1 from "@/assets/avatars/avatar-full-1.png";
-import fullBody2 from "@/assets/avatars/avatar-full-2.png";
-import fullBody3 from "@/assets/avatars/avatar-full-3.png";
-import fullBody4 from "@/assets/avatars/avatar-full-4.png";
-import fullBody5 from "@/assets/avatars/avatar-full-5.png";
-import fullBody6 from "@/assets/avatars/avatar-full-6.png";
-import fullBody7 from "@/assets/avatars/avatar-full-7.png";
-import fullBody8 from "@/assets/avatars/avatar-full-8.png";
+// Full-body art is served from /public/avatars (see `fullBodyImage` below).
 
 export interface AvatarOption {
   id: string;

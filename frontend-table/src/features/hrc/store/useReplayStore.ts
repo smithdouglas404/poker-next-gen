@@ -55,10 +55,12 @@ export const useReplayStore = create<ReplayStore>((set, get) => ({
 
   stepForward: () =>
     set((state) => {
-      const next = Math.min(state.currentStep + 1, state.totalSteps - 1);
+      const last = Math.max(0, state.totalSteps - 1);
+      const next = Math.min(state.currentStep + 1, last);
       return {
         currentStep: next,
-        timelineStatus: next >= state.totalSteps - 1 ? "complete" : state.timelineStatus,
+        timelineStatus:
+          state.totalSteps > 0 && next >= last ? "complete" : state.timelineStatus,
       };
     }),
 
@@ -69,7 +71,7 @@ export const useReplayStore = create<ReplayStore>((set, get) => ({
 
   seekTo: (step) =>
     set((state) => ({
-      currentStep: Math.max(0, Math.min(step, state.totalSteps - 1)),
+      currentStep: Math.max(0, Math.min(step, Math.max(0, state.totalSteps - 1))),
     })),
 
   setCurrentStreet: (currentStreet) => set({ currentStreet }),
