@@ -84,7 +84,12 @@ type Table struct {
 	HoleCards   map[string][]Card
 	Pot         int64
 	CurrentBet  int64
+	// MinRaise is the last full-raise increment on the current street; the
+	// minimum legal raise-to is CurrentBet + MinRaise. BigBlind is this hand's
+	// big blind — the floor for any bet or raise increment, and the opening
+	// minimum bet on every post-flop street.
 	MinRaise    int64
+	BigBlind    int64
 	Street      Street
 	ButtonSeat  int
 	ActionSeat  int
@@ -357,6 +362,7 @@ func (t *Table) StartHand(sb, bb int64) error {
 	t.Pot = 0
 	t.CurrentBet = bb
 	t.MinRaise = bb
+	t.BigBlind = bb
 	t.Street = StreetPreflop
 	t.ActedThisRound = map[int]bool{}
 	t.LastAggressorSeat = -1 // reset show-order tracking each hand
@@ -852,7 +858,8 @@ func (t *Table) advanceStreet() bool {
 		}
 	}
 	t.CurrentBet = 0
-	t.MinRaise = 0
+	// A new street opens with no bet, and the minimum bet is one big blind.
+	t.MinRaise = t.BigBlind
 	t.ActedThisRound = map[int]bool{}
 
 	switch t.Street {
@@ -927,8 +934,8 @@ func (t *Table) ValidActions(seat int) (actions []string, toCall, minRaise, maxR
 }
 
 func (t *Table) BigBlindAmount() int64 {
-	if t.MinRaise > 0 {
-		return t.MinRaise
+	if t.BigBlind > 0 {
+		return t.BigBlind
 	}
 	return 200
 }
