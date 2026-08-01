@@ -359,43 +359,31 @@ func TournamentFinalize(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 		return "", runtime.NewError(err.Error(), 13)
 	}
 
-	// Pay the full prize ladder: each tier's basis-point share is split evenly
-	// across the finishing positions it covers.
+	// store.TournamentPayouts owns the ladder arithmetic (shared with the
+	// director's automatic finish): it keeps an over-promised ladder inside the
+	// pool and pays the champion when no ladder was configured.
 	payouts := []map[string]interface{}{}
 	var paidTotal int64
-	for _, prize := range prizes {
-		places := int(prize.RankTo - prize.RankFrom + 1)
-		if places <= 0 {
-			places = 1
+	for _, p := range store.TournamentPayouts(prizes, finishers, pool) {
+		if err := ts.PayWinner(ctx, req.TournamentID, p.UserID, p.AmountMinor); err != nil {
+			return "", runtime.NewError(err.Error(), 13)
 		}
-		perPlace := pool * int64(prize.PayoutBps) / 10000 / int64(places)
-		if perPlace <= 0 {
-			continue
+		if aerr := audit.EmitLedger(ctx, audit.NewPostgresEmitter(db), "tournament_prize_paid", "", map[string]any{
+			"tournament_id": req.TournamentID,
+			"user_id":       p.UserID,
+			"finish_place":  p.Place,
+			"amount_cents":  p.AmountMinor,
+		}); aerr != nil {
+			logger.Warn("tournament prize audit anchor failed: %v", aerr)
 		}
-		for _, f := range finishers {
-			if f.FinishPlace < int(prize.RankFrom) || f.FinishPlace > int(prize.RankTo) {
-				continue
-			}
-			if err := ts.PayWinner(ctx, req.TournamentID, f.UserID, perPlace); err != nil {
-				return "", runtime.NewError(err.Error(), 13)
-			}
-			if aerr := audit.EmitLedger(ctx, audit.NewPostgresEmitter(db), "tournament_prize_paid", "", map[string]any{
-				"tournament_id": req.TournamentID,
-				"user_id":       f.UserID,
-				"finish_place":  f.FinishPlace,
-				"amount_cents":  perPlace,
-			}); aerr != nil {
-				logger.Warn("tournament prize audit anchor failed: %v", aerr)
-			}
-			paidTotal += perPlace
-			payouts = append(payouts, map[string]interface{}{
-				"user_id":        f.UserID,
-				"username":       f.Username,
-				"place":          f.FinishPlace,
-				"amount_minor":   perPlace,
-				"amount_display": dollars(perPlace),
-			})
-		}
+		paidTotal += p.AmountMinor
+		payouts = append(payouts, map[string]interface{}{
+			"user_id":        p.UserID,
+			"username":       p.Username,
+			"place":          p.Place,
+			"amount_minor":   p.AmountMinor,
+			"amount_display": dollars(p.AmountMinor),
+		})
 	}
 
 	// Status is already 'finished' — FinishOnce claimed it before any payout ran.
