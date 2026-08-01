@@ -15,6 +15,7 @@ import {
 import { Button, Input, SectionHeader, cn } from "@/features/ui";
 import { getTableGraphics } from "@/features/table/tableGraphics";
 import { useRoomPanelOpen } from "@/features/hud/roomPanelState";
+import { listSponsorClubs, type SponsorClub } from "@/features/clubs/sponsorClub";
 
 export function RoomPanel() {
   const {
@@ -71,6 +72,24 @@ export function RoomPanel() {
   useEffect(() => {
     if (connected) void listTables();
   }, [connected, listTables]);
+
+  // Proactive gate for Create Room: table_create requires the caller to
+  // sponsor a club (server-enforced — see rpc/table.go), which a caller with
+  // no operator seat on any club will never satisfy. Rather than let them
+  // click through to a NoSponsorClubError, disable the button up front once
+  // we know for sure (null = still checking, so it doesn't flash disabled).
+  const [sponsorClubs, setSponsorClubs] = useState<SponsorClub[] | null>(null);
+  useEffect(() => {
+    if (!connected) return;
+    let cancelled = false;
+    void listSponsorClubs().then((clubs) => {
+      if (!cancelled) setSponsorClubs(clubs);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [connected]);
+  const canHost = sponsorClubs === null || sponsorClubs.length > 0;
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -233,7 +252,7 @@ export function RoomPanel() {
 
         <div className="mt-4 flex flex-col gap-2">
           <Button
-            disabled={busy || !createValid}
+            disabled={busy || !createValid || !canHost}
             onClick={() =>
               run(() =>
                 createRoom({
@@ -250,6 +269,16 @@ export function RoomPanel() {
           >
             Create Room
           </Button>
+
+          {!canHost && (
+            <p className="text-[10px] text-neutral-500">
+              Hosting needs a club to sponsor the table.{" "}
+              <Link href="/clubs/new" className="text-gold/80 hover:text-gold">
+                Create one
+              </Link>{" "}
+              or ask an operator to add you to theirs.
+            </p>
+          )}
 
           <Button
             variant="outline"
