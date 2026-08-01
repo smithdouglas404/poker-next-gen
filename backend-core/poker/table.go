@@ -552,16 +552,6 @@ func (t *Table) seatedIndices() []int {
 	return out
 }
 
-func (t *Table) nextSeated(from int) int {
-	for i := 1; i <= MaxSeats; i++ {
-		idx := (from + i) % MaxSeats
-		if t.Seats[idx] != nil {
-			return idx
-		}
-	}
-	return from
-}
-
 // active reports whether a seat is eligible to be dealt into a new hand: seated
 // with chips, not sitting out, and not owing a post. Blind/button SELECTION uses
 // this (and its walkers below); in-hand ACTION order still uses nextActiveSeat.
@@ -728,16 +718,6 @@ func (t *Table) FirstToShowSeat() int {
 		return t.LastAggressorSeat
 	}
 	return t.nextActiveSeat(t.ButtonSeat)
-}
-
-func (t *Table) activeCount() int {
-	n := 0
-	for _, s := range t.Seats {
-		if s != nil && (s.Status == SeatSeated || s.Status == SeatAllIn) {
-			n++
-		}
-	}
-	return n
 }
 
 func (t *Table) ApplyAction(seat int, action string, amount int64) error {

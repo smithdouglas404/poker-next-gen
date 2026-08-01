@@ -133,7 +133,11 @@ function Confetti({ active }: { active: boolean }) {
             const a = (s * Math.PI) / spikes;
             const sx = p.x + Math.cos(a) * r;
             const sy = p.y + Math.sin(a) * r;
-            s === 0 ? ctx!.moveTo(sx, sy) : ctx!.lineTo(sx, sy);
+            if (s === 0) {
+              ctx!.moveTo(sx, sy);
+            } else {
+              ctx!.lineTo(sx, sy);
+            }
           }
           ctx!.closePath();
           ctx!.fill();

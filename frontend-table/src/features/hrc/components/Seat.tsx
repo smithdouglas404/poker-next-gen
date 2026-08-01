@@ -468,19 +468,30 @@ export function Seat({ player, position, isHero = false, isWinner = false, seatI
       }
     }
     prevBetRef.current = player.currentBet;
-  }, [player.currentBet, sound]);
+  }, [player.currentBet, sound, position.x, perspectiveScale]);
 
   // Timer tick sound — only plays when running low (≤50%), rate intensifies as time runs out
   // >50%: silent, 25-50%: every 2s, 10-25%: every 1s, <10%: every 500ms
+  // The interval restarts on threshold crossings only; the live percentage is
+  // read through a ref so a per-frame countdown never tears down the interval.
+  const timerPercentRef = useRef(timer.percent);
   useEffect(() => {
-    if (!isTurn || !isHero || timer.percent > 50) {
+    timerPercentRef.current = timer.percent;
+  }, [timer.percent]);
+
+  const timerAbove50 = timer.percent > 50;
+  const timerAbove25 = timer.percent > 25;
+  const timerAbove10 = timer.percent > 10;
+
+  useEffect(() => {
+    if (!isTurn || !isHero || timerAbove50) {
       if (timerTickRef.current) clearInterval(timerTickRef.current);
       timerTickRef.current = undefined;
       return;
     }
 
     const getInterval = () => {
-      const pct = timer.percent;
+      const pct = timerPercentRef.current;
       if (pct > 25) return 2000;
       if (pct > 10) return 1000;
       return 500;
@@ -488,7 +499,7 @@ export function Seat({ player, position, isHero = false, isWinner = false, seatI
 
     let currentInterval = getInterval();
     const tick = () => {
-      const urgency = 1 - timer.percent / 100;
+      const urgency = 1 - timerPercentRef.current / 100;
       sound.playTimerTick(urgency);
       const newInterval = getInterval();
       if (newInterval !== currentInterval) {
@@ -499,14 +510,14 @@ export function Seat({ player, position, isHero = false, isWinner = false, seatI
     };
 
     // Play first tick immediately when crossing the 50% threshold
-    sound.playTimerTick(1 - timer.percent / 100);
+    sound.playTimerTick(1 - timerPercentRef.current / 100);
     timerTickRef.current = setInterval(tick, currentInterval);
 
     return () => {
       if (timerTickRef.current) clearInterval(timerTickRef.current);
       timerTickRef.current = undefined;
     };
-  }, [isTurn, isHero, timer.percent > 50, timer.percent > 25, timer.percent > 10, sound]);
+  }, [isTurn, isHero, timerAbove50, timerAbove25, timerAbove10, sound]);
 
   // Parallax depth effect for hero avatar only
   const [mouseOffset, setMouseOffset] = useState({ x: 0, y: 0 });

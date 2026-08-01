@@ -11,14 +11,6 @@ import (
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
 
-// leaderboardBoardID maps a public metric to its native Nakama leaderboard id.
-// "chips"/"winnings" both read the all-time net-winnings board created in
-// social.EnsureLeaderboards; "hands" and "hrp" read boards the loyalty/match
-// pipeline writes. An unknown metric returns "".
-func leaderboardBoardID(metric string) string {
-	return leaderboardBoardFor(metric, "")
-}
-
 // leaderboardBoardFor resolves a metric + period to a native board id. period
 // "season" reads the monthly-resetting bankroll-season mirror; anything else
 // reads the all-time board.

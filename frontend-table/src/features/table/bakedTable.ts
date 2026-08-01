@@ -36,11 +36,6 @@ export interface BakedPlate extends BakedConfig {
   label: string;
 }
 
-// The default cinematic seat ellipse + camera (mirrors CinematicScene SX/SZ + the
-// contract camera) — the placeholder reuses these so it composites without tuning.
-const DEFAULT_CAMERA = { position: [0, 6.9, 7.9] as [number, number, number], fov: 42 };
-const DEFAULT_ELLIPSE = { sx: 4.95, sz: 3.2, y: 0.12 };
-
 export const BAKED_PLATES: Record<string, BakedPlate> = {
   // Red/gold arena (the user's committed plate, 1024×1024, 10 painted seat frames).
   // camera/ellipse are tuned so seatPoint() lands the 10 seats on the painted chairs.

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Button, Field, Input, Select } from "@/features/ui";
+import { Button, Input, Select } from "@/features/ui";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
 import { clubApi, relTime } from "../clubRpc";

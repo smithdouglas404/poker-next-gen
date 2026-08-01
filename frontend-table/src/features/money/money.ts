@@ -53,7 +53,7 @@ export function moneyModeHint(mode: MoneyMode): string {
 }
 
 /** Compact grouped whole-unit string for chips ("1,000"). */
-function chipUnits(cents: number, currency?: string): string {
+function chipUnits(cents: number): string {
   // Chips carry no fractional value; show whole units with the chip glyph.
   const whole = Math.round((cents ?? 0) / 100);
   return `${CHIP_GLYPH} ${whole.toLocaleString("en-US")}`;
@@ -74,7 +74,7 @@ export function formatMoneyMode(
   let base: string;
   switch (mode) {
     case "chips":
-      base = chipUnits(cents, currency);
+      base = chipUnits(cents);
       break;
     case "club":
     case "cash":

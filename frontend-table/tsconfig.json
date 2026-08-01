@@ -23,14 +23,6 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "// hrc note": "src/features/hrc is the HighRollersClub table, ported verbatim. The core table (ImageTable/Seat/Card + adapter + HrcTable) now typechecks and is NOT excluded. Only the six components still bound to HRC's own data layer are — they need @/lib/ws-client, @/lib/multiplayer-engine, @/lib/commentary-engine, @/lib/video-manager, @/hooks/useHandReplayState and @/components/ui/slider. Port those and drop the entries.",
-  "exclude": [
-    "node_modules",
-    "src/features/hrc/components/HandHistoryDrawer.tsx",
-    "src/features/hrc/components/ProvablyFairPanel.tsx",
-    "src/features/hrc/components/CommentaryOverlay.tsx",
-    "src/features/hrc/components/ReplayTimeline.tsx",
-    "src/features/hrc/components/ReplayMiniTable.tsx",
-    "src/features/hrc/components/Controls.tsx"
-  ]
+  "// hrc note": "src/features/hrc is the HighRollersClub table, ported verbatim. Everything kept is wired to our own data layer and typechecks; the components that were still bound to HRC's data layer (@/lib/multiplayer-engine, @/hooks/useHandReplayState, @/components/ui/slider, …) were unused and have been deleted.",
+  "exclude": ["node_modules"]
 }

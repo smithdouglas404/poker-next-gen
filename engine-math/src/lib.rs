@@ -344,7 +344,7 @@ pub fn gto_advise(
         0.0
     };
     let ev_call = hero_eq * (pot + to_call) - to_call;
-    let mut suggested = "check".to_string();
+    let suggested: String;
     let mut rationale = format!(
         "hero equity {:.1}% vs pot odds {:.1}%",
         hero_eq * 100.0,

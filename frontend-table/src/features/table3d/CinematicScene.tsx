@@ -12,10 +12,10 @@
 import * as THREE from "three";
 import { Suspense, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Environment, Lightformer, Html, useTexture, useGLTF, useAnimations, Clone, ContactShadows } from "@react-three/drei";
+import { Environment, Lightformer, Html, useGLTF, useAnimations, Clone, ContactShadows } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 
-import { cardBackArt, cardFaceArt, feltTexture } from "./textures";
+import { cardBackArt, cardFaceArt } from "./textures";
 import { avatarSrc } from "@/features/table/avatars";
 import type { BakedConfig } from "@/features/table/bakedTable";
 
@@ -148,14 +148,6 @@ export interface CinematicSceneProps {
 //
 // Scene scale is anchored on the felt: 275 blueprint px == 2.1 world units, so
 // 1 unit = 0.2457 m and every dimension below is the spec converted, not eyeballed.
-const PX = 2.1 / 275; // world units per blueprint pixel
-const STAD_L = 3.55 - 1.70; // reference: X radius 3.55, Z radius 1.70 // 2.864 — half-length of the STRAIGHT run (> end radius)
-const FELT_R = 1.70; // 2.276 — felt end-cap radius; sets table width to 44in (spec 41-48in)
-const RAIL_W = 55 * PX; //  0.420 — rail thickness (the 4in armrest)
-const TABLE_H = 3.09; // 30in floor-to-rail at this scale (0.76m / 0.2457)
-const SEAT_R = 1.70; // reference implementation // seats sit just outside the rail
-const SX = 4.62; // legacy ellipse (baked plates only)
-const SZ = 3.82;
 // Active seat path for the current scene. Cinematic felt uses the stadium; a baked
 // plate overrides with its own ELLIPSE so seats project onto the painted chairs.
 // There is exactly one live table Canvas mounted at a time, so module-level is safe.
@@ -177,9 +169,6 @@ function stadiumPoint(u: number, L: number, R: number, y: number): [number, numb
   d -= arc;
   return [-L + d, y, R]; // bottom straight, left -> center
 }
-// Side-middle seats sit at the stadium's widest point; clamp X so their DOM
-// tiles stay fully on screen (the table geometry may bleed — tiles may not).
-const SEAT_XMAX = 6.0;
 /** Ring phase that places seat 1 (hero) at the near curve. */
 const SEAT_PHASE = 0.75;
 /** Horizontal scale on world X — widens the table so the front edge fills the frame. */
@@ -218,50 +207,8 @@ function seatPoint(index: number, total: number): [number, number, number] {
   const a = (index / total) * Math.PI * 2 + Math.PI / 2;
   return [Math.cos(a) * e.sx, e.y, Math.sin(a) * e.sz];
 }
-// Stadium outline / ring shapes for the table build.
-function stadiumOutline(L: number, R: number, into?: THREE.Path): THREE.Path {
-  const s = into ?? new THREE.Shape();
-  s.moveTo(-L, -R);
-  s.lineTo(L, -R);
-  s.absarc(L, 0, R, -Math.PI / 2, Math.PI / 2, false);
-  s.lineTo(-L, R);
-  s.absarc(-L, 0, R, Math.PI / 2, (3 * Math.PI) / 2, false);
-  return s;
-}
-function stadiumShape(L: number, R: number): THREE.Shape {
-  return stadiumOutline(L, R) as THREE.Shape;
-}
-function stadiumRing(L: number, outerR: number, innerR: number): THREE.Shape {
-  const shape = stadiumShape(L, outerR);
-  shape.holes.push(stadiumOutline(L, innerR, new THREE.Path()));
-  return shape;
-}
-// ShapeGeometry UVs come out in shape-space; remap to 0..1 so textures fit.
-function remapUVs(g: THREE.BufferGeometry, w: number, h: number) {
-  const pos = g.attributes.position;
-  const uv = g.attributes.uv as THREE.BufferAttribute;
-  for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i) / w + 0.5, pos.getY(i) / h + 0.5);
-  uv.needsUpdate = true;
-}
 
 /* ---------------- table geometry ---------------- */
-
-const TABLE_GLB = "/models/cyber_poker_table.glb";
-// The asset pack is authored in METRES with table length along X. Our scene unit
-// is 0.2374 m, so metres -> units is 4.216x, and a 90-degree yaw lays their +X
-// length along our Z runway (portrait orientation).
-const GLB_SCALE = 10.279 / 2.4384;
-
-/** The design team's real table mesh: rail, cyan accent, pedestal, ten chairs,
- *  dealer button and sample chips — replaces the procedural stadium. */
-function TableModel() {
-  const { scene } = useGLTF(TABLE_GLB);
-  return (
-    <group rotation={[0, Math.PI / 2, 0]} scale={GLB_SCALE}>
-      <primitive object={scene} />
-    </group>
-  );
-}
 
 function TableBody() {
   // TRUE OVAL, ported from the reference implementation: four scaled capsules
@@ -534,7 +481,6 @@ function Board({ board }: { board: string[] }) {
 // is 180px of a ~790px felt (22.8%), which at our felt width gives a 1.04u
 // cluster, and the chip is the specified flat 3.8:1 disk.
 const CHIP_R = 0.259; // ~123mm "table chip" — reads at game scale
-const CHIP_T = 0.068; // stack offset = 5px overlap on a 10px chip
 function ChipStack({
   position,
   color,
@@ -790,59 +736,6 @@ function ActionChip({ action }: { action: NonNullable<SceneSeat["action"]> }) {
   );
 }
 
-function SeatPortrait2D({ seat, total }: { seat: SceneSeat; total: number }) {
-  const p = seatPoint(seat.index, total);
-  const ringColor = seat.ringColor;
-  const glow = seat.state === "active" ? "rgba(243,193,75,0.75)" : seat.state === "allin" ? "rgba(255,59,70,0.7)" : "rgba(91,100,114,0.5)";
-  const src = seat.avatar ? avatarSrc(seat.avatar) : avatarSrc("neon-viper");
-  // Bring the portrait to life: gentle idle float, an eager bob on the player's
-  // turn, a win pulse for the winner (shared globals.css keyframes). Folded seats
-  // hold still. Staggered so seats don't float in unison.
-  const anim =
-    seat.state === "winner"
-      ? "seatWinPulse 0.9s ease-out"
-      : seat.state === "active"
-        ? "seatTurnBob 1.6s ease-in-out infinite"
-        : seat.state === "folded"
-          ? "none"
-          : "seatIdleFloat 4s ease-in-out infinite";
-  // Portrait diameter (px). Enlarged so the character reads as the hero of the
-  // seat (the 2.5D avatar is the headline art, not a thumbnail).
-  const SIZE = 148;
-  return (
-    <Html position={[p[0], 0.42, p[2]]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
-      <div className="flex flex-col items-center">
-        <div style={{ position: "relative", opacity: seat.state === "folded" ? 0.55 : 1, animation: anim, animationDelay: `${(seat.index % 6) * 0.35}s` }}>
-          {/* Rounded-SQUARE portrait tile (per the approved reference art) — a
-              card-like frame, not a circle: dark bezel, neon state edge, gold trim. */}
-          <div
-            style={{
-              width: SIZE, height: SIZE, borderRadius: 16, overflow: "hidden",
-              border: `3px solid ${ringColor}`,
-              background: "#0b0e13",
-              boxShadow: `0 0 38px ${glow}, 0 0 0 2px rgba(212,175,55,0.35), inset 0 0 14px rgba(0,0,0,0.55)`,
-            }}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt="" width={SIZE} height={SIZE} style={{ objectFit: "cover", display: "block", imageRendering: "auto" }} />
-          </div>
-          {/* owned badge — bottom-center on the tile edge, like the reference's seat badge */}
-          <div
-            style={{
-              position: "absolute", left: "50%", bottom: -12, transform: "translateX(-50%)",
-              width: 26, height: 26, borderRadius: "50%",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13,
-              background: "linear-gradient(180deg,#f3e2ad,#d4af37)", color: "#3a2c07",
-              border: "1.5px solid rgba(0,0,0,0.4)", boxShadow: "0 0 10px rgba(212,175,55,0.6)",
-            }}
-            title="Owned avatar"
-          >★</div>
-        </div>
-        <SeatPill seat={seat} />
-      </div>
-    </Html>
-  );
-}
 
 /** A dark gunmetal + neon-piped chair the 3D figure sits in — sells the
  *  "seated full body" read of the full_body_avatar master (figures at the rail,

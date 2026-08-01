@@ -32,6 +32,20 @@ export function useOpponentStats(
   const [hudEnabled, setHudEnabled] = useState(false);
   const [snapshot, setSnapshot] = useState<Map<string, OpponentHudStats>>(new Map());
 
+  const updateSnapshot = useCallback(() => {
+    const next = new Map<string, OpponentHudStats>();
+    countsRef.current.forEach((c, id) => {
+      next.set(id, {
+        handsPlayed: c.handsPlayed,
+        vpipCount: c.vpipCount,
+        pfrCount: c.pfrCount,
+        aggressiveActions: c.aggressiveActions,
+        passiveActions: c.passiveActions,
+      });
+    });
+    setSnapshot(next);
+  }, []);
+
   // Track hand changes — increment handsPlayed for each active player
   useEffect(() => {
     const handNum = gameState.handNumber ?? 0;
@@ -53,7 +67,7 @@ export function useOpponentStats(
       // Update snapshot
       updateSnapshot();
     }
-  }, [gameState.handNumber, players, heroId]);
+  }, [gameState.handNumber, players, heroId, updateSnapshot]);
 
   // Track actions — update VPIP/PFR/AF
   useEffect(() => {
@@ -93,21 +107,7 @@ export function useOpponentStats(
     }
 
     updateSnapshot();
-  }, [gameState.lastAction, gameState.actionNumber, gameState.phase, heroId]);
-
-  const updateSnapshot = useCallback(() => {
-    const next = new Map<string, OpponentHudStats>();
-    countsRef.current.forEach((c, id) => {
-      next.set(id, {
-        handsPlayed: c.handsPlayed,
-        vpipCount: c.vpipCount,
-        pfrCount: c.pfrCount,
-        aggressiveActions: c.aggressiveActions,
-        passiveActions: c.passiveActions,
-      });
-    });
-    setSnapshot(next);
-  }, []);
+  }, [gameState.lastAction, gameState.actionNumber, gameState.phase, heroId, updateSnapshot]);
 
   return { opponentStats: snapshot, hudEnabled, setHudEnabled };
 }

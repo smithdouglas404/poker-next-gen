@@ -275,6 +275,10 @@ export function PrivateTableSetup({
     openWindow,
     walletLimitDollars,
     autoBuyBackDollars,
+    isPlayMoney,
+    noMaxBuyIn,
+    renderStyle,
+    tableArt,
     connected,
     joinRoom,
   ]);

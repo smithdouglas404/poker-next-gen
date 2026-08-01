@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { TrendingUp, TrendingDown, ArrowRight, CheckCircle, DollarSign, Users, Hash, Loader2, ExternalLink, ShieldCheck } from "lucide-react";
 
 interface LedgerSession {
@@ -49,7 +49,7 @@ export function TableLedger({ tableId, isOwner }: { tableId: string; isOwner: bo
   const [settled, setSettled] = useState(false);
   const [settlementProof, setSettlementProof] = useState<{ settlementHash?: string; settlementTxHash?: string; explorerUrl?: string } | null>(null);
 
-  const fetchLedger = async () => {
+  const fetchLedger = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/tables/${tableId}/ledger`);
@@ -59,9 +59,9 @@ export function TableLedger({ tableId, isOwner }: { tableId: string; isOwner: bo
         setSummary(data.summary || null);
       }
     } catch {} finally { setLoading(false); }
-  };
+  }, [tableId]);
 
-  useEffect(() => { fetchLedger(); }, [tableId]);
+  useEffect(() => { fetchLedger(); }, [fetchLedger]);
 
   const handleSettle = async () => {
     setSettling(true);
