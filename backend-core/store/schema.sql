@@ -433,6 +433,14 @@ CREATE TABLE IF NOT EXISTS poker_loyalty (
 -- purchased points can't inflate rank).
 ALTER TABLE poker_loyalty ADD COLUMN IF NOT EXISTS hrp_spendable BIGINT NOT NULL DEFAULT 0;
 
+-- Lifetime counters backing the achievement catalog's real-tracked codes
+-- (loyalty.Catalog: high_roller / bluff_master / streak_fire). current_win_streak
+-- resets to 0 the moment a hand is lost; best_win_streak only ever grows.
+ALTER TABLE poker_loyalty ADD COLUMN IF NOT EXISTS total_winnings_cents BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE poker_loyalty ADD COLUMN IF NOT EXISTS no_showdown_wins BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE poker_loyalty ADD COLUMN IF NOT EXISTS current_win_streak BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE poker_loyalty ADD COLUMN IF NOT EXISTS best_win_streak BIGINT NOT NULL DEFAULT 0;
+
 -- Permanent achievement unlocks shown on a player's profile.
 CREATE TABLE IF NOT EXISTS poker_achievement (
     user_id     TEXT NOT NULL,

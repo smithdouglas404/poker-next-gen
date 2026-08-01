@@ -8,6 +8,8 @@ import (
 	"github.com/heroiclabs/nakama-common/runtime"
 
 	"github.com/smithdouglas404/poker-next-gen/backend-core/audit"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/loyalty"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/social"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/store"
 )
 
@@ -268,6 +270,26 @@ func TournamentConfig(ctx context.Context, logger runtime.Logger, db *sql.DB, nk
 // ladder by basis points) as an admin-triggered fallback for when the director
 // match is not running. Idempotent: a tournament already 'finished' is not paid
 // twice. Platform-admin only.
+// awardTournamentChampionAchievement mirrors match/tournament/director.go's
+// awardTournamentChampion — the director's automatic checkFinish and this
+// admin-triggered finalize path are the two places a tournament champion gets
+// determined, so both unlock the achievement. Best-effort — never blocks the
+// payout it runs alongside.
+func awardTournamentChampionAchievement(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, userID, username string) {
+	ls := store.NewLoyaltyStore(db)
+	newly, err := ls.UnlockAchievement(ctx, userID, "tournament_champ")
+	if err != nil || !newly {
+		return
+	}
+	a, ok := loyalty.Catalog["tournament_champ"]
+	if !ok || a.HRP <= 0 {
+		return
+	}
+	_, _ = ls.Award(ctx, userID, a.HRP, 0, 0, 0, 0)
+	_ = store.NewStatsStore(db).RecordHRP(ctx, userID, a.HRP, "achievement:tournament_champ", nil)
+	social.RecordHRP(ctx, nk, userID, username, a.HRP)
+}
+
 func TournamentFinalize(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	if _, err := requireAdmin(ctx); err != nil {
 		return "", err
@@ -339,6 +361,7 @@ func TournamentFinalize(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 					logger.Error("champion finish place not recorded tournament=%s user=%s: %v",
 						req.TournamentID, p.UserID, serr)
 				}
+				awardTournamentChampionAchievement(ctx, db, nk, p.UserID, p.Username)
 			}
 		}
 	}

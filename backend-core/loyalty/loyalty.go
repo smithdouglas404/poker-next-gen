@@ -84,14 +84,20 @@ type Achievement struct {
 	HRP         int64  `json:"hrp"`
 }
 
-// Catalog is the full achievement set (subset auto-detected from hand results).
+// Catalog is the full achievement set (subset auto-detected from hand results,
+// the rest — tournament_champ — unlocked directly at tournament payout time
+// since it isn't a per-hand event).
 var Catalog = map[string]Achievement{
-	"first_blood":  {"first_blood", "First Blood", "Win your first hand", 100},
-	"century":      {"century", "Century", "Play 100 hands", 200},
-	"millennium":   {"millennium", "Millennium", "Play 1,000 hands", 500},
-	"iron_player":  {"iron_player", "Iron Player", "Play 10,000 hands", 2_000},
-	"quad_squad":   {"quad_squad", "Quad Squad", "Win with four of a kind", 300},
-	"straight_flush": {"straight_flush", "Straight Flush", "Win with a straight flush", 500},
+	"first_blood":      {"first_blood", "First Blood", "Win your first hand", 100},
+	"century":          {"century", "Century", "Play 100 hands", 200},
+	"millennium":       {"millennium", "Millennium", "Play 1,000 hands", 500},
+	"iron_player":      {"iron_player", "Iron Player", "Play 10,000 hands", 2_000},
+	"quad_squad":       {"quad_squad", "Quad Squad", "Win with four of a kind", 300},
+	"straight_flush":   {"straight_flush", "Straight Flush", "Win with a straight flush", 500},
+	"high_roller":      {"high_roller", "High Roller", "Win $10,000+ total across all hands", 400},
+	"bluff_master":     {"bluff_master", "Bluff Master", "Win 50 pots without a showdown", 300},
+	"streak_fire":      {"streak_fire", "On Fire", "Win 5 pots in a row", 250},
+	"tournament_champ": {"tournament_champ", "Tournament Champion", "Win a tournament", 500},
 }
 
 // normalizeCat lowercases and strips separators so rs_poker category strings
@@ -102,9 +108,13 @@ func normalizeCat(cat string) string {
 }
 
 // AchievementsForResult returns the achievement codes a player has now earned,
-// given their post-hand totals, whether they won, and (if they won) the winning
+// given their post-hand totals (already including this hand's result — see
+// store.LoyaltyStore.Award), whether they won, and (if they won) the winning
 // hand category. Already-unlocked ones are filtered by the caller.
-func AchievementsForResult(handsPlayed, handsWon int64, won bool, handCat string) []string {
+// totalWinningsCents/noShowdownWins/currentWinStreak back high_roller/
+// bluff_master/streak_fire; tournament_champ is unlocked separately at
+// tournament payout time, not from a hand result.
+func AchievementsForResult(handsPlayed, handsWon, totalWinningsCents, noShowdownWins, currentWinStreak int64, won bool, handCat string) []string {
 	var out []string
 	if won && handsWon >= 1 {
 		out = append(out, "first_blood")
@@ -125,6 +135,15 @@ func AchievementsForResult(handsPlayed, handsWon int64, won bool, handCat string
 		case "straightflush", "royalflush":
 			out = append(out, "straight_flush")
 		}
+	}
+	if totalWinningsCents >= 1_000_000 { // $10,000 lifetime
+		out = append(out, "high_roller")
+	}
+	if noShowdownWins >= 50 {
+		out = append(out, "bluff_master")
+	}
+	if currentWinStreak >= 5 {
+		out = append(out, "streak_fire")
 	}
 	return out
 }
