@@ -252,7 +252,13 @@ export function Lobby({
   }, [tournaments, filter, sort, registeredCounts]);
 
   const selected = tournaments.find((t) => t.id === selectedId) ?? null;
-  const activeTables = tournaments.filter((t) => t.status === "running").length * 12 + 24;
+  // Real tables running right now — registered players in RUNNING
+  // tournaments divided by that tournament's real seat cap, not a
+  // fabricated "N running * 12 + 24" placeholder (that baseline alone
+  // showed "24 active tables" even with zero real tournaments running).
+  const activeTables = tournaments
+    .filter((t) => t.status === "running")
+    .reduce((sum, t) => sum + Math.ceil(reg(t.id) / (t.max_seats_per_table || 9)), 0);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
