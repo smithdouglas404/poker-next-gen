@@ -12,7 +12,6 @@ import { PublicGameBrowser } from "@/features/lobby/PublicGameBrowser";
 import { PublicLobbyList } from "@/features/lobby/PublicLobbyList";
 import {
   DEMO_CLUBS,
-  DEMO_TOURNAMENTS,
   normalizeTournaments,
   type ClubLite,
   type LobbyView,

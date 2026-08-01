@@ -305,7 +305,6 @@ export function JoinPrivateGame({ open, onClose }: { open: boolean; onClose: () 
               <div className="mt-3 flex gap-2" onPaste={handlePaste}>
                 {digits.map((d, i) => (
                   <input
-                    // eslint-disable-next-line react/no-array-index-key
                     key={i}
                     ref={(el) => {
                       inputsRef.current[i] = el;

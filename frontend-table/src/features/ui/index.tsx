@@ -2,7 +2,7 @@
 
 import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
 
-import { BTN_GOLD, BTN_GREEN, BTN_RED, GLASS_PANEL, GLASS_PANEL_HOVER, HEADING_SM, cn } from "./tokens";
+import { BTN_GOLD, BTN_GREEN, BTN_RED, GLASS_PANEL, HEADING_SM, cn } from "./tokens";
 
 // A small, dependency-free primitive layer giving the app a consistent
 // GGPoker-grade look for buttons, panels, inputs, selects, and labeled fields.

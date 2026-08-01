@@ -3874,14 +3874,6 @@ func narrateAction(dispatcher runtime.MatchDispatcher, s *MatchState, seat int, 
 	narrate(dispatcher, s, text)
 }
 
-func boardCodesSpaced(board []poker.Card) string {
-	parts := make([]string, 0, len(board))
-	for _, c := range board {
-		parts = append(parts, c.Code())
-	}
-	return strings.Join(parts, " ")
-}
-
 func sendError(dispatcher runtime.MatchDispatcher, p runtime.Presence, code, message string) {
 	data, _ := json.Marshal(protocol.ErrorMessage{Code: code, Message: message})
 	_ = dispatcher.BroadcastMessage(protocol.OpError, data, []runtime.Presence{p}, nil, true)

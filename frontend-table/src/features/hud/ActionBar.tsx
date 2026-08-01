@@ -31,7 +31,13 @@ export function ActionBar() {
   const live = useGame();
   const demo = useSearchParams().get("demo") === "1";
   const actionRequired = demo ? DEMO_ACTION_REQUIRED : live.actionRequired;
-  const sendAction = demo ? async () => {} : live.sendAction;
+  const liveSendAction = live.sendAction;
+  // Memoized so the demo no-op isn't a fresh function on every render, which
+  // would re-run the pre-action effect below.
+  const sendAction = useMemo(
+    () => (demo ? async () => {} : liveSendAction),
+    [demo, liveSendAction],
+  );
   const { profile, snapshot } = live;
   const [raiseAmount, setRaiseAmount] = useState(0);
 

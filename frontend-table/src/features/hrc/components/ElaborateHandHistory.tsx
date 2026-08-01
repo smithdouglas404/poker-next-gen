@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, DollarSign, Trophy, ChevronDown, ChevronRight, Play, Loader2, Hash, ExternalLink } from "lucide-react";
 
@@ -18,31 +18,35 @@ export function ElaborateHandHistory({ tableId, onClose }: HandHistoryProps) {
   const [players, setPlayers] = useState<Map<string, any[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [summary, setSummary] = useState<{ totalPot: number; totalRake: number; handsCount: number }>({ totalPot: 0, totalRake: 0, handsCount: 0 });
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const PAGE_SIZE = 30;
 
-  const fetchHands = (currentOffset: number, append: boolean) => {
+  const summary = useMemo(
+    () => ({
+      totalPot: hands.reduce((s: number, h: any) => s + (h.potTotal || 0), 0),
+      totalRake: hands.reduce((s: number, h: any) => s + (h.totalRake || 0), 0),
+      handsCount: hands.length,
+    }),
+    [hands],
+  );
+
+  const fetchHands = useCallback((currentOffset: number, append: boolean) => {
     const setLoadingFn = append ? setLoadingMore : setLoading;
     setLoadingFn(true);
     fetch(`/api/tables/${tableId}/hands?limit=${PAGE_SIZE}&offset=${currentOffset}`).then(r => r.ok ? r.json() : [])
       .then((data: any[]) => {
-        const newHands = append ? [...hands, ...data] : data;
-        setHands(newHands);
-        const totalPot = newHands.reduce((s: number, h: any) => s + (h.potTotal || 0), 0);
-        const totalRake = newHands.reduce((s: number, h: any) => s + (h.totalRake || 0), 0);
-        setSummary({ totalPot, totalRake, handsCount: newHands.length });
+        setHands(prev => (append ? [...prev, ...data] : data));
         setHasMore(data.length >= PAGE_SIZE);
       })
       .catch(() => {})
       .finally(() => setLoadingFn(false));
-  };
+  }, [tableId]);
 
   useEffect(() => {
     fetchHands(0, false);
-  }, [tableId]);
+  }, [fetchHands]);
 
   const handleLoadMore = () => {
     const newOffset = offset + PAGE_SIZE;
