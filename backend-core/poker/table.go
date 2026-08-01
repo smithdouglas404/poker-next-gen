@@ -771,6 +771,13 @@ func (t *Table) ApplyAction(seat int, action string, amount int64) error {
 		}
 		raiseTotal := amount - s.Bet
 		if raiseTotal <= toCall {
+			// A shove for less than the call is a legal all-in call, not a raise:
+			// the short stack puts in everything it has and the excess stays with
+			// the caller's opponents (BuildSidePots handles the layers). Only an
+			// explicit raise of that size is illegal.
+			if action == "all_in" {
+				return t.ApplyAction(seat, "call", 0)
+			}
 			return fmt.Errorf("raise too small")
 		}
 		if amount > s.Bet+s.Stack {
@@ -920,6 +927,12 @@ func (t *Table) ValidActions(seat int) (actions []string, toCall, minRaise, maxR
 	minRaise = t.CurrentBet + t.MinRaise
 	if minRaise < t.BigBlindAmount() {
 		minRaise = t.BigBlindAmount()
+	}
+	// A stack too short to make the minimum raise can still shove: the only legal
+	// raise-to is its all-in. Reporting a minimum above the maximum would leave a
+	// client with an empty (inverted) raise range for that seat.
+	if minRaise > maxRaise {
+		minRaise = maxRaise
 	}
 	actions = append(actions, "fold")
 	if toCall == 0 {
