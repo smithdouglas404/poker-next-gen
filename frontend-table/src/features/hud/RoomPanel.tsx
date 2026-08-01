@@ -14,8 +14,7 @@ import {
 } from "@/features/game/protocol";
 import { Button, Input, SectionHeader, cn } from "@/features/ui";
 import { getTableGraphics } from "@/features/table/tableGraphics";
-
-const OPEN_STORAGE_KEY = "pkr:roomPanelOpen";
+import { useRoomPanelOpen } from "@/features/hud/roomPanelState";
 
 export function RoomPanel() {
   const {
@@ -45,7 +44,9 @@ export function RoomPanel() {
   // Cinematic is the default look and the felt must stay clear, so the Room
   // Control drawer starts collapsed there (reachable via the ⚙ Room tab). In
   // classic mode it stays open as before. A stored preference still wins.
-  const [open, setOpen] = useState(() => getTableGraphics() !== "cinematic");
+  // Shared with SeatHud (roomPanelState.ts) so the seat ring can shift clear
+  // of the drawer while it's open, instead of open seats landing underneath it.
+  const [open, setOpen] = useRoomPanelOpen(getTableGraphics() !== "cinematic");
 
   // Create-table parameters (blinds in cents, consistent with the buy-in).
   const [smallBlind, setSmallBlind] = useState(DEFAULT_SMALL_BLIND_CENTS);
@@ -66,24 +67,6 @@ export function RoomPanel() {
   const blindsValid = smallBlind >= 1 && bigBlind >= smallBlind;
   const seatsValid = seats >= MIN_SEATS && seats <= MAX_SEATS;
   const createValid = blindsValid && seatsValid;
-
-  // Restore drawer state from localStorage on mount.
-  useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(OPEN_STORAGE_KEY);
-      if (stored !== null) setOpen(stored === "1");
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(OPEN_STORAGE_KEY, open ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
-  }, [open]);
 
   useEffect(() => {
     if (connected) void listTables();
@@ -408,7 +391,7 @@ export function RoomPanel() {
 
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-label={open ? "Close room control" : "Open room control"}
         className="pointer-events-auto mt-2 flex items-center gap-1 rounded-r-xl border border-l-0 border-white/[0.08] bg-surface px-2 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted shadow-lg transition hover:bg-white/5 hover:text-foreground [writing-mode:vertical-rl]"
