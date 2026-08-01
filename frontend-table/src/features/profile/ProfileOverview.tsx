@@ -111,8 +111,20 @@ function AvatarBattleRecord({ avatarId }: { avatarId: string }) {
   );
 }
 
+// Real HRC badge art for the achievement codes whose criteria genuinely match
+// the art's concept (loyalty.go's Catalog codes → /public/badges). Codes with
+// no honest match (e.g. "century", "quad_squad") intentionally fall back to
+// the plain rarity dot below rather than wearing a mismatched badge.
+const ACHIEVEMENT_BADGE_IMG: Record<string, string> = {
+  first_blood: "/badges/badge_first_win.webp",
+  millennium: "/badges/badge_club_legend.webp",
+  iron_player: "/badges/badge_iron_player.webp",
+  straight_flush: "/badges/badge_royal_flush.webp",
+};
+
 function AchievementBadge({ a }: { a: Achievement }) {
   const r = RARITY[a.tier];
+  const img = ACHIEVEMENT_BADGE_IMG[a.id];
   return (
     <div
       className={cn(
@@ -122,7 +134,16 @@ function AchievementBadge({ a }: { a: Achievement }) {
       style={a.earned ? { boxShadow: `0 0 16px -6px ${r.glow}` } : undefined}
     >
       <div className="flex items-center gap-2">
-        <span className={cn("h-2 w-2 rounded-full", a.earned ? "" : "bg-neutral-700")} style={a.earned ? { background: r.glow } : undefined} />
+        {img ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={img}
+            alt=""
+            className={cn("h-6 w-6 rounded-full object-cover", !a.earned && "grayscale")}
+          />
+        ) : (
+          <span className={cn("h-2 w-2 rounded-full", a.earned ? "" : "bg-neutral-700")} style={a.earned ? { background: r.glow } : undefined} />
+        )}
         <span className={cn("font-display text-xs font-bold uppercase tracking-wide", a.earned ? r.text : "text-neutral-500")}>
           {a.name}
         </span>
