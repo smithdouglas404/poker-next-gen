@@ -1,0 +1,72 @@
+name: CI
+
+# Builds and tests every service on pushes and PRs. Each service is its own job
+# with a path filter, so touching one stack doesn't rebuild the others.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch: {}
+
+jobs:
+  frontend-table:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend-table
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend-table/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+
+  mcp-coach:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp-coach
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: mcp-coach/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  backend-core:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache-dependency-path: backend-core/go.sum
+      - run: go vet ./...
+      - run: go test ./...
+      # Nakama runtime module — there is no main package, so a plain
+      # `go build ./...` cannot work here.
+      - run: go build -buildmode=plugin -trimpath -o backend-core.so .
+
+  engine-math:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: engine-math
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: engine-math
+      - run: cargo build --locked
+      - run: cargo test --locked
