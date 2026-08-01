@@ -110,7 +110,10 @@ async fn shuffle_verify(
 ) -> Result<Json<SeedVerifyResponse>, (StatusCode, String)> {
     let (cards, commitment) =
         reproduce_from_seed(&req.seed).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
-    let valid = req.commitment.as_deref().map_or(true, |c| c.eq_ignore_ascii_case(&commitment));
+    let valid = req
+        .commitment
+        .as_deref()
+        .is_none_or(|c| c.trim().eq_ignore_ascii_case(&commitment));
     Ok(Json(SeedVerifyResponse {
         cards,
         commitment,
@@ -415,8 +418,10 @@ async fn deck_verify(
     Json(req): Json<DeckVerifyRequest>,
 ) -> Result<Json<DeckVerifyResponse>, (StatusCode, String)> {
     let computed = deck_commitment(&req.cards);
+    // Hex digests compare case-insensitively — an upper-case hash from a caller
+    // must not read as a tampered deck.
     Ok(Json(DeckVerifyResponse {
-        valid: computed == req.deck_hash,
+        valid: req.deck_hash.trim().eq_ignore_ascii_case(&computed),
         computed_hash: computed,
     }))
 }

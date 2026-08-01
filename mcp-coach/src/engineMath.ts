@@ -22,6 +22,10 @@
 
 const DEFAULT_ENGINE_MATH_URL = "http://localhost:8080";
 
+/** Per-request ceiling so a wedged sidecar cannot hang an MCP tool call forever.
+ *  A CFR solve carries its own deadline_ms, so allow headroom above it. */
+const REQUEST_TIMEOUT_MS = 30_000;
+
 export function engineMathBaseUrl(): string {
   return (process.env.ENGINE_MATH_URL ?? DEFAULT_ENGINE_MATH_URL).replace(/\/+$/, "");
 }
@@ -114,6 +118,7 @@ async function postJson<TReq, TRes>(path: string, body: TReq): Promise<TRes> {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
   } catch (err) {
     throw new EngineMathError(
@@ -153,7 +158,7 @@ export async function health(): Promise<HealthResponse> {
   const url = `${engineMathBaseUrl()}/health`;
   let res: Response;
   try {
-    res = await fetch(url, { method: "GET" });
+    res = await fetch(url, { method: "GET", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   } catch (err) {
     throw new EngineMathError(
       `engine-math unreachable at ${url}: ${(err as Error).message}`,

@@ -224,11 +224,11 @@ pub fn run_it_twice(board: &str, dead: &[&str], boards: usize) -> Result<Vec<Str
     // verbatim (rs_poker's `Hand` reorders internally, which we must not do to a
     // board that is already on the table).
     let board = board.trim();
-    if board.len() % 2 != 0 {
+    let chars: Vec<char> = board.chars().collect();
+    if !chars.len().is_multiple_of(2) {
         return Err(format!("board '{board}' has a dangling card code"));
     }
-    let mut board_cards: Vec<String> = Vec::with_capacity(board.len() / 2);
-    let chars: Vec<char> = board.chars().collect();
+    let mut board_cards: Vec<String> = Vec::with_capacity(chars.len() / 2);
     let mut i = 0;
     while i < chars.len() {
         let r = chars[i];
@@ -344,7 +344,7 @@ pub fn gto_advise(
         0.0
     };
     let ev_call = hero_eq * (pot + to_call) - to_call;
-    let mut suggested = "check".to_string();
+    let suggested;
     let mut rationale = format!(
         "hero equity {:.1}% vs pot odds {:.1}%",
         hero_eq * 100.0,
@@ -813,7 +813,10 @@ pub struct IcmResult {
 /// inputs are rounded to the nearest whole unit.
 ///
 /// # Errors
-/// Returns `Err` on empty stacks or payouts.
+/// Returns `Err` on empty stacks or payouts, a stack that rounds to zero chips
+/// (a busted player has no ICM equity and stalls the simulator), or more paid
+/// places than players (those places can never be awarded, so the reported
+/// equities could not sum to the prize pool).
 pub fn icm(chips: Vec<f64>, payouts: Vec<f64>, trials: usize) -> Result<IcmResult, String> {
     use rs_poker::simulated_icm::simulate_icm_tournament;
 
@@ -823,8 +826,18 @@ pub fn icm(chips: Vec<f64>, payouts: Vec<f64>, trials: usize) -> Result<IcmResul
     if payouts.is_empty() {
         return Err("need at least one payout".into());
     }
+    if payouts.len() > chips.len() {
+        return Err(format!(
+            "{} paid places for {} players — every paid place needs a player",
+            payouts.len(),
+            chips.len()
+        ));
+    }
 
     let chip_stacks: Vec<i32> = chips.iter().map(|c| c.round().max(0.0) as i32).collect();
+    if let Some(i) = chip_stacks.iter().position(|c| *c <= 0) {
+        return Err(format!("chip stack {i} rounds to 0 chips; drop busted stacks"));
+    }
     let payments: Vec<i32> = payouts.iter().map(|p| p.round().max(0.0) as i32).collect();
 
     let runs = trials.clamp(100, 100_000);
@@ -990,6 +1003,28 @@ mod tests {
         for b in &boards {
             assert_eq!(b, "QdJc2s5h9c");
         }
+    }
+
+    #[test]
+    fn run_it_twice_rejects_non_ascii_board() {
+        // A multi-byte character makes the byte length even while the character
+        // count is odd — the parser must reject it, not index past the end.
+        let err = run_it_twice("é", &["AsAh"], 2).expect_err("non-ascii board must error");
+        assert!(err.contains("dangling") || err.contains("invalid"), "{err}");
+    }
+
+    #[test]
+    fn icm_rejects_busted_and_unpayable_places() {
+        // A stack that rounds to zero is a busted player: the simulator still
+        // seats it and pays it a real prize (and with every stack at zero it
+        // underflows its place counter and panics).
+        let err = icm(vec![0.4, 1000.0], vec![100.0, 60.0], 100).expect_err("busted stack");
+        assert!(err.contains("0 chips"), "{err}");
+        // More paid places than players: those places can never be awarded, so
+        // the equities could not sum to the reported prize pool.
+        let err = icm(vec![1000.0, 1000.0], vec![100.0, 60.0, 40.0], 100)
+            .expect_err("unpayable places");
+        assert!(err.contains("paid place"), "{err}");
     }
 
     #[test]

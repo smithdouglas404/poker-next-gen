@@ -114,6 +114,13 @@ const analyzeSpotShape = {
     .describe("Wall-clock budget for the CFR solve. Higher => more likely to converge."),
 } as const;
 
+/** engine-math parses card strings two characters at a time, so any whitespace
+ *  inside them is a parse error. Tool callers are told 'Jh Ts 2c' is fine, so
+ *  strip it before the cards reach the sidecar. */
+function normalizeCards(cards: string): string {
+  return cards.replace(/\s+/g, "");
+}
+
 interface SpotEngineData {
   cfr: CfrAdvice | { error: string };
   equity: EquityResponse | { error: string };
@@ -130,11 +137,13 @@ async function gatherSpot(args: {
   villain_stack: number;
   deadline_ms: number;
 }): Promise<SpotEngineData> {
-  const board = args.board.trim();
+  const board = normalizeCards(args.board);
+  const heroHole = normalizeCards(args.hero_hole);
+  const villainHole = normalizeCards(args.villain_hole);
   const [cfr, eq, gto] = await Promise.allSettled([
     cfrSolve({
-      hero_hole: args.hero_hole,
-      villain_hole: args.villain_hole,
+      hero_hole: heroHole,
+      villain_hole: villainHole,
       board,
       hero_stack: args.hero_stack,
       villain_stack: args.villain_stack,
@@ -142,10 +151,10 @@ async function gatherSpot(args: {
       to_call: args.to_call,
       deadline_ms: args.deadline_ms,
     }),
-    equity({ holes: [args.hero_hole, args.villain_hole], board }),
+    equity({ holes: [heroHole, villainHole], board }),
     gtoAdvise({
-      hero_hole: args.hero_hole,
-      villain_holes: [args.villain_hole],
+      hero_hole: heroHole,
+      villain_holes: [villainHole],
       board,
       pot: args.pot,
       to_call: args.to_call,
@@ -153,7 +162,9 @@ async function gatherSpot(args: {
   ]);
 
   const unwrap = <T>(r: PromiseSettledResult<T>): T | { error: string } =>
-    r.status === "fulfilled" ? r.value : { error: (r.reason as Error).message };
+    r.status === "fulfilled"
+      ? r.value
+      : { error: r.reason instanceof Error ? r.reason.message : String(r.reason) };
 
   return { cfr: unwrap(cfr), equity: unwrap(eq), gto: unwrap(gto) };
 }
@@ -310,7 +321,7 @@ function buildServer(): McpServer {
         `Spot:\n` +
         `  hero_hole: ${args.hero_hole}\n` +
         `  villain_hole: ${args.villain_hole}\n` +
-        `  board: ${args.board.trim() || "(preflop)"}\n` +
+        `  board: ${normalizeCards(args.board) || "(preflop)"}\n` +
         `  pot: ${args.pot}\n` +
         `  to_call: ${args.to_call}\n` +
         `  hero_stack: ${args.hero_stack}, villain_stack: ${args.villain_stack}\n\n` +
