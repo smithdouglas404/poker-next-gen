@@ -45,12 +45,12 @@ func (s *LoyaltyStore) Get(ctx context.Context, userID string) (Loyalty, error) 
 }
 
 // Award increments lifetime HRP, the spendable balance, and every per-hand
-// counter in one upsert. Earned points raise BOTH the lifetime total (rank)
-// and the spendable balance (rewards) by the same amount. wonDelta > 0 both
-// bumps hands_won and extends the win streak; wonDelta == 0 resets the streak
-// to 0 (any non-winning hand breaks it). winningsCentsDelta and
-// noShowdownWinDelta are 0 for the achievement-HRP top-up call (no second hand
-// was played) and for a losing hand.
+// counter in one upsert — call this ONLY for an actual hand result (winning
+// or losing), never for a standalone bonus credit (use AwardBonus for that;
+// see its doc comment for why). Earned points raise BOTH the lifetime total
+// (rank) and the spendable balance (rewards) by the same amount. wonDelta > 0
+// both bumps hands_won and extends the win streak; wonDelta == 0 resets the
+// streak to 0 (any non-winning hand breaks it).
 func (s *LoyaltyStore) Award(ctx context.Context, userID string, hrp, playedDelta, wonDelta, winningsCentsDelta, noShowdownWinDelta int64) (Loyalty, error) {
 	l := Loyalty{UserID: userID}
 	won := wonDelta > 0
@@ -73,6 +73,30 @@ func (s *LoyaltyStore) Award(ctx context.Context, userID string, hrp, playedDelt
 		RETURNING hrp_total, hrp_spendable, hands_played, hands_won,
 		          total_winnings_cents, no_showdown_wins, current_win_streak, best_win_streak`,
 		userID, hrp, playedDelta, wonDelta, winningsCentsDelta, noShowdownWinDelta, won).
+		Scan(&l.HRPTotal, &l.HRPSpendable, &l.HandsPlayed, &l.HandsWon,
+			&l.TotalWinningsCents, &l.NoShowdownWins, &l.CurrentWinStreak, &l.BestWinStreak)
+	return l, err
+}
+
+// AwardBonus tops up lifetime + spendable HRP only — for credits that are NOT
+// a hand result (achievement unlocks, tournament-championship bonuses). Using
+// Award for these (with wonDelta=0) would corrupt CurrentWinStreak: Award's
+// "wonDelta==0 resets the streak" rule is meant for an actual losing hand, not
+// a bonus top-up that happens to follow a winning one — confirmed as a real
+// bug via a live-table test (a player who won every hand still showed a
+// broken, reset streak because each achievement's bonus Award call zeroed it).
+func (s *LoyaltyStore) AwardBonus(ctx context.Context, userID string, hrp int64) (Loyalty, error) {
+	l := Loyalty{UserID: userID}
+	err := s.db.QueryRowContext(ctx, `
+		INSERT INTO poker_loyalty (user_id, hrp_total, hrp_spendable, updated_at)
+		VALUES ($1,$2,$2,NOW())
+		ON CONFLICT (user_id) DO UPDATE SET
+			hrp_total     = poker_loyalty.hrp_total + $2,
+			hrp_spendable = poker_loyalty.hrp_spendable + $2,
+			updated_at    = NOW()
+		RETURNING hrp_total, hrp_spendable, hands_played, hands_won,
+		          total_winnings_cents, no_showdown_wins, current_win_streak, best_win_streak`,
+		userID, hrp).
 		Scan(&l.HRPTotal, &l.HRPSpendable, &l.HandsPlayed, &l.HandsWon,
 			&l.TotalWinningsCents, &l.NoShowdownWins, &l.CurrentWinStreak, &l.BestWinStreak)
 	return l, err

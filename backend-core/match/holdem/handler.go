@@ -2822,7 +2822,7 @@ func accrueLoyalty(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *
 		for _, code := range codes {
 			if newly, _ := ls.UnlockAchievement(ctx, seat.UserID, code); newly {
 				if a, ok := loyalty.Catalog[code]; ok && a.HRP > 0 {
-					_, _ = ls.Award(ctx, seat.UserID, a.HRP, 0, 0, 0, 0)
+					_, _ = ls.AwardBonus(ctx, seat.UserID, a.HRP)
 					_ = ss.RecordHRP(ctx, seat.UserID, a.HRP, "achievement:"+code, nil)
 					social.RecordHRP(ctx, nk, seat.UserID, seat.Username, a.HRP)
 				}
