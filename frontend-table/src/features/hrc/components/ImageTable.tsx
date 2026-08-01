@@ -185,55 +185,15 @@ export function ImageTable({
       {/* ── Game elements overlay — matches table image position exactly ── */}
       <div className="pointer-events-none" style={{ ...FELT_BOUNDS, zIndex: 10 }}>
 
-        {/* Seat slots — rendered as HTML squares (never misalign on resize) */}
-        {Array.from({ length: maxSeats }).map((_, i) => {
-          const seat = TABLE_SEATS[i];
-          if (!seat) return null;
-          const isOccupied = occupiedSet ? occupiedSet.has(i) : i < occupiedCount;
-          // Empty seats are clickable
-          if (!isOccupied) {
-            const s = seat.scale;
-            // Match an occupied seat's FULL footprint, not just the portrait
-            // square — a real seat is the 100px portrait PLUS the attached
-            // name/chip pill below it (~139px total, per measured DOM). A
-            // 100x100 vacant box is shorter than that, so it still reads as
-            // undersized next to a real seat even though it's now visible.
-            return (
-              <div
-                key={`empty-${i}`}
-                className="absolute pointer-events-auto cursor-pointer group"
-                style={{
-                  left: `${seat.x}%`,
-                  top: `${seat.y}%`,
-                  transform: `translate(-50%, -50%) scale(${s})`,
-                }}
-              >
-                <div
-                  className="flex flex-col items-center justify-center gap-2.5 rounded-xl border-2 border-dashed transition-all group-hover:scale-105"
-                  style={{
-                    width: 130,
-                    height: 139,
-                    borderColor: "rgba(212,175,55,0.55)",
-                    background: "rgba(212,175,55,0.1)",
-                    boxShadow: "0 0 14px rgba(212,175,55,0.15)",
-                  }}
-                >
-                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.75 }}>
-                    <circle cx="12" cy="8" r="4" stroke="#f5c518" strokeWidth="1.8" />
-                    <path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7" stroke="#f5c518" strokeWidth="1.8" strokeLinecap="round" />
-                  </svg>
-                  <span
-                    className="font-bold uppercase tracking-[0.15em]"
-                    style={{ fontSize: "0.6875rem", color: "rgba(245,197,24,0.85)" }}
-                  >
-                    Vacant
-                  </span>
-                </div>
-              </div>
-            );
-          }
-          return null; // Occupied seats rendered by Seat component
-        })}
+        {/* Empty-seat markers are NOT rendered here — SeatHud.tsx's SeatCard
+            already draws a real, clickable "Sit Here" card for every empty
+            seat (wired to the real sitDown RPC), positioned via its own
+            computeTableLayout/getSeatPositions geometry. This file used to
+            also draw a purely decorative "Vacant" box (dashed border, no
+            onClick) at the same seats via the older TABLE_SEATS coordinates,
+            which didn't line up with SeatHud's layout and produced two
+            stacked, conflicting empty-seat indicators. Removed rather than
+            reconciled — SeatHud's card is the one that actually works. */}
 
         {/* ── Burn card visual ── */}
         <AnimatePresence>
