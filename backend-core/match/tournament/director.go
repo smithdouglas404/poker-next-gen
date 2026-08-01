@@ -203,47 +203,35 @@ func (h *Handler) checkFinish(ctx context.Context, logger runtime.Logger, db *sq
 	bracket, _ := tStore.Get(ctx, s.TournamentID)
 	pool := store.TournamentMoney(bracket, entrants).PoolMinor
 
-	// Pay the full prize ladder: each tier's basis-point share is split evenly
-	// across the finishing positions it covers.
+	// store.TournamentPayouts owns the ladder arithmetic (shared with the
+	// tournament_finalize RPC): it keeps an over-promised ladder inside the
+	// pool and pays the champion when no ladder was configured.
 	prizes, _ := tStore.ListPrizes(ctx, s.TournamentID)
 	finishers, _ := tStore.ListFinishers(ctx, s.TournamentID)
-	for _, prize := range prizes {
-		places := int(prize.RankTo - prize.RankFrom + 1)
-		if places <= 0 {
-			places = 1
+	for _, p := range store.TournamentPayouts(prizes, finishers, pool) {
+		// FinishOnce already claimed and committed 'finished' above, by design,
+		// so nothing will ever retry this payout for this tournament — a failure
+		// here has no other chance to be corrected.
+		if perr := tStore.PayWinner(ctx, s.TournamentID, p.UserID, p.AmountMinor); perr != nil {
+			logger.Error("TOURNAMENT PAYOUT FAILED tournament=%s user=%s place=%d amount_cents=%d: %v",
+				s.TournamentID, p.UserID, p.Place, p.AmountMinor, perr)
+		} else if aerr := audit.EmitLedger(ctx, audit.NewPostgresEmitter(db), "tournament_prize_paid", bracket.ClubID, map[string]any{
+			"tournament_id": s.TournamentID,
+			"user_id":       p.UserID,
+			"finish_place":  p.Place,
+			"amount_cents":  p.AmountMinor,
+		}); aerr != nil {
+			logger.Warn("tournament prize audit anchor failed: %v", aerr)
 		}
-		perPlace := pool * int64(prize.PayoutBps) / 10000 / int64(places)
-		if perPlace <= 0 {
-			continue
+		subject, code := "tournament_cashed", social.CodeTournamentInfo
+		if p.Place == 1 {
+			subject, code = "tournament_won", social.CodeTournamentWon
 		}
-		for _, f := range finishers {
-			if f.FinishPlace < int(prize.RankFrom) || f.FinishPlace > int(prize.RankTo) {
-				continue
-			}
-			// FinishOnce already claimed and committed 'finished' above, by
-			// design, so nothing will ever retry this payout for this
-			// tournament — a failure here has no other chance to be corrected.
-			if perr := tStore.PayWinner(ctx, s.TournamentID, f.UserID, perPlace); perr != nil {
-				logger.Error("TOURNAMENT PAYOUT FAILED tournament=%s user=%s place=%d amount_cents=%d: %v",
-					s.TournamentID, f.UserID, f.FinishPlace, perPlace, perr)
-			} else if aerr := audit.EmitLedger(ctx, audit.NewPostgresEmitter(db), "tournament_prize_paid", bracket.ClubID, map[string]any{
-				"tournament_id": s.TournamentID,
-				"user_id":       f.UserID,
-				"finish_place":  f.FinishPlace,
-				"amount_cents":  perPlace,
-			}); aerr != nil {
-				logger.Warn("tournament prize audit anchor failed: %v", aerr)
-			}
-			subject, code := "tournament_cashed", social.CodeTournamentInfo
-			if f.FinishPlace == 1 {
-				subject, code = "tournament_won", social.CodeTournamentWon
-			}
-			social.Notify(ctx, nk, f.UserID, subject, map[string]interface{}{
-				"tournament_id": s.TournamentID,
-				"place":         f.FinishPlace,
-				"amount":        perPlace,
-			}, code)
-		}
+		social.Notify(ctx, nk, p.UserID, subject, map[string]interface{}{
+			"tournament_id": s.TournamentID,
+			"place":         p.Place,
+			"amount":        p.AmountMinor,
+		}, code)
 	}
 
 	// Status is already 'finished' — FinishOnce claimed it before any payout ran.

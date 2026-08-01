@@ -300,7 +300,17 @@ func PrizePoolAdd(ctx context.Context, logger runtime.Logger, db *sql.DB, nk run
 	if _, err := requireTournamentOwner(ctx, db, req.TournamentID); err != nil {
 		return "", err
 	}
-	if err := store.NewTournamentStore(db).AddPrizeTier(ctx, &req); err != nil {
+	ts := store.NewTournamentStore(db)
+	// The ladder is real money: a tier that overlaps another or pushes the total
+	// past 100% would pay out more than the tournament collected.
+	existing, err := ts.ListPrizes(ctx, req.TournamentID)
+	if err != nil {
+		return "", runtime.NewError(err.Error(), 13)
+	}
+	if err := store.ValidatePrizeLadder(existing, &req); err != nil {
+		return "", runtime.NewError(err.Error(), 3)
+	}
+	if err := ts.AddPrizeTier(ctx, &req); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	out, _ := json.Marshal(req)
