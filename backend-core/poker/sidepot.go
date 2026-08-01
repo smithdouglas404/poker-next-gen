@@ -64,6 +64,70 @@ func BuildSidePots(t *Table) []SidePot {
 	return pots
 }
 
+// UncalledRefunds returns, per seat, the chips in the pot that no live player
+// can win: rungs of the contribution ladder where every remaining contributor
+// has folded. Those chips were never called, so they go back to whoever put
+// them in instead of being paid to a winner — BuildSidePots drops such a layer
+// (there is nobody eligible for it), which would otherwise destroy the chips.
+// Nil for an uncontested hand, where the last player standing takes the whole
+// pot including their own uncalled bet.
+func UncalledRefunds(t *Table) map[int]int64 {
+	if _, ok := t.UncontestedWinner(); ok {
+		return nil
+	}
+	type entry struct {
+		seat   int
+		total  int64
+		folded bool
+	}
+	var remaining []entry
+	for i, s := range t.Seats {
+		if s == nil || s.TotalContributed <= 0 {
+			continue
+		}
+		remaining = append(remaining, entry{seat: i, total: s.TotalContributed, folded: s.Status == SeatFolded})
+	}
+	sort.Slice(remaining, func(i, j int) bool { return remaining[i].total < remaining[j].total })
+
+	refunds := map[int]int64{}
+	for len(remaining) > 0 {
+		minAmt := remaining[0].total
+		live := false
+		for _, e := range remaining {
+			if !e.folded {
+				live = true
+				break
+			}
+		}
+		if !live && minAmt > 0 {
+			for _, e := range remaining {
+				refunds[e.seat] += minAmt
+			}
+		}
+		var next []entry
+		for _, e := range remaining {
+			e.total -= minAmt
+			if e.total > 0 {
+				next = append(next, e)
+			}
+		}
+		remaining = next
+	}
+	if len(refunds) == 0 {
+		return nil
+	}
+	return refunds
+}
+
+// payUncalledRefunds returns uncalled chips to their contributors' stacks.
+func payUncalledRefunds(t *Table) {
+	for seat, amount := range UncalledRefunds(t) {
+		if amount > 0 && t.Seats[seat] != nil {
+			t.Seats[seat].Stack += amount
+		}
+	}
+}
+
 func handCardString(hole []Card, community []Card) string {
 	var b strings.Builder
 	for _, c := range hole {
@@ -132,6 +196,7 @@ func AwardSidePots(t *Table) ([][]int, int64, error) {
 		return [][]int{{winner}}, amount, nil
 	}
 
+	payUncalledRefunds(t)
 	pots := BuildSidePots(t)
 	allWinners := make([][]int, 0, len(pots))
 	var total int64

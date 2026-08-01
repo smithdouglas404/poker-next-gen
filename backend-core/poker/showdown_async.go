@@ -299,6 +299,10 @@ func DeductRakeFromWinners(t *Table, resolutions []PotResolution, rake int64) {
 func ApplyResolutions(t *Table, resolutions []PotResolution) ([][]int, int64) {
 	groups := make([][]int, 0, len(resolutions))
 	var total int64
+	// Chips no live player could win (an uncalled bet whose only contributors
+	// folded) are never part of a resolution — hand them back before the pot is
+	// cleared, or they would vanish from the table.
+	payUncalledRefunds(t)
 	for _, r := range resolutions {
 		pokerAward(t, r.Winners, r.Amount)
 		groups = append(groups, r.Winners)
