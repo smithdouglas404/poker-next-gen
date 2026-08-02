@@ -21,7 +21,6 @@ import {
   DECISION_TIME_OPTIONS,
   DURATION_OPTIONS,
   MIN_PLAYERS_OPTIONS,
-  demoRoomCode,
   generateJoinCode,
   type AccessType,
   type ClubLite,
@@ -41,7 +40,6 @@ interface CreatedTable {
   match_id?: string;
   room_id?: string;
   code?: string;
-  demo?: boolean;
 }
 
 const FEATURE_TOGGLES: Array<{ key: FeatureKey; label: string; blurb: string }> = [
@@ -239,13 +237,12 @@ export function PrivateTableSetup({
         await joinRoom(matchId);
       }
     } catch (e) {
-      // Offline / guest with no reachable backend: show a clearly-labeled demo
-      // confirmation rather than a hard failure. Never presented as live.
-      if (!connected) {
-        setCreated({ demo: true, code: demoRoomCode(), room_id: name.trim() || fallbackName });
-      } else {
-        setError(e instanceof Error ? e.message : "Could not create the table");
-      }
+      // A failed create is a failed create. This used to fabricate a "Demo
+      // (offline)" confirmation with an invented room code whenever the session
+      // was unreachable — a table that does not exist, announced as if it did,
+      // with a code nobody can join. Demo is opt-in only (features/ui/demoMode),
+      // so an error now reports itself honestly.
+      setError(e instanceof Error ? e.message : "Could not create the table");
     } finally {
       setBusy(false);
     }
@@ -916,24 +913,11 @@ export function PrivateTableSetup({
         </div>
 
         {created && (
-          <div
-            className={cn(
-              GLASS_PANEL,
-              "border-gold/30 p-5",
-              created.demo && "border-amber-400/30",
-            )}
-          >
+          <div className={cn(GLASS_PANEL, "border-gold/30 p-5")}>
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-gold shadow-[0_0_10px_rgba(245,197,24,0.6)]" />
-              <p className={cn(HEADING_SM, "text-gold")}>
-                {created.demo ? "Demo (offline)" : "Table Created"}
-              </p>
+              <p className={cn(HEADING_SM, "text-gold")}>Table Created</p>
             </div>
-            {created.demo && (
-              <p className="mt-2 text-[11px] text-amber-200/80">
-                No backend reachable — this is a demo confirmation, not a live table.
-              </p>
-            )}
             {created.code && (
               <div className="mt-3">
                 <p className="text-[10px] uppercase tracking-[0.2em] text-neutral-500">Room Code</p>
@@ -945,7 +929,7 @@ export function PrivateTableSetup({
                 </p>
               </div>
             )}
-            {!created.demo && created.match_id && (
+            {created.match_id && (
               <p className="mt-3 text-[11px] text-neutral-400">
                 {connected ? "Seating you now…" : "Sign in to take your seat."}
               </p>

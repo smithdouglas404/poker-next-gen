@@ -11,8 +11,6 @@ import { PrivateTableSetup } from "@/features/lobby/PrivateTableSetup";
 import { PublicGameBrowser } from "@/features/lobby/PublicGameBrowser";
 import { PublicLobbyList } from "@/features/lobby/PublicLobbyList";
 import {
-  DEMO_CLUBS,
-  DEMO_TOURNAMENTS,
   normalizeTournaments,
   type ClubLite,
   type LobbyView,
@@ -110,8 +108,12 @@ function LobbyContent() {
   const ownedClubs = useMemo(() => {
     const ids = new Set(roles?.club_admin_of ?? []);
     const owned = clubs.filter((c) => ids.has(c.id));
+    // A platform admin may sponsor on behalf of any REAL club, but never a
+    // fabricated one. The old `: DEMO_CLUBS` fallback put a "demo-club" id into
+    // the sponsor picker, which was then sent as `club_id` to the live
+    // table_create — a request the server can only reject.
     if (owned.length === 0 && roles?.platform_admin) {
-      return clubs.length > 0 ? clubs : DEMO_CLUBS;
+      return clubs;
     }
     return owned;
   }, [roles, clubs]);
@@ -373,7 +375,6 @@ function LobbyContent() {
               <div className="mt-5">
                 <PublicLobbyList
                   liveTables={openTables}
-                  connected={connected}
                   busy={busy}
                   query={query}
                   onJoin={(id) => void run(() => joinRoom(id))}
@@ -413,7 +414,13 @@ function LobbyContent() {
             ) : (
               <PrivateTableSetup
                 mode={view}
-                sponsorClubs={view === "public" ? ownedClubs : undefined}
+                // EVERY table is hosted by a club — table_create rejects a
+                // request without one (rpc/table.go), and PrivateTableSetup
+                // disables Create until a sponsor is picked. Passing these only
+                // for "public" left the private and play-money flows with an
+                // empty picker and a permanently disabled Create button, even
+                // for a host who owns clubs.
+                sponsorClubs={ownedClubs}
                 onBack={() => setView("select")}
               />
             )}
@@ -490,7 +497,6 @@ function LobbyContent() {
         {view === "browse" && (
           <PublicGameBrowser
             liveTables={openTables}
-            connected={connected}
             busy={busy}
             onJoin={(id) => void run(() => joinRoom(id))}
             onBack={() => setView("select")}

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { formatCents } from "@/features/game/GameProvider";
 import type { TableListItem } from "@/features/game/protocol";
+import { useDemoMode } from "@/features/ui/demoMode";
 import { BTN_GOLD, GLASS_PANEL, GLASS_PANEL_HOVER, cn } from "@/features/ui/tokens";
 
 import {
@@ -24,24 +25,26 @@ import {
 
 export function PublicLobbyList({
   liveTables,
-  connected,
   busy,
   query,
   onJoin,
 }: {
   liveTables: TableListItem[];
-  connected: boolean;
   busy: boolean;
   query: string;
   onJoin: (matchId: string) => void;
 }) {
   const [stakes, setStakes] = useState<Set<StakeTier>>(new Set());
+  const demo = useDemoMode();
 
   const rows = useMemo<PublicTableRow[]>(() => {
     if (liveTables.length > 0) return rowsFromLiveTables(liveTables);
-    // No live tables: demo fallback only when there is no backend session.
-    return connected ? [] : DEMO_PUBLIC_TABLES;
-  }, [liveTables, connected]);
+    // Demo is OPT-IN (`?demo=1`), never a fallback — see features/ui/demoMode.
+    // This used to show the fabricated table list to anyone whose session was
+    // merely offline, which is exactly the substitution that rule forbids: no
+    // live tables renders the honest empty state instead.
+    return demo ? DEMO_PUBLIC_TABLES : [];
+  }, [liveTables, demo]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -110,10 +113,13 @@ export function PublicLobbyList({
         filtered.map((r) => {
           const full = r.seated >= r.capacity;
           const pct = Math.min(100, Math.round((r.seated / r.capacity) * 100));
+          // Blinds come from the match label. When it carries none there is
+          // nothing real to show — falling back to the buy-in put a dollar
+          // figure under a "Blinds" heading, which is simply a different number.
           const blinds =
             r.big_blind_minor && r.small_blind_minor
               ? `${r.small_blind_minor / 100}/${r.big_blind_minor / 100}`
-              : formatCents(r.buy_in_minor);
+              : "—";
           return (
             <article
               key={r.match_id}
@@ -147,9 +153,11 @@ export function PublicLobbyList({
                     </span>
                   )}
                 </div>
-                <p className="mt-0.5 text-[11px] uppercase tracking-[0.15em] text-neutral-500">
-                  Buy-in {formatCents(r.buy_in_minor)}
-                </p>
+                {r.buy_in_minor !== undefined && (
+                  <p className="mt-0.5 text-[11px] uppercase tracking-[0.15em] text-neutral-500">
+                    Buy-in {formatCents(r.buy_in_minor)}
+                  </p>
+                )}
               </div>
 
               {/* blind levels */}

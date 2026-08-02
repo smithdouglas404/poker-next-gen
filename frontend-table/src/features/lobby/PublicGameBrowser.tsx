@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import type { TableListItem } from "@/features/game/protocol";
+import { useDemoMode } from "@/features/ui/demoMode";
 import { BTN_GOLD, GLASS_PANEL, GLASS_PANEL_HOVER, cn } from "@/features/ui/tokens";
 
 import {
@@ -19,18 +20,16 @@ import {
 // public games with a Stakes multi-select (Low / Medium / High) and a Game Type
 // dropdown. Each card shows a LIVE badge, felt thumbnail, Table Name, Blind
 // Levels and Players, and a gold JOIN TABLE CTA. Live rows come from the
-// `table_list` RPC (GameProvider.openTables); offline/guest sessions fall back
-// to clearly-labeled demo rows so the browser always reads intentionally.
+// `table_list` RPC (GameProvider.openTables). The showcase grid is opt-in only
+// (`?demo=1`); with no live tables the browser renders an honest empty state.
 
 export function PublicGameBrowser({
   liveTables,
-  connected,
   busy,
   onJoin,
   onBack,
 }: {
   liveTables: TableListItem[];
-  connected: boolean;
   busy: boolean;
   onJoin: (matchId: string) => void;
   onBack: () => void;
@@ -38,11 +37,13 @@ export function PublicGameBrowser({
   const [stakes, setStakes] = useState<Set<StakeTier>>(new Set());
   const [gameType, setGameType] = useState("all");
   const [seatsOnly, setSeatsOnly] = useState(false);
+  const demo = useDemoMode();
 
   const rows = useMemo<PublicTableRow[]>(() => {
     if (liveTables.length > 0) return rowsFromLiveTables(liveTables);
-    return connected ? [] : DEMO_BROWSER_TABLES;
-  }, [liveTables, connected]);
+    // Demo is OPT-IN, never an offline fallback (features/ui/demoMode).
+    return demo ? DEMO_BROWSER_TABLES : [];
+  }, [liveTables, demo]);
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
