@@ -90,7 +90,52 @@ func (s *WithdrawalStore) CreateRequest(ctx context.Context, userID string, amou
 	return id, nil
 }
 
-// Approve marks a pending withdrawal paid (funds were already held on request).
+// ClaimForPayout atomically takes exclusive ownership of a pending withdrawal
+// before any external payout is attempted, moving it to 'paying'.
+//
+// This exists because the approve path used to read the row unlocked, fire an
+// IRREVERSIBLE crypto payout, and only then flip the status. Two admins (or one
+// double-click, or a retried request) could both observe 'pending' and both
+// send real money, with the accounting recording a single payout. Claiming
+// first means exactly one caller is ever authorised to spend.
+//
+// Returns the fields the payout needs, so this REPLACES the previous unlocked
+// GetByID — there is no read left outside the claim.
+func (s *WithdrawalStore) ClaimForPayout(ctx context.Context, id string) (*Withdrawal, error) {
+	var w Withdrawal
+	w.ID = id
+	err := s.db.QueryRowContext(ctx, `
+		UPDATE poker_withdrawal SET status='paying', updated_at=NOW()
+		WHERE id=$1 AND status='pending'
+		RETURNING user_id, amount_cents, currency, destination, gateway`, id).
+		Scan(&w.UserID, &w.AmountCents, &w.Currency, &w.Destination, &w.Gateway)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("withdrawal not pending")
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &w, nil
+}
+
+// ReleaseClaim moves a claimed withdrawal to 'payout_failed' when the external
+// payout call errored.
+//
+// Deliberately NOT back to 'pending': a transport error is ambiguous about
+// whether the money actually left, and returning it to the approvable pool is
+// exactly how a second payout gets sent for the same request. A human has to
+// reconcile against the gateway before it can be approved again.
+func (s *WithdrawalStore) ReleaseClaim(ctx context.Context, id, reason string) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE poker_withdrawal SET status='payout_failed', reason=$2, updated_at=NOW()
+		WHERE id=$1 AND status='paying'`, id, reason)
+	return err
+}
+
+// Approve marks a claimed/pending withdrawal paid (funds were already held on
+// request). Accepts 'paying' as well as 'pending' so the claim-then-pay path
+// above can settle; the manual (non-gateway) path never enters 'paying' and is
+// unaffected.
 func (s *WithdrawalStore) Approve(ctx context.Context, id, payoutID string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -103,7 +148,7 @@ func (s *WithdrawalStore) Approve(ctx context.Context, id, payoutID string) erro
 	var amount int64
 	err = tx.QueryRowContext(ctx, `
 		UPDATE poker_withdrawal SET status='paid', gateway_payout_id=$2, updated_at=NOW()
-		WHERE id=$1 AND status='pending'
+		WHERE id=$1 AND status IN ('pending','paying')
 		RETURNING amount_cents`, id, payoutID).Scan(&amount)
 	if err == sql.ErrNoRows {
 		return fmt.Errorf("withdrawal not pending")

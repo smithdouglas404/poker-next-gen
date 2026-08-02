@@ -369,9 +369,24 @@ function ClaimCard({
 
 const WITHDRAW_STATUS_TONE: Record<string, string> = {
   pending: "text-amber-300 border-amber-500/30 bg-amber-500/5",
+  // An admin has claimed the request and the external payout is in flight.
+  paying: "text-amber-300 border-amber-500/30 bg-amber-500/5",
   paid: "text-emerald-300 border-emerald-500/30 bg-emerald-500/5",
   approved: "text-emerald-300 border-emerald-500/30 bg-emerald-500/5",
   rejected: "text-red-300 border-red-500/30 bg-red-500/5",
+  // The gateway call errored after the claim — being reconciled by hand.
+  payout_failed: "text-red-300 border-red-500/30 bg-red-500/5",
+};
+
+/** Player-facing wording for a withdrawal status. Raw DB values like
+ *  "payout_failed" must never reach the screen. */
+const WITHDRAW_STATUS_LABEL: Record<string, string> = {
+  pending: "Pending review",
+  paying: "Sending",
+  paid: "Paid",
+  approved: "Approved",
+  rejected: "Rejected",
+  payout_failed: "Under review",
 };
 
 function WithdrawPanel({
@@ -497,7 +512,7 @@ function WithdrawPanel({
                     "border-white/15 bg-white/5 text-neutral-300",
                 )}
               >
-                {w.status}
+                {WITHDRAW_STATUS_LABEL[w.status] ?? w.status}
               </span>
             </div>
           ))}

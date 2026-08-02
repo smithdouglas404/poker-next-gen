@@ -24,7 +24,50 @@ pub fn rank_hand(cards: &str) -> Result<Rank, String> {
     if hand.count() < 5 {
         return Err(format!("need at least 5 cards, got {}", hand.count()));
     }
+    // rs_poker's evaluator only supports up to 7 cards, and guards that with a
+    // debug_assert! which is compiled out in release. Its table lookups are
+    // power-of-two masked, so an 8+ card hand doesn't panic — it silently
+    // returns what the crate's own docs call "a meaningless score". On the
+    // settlement path a meaningless score decides who gets paid, so reject it.
+    if hand.count() > 7 {
+        return Err(format!("at most 7 cards, got {}", hand.count()));
+    }
     Ok(hand.rank())
+}
+
+/// Reject a deal in which the same physical card appears twice across the board
+/// and every player's hole cards.
+///
+/// `Hand::new_from_str` only rejects duplicates WITHIN one player's string, so
+/// nothing stopped two players being dealt the same card and a winner still
+/// being returned for a physically impossible deal — on the path that decides
+/// real money. `range_equity` already guards its sampling this way; this is the
+/// same check applied where it settles.
+fn assert_distinct_deal(holes: &[&str], board: &str) -> Result<(), String> {
+    let mut used: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut add = |src: &str, whose: &str| -> Result<(), String> {
+        if !src.is_ascii() {
+            return Err(format!("{whose} contains a non-ASCII character"));
+        }
+        let chars: Vec<char> = src.trim().chars().collect();
+        if chars.len() % 2 != 0 {
+            return Err(format!("{whose} has a dangling card code"));
+        }
+        let mut i = 0;
+        while i < chars.len() {
+            let code = format!("{}{}", chars[i], chars[i + 1]);
+            if !used.insert(code.clone()) {
+                return Err(format!("card {code} appears more than once in this deal"));
+            }
+            i += 2;
+        }
+        Ok(())
+    };
+    add(board, "board")?;
+    for (i, hole) in holes.iter().enumerate() {
+        add(hole, &format!("player {i}'s hole cards"))?;
+    }
+    Ok(())
 }
 
 /// Compare two hands and report which is stronger.
@@ -64,6 +107,7 @@ pub fn showdown_winners(holes: &[&str], board: &str) -> Result<Vec<usize>, Strin
     if holes.is_empty() {
         return Ok(vec![]);
     }
+    assert_distinct_deal(holes, board)?;
     let mut ranked: Vec<(usize, Rank)> = Vec::with_capacity(holes.len());
     for (i, hole) in holes.iter().enumerate() {
         let rank = rank_hand(&format!("{hole}{board}"))?;
@@ -224,11 +268,21 @@ pub fn run_it_twice(board: &str, dead: &[&str], boards: usize) -> Result<Vec<Str
     // verbatim (rs_poker's `Hand` reorders internally, which we must not do to a
     // board that is already on the table).
     let board = board.trim();
-    if board.len() % 2 != 0 {
+    // Card codes are ASCII rank+suit pairs. Reject anything else BEFORE the
+    // pairing check: str::len() counts BYTES while chars() yields CHARS, and a
+    // single multi-byte character makes the two disagree — an even byte length
+    // could hide an odd char count, so the loop below would index one past the
+    // end and panic. ("AsAhé" is 6 bytes but 5 chars.) The board string comes
+    // straight off an HTTP request body, so this was a remotely reachable crash
+    // on the all-in run-it-twice path.
+    if !board.is_ascii() {
+        return Err(format!("board '{board}' contains a non-ASCII character"));
+    }
+    let chars: Vec<char> = board.chars().collect();
+    if chars.len() % 2 != 0 {
         return Err(format!("board '{board}' has a dangling card code"));
     }
-    let mut board_cards: Vec<String> = Vec::with_capacity(board.len() / 2);
-    let chars: Vec<char> = board.chars().collect();
+    let mut board_cards: Vec<String> = Vec::with_capacity(chars.len() / 2);
     let mut i = 0;
     while i < chars.len() {
         let r = chars[i];
@@ -301,6 +355,7 @@ pub fn omaha_showdown_winners(holes: &[&str], board: &str) -> Result<Vec<usize>,
     if holes.is_empty() {
         return Ok(vec![]);
     }
+    assert_distinct_deal(holes, board)?;
     let mut ranked: Vec<(usize, Rank)> = Vec::with_capacity(holes.len());
     for (i, hole) in holes.iter().enumerate() {
         let rank = rank_omaha(hole, board)?;
@@ -906,6 +961,46 @@ mod tests {
         assert_eq!(cards, a);
         assert_eq!(commitment, seed_commitment(&seed));
         assert_eq!(commitment.len(), 64);
+    }
+
+    #[test]
+    fn showdown_rejects_a_card_held_by_two_players() {
+        // Both players hold As — physically impossible. Before this check the
+        // showdown happily returned a winner and real money moved on it.
+        let err = showdown_winners(&["AsKh", "AsQd"], "2c3d4h5s9c").unwrap_err();
+        assert!(err.contains("more than once"), "unexpected error: {err}");
+
+        // A hole card that is also on the board is equally impossible.
+        let err = showdown_winners(&["AsKh", "7c8d"], "As3d4h5s9c").unwrap_err();
+        assert!(err.contains("more than once"), "unexpected error: {err}");
+
+        // Omaha settles through a different entry point — guard it too.
+        let err = omaha_showdown_winners(&["AsKhQdJc", "AsTh9d8c"], "2c3d4h5s9h").unwrap_err();
+        assert!(err.contains("more than once"), "unexpected error: {err}");
+
+        // A legitimate deal still resolves.
+        assert!(showdown_winners(&["AsKh", "7c8d"], "2c3d4h5s9c").is_ok());
+    }
+
+    #[test]
+    fn rank_hand_rejects_more_than_seven_cards() {
+        // rs_poker's >7 guard is a debug_assert, compiled out in release, and
+        // its masked lookups return a meaningless score rather than panicking.
+        let err = rank_hand("2c3d4h5s6c7d8h9s").unwrap_err();
+        assert!(err.contains("at most 7"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn run_it_twice_rejects_non_ascii_board_without_panicking() {
+        // "AsAhé" is 6 BYTES but only 5 CHARS. The byte-length evenness check
+        // used to pass it through to a char-indexed loop, which then read one
+        // past the end and panicked on a real-money code path.
+        let err = run_it_twice("AsAhé", &[], 2).unwrap_err();
+        assert!(err.contains("non-ASCII"), "unexpected error: {err}");
+
+        // An odd number of ASCII chars is still a dangling code, not a panic.
+        let err = run_it_twice("AsA", &[], 2).unwrap_err();
+        assert!(err.contains("dangling"), "unexpected error: {err}");
     }
 
     #[test]

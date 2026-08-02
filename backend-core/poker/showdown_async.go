@@ -296,16 +296,22 @@ func DeductRakeFromWinners(t *Table, resolutions []PotResolution, rake int64) {
 	}
 }
 
-func ApplyResolutions(t *Table, resolutions []PotResolution) ([][]int, int64) {
+// ApplyResolutions pays out every resolved pot layer. The third return value is
+// any share that could not be paid because the winning seat vanished during the
+// async showdown round-trip — see OrphanedPayout. Callers MUST NOT ignore it:
+// it represents real chips owed to a departed player, and this is the only
+// place that fact is observable.
+func ApplyResolutions(t *Table, resolutions []PotResolution) ([][]int, int64, []OrphanedPayout) {
 	groups := make([][]int, 0, len(resolutions))
 	var total int64
+	var orphaned []OrphanedPayout
 	for _, r := range resolutions {
-		pokerAward(t, r.Winners, r.Amount)
+		orphaned = append(orphaned, pokerAward(t, r.Winners, r.Amount)...)
 		groups = append(groups, r.Winners)
 		total += r.Amount
 	}
 	t.Pot = 0
-	return groups, total
+	return groups, total, orphaned
 }
 
 // HandPhaseForTable maps match phase + street to client-facing phase string.

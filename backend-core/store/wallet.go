@@ -402,10 +402,44 @@ func (s *TournamentStore) ListRegistered(ctx context.Context, tournamentID strin
 	return out, rows.Err()
 }
 
+// ClaimForStart atomically takes exclusive ownership of starting a tournament,
+// moving it from 'registering' to 'starting'. Returns false if someone else
+// already claimed it, or if it is already running or finished.
+//
+// Nothing guarded this before: neither the RPC nor StartTournament checked
+// status, so a double-clicked "Start" (or two configurers racing, or a call
+// against an already-finished event) re-listed the players, created a SECOND
+// set of table matches, reassigned everyone onto them while they were still
+// seated at the originals, leaked the first director match, and reset the blind
+// clock to level 1. Same compare-and-set shape as FinishOnce.
+func (s *TournamentStore) ClaimForStart(ctx context.Context, tournamentID string) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE poker_tournament SET status='starting', updated_at=NOW()
+		WHERE id=$1 AND status='registering'`, tournamentID)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n == 1, nil
+}
+
+// ReleaseStartClaim returns a claimed tournament to 'registering' when start-up
+// failed before any table was created — so a transient error doesn't strand the
+// event in a state nobody can start.
+func (s *TournamentStore) ReleaseStartClaim(ctx context.Context, tournamentID string) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE poker_tournament SET status='registering', updated_at=NOW()
+		WHERE id=$1 AND status='starting'`, tournamentID)
+	return err
+}
+
+// SetDirectorMatch completes the start, moving 'starting' → 'running'. The
+// status predicate means a caller that never won ClaimForStart cannot install
+// its own director match over the real one.
 func (s *TournamentStore) SetDirectorMatch(ctx context.Context, tournamentID, directorMatchID string) error {
 	_, err := s.db.ExecContext(ctx, `
 		UPDATE poker_tournament SET director_match_id=$2, status='running', current_level=1, level_started_at=NOW(), updated_at=NOW()
-		WHERE id=$1`, tournamentID, directorMatchID)
+		WHERE id=$1 AND status='starting'`, tournamentID, directorMatchID)
 	return err
 }
 
@@ -465,15 +499,56 @@ func (s *TournamentStore) SetFinishPlace(ctx context.Context, tournamentID, user
 // Eliminate marks a player busted: status 'eliminated' + finish place. Only
 // affects a currently-playing registration (idempotent — a re-reported bust is a
 // no-op), so CountPlaying decreases exactly once per real elimination.
-func (s *TournamentStore) Eliminate(ctx context.Context, tournamentID, userID string, place int) (bool, error) {
-	res, err := s.db.ExecContext(ctx, `
+//
+// The finish place is computed HERE, inside a transaction that first takes a
+// row lock on the tournament, rather than being passed in by the caller.
+//
+// It used to be a caller-supplied value read via a separate CountPlaying()
+// round-trip, which raced: the director runs one match goroutine per table
+// concurrently, so two players busting at two different tables within the same
+// few milliseconds both read the same "players still playing" count and were
+// both assigned the same finish place — while the place between them was never
+// assigned to anyone. Both payout paths pay every finisher whose place falls in
+// a prize tier's [RankFrom, RankTo], so a duplicated place landing in a richer
+// tier makes total disbursement exceed the collected pool.
+//
+// A single UPDATE with a COUNT subquery is NOT sufficient on its own: row-level
+// locking only serializes writes to the same row, and these are different
+// players' rows, so two concurrent statements would still both see the
+// pre-update count. The FOR UPDATE on the parent tournament row is what
+// actually serializes eliminations within a tournament.
+func (s *TournamentStore) Eliminate(ctx context.Context, tournamentID, userID string) (bool, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// Serialize every elimination in THIS tournament against each other. Any
+	// concurrent eliminator blocks here until we commit, so its COUNT below
+	// sees our committed status change.
+	var lockID string
+	if err := tx.QueryRowContext(ctx,
+		`SELECT id FROM poker_tournament WHERE id=$1 FOR UPDATE`, tournamentID).Scan(&lockID); err != nil {
+		return false, err
+	}
+
+	// The subquery sees the pre-update snapshot (this row is still 'playing'),
+	// so the busting player gets the correct place: Nth-from-last == N still in.
+	res, err := tx.ExecContext(ctx, `
 		UPDATE poker_tournament_registration
-		SET status='eliminated', finish_place=$3, updated_at=NOW()
-		WHERE tournament_id=$1 AND user_id=$2 AND status='playing'`, tournamentID, userID, place)
+		SET status='eliminated',
+		    finish_place=(SELECT COUNT(*) FROM poker_tournament_registration
+		                  WHERE tournament_id=$1 AND status='playing'),
+		    updated_at=NOW()
+		WHERE tournament_id=$1 AND user_id=$2 AND status='playing'`, tournamentID, userID)
 	if err != nil {
 		return false, err
 	}
 	n, _ := res.RowsAffected()
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
 	return n == 1, nil
 }
 

@@ -132,6 +132,26 @@ func (s *DepositStore) SumRecentCents(ctx context.Context, userID string, hours 
 	return sum.Int64, nil
 }
 
+// LifetimeCreditedCents returns the total of every deposit that actually
+// landed in this user's wallet, ever ('credited' only — pending/waiting money
+// is not in the balance yet and must not license a withdrawal).
+//
+// This is what distinguishes real funds from the sign-up stipend. Every wallet
+// is opened with GuestStipendCents of play money that no deposit backs and no
+// ledger entry records; without this figure there is no way to tell, from the
+// balance alone, whether a dollar came from a real payment or was minted at
+// account creation.
+func (s *DepositStore) LifetimeCreditedCents(ctx context.Context, userID string) (int64, error) {
+	var sum sql.NullInt64
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COALESCE(SUM(amount_cents),0) FROM poker_deposit
+		WHERE user_id=$1 AND status='credited'`, userID).Scan(&sum)
+	if err != nil {
+		return 0, err
+	}
+	return sum.Int64, nil
+}
+
 // MarkFailed flips a non-credited deposit to 'failed'.
 func (s *DepositStore) MarkFailed(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx,

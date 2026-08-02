@@ -1321,6 +1321,17 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			broadcastActionRequired(ctx, db, dispatcher, s)
 
 		case protocol.OpAddChips:
+			// Cash games only. reserveBuyIn short-circuits to ("tournament", amount)
+			// with NO wallet debit — correct for OpSitDown, where the buy-in was
+			// already paid at tournament registration, but catastrophic here: it
+			// would mint chips from nothing, letting any seated player top up their
+			// tournament stack for free between hands. Tournament chips are
+			// director-managed; rebuys/add-ons are a separate, registration-side
+			// concept, never a mid-event stack top-up.
+			if s.TournamentID != "" {
+				sendError(dispatcher, presence, "tournament_table", "you can't add chips to a tournament stack")
+				continue
+			}
 			seatIdx := seatForUser(s, userID)
 			if seatIdx < 0 {
 				sendError(dispatcher, presence, "not_seated", "sit down before adding chips")
@@ -1929,7 +1940,24 @@ func pollPendingShowdown(ctx context.Context, logger runtime.Logger, db *sql.DB,
 			return true
 		}
 
-		winners, _ := poker.ApplyResolutions(s.Table, res.Resolutions)
+		winners, _, orphaned := poker.ApplyResolutions(s.Table, res.Resolutions)
+		// A winner whose seat vanished during the async showdown round-trip
+		// (stand-up / kick / rebalance landing between the frozen ShowdownPlan
+		// and this apply). Their share used to be silently dropped — real chips
+		// destroyed with no record anyone was owed anything. Pay it back to the
+		// wallet the seat bought in from, using the same path a normal cash-out
+		// takes, and log loudly either way so it is findable if the credit fails.
+		for _, o := range orphaned {
+			uid := ""
+			if o.Seat >= 0 && o.Seat < len(plan.Seats) && plan.Seats[o.Seat] != nil {
+				uid = plan.Seats[o.Seat].UserID
+			}
+			logger.Error("ORPHANED POT SHARE match=%s hand=%d seat=%d user=%q amount_cents=%d — winning seat left the table mid-showdown",
+				matchIDForAudit(s), s.Table.HandNo, o.Seat, uid, o.Amount)
+			if uid != "" && s.TournamentID == "" {
+				releaseBuyIn(ctx, logger, db, s, o.Seat, uid, o.Amount)
+			}
+		}
 		// Rake comes OUT of the pot: credit the club, then deduct that same amount
 		// from the winners' stacks so total chips are conserved (Σ player nets ==
 		// −rake) rather than the club's rake being minted on top of a full payout.
@@ -2466,6 +2494,16 @@ func reserveBuyIn(ctx context.Context, db *sql.DB, s *MatchState, userID string,
 	// true on a real-money table (gated at match init on realMoneyEnabled()), so
 	// this only relaxes the cap where the table already can't move real money.
 	amount = poker.ClampBuyInBand(amount, s.NoMaxBuyIn)
+	// CALLER CONTRACT — READ BEFORE ADDING A CALL SITE.
+	//
+	// This branch returns a "successful reservation" WITHOUT DEBITING ANYTHING.
+	// It is only correct where the chips were already paid for elsewhere —
+	// i.e. OpSitDown, where tournament entry was collected at registration.
+	// Any other caller reaching here mints chips from nothing.
+	//
+	// OpAddChips and the auto-buy-back path both guard on s.TournamentID
+	// themselves for exactly this reason; a new caller must do the same, or
+	// establish that its chips were already paid for.
 	if s.TournamentID != "" {
 		return "tournament", amount // director-managed; no wallet debit
 	}
@@ -2687,8 +2725,14 @@ func processTournamentEliminations(ctx context.Context, logger runtime.Logger, d
 		if seat == nil || seat.Stack > 0 || seat.UserID == "" {
 			continue
 		}
-		place, _ := ts.CountPlaying(ctx, s.TournamentID)
-		ok, _ := ts.Eliminate(ctx, s.TournamentID, seat.UserID, place)
+		// Eliminate computes the finish place itself, under a lock on the
+		// tournament row. It used to be read here via a separate CountPlaying()
+		// call and passed in, which raced across tables: two busts within the
+		// same few milliseconds at different tables both read the same count and
+		// were assigned the same finish place, while the place between them went
+		// to nobody — over-paying whenever the duplicate landed in a richer
+		// prize tier.
+		ok, _ := ts.Eliminate(ctx, s.TournamentID, seat.UserID)
 		if !ok {
 			continue // no live registration (bot/filler) or already recorded
 		}
@@ -2982,7 +3026,13 @@ func standUpBusted(ctx context.Context, logger runtime.Logger, db *sql.DB, dispa
 		if seat == nil || seat.Stack > 0 {
 			continue
 		}
-		if s.AutoBuyBackCents > 0 && !seat.IsBot {
+		// Never in a tournament: a busted tournament player is ELIMINATED, not
+		// rebought — and reserveBuyIn's tournament branch debits no wallet, so an
+		// auto-buy-back here would mint free chips and resurrect a player who
+		// should be out. Tournament tables don't set auto_buy_back_cents today
+		// (director.go never passes it), so this is defense in depth against a
+		// future config path that does.
+		if s.AutoBuyBackCents > 0 && !seat.IsBot && s.TournamentID == "" {
 			topUp := poker.ClampBuyInBand(s.AutoBuyBackCents, s.NoMaxBuyIn)
 			// Respect the table band + any universal wallet cap on the seat.
 			if topUp < s.minBuyIn() {
@@ -3406,6 +3456,18 @@ func (h *Handler) MatchSignal(ctx context.Context, logger runtime.Logger, db *sq
 				err = s.Table.SitDownBot(seatIdx, botID, name, buyIn)
 			}
 			if err == nil {
+				// A bot seated mid-hand was never dealt in, so it must not be
+				// treated as a live contender for the current pot. The human
+				// sit-down path (OpSitDown) applies exactly this patch; this
+				// path had no phase check at all, so a bot added while a hand
+				// was live counted as "not folded" and could be handed the whole
+				// pot when everyone else folded.
+				if s.Phase != poker.PhaseWaiting {
+					if seat := s.Table.Seats[seatIdx]; seat != nil {
+						seat.Status = poker.SeatFolded
+						seat.OwesPost = true
+					}
+				}
 				dispatcher.MatchLabelUpdate(buildLabel(s))
 				broadcastSnapshot(ctx, db, dispatcher, s, nil)
 			}

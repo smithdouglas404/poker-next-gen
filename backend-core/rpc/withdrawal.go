@@ -30,6 +30,36 @@ func WalletWithdraw(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 	if err := requireVerified(ctx, db, userID, "kyc_aml", "withdrawing funds"); err != nil {
 		return "", err
 	}
+	// Same jurisdiction gate every deposit path applies. Its absence here meant a
+	// player in a denied country — including one added to the deny list after
+	// they funded — could still pull money OUT, which is the direction that
+	// actually matters for sanctions exposure.
+	if err := guardJurisdiction(ctx, db); err != nil {
+		return "", err
+	}
+	// The sign-up stipend is play money: every wallet opens with
+	// store.GuestStipendCents that no deposit funded and no ledger entry
+	// records. Nothing stopped it being withdrawn as real cash — an account
+	// that never paid in a cent could complete KYC and draw the stipend (plus
+	// any bonuses/rakeback accrued on top of it) straight out, so the platform
+	// paid out money it never took in.
+	//
+	// The invariant the store layer already documents ("free accounts cannot
+	// deposit or withdraw, so the stipend ... can never become or come from
+	// real funds") is enforced HERE, and by real inflow rather than by tier:
+	// gating on the subscription tier would sell access to your own money and
+	// would strand a lapsed paid member. An account that has genuinely
+	// deposited may withdraw; one that never has, cannot.
+	deposited, derr := store.NewDepositStore(db).LifetimeCreditedCents(ctx, userID)
+	if derr != nil {
+		// Fail CLOSED, matching the weekly-limit handling below: an unreadable
+		// deposit history means real-vs-stipend can't be told apart.
+		return "", runtime.NewError("could not verify your deposit history — please try again", 13)
+	}
+	if deposited <= 0 {
+		return "", runtime.NewError(
+			"your balance is sign-up credit, which can't be withdrawn — make a deposit first", 9)
+	}
 	var req struct {
 		AmountCents int64  `json:"amount_cents"`
 		Destination string `json:"destination"`
@@ -128,12 +158,17 @@ func WithdrawalApproveAdmin(ctx context.Context, logger runtime.Logger, db *sql.
 		return "", runtime.NewError("withdrawal_id required", 3)
 	}
 	wd := store.NewWithdrawalStore(db)
-	w, err := wd.GetByID(ctx, req.WithdrawalID)
+	// CLAIM BEFORE PAYING. This used to be an unlocked GetByID, then an
+	// irreversible payout, then the status flip — so two admins (or one
+	// double-click, or a retried request) could both read 'pending' and both
+	// send real crypto, while the books recorded one payout. ClaimForPayout
+	// atomically moves pending → paying and returns the row, so exactly one
+	// caller is ever authorised to spend, and there is no unlocked read left.
+	w, err := wd.ClaimForPayout(ctx, req.WithdrawalID)
 	if err != nil {
-		return "", runtime.NewError(err.Error(), 13)
-	}
-	if w == nil {
-		return "", runtime.NewError("withdrawal not found", 5)
+		// "withdrawal not pending" covers both a missing row and one another
+		// caller already claimed — either way this caller must not pay.
+		return "", runtime.NewError(err.Error(), 9)
 	}
 
 	payoutID := req.PayoutID
@@ -142,9 +177,19 @@ func WithdrawalApproveAdmin(ctx context.Context, logger runtime.Logger, db *sql.
 	// payout is configured, execute the payout now and record the batch id.
 	// Fiat/manual withdrawals just get marked paid for the operator to send.
 	if w.Gateway == "nowpayments" && payments.NowPaymentsPayoutConfigured() {
-		batchID, perr := payments.CreateNowPaymentsPayout(ctx, w.Destination, w.Currency, w.AmountCents)
+		// w.ID is passed as the payout's external id so a retry at the gateway
+		// is deduplicated on their side too, not just ours.
+		batchID, perr := payments.CreateNowPaymentsPayout(ctx, w.Destination, w.Currency, w.AmountCents, w.ID)
 		if perr != nil {
 			logger.Error("crypto payout failed for %s: %v", w.ID, perr)
+			// Park it in a terminal failed state rather than releasing back to
+			// 'pending'. A transport error is ambiguous about whether the money
+			// actually left; auto-returning it to the approvable pool is exactly
+			// how the same request gets paid twice. A human reconciles against
+			// the gateway before this can be approved again.
+			if rerr := wd.ReleaseClaim(ctx, w.ID, "payout execution failed: "+perr.Error()); rerr != nil {
+				logger.Error("WITHDRAWAL STUCK IN 'paying' %s — release failed: %v", w.ID, rerr)
+			}
 			return "", runtime.NewError("payout execution failed: "+perr.Error(), 13)
 		}
 		payoutID = batchID
