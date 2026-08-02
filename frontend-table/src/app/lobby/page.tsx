@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 import { GameProvider, formatCents, useGame } from "@/features/game/GameProvider";
 import { GameModeCards, type ModeCardDef } from "@/features/lobby/GameModeCards";
@@ -36,7 +36,15 @@ function LobbyContent() {
     profile,
   } = useGame();
 
-  const [view, setView] = useState<LobbyView>("select");
+  // RoomPanel's "More options" link on the live felt sends players here with
+  // ?view=private so the full table builder opens directly instead of
+  // landing on the mode-select screen first.
+  const sp = useSearchParams();
+  const initialView = sp.get("view") as LobbyView | null;
+  const validViews: LobbyView[] = ["select", "private", "public", "playmoney", "tournament", "browse"];
+  const [view, setView] = useState<LobbyView>(
+    initialView && validViews.includes(initialView) ? initialView : "select",
+  );
   const [busy, setBusy] = useState(false);
 
   // roles + clubs (public-game gate), tournaments (teaser), demo flags
@@ -524,7 +532,9 @@ function Stat({ k, v, accent }: { k: string; v: string; accent?: boolean }) {
 export default function LobbyPage() {
   return (
     <GameProvider>
-      <LobbyContent />
+      <Suspense fallback={null}>
+        <LobbyContent />
+      </Suspense>
     </GameProvider>
   );
 }

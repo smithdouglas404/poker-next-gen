@@ -37,12 +37,12 @@ export type ConsoleAccent = "redGradient" | "gold" | "brand";
 
 const ACTIVE_CLS: Record<ConsoleAccent, string> = {
   redGradient:
-    "border border-transparent bg-gradient-to-r from-[#e01e2b] to-[#b3151f] text-white shadow-[0_6px_18px_-8px_rgba(224,30,43,0.5)]",
-  gold: "border border-gold/40 bg-gold/[0.08] font-semibold text-gold",
-  brand: "border border-brand/40 bg-brand/[0.1] text-brand",
+    "border border-[#e01e2b]/40 bg-gradient-to-r from-[#e01e2b]/20 to-[#b3151f]/10 text-white shadow-[0_2px_12px_rgba(224,30,43,0.25)] font-semibold",
+  gold: "border border-[#f5c518]/40 bg-[#f5c518]/[0.08] font-semibold text-[#f5c518] shadow-[0_2px_8px_rgba(245,197,24,0.15)]",
+  brand: "border border-[#e01e2b]/40 bg-[#e01e2b]/[0.08] text-[#ff2d3f] font-semibold",
 };
 const INACTIVE_CLS =
-  "border border-transparent text-white/55 hover:bg-white/[0.04] hover:text-white/85";
+  "border border-transparent text-white/50 hover:bg-white/[0.05] hover:text-white/90 hover:border-white/[0.06]";
 
 function Brand({ brand }: { brand: ConsoleBrand }) {
   const gold = brand.variant === "gold";
@@ -170,7 +170,7 @@ function NavList({
         {groups.map((g) => (
           <div key={g}>
             {g && (
-              <p className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-neutral-600">
+              <p className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-[0.28em] text-neutral-600">
                 {g}
               </p>
             )}

@@ -13,6 +13,9 @@ export interface Profile {
   user_id: string;
   username: string;
   balance_cents: number;
+  /** ISO date (YYYY-MM-DD), real Nakama account creation time. Empty string
+   *  if the account lookup failed server-side — never fabricated. */
+  member_since?: string;
 }
 
 export interface PlayerStats {

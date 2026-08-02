@@ -1,27 +1,30 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, Manrope } from "next/font/google";
+import { Playfair_Display, Inter } from "next/font/google";
 import "./globals.css";
 import { SiteFooter } from "@/features/nav/SiteFooter";
 import { AppShell } from "@/features/nav/AppShell";
 import { AgeGate } from "@/features/nav/AgeGate";
 import { Providers } from "./providers";
 
-// Neon Vault type system (matches HighRollersClub): Space Grotesk for display,
-// Manrope for body.
-const displayFont = Space_Grotesk({
+// Premium typography: Playfair Display for display/headings (editorial, luxury),
+// Inter for body (clean, readable, modern).
+const displayFont = Playfair_Display({
   variable: "--font-display",
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["600", "700", "800", "900"],
+  style: ["normal", "italic"],
 });
 
-const bodyFont = Manrope({
+const bodyFont = Inter({
   variable: "--font-body",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "High Rollers Club — Command Center",
-  description: "Premium poker network: clubs, cash games, tournaments, and the live table",
+  title: "High Rollers Club — Premium Poker Network",
+  description:
+    "The premier private poker network: clubs, cash games, tournaments, and the live table. Provably fair. GTO verified.",
 };
 
 export default function RootLayout({
@@ -41,4 +44,3 @@ export default function RootLayout({
     </html>
   );
 }
-

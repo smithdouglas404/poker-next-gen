@@ -23,6 +23,16 @@ import {
   type WalletBalance,
 } from "./profileRpc";
 
+// loyalty_get's real achievement catalog has no rarity concept, just an HRP
+// cost — bucket it into the same tiers DEMO_ACHIEVEMENTS/RARITY use so real
+// and demo rows render identically.
+function tierForHRP(hrp: number): Achievement["tier"] {
+  if (hrp >= 1000) return "legendary";
+  if (hrp >= 500) return "epic";
+  if (hrp >= 200) return "rare";
+  return "common";
+}
+
 const AVATAR_KEY = "poker.profile.avatar";
 
 // Player-selectable identity portraits (the detailed_15 "Initial Avatar
@@ -101,8 +111,25 @@ function AvatarBattleRecord({ avatarId }: { avatarId: string }) {
   );
 }
 
+// Real HRC badge art for the achievement codes whose criteria genuinely match
+// the art's concept (loyalty.go's Catalog codes → /public/badges). "century"
+// and "quad_squad" have no honest match among the 8 HRC badges and
+// intentionally fall back to the plain rarity dot below rather than wearing
+// one that means something else.
+const ACHIEVEMENT_BADGE_IMG: Record<string, string> = {
+  first_blood: "/badges/badge_first_win.webp",
+  millennium: "/badges/badge_club_legend.webp",
+  iron_player: "/badges/badge_iron_player.webp",
+  straight_flush: "/badges/badge_royal_flush.webp",
+  high_roller: "/badges/badge_high_roller.webp",
+  bluff_master: "/badges/badge_bluff_master.webp",
+  streak_fire: "/badges/badge_streak_fire.webp",
+  tournament_champ: "/badges/badge_tournament_champ.webp",
+};
+
 function AchievementBadge({ a }: { a: Achievement }) {
   const r = RARITY[a.tier];
+  const img = ACHIEVEMENT_BADGE_IMG[a.id];
   return (
     <div
       className={cn(
@@ -112,7 +139,16 @@ function AchievementBadge({ a }: { a: Achievement }) {
       style={a.earned ? { boxShadow: `0 0 16px -6px ${r.glow}` } : undefined}
     >
       <div className="flex items-center gap-2">
-        <span className={cn("h-2 w-2 rounded-full", a.earned ? "" : "bg-neutral-700")} style={a.earned ? { background: r.glow } : undefined} />
+        {img ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={img}
+            alt=""
+            className={cn("h-6 w-6 rounded-full object-cover", !a.earned && "grayscale")}
+          />
+        ) : (
+          <span className={cn("h-2 w-2 rounded-full", a.earned ? "" : "bg-neutral-700")} style={a.earned ? { background: r.glow } : undefined} />
+        )}
         <span className={cn("font-display text-xs font-bold uppercase tracking-wide", a.earned ? r.text : "text-neutral-500")}>
           {a.name}
         </span>
@@ -133,16 +169,35 @@ export function ProfileOverview({ notify }: { notify: (msg: string, kind?: "ok" 
     DEMO_TRANSACTIONS,
   );
   const [hrp, setHrp] = useState(0); // High Roller Points → "Tournament Points"
+  const [achievements, setAchievements] = useState<Achievement[]>(DEMO_ACHIEVEMENTS);
 
-  // Real HRP points for the Tournament-Points stat.
+  // Real HRP points + achievement progress (loyalty_get already returns both —
+  // this used to read hrp_total only and let the Achievements section below
+  // always render DEMO_ACHIEVEMENTS regardless of connection, which showed
+  // every player the exact same fake "earned" badges).
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const d = (await callSessionRpc("loyalty_get", {})) as { hrp_total?: number };
-        if (!cancelled && typeof d.hrp_total === "number") setHrp(d.hrp_total);
+        const d = (await callSessionRpc("loyalty_get", {})) as {
+          hrp_total?: number;
+          achievements?: Array<{ code: string; name: string; description: string; hrp: number; unlocked: boolean }>;
+        };
+        if (cancelled) return;
+        if (typeof d.hrp_total === "number") setHrp(d.hrp_total);
+        if (Array.isArray(d.achievements) && d.achievements.length > 0) {
+          setAchievements(
+            d.achievements.map((a) => ({
+              id: a.code,
+              name: a.name,
+              desc: a.description,
+              tier: tierForHRP(a.hrp),
+              earned: a.unlocked,
+            })),
+          );
+        }
       } catch {
-        /* offline */
+        /* offline → keep demo rows */
       }
     })();
     return () => {
@@ -269,7 +324,7 @@ export function ProfileOverview({ notify }: { notify: (msg: string, kind?: "ok" 
             <section className={cn(GLASS_PANEL, "p-5")}>
               <p className={cn(HEADING_SM, "text-gold/80")}>Personal Bio &amp; Stats</p>
               <div className="mt-3">
-                <StatRow label="Member Since" value="2020-05-15" />
+                <StatRow label="Member Since" value={profile?.member_since || "—"} />
                 <StatRow label="VIP Tier" value={tier} tone={ts.text} />
                 <StatRow label="Username" value={profile?.username || (loading ? "…" : "Player")} />
               </div>
@@ -339,9 +394,12 @@ export function ProfileOverview({ notify }: { notify: (msg: string, kind?: "ok" 
         <section className={cn(GLASS_PANEL, "p-5")}>
           <p className={cn(HEADING_SM, "text-gold/80")}>Social &amp; Behavior</p>
           <div className="mt-3">
+            {/* "Recent Chat History" / "Mutual Members" used to render here as
+                static text styled like links ("View Logs" / "List") with no
+                onClick and no backing feature (no chat-log or friends/mutual-
+                members RPC exists anywhere) — dead controls. Removed rather
+                than left as decoration; re-add once those features are real. */}
             <StatRow label="Table Reputation" value={reputation} tone="text-green" />
-            <StatRow label="Recent Chat History" value="View Logs" tone="text-neutral-300" />
-            <StatRow label="Mutual Members" value="List" tone="text-neutral-300" />
           </div>
         </section>
       </div>
@@ -355,7 +413,7 @@ export function ProfileOverview({ notify }: { notify: (msg: string, kind?: "ok" 
           </Link>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {DEMO_ACHIEVEMENTS.map((a) => (
+          {achievements.map((a) => (
             <AchievementBadge key={a.id} a={a} />
           ))}
         </div>

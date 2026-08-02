@@ -6,6 +6,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 import { AnalyticsPanel } from "@/features/profile/AnalyticsPanel";
 import { AvatarPanel } from "@/features/profile/AvatarPanel";
+import { IdentityVerificationSection } from "@/features/profile/IdentityVerificationSection";
 import { LeaderboardPanel } from "@/features/profile/LeaderboardPanel";
 import { ProfileOverview } from "@/features/profile/ProfileOverview";
 import { SecurityDashboard } from "@/features/profile/SecurityDashboard";
@@ -88,7 +89,12 @@ function ProfileBody() {
       case "leaderboard":
         return <LeaderboardPanel meUserId={profile?.user_id ?? null} notify={notify} />;
       case "verification":
-        return <VerificationPanel notify={notify} />;
+        return (
+          <div className="space-y-8">
+            <IdentityVerificationSection notify={notify} />
+            <VerificationPanel notify={notify} />
+          </div>
+        );
       case "security":
         return (
           <div className="space-y-8">

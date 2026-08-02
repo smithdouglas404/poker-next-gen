@@ -132,6 +132,8 @@ export interface TableListItem {
   label?: string;
   seated?: number;
   open_seats?: number;
+  small_blind?: number;
+  big_blind?: number;
 }
 
 export interface GameLogEntry {
