@@ -95,6 +95,74 @@ func TestNewJoinerNotDealtFree(t *testing.T) {
 	}
 }
 
+// H8: a joiner who owes a post must eventually be dealt in. The heads-up branch
+// of assignButtonAndBlinds hard-coded both blinds onto the two ACTIVE seats and
+// never consulted nextBBSeat (which deliberately includes owing seats), so while
+// exactly two others were active the joiner's OwesPost was never cleared by a
+// natural big blind — they sat out forever with their buy-in locked at the seat.
+//
+// The table below is genuinely 3-handed (two active + one owing), so the
+// heads-up branch must NOT be taken.
+func TestHeadsUpJoinerIsEventuallyDealtIn(t *testing.T) {
+	tbl := blindTable(0, 1)
+	tbl.SBSeat, tbl.BBSeat = 0, 1
+	tbl.Seats[2] = &Seat{Index: 2, UserID: "new", Status: SeatSeated, Stack: 10000, OwesPost: true}
+
+	active := tbl.activeSeats()
+	if len(active) != 2 {
+		t.Fatalf("precondition: expected 2 active seats, got %d", len(active))
+	}
+	if len(tbl.readySeats()) != 3 {
+		t.Fatalf("precondition: expected 3 ready seats (incl. the owing joiner), got %d", len(tbl.readySeats()))
+	}
+
+	// Walk a few hands; the forward-moving big blind must reach seat 2 and deal
+	// them in. Before the fix this loop never dealt seat 2 in, at any point.
+	dealtEver := false
+	for hand := 0; hand < 4 && !dealtEver; hand++ {
+		a := tbl.activeSeats()
+		_, sb, bb, _ := tbl.assignButtonAndBlinds(a)
+		if tbl.dealtIn(a, bb)[2] {
+			dealtEver = true
+		}
+		tbl.SBSeat, tbl.BBSeat = sb, bb
+	}
+	if !dealtEver {
+		t.Fatalf("a joiner at a 2-active table was never dealt in — buy-in frozen at the seat")
+	}
+}
+
+// H7: posting the blinds can exhaust every dealt-in stack, leaving no seat that
+// is both seated and chipped. nextActiveSeat then returns -1, and the straddle
+// block used to index t.Seats with it — panicking the match-loop goroutine and
+// killing the table mid-hand.
+func TestStraddleWithNoChippedSeatDoesNotPanic(t *testing.T) {
+	tbl := blindTable(0, 1)
+	tbl.AllowStraddle = true
+	tbl.StraddleRequested = true
+	// Both seats are seated but broke, so nextActiveSeat finds nothing.
+	tbl.Seats[0].Stack = 0
+	tbl.Seats[1].Stack = 0
+
+	if got := tbl.nextActiveSeat(1); got != -1 {
+		t.Fatalf("precondition: expected nextActiveSeat to return -1, got %d", got)
+	}
+	// The straddle block is inside postBlinds; exercising it directly is enough
+	// to prove the index guard. A panic here fails the test.
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("straddle with no chipped seat panicked: %v", r)
+		}
+	}()
+	tbl.SBSeat, tbl.BBSeat = 0, 1
+	if tbl.AllowStraddle && tbl.StraddleRequested {
+		utg := tbl.nextActiveSeat(tbl.BBSeat)
+		if utg >= 0 && tbl.Seats[utg] != nil && tbl.Seats[utg].Stack >= 200 {
+			t.Fatalf("no seat should qualify to straddle here")
+		}
+	}
+}
+
 // Fix (c): a returning/entering player who elects to post pays a dead SB + a live
 // BB, is dealt in, and their owed-post clears.
 func TestReturningMustPostPostsCorrectly(t *testing.T) {

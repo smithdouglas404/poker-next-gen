@@ -467,10 +467,17 @@ func (t *Table) StartHand(sb, bb int64) error {
 	// straddle (the straddler retains the option to act last preflop, exactly as
 	// the big blind does — postBlind does not mark the seat as having acted).
 	if t.AllowStraddle && t.StraddleRequested {
+		// nextActiveSeat returns -1 when no seat is both seated and has chips —
+		// reachable when posting the blinds exhausts every dealt-in stack (a
+		// short-stacked heads-up hand where SB and BB each post their last
+		// chips). Indexing t.Seats with that -1 panicked the match-loop
+		// goroutine, killing the table mid-hand. The nil check below ran AFTER
+		// the deref, so it never helped. advanceStreet (:897) already guards its
+		// own nextActiveSeat call the same way.
 		utg := t.nextActiveSeat(bbSeat)
-		su := t.Seats[utg]
 		straddle := 2 * bb
-		if utg != bbSeat && utg != sbSeat && su != nil && su.Stack >= straddle {
+		if utg >= 0 && utg != bbSeat && utg != sbSeat &&
+			t.Seats[utg] != nil && t.Seats[utg].Stack >= straddle {
 			t.postBlind(utg, straddle, "STRADDLE")
 			t.CurrentBet = straddle
 			t.MinRaise = bb // last raise increment stays one big blind
@@ -632,7 +639,21 @@ func (t *Table) postsSB(idx int) bool { return t.active(idx) }
 // thereafter the blinds are pinned from last hand's anchors so the button can be
 // dead (its seat emptied) and the small blind can be dead (its seat can't post).
 func (t *Table) assignButtonAndBlinds(active []int) (btn, sbSeat, bbSeat int, deadSB bool) {
-	if len(active) == 2 {
+	// Heads-up rules apply only when the table is ACTUALLY two-handed — not
+	// merely when two seats are currently eligible to be dealt.
+	//
+	// readySeats() includes a seat that owes a post; activeSeats() does not. The
+	// heads-up branch below pins both blinds onto the two active seats and never
+	// consults nextBBSeat (the helper that deliberately includes owing seats so a
+	// natural big blind clears the debt). So with two active players and a third
+	// who joined mid-game, the joiner's OwesPost was never cleared by the moving
+	// big blind and they sat out every hand indefinitely, buy-in locked at the
+	// seat, unless they happened to elect PostNow at sit-down.
+	//
+	// Falling through to the moving-BB branch is the correct model, not a
+	// workaround: heads-up mechanics (button = small blind) genuinely stop
+	// applying the moment a third player is in the game.
+	if len(active) == 2 && len(t.readySeats()) == 2 {
 		// Heads-up: the button posts the small blind and acts first pre-flop.
 		// Alternate the button each hand off the anchor (last BB becomes button/SB).
 		if t.BBSeat >= 0 && (t.Seats[t.BBSeat] != nil) {
