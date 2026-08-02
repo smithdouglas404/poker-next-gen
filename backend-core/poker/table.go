@@ -978,15 +978,50 @@ func (t *Table) NonFoldedSeats() []int {
 	return out
 }
 
+// dealtInThisHand reports whether a seat actually received cards for the
+// current hand. A seat installed mid-hand (a late sit-down, or add_bot) is
+// SeatSeated and not folded, but holds no cards — it must never be treated as
+// a live contender for the pot.
+func (t *Table) dealtInThisHand(i int) bool {
+	s := t.Seats[i]
+	if s == nil || s.UserID == "" {
+		return false
+	}
+	return len(t.HoleCards[s.UserID]) > 0
+}
+
+// UncontestedWinner returns the sole remaining contender when everyone else has
+// folded, and whether such a seat exists.
+//
+// It filters to seats actually DEALT INTO this hand. Without that filter, a
+// seat added while the hand was live (add_bot has no phase guard; a late human
+// sit-down is patched in the match handler, not here) counted as "not folded"
+// and could be handed the entire pot despite never contributing a chip or
+// holding a card. The filter applies only when hole-card data exists for this
+// hand, so paths that don't track cards keep their previous behavior.
 func (t *Table) UncontestedWinner() (int, bool) {
 	active := t.NonFoldedSeats()
+	if len(t.HoleCards) > 0 {
+		dealt := active[:0:0]
+		for _, i := range active {
+			if t.dealtInThisHand(i) {
+				dealt = append(dealt, i)
+			}
+		}
+		active = dealt
+	}
 	if len(active) == 1 {
 		return active[0], true
 	}
 	return -1, false
 }
 
+// ResolveAndAward resolves and pays the pot, returning the winner groups.
+// The orphaned-payout channel is intentionally not surfaced here: this helper
+// is only used by paths with no async window (and by tests), where a vanished
+// winner seat cannot occur. Callers that resolve asynchronously must use
+// AwardSidePots / ApplyResolutions directly and handle the orphaned shares.
 func (t *Table) ResolveAndAward() ([][]int, error) {
-	winners, _, err := AwardSidePots(t)
+	winners, _, _, err := AwardSidePots(t)
 	return winners, err
 }

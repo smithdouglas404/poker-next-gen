@@ -210,10 +210,17 @@ func main() {
 		_, uncontested := t.UncontestedWinner()
 		flopSeen := len(t.Board) >= 3
 
-		winnerGroups, _, err := poker.AwardSidePots(t)
+		// Orphaned payouts can't occur in this simulator (it resolves
+		// synchronously, so no seat can vanish mid-showdown), but surface them
+		// loudly rather than discarding — a non-empty list here would mean the
+		// sim's own bookkeeping had drifted.
+		winnerGroups, _, orphaned, err := poker.AwardSidePots(t)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "showdown error:", err)
 			break
+		}
+		for _, o := range orphaned {
+			fmt.Fprintf(os.Stderr, "orphaned pot share: seat=%d amount=%d\n", o.Seat, o.Amount)
 		}
 		if uncontested {
 			foldWins++
