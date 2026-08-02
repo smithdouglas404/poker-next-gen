@@ -402,10 +402,44 @@ func (s *TournamentStore) ListRegistered(ctx context.Context, tournamentID strin
 	return out, rows.Err()
 }
 
+// ClaimForStart atomically takes exclusive ownership of starting a tournament,
+// moving it from 'registering' to 'starting'. Returns false if someone else
+// already claimed it, or if it is already running or finished.
+//
+// Nothing guarded this before: neither the RPC nor StartTournament checked
+// status, so a double-clicked "Start" (or two configurers racing, or a call
+// against an already-finished event) re-listed the players, created a SECOND
+// set of table matches, reassigned everyone onto them while they were still
+// seated at the originals, leaked the first director match, and reset the blind
+// clock to level 1. Same compare-and-set shape as FinishOnce.
+func (s *TournamentStore) ClaimForStart(ctx context.Context, tournamentID string) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE poker_tournament SET status='starting', updated_at=NOW()
+		WHERE id=$1 AND status='registering'`, tournamentID)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n == 1, nil
+}
+
+// ReleaseStartClaim returns a claimed tournament to 'registering' when start-up
+// failed before any table was created — so a transient error doesn't strand the
+// event in a state nobody can start.
+func (s *TournamentStore) ReleaseStartClaim(ctx context.Context, tournamentID string) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE poker_tournament SET status='registering', updated_at=NOW()
+		WHERE id=$1 AND status='starting'`, tournamentID)
+	return err
+}
+
+// SetDirectorMatch completes the start, moving 'starting' → 'running'. The
+// status predicate means a caller that never won ClaimForStart cannot install
+// its own director match over the real one.
 func (s *TournamentStore) SetDirectorMatch(ctx context.Context, tournamentID, directorMatchID string) error {
 	_, err := s.db.ExecContext(ctx, `
 		UPDATE poker_tournament SET director_match_id=$2, status='running', current_level=1, level_started_at=NOW(), updated_at=NOW()
-		WHERE id=$1`, tournamentID, directorMatchID)
+		WHERE id=$1 AND status='starting'`, tournamentID, directorMatchID)
 	return err
 }
 

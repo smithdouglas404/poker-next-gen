@@ -268,7 +268,12 @@ func estimateCoinAmount(ctx context.Context, amountCents int64, currency string)
 // CreateNowPaymentsPayout sends `amountCents` (USD) worth of `currency` to
 // `address`, returning the payout batch id. `currency` is the coin ticker
 // (e.g. "btc", "usdttrc20").
-func CreateNowPaymentsPayout(ctx context.Context, address, currency string, amountCents int64) (string, error) {
+// externalID is our own withdrawal id, sent as the payout's unique_external_id
+// so the gateway can deduplicate a retried request on its side as well. The
+// caller's atomic claim (WithdrawalStore.ClaimForPayout) is the primary defence
+// against paying twice; this is the second layer, for the case where our
+// request reached NOWPayments but the response did not reach us.
+func CreateNowPaymentsPayout(ctx context.Context, address, currency string, amountCents int64, externalID string) (string, error) {
 	token, err := nowPaymentsAuth(ctx)
 	if err != nil {
 		return "", err
@@ -277,11 +282,13 @@ func CreateNowPaymentsPayout(ctx context.Context, address, currency string, amou
 	if err != nil {
 		return "", err
 	}
+	withdrawal := map[string]interface{}{"address": address, "currency": currency, "amount": coinAmount}
+	if externalID != "" {
+		withdrawal["unique_external_id"] = externalID
+	}
 	body, _ := json.Marshal(map[string]interface{}{
 		"ipn_callback_url": os.Getenv("NOWPAYMENTS_IPN_CALLBACK_URL"),
-		"withdrawals": []map[string]interface{}{
-			{"address": address, "currency": currency, "amount": coinAmount},
-		},
+		"withdrawals":      []map[string]interface{}{withdrawal},
 	})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, nowPaymentsAPI+"/payout", bytes.NewReader(body))
 	if err != nil {

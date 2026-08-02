@@ -272,7 +272,15 @@ CREATE TABLE IF NOT EXISTS poker_withdrawal (
     destination TEXT NOT NULL DEFAULT '',
     gateway TEXT NOT NULL DEFAULT '',
     gateway_payout_id TEXT NOT NULL DEFAULT '',
-    status TEXT NOT NULL DEFAULT 'pending', -- pending | paid | rejected
+    -- pending  → awaiting admin decision (funds already held off the balance)
+    -- paying   → an admin claimed it and an external payout is in flight
+    -- paid     → settled
+    -- rejected → declined, funds refunded
+    -- payout_failed → the gateway call errored after the claim; ambiguous
+    --   whether money left, so a human must reconcile before re-approving.
+    --   Deliberately NOT auto-returned to 'pending' (that is how the same
+    --   withdrawal gets paid twice).
+    status TEXT NOT NULL DEFAULT 'pending',
     reason TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

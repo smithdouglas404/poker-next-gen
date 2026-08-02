@@ -158,12 +158,17 @@ func WithdrawalApproveAdmin(ctx context.Context, logger runtime.Logger, db *sql.
 		return "", runtime.NewError("withdrawal_id required", 3)
 	}
 	wd := store.NewWithdrawalStore(db)
-	w, err := wd.GetByID(ctx, req.WithdrawalID)
+	// CLAIM BEFORE PAYING. This used to be an unlocked GetByID, then an
+	// irreversible payout, then the status flip — so two admins (or one
+	// double-click, or a retried request) could both read 'pending' and both
+	// send real crypto, while the books recorded one payout. ClaimForPayout
+	// atomically moves pending → paying and returns the row, so exactly one
+	// caller is ever authorised to spend, and there is no unlocked read left.
+	w, err := wd.ClaimForPayout(ctx, req.WithdrawalID)
 	if err != nil {
-		return "", runtime.NewError(err.Error(), 13)
-	}
-	if w == nil {
-		return "", runtime.NewError("withdrawal not found", 5)
+		// "withdrawal not pending" covers both a missing row and one another
+		// caller already claimed — either way this caller must not pay.
+		return "", runtime.NewError(err.Error(), 9)
 	}
 
 	payoutID := req.PayoutID
@@ -172,9 +177,19 @@ func WithdrawalApproveAdmin(ctx context.Context, logger runtime.Logger, db *sql.
 	// payout is configured, execute the payout now and record the batch id.
 	// Fiat/manual withdrawals just get marked paid for the operator to send.
 	if w.Gateway == "nowpayments" && payments.NowPaymentsPayoutConfigured() {
-		batchID, perr := payments.CreateNowPaymentsPayout(ctx, w.Destination, w.Currency, w.AmountCents)
+		// w.ID is passed as the payout's external id so a retry at the gateway
+		// is deduplicated on their side too, not just ours.
+		batchID, perr := payments.CreateNowPaymentsPayout(ctx, w.Destination, w.Currency, w.AmountCents, w.ID)
 		if perr != nil {
 			logger.Error("crypto payout failed for %s: %v", w.ID, perr)
+			// Park it in a terminal failed state rather than releasing back to
+			// 'pending'. A transport error is ambiguous about whether the money
+			// actually left; auto-returning it to the approvable pool is exactly
+			// how the same request gets paid twice. A human reconciles against
+			// the gateway before this can be approved again.
+			if rerr := wd.ReleaseClaim(ctx, w.ID, "payout execution failed: "+perr.Error()); rerr != nil {
+				logger.Error("WITHDRAWAL STUCK IN 'paying' %s — release failed: %v", w.ID, rerr)
+			}
 			return "", runtime.NewError("payout execution failed: "+perr.Error(), 13)
 		}
 		payoutID = batchID

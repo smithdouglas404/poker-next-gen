@@ -363,6 +363,10 @@ func TournamentFinalize(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 	// across the finishing positions it covers.
 	payouts := []map[string]interface{}{}
 	var paidTotal int64
+	// Mirrors the director's guard: overlapping prize tiers must never pay one
+	// finisher twice. TournamentStart rejects an overlapping ladder now, but a
+	// tournament configured before that check can still carry one.
+	paid := map[string]bool{}
 	for _, prize := range prizes {
 		places := int(prize.RankTo - prize.RankFrom + 1)
 		if places <= 0 {
@@ -376,6 +380,12 @@ func TournamentFinalize(ctx context.Context, logger runtime.Logger, db *sql.DB, 
 			if f.FinishPlace < int(prize.RankFrom) || f.FinishPlace > int(prize.RankTo) {
 				continue
 			}
+			if paid[f.UserID] {
+				logger.Error("OVERLAPPING PRIZE TIERS tournament=%s user=%s place=%d — already paid, skipping a second payout",
+					req.TournamentID, f.UserID, f.FinishPlace)
+				continue
+			}
+			paid[f.UserID] = true
 			if err := ts.PayWinner(ctx, req.TournamentID, f.UserID, perPlace); err != nil {
 				return "", runtime.NewError(err.Error(), 13)
 			}

@@ -207,6 +207,11 @@ func (h *Handler) checkFinish(ctx context.Context, logger runtime.Logger, db *sq
 	// across the finishing positions it covers.
 	prizes, _ := tStore.ListPrizes(ctx, s.TournamentID)
 	finishers, _ := tStore.ListFinishers(ctx, s.TournamentID)
+	// Last line of defence against overlapping prize tiers paying one finisher
+	// twice. TournamentStart now rejects an overlapping ladder outright, but
+	// tournaments configured before that validation existed can still hold one,
+	// and this loop is where the money actually moves.
+	paid := map[string]bool{}
 	for _, prize := range prizes {
 		places := int(prize.RankTo - prize.RankFrom + 1)
 		if places <= 0 {
@@ -220,6 +225,12 @@ func (h *Handler) checkFinish(ctx context.Context, logger runtime.Logger, db *sq
 			if f.FinishPlace < int(prize.RankFrom) || f.FinishPlace > int(prize.RankTo) {
 				continue
 			}
+			if paid[f.UserID] {
+				logger.Error("OVERLAPPING PRIZE TIERS tournament=%s user=%s place=%d — already paid, skipping a second payout",
+					s.TournamentID, f.UserID, f.FinishPlace)
+				continue
+			}
+			paid[f.UserID] = true
 			// FinishOnce already claimed and committed 'finished' above, by
 			// design, so nothing will ever retry this payout for this
 			// tournament — a failure here has no other chance to be corrected.
@@ -418,11 +429,33 @@ func mergeTable(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *Dir
 // StartTournament creates table matches and the director match for a tournament.
 func StartTournament(ctx context.Context, nk runtime.NakamaModule, db *sql.DB, tournamentID string) (string, []string, error) {
 	tStore := store.NewTournamentStore(db)
+	// Claim the right to start BEFORE doing anything observable. Without this,
+	// a second call (double-click, two configurers, or a call against an
+	// already-running/finished event) would build a whole second set of tables
+	// and reseat live players onto them. A plain status read in the RPC would
+	// still race; this is a compare-and-set.
+	claimed, cerr := tStore.ClaimForStart(ctx, tournamentID)
+	if cerr != nil {
+		return "", nil, cerr
+	}
+	if !claimed {
+		return "", nil, runtime.NewError("tournament is not accepting a start (already running, finished, or being started)", 9)
+	}
+	// From here on, any early return must release the claim — otherwise a
+	// transient failure strands the event in 'starting' where nobody can start it.
+	release := func() {
+		if rerr := tStore.ReleaseStartClaim(ctx, tournamentID); rerr != nil {
+			_ = rerr // best-effort; the tournament stays claimed and needs an admin
+		}
+	}
+
 	players, err := tStore.ListRegistered(ctx, tournamentID)
 	if err != nil {
+		release()
 		return "", nil, err
 	}
 	if len(players) < 2 {
+		release()
 		return "", nil, runtime.NewError("need at least 2 registered players", 3)
 	}
 	bracket, _ := tStore.Get(ctx, tournamentID)
@@ -459,6 +492,10 @@ func StartTournament(ctx context.Context, nk runtime.NakamaModule, db *sql.DB, t
 			"auto_away_on_timeout": autoAway,
 		})
 		if err != nil {
+			// Tables already created are left registered against the tournament
+			// rather than silently orphaned; releasing the claim lets an operator
+			// retry, and the partial set is visible to them.
+			release()
 			return "", nil, err
 		}
 		tableMatches = append(tableMatches, matchID)
@@ -473,8 +510,13 @@ func StartTournament(ctx context.Context, nk runtime.NakamaModule, db *sql.DB, t
 		"table_matches": tableMatches,
 	})
 	if err != nil {
+		release()
 		return "", nil, err
 	}
-	_ = tStore.SetDirectorMatch(ctx, tournamentID, directorID)
+	// 'starting' → 'running'. Guarded on the claim we hold, so a caller that
+	// never won ClaimForStart can't install its director match over the real one.
+	if serr := tStore.SetDirectorMatch(ctx, tournamentID, directorID); serr != nil {
+		return "", nil, serr
+	}
 	return directorID, tableMatches, nil
 }

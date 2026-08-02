@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/heroiclabs/nakama-common/runtime"
@@ -300,7 +301,32 @@ func PrizePoolAdd(ctx context.Context, logger runtime.Logger, db *sql.DB, nk run
 	if _, err := requireTournamentOwner(ctx, db, req.TournamentID); err != nil {
 		return "", err
 	}
-	if err := store.NewTournamentStore(db).AddPrizeTier(ctx, &req); err != nil {
+	// Range sanity. Without this, a tier could cover ranks 1-3 and another 2-5
+	// with the basis points still summing to exactly 10000 — so the total check
+	// on start passed while places 2 and 3 matched BOTH tiers and got paid
+	// twice, disbursing more than the pool actually held.
+	if req.RankFrom < 1 {
+		return "", runtime.NewError("rank_from must be at least 1", 3)
+	}
+	if req.RankTo < req.RankFrom {
+		return "", runtime.NewError("rank_to must be greater than or equal to rank_from", 3)
+	}
+	if req.PayoutBps <= 0 {
+		return "", runtime.NewError("payout_bps must be positive", 3)
+	}
+	ts := store.NewTournamentStore(db)
+	existing, lerr := ts.ListPrizes(ctx, req.TournamentID)
+	if lerr != nil {
+		return "", runtime.NewError(lerr.Error(), 13)
+	}
+	for _, p := range existing {
+		if req.RankFrom <= p.RankTo && req.RankTo >= p.RankFrom {
+			return "", runtime.NewError(fmt.Sprintf(
+				"ranks %d-%d overlap an existing tier covering %d-%d",
+				req.RankFrom, req.RankTo, p.RankFrom, p.RankTo), 3)
+		}
+	}
+	if err := ts.AddPrizeTier(ctx, &req); err != nil {
 		return "", runtime.NewError(err.Error(), 13)
 	}
 	out, _ := json.Marshal(req)
@@ -376,6 +402,25 @@ func TournamentStart(ctx context.Context, logger runtime.Logger, db *sql.DB, nk 
 	}
 	if totalBps != 10000 {
 		return "", runtime.NewError(fmt.Sprintf("cannot start: prize tiers must total 100%% (10000 bps), got %d", totalBps), 9)
+	}
+	// Re-validate the assembled ladder, not just the total. This is the real
+	// gate: PrizePoolAdd's own overlap check only sees the tiers that existed
+	// when it ran, so a ladder built before that check existed — or assembled in
+	// an order that slipped past it — can still be overlapping here. Both payout
+	// loops iterate tiers outer / finishers inner with no per-user dedup, so an
+	// overlap pays the same player twice out of a pool that only funded them once.
+	sorted := append([]models.PrizeDistributionPool(nil), prizes...)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].RankFrom < sorted[j].RankFrom })
+	for i, p := range sorted {
+		if p.RankFrom < 1 || p.RankTo < p.RankFrom {
+			return "", runtime.NewError(fmt.Sprintf(
+				"cannot start: prize tier has an invalid rank range %d-%d", p.RankFrom, p.RankTo), 9)
+		}
+		if i > 0 && p.RankFrom <= sorted[i-1].RankTo {
+			return "", runtime.NewError(fmt.Sprintf(
+				"cannot start: prize tiers %d-%d and %d-%d overlap — a finisher in the overlap would be paid twice",
+				sorted[i-1].RankFrom, sorted[i-1].RankTo, p.RankFrom, p.RankTo), 9)
+		}
 	}
 	directorID, tables, err := tournament.StartTournament(ctx, nk, db, req.TournamentID)
 	if err != nil {
