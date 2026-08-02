@@ -30,6 +30,36 @@ func WalletWithdraw(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 	if err := requireVerified(ctx, db, userID, "kyc_aml", "withdrawing funds"); err != nil {
 		return "", err
 	}
+	// Same jurisdiction gate every deposit path applies. Its absence here meant a
+	// player in a denied country — including one added to the deny list after
+	// they funded — could still pull money OUT, which is the direction that
+	// actually matters for sanctions exposure.
+	if err := guardJurisdiction(ctx, db); err != nil {
+		return "", err
+	}
+	// The sign-up stipend is play money: every wallet opens with
+	// store.GuestStipendCents that no deposit funded and no ledger entry
+	// records. Nothing stopped it being withdrawn as real cash — an account
+	// that never paid in a cent could complete KYC and draw the stipend (plus
+	// any bonuses/rakeback accrued on top of it) straight out, so the platform
+	// paid out money it never took in.
+	//
+	// The invariant the store layer already documents ("free accounts cannot
+	// deposit or withdraw, so the stipend ... can never become or come from
+	// real funds") is enforced HERE, and by real inflow rather than by tier:
+	// gating on the subscription tier would sell access to your own money and
+	// would strand a lapsed paid member. An account that has genuinely
+	// deposited may withdraw; one that never has, cannot.
+	deposited, derr := store.NewDepositStore(db).LifetimeCreditedCents(ctx, userID)
+	if derr != nil {
+		// Fail CLOSED, matching the weekly-limit handling below: an unreadable
+		// deposit history means real-vs-stipend can't be told apart.
+		return "", runtime.NewError("could not verify your deposit history — please try again", 13)
+	}
+	if deposited <= 0 {
+		return "", runtime.NewError(
+			"your balance is sign-up credit, which can't be withdrawn — make a deposit first", 9)
+	}
 	var req struct {
 		AmountCents int64  `json:"amount_cents"`
 		Destination string `json:"destination"`

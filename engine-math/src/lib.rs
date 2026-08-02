@@ -224,11 +224,21 @@ pub fn run_it_twice(board: &str, dead: &[&str], boards: usize) -> Result<Vec<Str
     // verbatim (rs_poker's `Hand` reorders internally, which we must not do to a
     // board that is already on the table).
     let board = board.trim();
-    if board.len() % 2 != 0 {
+    // Card codes are ASCII rank+suit pairs. Reject anything else BEFORE the
+    // pairing check: str::len() counts BYTES while chars() yields CHARS, and a
+    // single multi-byte character makes the two disagree — an even byte length
+    // could hide an odd char count, so the loop below would index one past the
+    // end and panic. ("AsAhé" is 6 bytes but 5 chars.) The board string comes
+    // straight off an HTTP request body, so this was a remotely reachable crash
+    // on the all-in run-it-twice path.
+    if !board.is_ascii() {
+        return Err(format!("board '{board}' contains a non-ASCII character"));
+    }
+    let chars: Vec<char> = board.chars().collect();
+    if chars.len() % 2 != 0 {
         return Err(format!("board '{board}' has a dangling card code"));
     }
-    let mut board_cards: Vec<String> = Vec::with_capacity(board.len() / 2);
-    let chars: Vec<char> = board.chars().collect();
+    let mut board_cards: Vec<String> = Vec::with_capacity(chars.len() / 2);
     let mut i = 0;
     while i < chars.len() {
         let r = chars[i];
@@ -906,6 +916,19 @@ mod tests {
         assert_eq!(cards, a);
         assert_eq!(commitment, seed_commitment(&seed));
         assert_eq!(commitment.len(), 64);
+    }
+
+    #[test]
+    fn run_it_twice_rejects_non_ascii_board_without_panicking() {
+        // "AsAhé" is 6 BYTES but only 5 CHARS. The byte-length evenness check
+        // used to pass it through to a char-indexed loop, which then read one
+        // past the end and panicked on a real-money code path.
+        let err = run_it_twice("AsAhé", &[], 2).unwrap_err();
+        assert!(err.contains("non-ASCII"), "unexpected error: {err}");
+
+        // An odd number of ASCII chars is still a dangling code, not a panic.
+        let err = run_it_twice("AsA", &[], 2).unwrap_err();
+        assert!(err.contains("dangling"), "unexpected error: {err}");
     }
 
     #[test]

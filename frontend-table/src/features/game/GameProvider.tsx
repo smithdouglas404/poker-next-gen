@@ -123,6 +123,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
   // turn, reused for whatever action we send that turn, so a double-tap / retry of
   // the same turn's action carries the same nonce and the server dedupes it.
   const turnNonceRef = useRef<string>("");
+  // Mirrors `actionRequired` so sendAction can capture it without re-creating
+  // the callback on every turn, and holds the last optimistically-cleared value
+  // so a server rejection can put the action bar back (see sendAction/OpError).
+  const actionRequiredRef = useRef<ActionRequiredMessage | null>(null);
+  const lastActionRequiredRef = useRef<ActionRequiredMessage | null>(null);
 
   const [connected, setConnected] = useState(false);
   const [matchId, setMatchId] = useState<string | null>(null);
@@ -131,6 +136,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [snapshot, setSnapshot] = useState<TableSnapshot | null>(null);
   const [holeCards, setHoleCards] = useState<CardView[]>([]);
   const [actionRequired, setActionRequired] = useState<ActionRequiredMessage | null>(null);
+  // Keep the ref in lockstep with the state via an effect rather than at each
+  // setActionRequired call site, so a future setter can't silently desync it.
+  useEffect(() => {
+    actionRequiredRef.current = actionRequired;
+  }, [actionRequired]);
   const [showdown, setShowdown] = useState<ShowdownMessage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [buyInCents, setBuyInCentsState] = useState(INITIAL_WALLET_CENTS);
@@ -247,6 +257,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
               typeof crypto !== "undefined" && crypto.randomUUID
                 ? crypto.randomUUID()
                 : `${Date.now()}-${Math.random()}`;
+            // A real new turn supersedes anything held for rejection-restore.
+            lastActionRequiredRef.current = null;
+            actionRequiredRef.current = payload as ActionRequiredMessage;
             setActionRequired(payload as ActionRequiredMessage);
             break;
           case OpShowdown: {
@@ -277,8 +290,20 @@ export function GameProvider({ children }: { children: ReactNode }) {
             break;
           }
           case OpError:
-            setError(payload.message ?? "Game error");
-            pushLog(payload.message ?? "Error", "error");
+            // Defensive: an OpError frame with an empty body would otherwise
+            // throw here, in the handler most likely to run during a degraded
+            // server state.
+            setError(payload?.message ?? "Game error");
+            pushLog(payload?.message ?? "Error", "error");
+            // The server rejected the action we just sent while it is STILL our
+            // turn (bad raise size, illegal check, …). It does not re-send
+            // OpActionRequired in that case, so restore what sendAction cleared
+            // optimistically — otherwise the action bar stays gone and the shot
+            // clock auto-folds a player who is sitting right there.
+            if (payload?.code === "action_failed" && lastActionRequiredRef.current) {
+              setActionRequired(lastActionRequiredRef.current);
+              lastActionRequiredRef.current = null;
+            }
             break;
           case OpTableMoved: {
             // Multi-table tournament merge (match/tournament/director.go
@@ -492,6 +517,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
     async (type: string, amount: number) => {
       await sendMatch(OpAction, { type, amount, nonce: turnNonceRef.current });
       pushLog(`${type.toUpperCase()}${amount ? ` ${formatCents(amount)}` : ""}`, "action");
+      // Clear optimistically so the action bar hides the instant you act
+      // (waiting for the server round-trip feels broken at a poker table) —
+      // but remember what we cleared. The server can legitimately REJECT an
+      // action while it is still your turn ("raise below minimum", "cannot
+      // check", …) and it does not re-send OpActionRequired in that case, so
+      // without this the action bar would stay gone until the shot clock
+      // auto-folded you. The OpError handler restores it.
+      lastActionRequiredRef.current = actionRequiredRef.current;
       setActionRequired(null);
     },
     [sendMatch, pushLog],

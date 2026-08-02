@@ -125,32 +125,61 @@ func winnersAmong(eligible []int, holeCards map[string][]Card, community []Card,
 }
 
 // AwardSidePots resolves and pays each side pot via rs_poker (engine-math only).
-func AwardSidePots(t *Table) ([][]int, int64, error) {
+//
+// This is the SYNCHRONOUS path (no async snapshot window), so a vanished winner
+// seat is not expected here — but pokerAward reports one either way, and
+// dropping that report would reintroduce the silent chip destruction it exists
+// to surface. Orphaned shares are returned for the caller to handle.
+func AwardSidePots(t *Table) ([][]int, int64, []OrphanedPayout, error) {
 	if winner, ok := t.UncontestedWinner(); ok {
 		amount := t.Pot
-		pokerAward(t, []int{winner}, amount)
-		return [][]int{{winner}}, amount, nil
+		orphaned := pokerAward(t, []int{winner}, amount)
+		return [][]int{{winner}}, amount, orphaned, nil
 	}
 
 	pots := BuildSidePots(t)
 	allWinners := make([][]int, 0, len(pots))
 	var total int64
+	var orphaned []OrphanedPayout
 	for _, pot := range pots {
 		winners, err := winnersAmong(pot.Eligible, t.HoleCards, t.Board, t.Seats, t.IsOmaha())
 		if err != nil {
-			return nil, 0, err
+			return nil, 0, nil, err
 		}
-		pokerAward(t, winners, pot.Amount)
+		orphaned = append(orphaned, pokerAward(t, winners, pot.Amount)...)
 		allWinners = append(allWinners, winners)
 		total += pot.Amount
 	}
 	t.Pot = 0
-	return allWinners, total, nil
+	return allWinners, total, orphaned, nil
 }
 
-func pokerAward(t *Table, winners []int, amount int64) {
+// OrphanedPayout is a pot share that could not be paid because the winning seat
+// no longer exists on the live table by the time the award is applied.
+//
+// This is possible because showdown resolution is asynchronous: ShowdownPlan
+// freezes a snapshot for the engine-math round-trip (up to the 2s client
+// timeout), and the live table can mutate in that window — a stand-up, a kick,
+// or a tournament rebalance can empty a seat that the frozen plan named as a
+// winner.
+//
+// It is deliberately reported rather than swallowed. The chips are real money;
+// silently dropping them destroyed value with no record that anyone was owed
+// anything. The poker package has no database access by design, so it cannot
+// credit the departed player itself — it hands the debt up to the caller, which
+// does. This mirrors releaseBuyIn's existing philosophy in the match handler:
+// where there is no natural retry, logging loudly is what makes a loss findable
+// and compensable instead of just gone.
+type OrphanedPayout struct {
+	Seat   int
+	Amount int64
+}
+
+// pokerAward pays `amount` to `winners`, returning any shares that could not be
+// paid because the seat had vanished (see OrphanedPayout).
+func pokerAward(t *Table, winners []int, amount int64) []OrphanedPayout {
 	if len(winners) == 0 || amount <= 0 {
-		return
+		return nil
 	}
 	// Odd-chip rule (TDA Rule 25): an indivisible remainder goes to the first
 	// winning seat clockwise from the button (first seat left of the button),
@@ -159,16 +188,21 @@ func pokerAward(t *Table, winners []int, amount int64) {
 	order := oddChipOrder(winners, t.ButtonSeat)
 	share := amount / int64(len(order))
 	remainder := amount % int64(len(order))
+	var orphaned []OrphanedPayout
 	for i, seat := range order {
-		if t.Seats[seat] == nil {
-			continue
-		}
 		pay := share
 		if int64(i) < remainder {
 			pay++
 		}
+		if seat < 0 || seat >= len(t.Seats) || t.Seats[seat] == nil {
+			if pay > 0 {
+				orphaned = append(orphaned, OrphanedPayout{Seat: seat, Amount: pay})
+			}
+			continue
+		}
 		t.Seats[seat].Stack += pay
 	}
+	return orphaned
 }
 
 // oddChipOrder returns winners rotated so the first entry is the first winner
