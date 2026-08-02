@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 
 import { DEFAULT_MAX_SEATS, MAX_SEATS, MIN_SEATS, type SeatView } from "@/features/game/protocol";
 import { formatCents, useGame } from "@/features/game/GameProvider";
@@ -14,8 +13,6 @@ import { Character3D } from "@/features/table/Character3D";
 import { Character3DGL } from "@/features/table/Character3DGL";
 import { useRenderMode } from "@/features/table/renderMode";
 import { useTableGraphics } from "@/features/table/tableGraphics";
-import { useRoomPanelOpen, ROOM_PANEL_WIDTH_PX } from "@/features/hud/roomPanelState";
-import { getTableGraphics } from "@/features/table/tableGraphics";
 
 function SeatCard({
   seat,
@@ -128,14 +125,6 @@ export function SeatHud() {
   const activeSeat = snapshot?.action_seat;
   const winnerSeats = new Set((showdown?.winners ?? []).map((w) => w.seat));
 
-  // RoomPanel (the "Room Control" drawer) renders only when !demo and sits
-  // above the seat layer (z-40 vs z-10) — when it's open, reserve its width
-  // so the ring shifts right instead of leaving left-side seats unreachable
-  // underneath it.
-  const demo = useSearchParams().get("demo") === "1";
-  const [roomPanelOpen] = useRoomPanelOpen(getTableGraphics() !== "cinematic");
-  const insetLeft = !demo && roomPanelOpen ? ROOM_PANEL_WIDTH_PX : 0;
-
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
   useEffect(() => {
     const update = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
@@ -161,7 +150,7 @@ export function SeatHud() {
   // table" without crowding the community cards.
   const positions =
     viewport.w > 0
-      ? getSeatPositions(computeTableLayout(viewport.w, viewport.h, insetLeft), seatCount, 1.04)
+      ? getSeatPositions(computeTableLayout(viewport.w, viewport.h), seatCount, 1.04)
       : [];
 
   return (

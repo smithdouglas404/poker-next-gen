@@ -639,11 +639,7 @@ export function Seat({ player, position, isHero = false, isWinner = false, seatI
         </div>
 
         {/* ── Stitch-poker-style full-body portrait card ── */}
-        <div
-          ref={avatarRef}
-          className={cn("relative z-10", onPlayerClick && "cursor-pointer")}
-          onClick={onPlayerClick ? () => onPlayerClick(player) : undefined}
-        >
+        <div ref={avatarRef} className="relative z-10">
           {showVideo && <VideoThumbnail userId={player.id} isLocal={isHero} size={Math.round(48 * perspectiveScale)} />}
           {avatarTier && avatarTier !== "common" && (
             <AvatarStatusRing

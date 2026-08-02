@@ -8,15 +8,11 @@ export interface TableLayout {
   railThickness: number;
 }
 
-/** `insetLeft` reserves a strip on the left (e.g. the open Room Control
- *  drawer) so the seat ring shifts right and shrinks to clear it, instead of
- *  seats landing underneath a higher-z-index panel and becoming unreachable. */
-export function computeTableLayout(width: number, height: number, insetLeft: number = 0): TableLayout {
-  const usableWidth = Math.max(width - insetLeft, 0);
-  const cx = insetLeft + usableWidth / 2;
+export function computeTableLayout(width: number, height: number): TableLayout {
+  const cx = width / 2;
   const cy = height / 2;
-  const margin = Math.min(usableWidth, height) * 0.08;
-  const maxRx = usableWidth / 2 - margin;
+  const margin = Math.min(width, height) * 0.08;
+  const maxRx = width / 2 - margin;
   const maxRy = height / 2 - margin;
 
   let rx = maxRx;

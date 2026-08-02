@@ -10,7 +10,6 @@ import { TableHud } from "@/features/hud/TableHud";
 import { SoundProvider } from "@/features/hrc/lib/sound-context";
 import { HandHistoryPanel } from "@/features/hud/HandHistoryPanel";
 import { ChatStatsPanel } from "@/features/hud/ChatStatsPanel";
-import { TableFeltBackdrop } from "@/features/hrc/components/TableFeltBackdrop";
 
 // framer-motion/three/drei all touch the DOM/WebGL — never import during SSR
 // (Golden rule 3).
@@ -23,11 +22,6 @@ function TableSurface() {
   // table's stored render_style says, until 3D work resumes.
   return (
     <SoundProvider>
-      {/* Always behind HrcTable — HrcTable itself renders nothing until a
-          real snapshot exists (no fake game state), which otherwise leaves
-          the pre-seat "This table is open" / "Sit Here" screen with no table
-          graphic under it at all. */}
-      <TableFeltBackdrop />
       <HrcTable demo={demo} override="2.5d" />
       <HandHistoryPanel />
       <ChatStatsPanel />

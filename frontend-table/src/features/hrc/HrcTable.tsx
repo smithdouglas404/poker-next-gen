@@ -20,13 +20,12 @@ import { ImageTable } from "./components/ImageTable";
 import { PokerSceneCanvas } from "./scene/canvas/PokerSceneCanvas";
 import { GameUIProvider } from "./lib/game-ui-context";
 import { adaptSnapshot, toCards } from "./adapter";
-import type { CardType, Player } from "./lib/poker-types";
+import type { CardType } from "./lib/poker-types";
 import { useSceneSync } from "./useSceneSync";
 import { avatarSrc } from "@/features/table/avatars";
 import { Seat } from "./components/Seat";
 import { HeroHoleCards } from "./components/HeroHoleCards";
 import { ShowdownOverlay } from "./components/ShowdownOverlay";
-import { PlayerDetailModal } from "@/features/hud/PlayerDetailModal";
 import { adaptShowdown } from "./lib/showdownAdapter";
 import { TABLE_SEATS, FELT_BOUNDS } from "./lib/table-constants";
 import { seatId } from "./adapter";
@@ -90,10 +89,6 @@ export default function HrcTable({
   // never shows it (CLAUDE.md: demo data is opt-in, never a fallback).
   const showdown = demo ? null : live.showdown;
   const [showdownDismissed, setShowdownDismissed] = useState(false);
-  // Player detail popup — click any seated player's avatar/name to see their
-  // session state + real stats (player_stats RPC). See PlayerDetailModal.tsx
-  // for why this stays scoped to stats only, no mute/report/friend actions.
-  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   useEffect(() => {
     if (showdown) setShowdownDismissed(false);
   }, [showdown]);
@@ -201,15 +196,10 @@ export default function HrcTable({
                     // reference (`showVideo={isMultiplayer && !player.isBot}`);
                     // demo has no real match to join a video room for.
                     showVideo={!demo && !player.isBot}
-                    onPlayerClick={setSelectedPlayer}
                   />
                 );
               })}
             </div>
-
-            {selectedPlayer && (
-              <PlayerDetailModal player={selectedPlayer} onClose={() => setSelectedPlayer(null)} />
-            )}
 
             <HeroHoleCards cards={heroCards} communityCards={adapted.gameState.communityCards} />
 

@@ -22,7 +22,6 @@ import { ChipAnimation } from "@/features/hrc/components/ChipAnimation";
 import { MusicPicker } from "@/features/sound/MusicPicker";
 import { TableSettings } from "@/features/hud/TableSettings";
 import { TauntBar } from "@/features/sound/TauntBar";
-import { EmotePicker } from "@/features/hrc/components/EmoteSystem";
 import { usePokerKeyboard } from "@/features/hud/usePokerKeyboard";
 import { useGameSounds } from "@/features/sound/useGameSounds";
 import { useGame } from "@/features/game/GameProvider";
@@ -81,7 +80,6 @@ export function TableHud({ children }: { children: React.ReactNode }) {
           <SpectatorBar />
           <TotalInPlay />
             <TauntBar />
-            <EmotePicker />
             {/* Music + display settings are tall always-expanded panels; in a
                 cinematic idle/demo they occlude the left seats, so hold them
                 until a live table is up. Mute stays reachable via the header. */}
