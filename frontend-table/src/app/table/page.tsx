@@ -39,11 +39,12 @@ export default function TablePage() {
   return (
     <GameProvider>
       <JurisdictionGate />
-      <TableHud>
-        <Suspense fallback={null}>
+      {/* TableHud itself reads useSearchParams, so it needs its own boundary. */}
+      <Suspense fallback={null}>
+        <TableHud>
           <TableSurface />
-        </Suspense>
-      </TableHud>
+        </TableHud>
+      </Suspense>
     </GameProvider>
   );
 }

@@ -192,10 +192,11 @@ export function ShowdownOverlay({ visible, results, players, pot, onDismiss, aut
       // Gold confetti burst
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ["#d4af37", "#f3e2ad", "#8a6914", "#ffffff", "#c9a227"] });
       // Second burst delayed
-      setTimeout(() => {
+      const t = setTimeout(() => {
         confetti({ particleCount: 50, angle: 60, spread: 55, origin: { x: 0 }, colors: ["#d4af37", "#f3e2ad"] });
         confetti({ particleCount: 50, angle: 120, spread: 55, origin: { x: 1 }, colors: ["#d4af37", "#f3e2ad"] });
       }, 300);
+      return () => clearTimeout(t);
     }
   }, [visible, winners.length]);
 
