@@ -1,139 +1,114 @@
 "use client";
-
+// ── Admin UI primitives v2 — Premium dark-casino design system ───────────────
+// AdminCard, KpiBar, Badge, Table, Th, Td, Row, Empty, Mono, statusTone
+// Used across all 15 admin sections. Upgraded with richer elevation, gold/red
+// accent system, and better table styling.
 import type { ReactNode } from "react";
+import { cn } from "@/features/ui/tokens";
 
-import { GLASS_PANEL, GLASS_PANEL_HOVER, HEADING_LG, cn } from "@/features/ui/tokens";
-
-// Screen-local presentational primitives for the admin console. They compose
-// the shared GGPoker tokens (GLASS_PANEL card / HEADING_LG) so the console
-// matches the rest of the app without re-inventing surfaces.
-
-/** Gold-gradient display heading used for section titles. */
-export function GoldHeading({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <h2
-      className={cn(
-        HEADING_LG,
-        "bg-gradient-to-r from-[#ffd54a] via-[#f5c518] to-[#d4a80f] bg-clip-text text-transparent",
-        className,
-      )}
-    >
-      {children}
-    </h2>
-  );
-}
-
-export function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <p
-      className={cn(
-        "text-[11px] font-semibold uppercase tracking-[0.28em] text-neutral-500",
-        className,
-      )}
-    >
-      {children}
-    </p>
-  );
-}
-
-/** A glass content card with an optional header row + actions. */
-export function Card({
+// ── AdminCard ─────────────────────────────────────────────────────────────────
+export function AdminCard({
   title,
-  eyebrow,
-  actions,
+  badge,
+  action,
   children,
   className,
-  bodyClassName,
 }: {
-  title?: ReactNode;
-  eyebrow?: string;
-  actions?: ReactNode;
+  title?: string;
+  badge?: ReactNode;
+  action?: ReactNode;
   children: ReactNode;
   className?: string;
-  bodyClassName?: string;
 }) {
   return (
-    <section className={cn(GLASS_PANEL, "overflow-hidden", className)}>
-      {(title || actions || eyebrow) && (
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] px-5 py-4">
-          <div>
-            {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
-            {title && (
-              <p className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
-                {title}
-              </p>
-            )}
-          </div>
-          {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
-        </header>
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-2xl border border-white/[0.07] bg-[#181e27] p-5 shadow-[0_2px_16px_rgba(0,0,0,0.45)]",
+        className,
       )}
-      <div className={cn("p-5", bodyClassName)}>{children}</div>
-    </section>
-  );
-}
-
-/** A headline metric tile. `accent` tints the value + glow. */
-export function StatTile({
-  label,
-  value,
-  sub,
-  accent = "neutral",
-}: {
-  label: string;
-  value: ReactNode;
-  sub?: ReactNode;
-  accent?: "cyan" | "gold" | "red" | "green" | "neutral";
-}) {
-  const tone: Record<string, string> = {
-    cyan: "text-cyan",
-    gold: "text-gold",
-    red: "text-brand",
-    green: "text-green",
-    neutral: "text-foreground",
-  };
-  // GGPoker: clean cards with a soft shadow — no heavy neon glow.
-  const glow: Record<string, string> = {
-    cyan: "",
-    gold: "",
-    red: "",
-    green: "",
-    neutral: "",
-  };
-  return (
-    <div className={cn(GLASS_PANEL, GLASS_PANEL_HOVER, "p-5", glow[accent])}>
-      <Eyebrow>{label}</Eyebrow>
-      <p className={cn("mt-2 font-display text-2xl font-bold tracking-tight", tone[accent])}>
-        {value}
-      </p>
-      {sub && <p className="mt-1 text-xs text-neutral-500">{sub}</p>}
+    >
+      {/* Subtle top accent */}
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+      {(title || badge || action) && (
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            {title && (
+              <h3 className="font-display text-xs font-bold uppercase tracking-[0.25em] text-white/60">
+                {title}
+              </h3>
+            )}
+            {badge}
+          </div>
+          {action}
+        </div>
+      )}
+      {children}
     </div>
   );
 }
 
+// ── KPI bar ───────────────────────────────────────────────────────────────────
+export function KpiBar({ items }: { items: { label: string; value: ReactNode; tone?: "gold" | "green" | "red" | "neutral" }[] }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {items.map((item, i) => {
+        const valueTone =
+          item.tone === "gold"  ? "text-[#f5c518]" :
+          item.tone === "green" ? "text-[#22c55e]" :
+          item.tone === "red"   ? "text-[#ff4455]" :
+          "text-white";
+        const borderColor =
+          item.tone === "gold"  ? "rgba(245,197,24,0.18)" :
+          item.tone === "green" ? "rgba(34,197,94,0.18)"  :
+          item.tone === "red"   ? "rgba(224,30,43,0.18)"  :
+          "rgba(255,255,255,0.08)";
+        const bgColor =
+          item.tone === "gold"  ? "rgba(245,197,24,0.05)" :
+          item.tone === "green" ? "rgba(34,197,94,0.05)"  :
+          item.tone === "red"   ? "rgba(224,30,43,0.05)"  :
+          "rgba(255,255,255,0.02)";
+        const accentLine =
+          item.tone === "gold"  ? "linear-gradient(90deg,transparent,rgba(245,197,24,0.50),transparent)" :
+          item.tone === "green" ? "linear-gradient(90deg,transparent,rgba(34,197,94,0.50),transparent)"  :
+          item.tone === "red"   ? "linear-gradient(90deg,transparent,rgba(224,30,43,0.50),transparent)"  :
+          "linear-gradient(90deg,transparent,rgba(255,255,255,0.12),transparent)";
+        return (
+          <div
+            key={i}
+            className="relative overflow-hidden rounded-2xl px-4 py-3.5 transition hover:-translate-y-0.5"
+            style={{ border: `1px solid ${borderColor}`, background: bgColor }}
+          >
+            <div className="absolute inset-x-0 top-0 h-px" style={{ background: accentLine }} />
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-neutral-500">{item.label}</p>
+            <p className={cn("mt-1.5 font-display text-2xl font-bold tabular-nums leading-none", valueTone)}>{item.value}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Badge ─────────────────────────────────────────────────────────────────────
 const BADGE_TONES: Record<string, string> = {
-  gold: "border-gold/40 bg-gold/10 text-gold",
-  cyan: "border-cyan/40 bg-cyan/10 text-cyan",
-  green: "border-green/30 bg-green/10 text-green",
-  red: "border-brand/40 bg-brand/10 text-brand",
-  purple: "border-purple-500/40 bg-purple-500/10 text-purple-300",
-  neutral: "border-white/15 bg-white/[0.04] text-neutral-300",
+  green:   "border-[#22c55e]/35 bg-[#22c55e]/[0.08] text-[#22c55e]",
+  gold:    "border-[#f5c518]/35 bg-[#f5c518]/[0.08] text-[#f5c518]",
+  red:     "border-[#e01e2b]/35 bg-[#e01e2b]/[0.08] text-[#ff4455]",
+  cyan:    "border-white/15 bg-white/[0.04] text-neutral-300",
+  neutral: "border-white/10 bg-white/[0.03] text-neutral-400",
 };
 
 export function Badge({
-  children,
   tone = "neutral",
-  className,
+  children,
 }: {
-  children: ReactNode;
   tone?: keyof typeof BADGE_TONES;
-  className?: string;
+  children: ReactNode;
 }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-        BADGE_TONES[tone],
-        className,
+        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.15em]",
+        BADGE_TONES[tone] ?? BADGE_TONES.neutral,
       )}
     >
       {children}
@@ -141,25 +116,22 @@ export function Badge({
   );
 }
 
-/** Map a status/risk string to a badge tone. */
 export function statusTone(status: string): keyof typeof BADGE_TONES {
   const s = status.toLowerCase();
-  if (["verified", "approved", "confirmed", "paid", "resolved", "allow", "closed"].includes(s))
-    return "green";
-  if (["pending", "review", "open", "in_review", "medium"].includes(s)) return "gold";
-  if (["rejected", "banned", "denied", "deny", "dismissed", "failed", "high", "critical"].includes(s))
-    return "red";
+  if (["verified","approved","confirmed","paid","resolved","allow","closed"].includes(s)) return "green";
+  if (["pending","review","open","in_review","medium"].includes(s)) return "gold";
+  if (["rejected","banned","denied","deny","dismissed","failed","high","critical"].includes(s)) return "red";
   if (["low"].includes(s)) return "cyan";
   return "neutral";
 }
 
-/** Simple glass table scaffolding — always horizontally scrollable. */
+// ── Table ─────────────────────────────────────────────────────────────────────
 export function Table({ head, children }: { head: ReactNode; children: ReactNode }) {
   return (
     <div className="-mx-5 -mb-5 overflow-x-auto">
       <table className="w-full min-w-[560px] border-collapse text-sm">
         <thead>
-          <tr className="border-b border-white/[0.08] text-left">{head}</tr>
+          <tr className="border-b border-white/[0.07] text-left">{head}</tr>
         </thead>
         <tbody>{children}</tbody>
       </table>
@@ -169,24 +141,21 @@ export function Table({ head, children }: { head: ReactNode; children: ReactNode
 
 export function Th({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <th
-      className={cn(
-        "px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500",
-        className,
-      )}
-    >
+    <th className={cn("px-5 py-3 text-[10px] font-bold uppercase tracking-[0.20em] text-neutral-500", className)}>
       {children}
     </th>
   );
 }
 
 export function Td({ children, className }: { children: ReactNode; className?: string }) {
-  return <td className={cn("px-5 py-3 align-middle text-neutral-200", className)}>{children}</td>;
+  return (
+    <td className={cn("px-5 py-3.5 align-middle text-neutral-200", className)}>{children}</td>
+  );
 }
 
 export function Row({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <tr className={cn("border-b border-white/[0.04] transition hover:bg-white/[0.02]", className)}>
+    <tr className={cn("border-b border-white/[0.04] transition hover:bg-white/[0.025]", className)}>
       {children}
     </tr>
   );
@@ -194,8 +163,8 @@ export function Row({ children, className }: { children: ReactNode; className?: 
 
 export function Empty({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-      <div className="grid h-11 w-11 place-items-center rounded-full border border-white/10 bg-white/[0.03] text-lg text-neutral-500">
+    <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+      <div className="grid h-12 w-12 place-items-center rounded-full border border-white/10 bg-white/[0.03] text-xl text-neutral-500">
         ◇
       </div>
       <p className="text-sm text-neutral-500">{children}</p>
@@ -205,4 +174,46 @@ export function Empty({ children }: { children: ReactNode }) {
 
 export function Mono({ children, className }: { children: ReactNode; className?: string }) {
   return <span className={cn("font-mono text-xs text-neutral-400", className)}>{children}</span>;
+}
+
+// ── Section header ────────────────────────────────────────────────────────────
+export function SectionHeader({
+  title,
+  subtitle,
+  action,
+}: {
+  title: string;
+  subtitle?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div>
+        <h2 className="font-display text-xl font-bold uppercase tracking-wide text-white">{title}</h2>
+        {subtitle && <p className="mt-0.5 text-xs text-neutral-500">{subtitle}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+// ── Alert strip ───────────────────────────────────────────────────────────────
+export function AlertStrip({
+  tone,
+  children,
+}: {
+  tone: "red" | "gold" | "green" | "neutral";
+  children: ReactNode;
+}) {
+  const styles: Record<string, string> = {
+    red:     "border-[#e01e2b]/30 bg-[#e01e2b]/[0.06] text-[#ff4455]",
+    gold:    "border-[#f5c518]/30 bg-[#f5c518]/[0.06] text-[#f5c518]",
+    green:   "border-[#22c55e]/30 bg-[#22c55e]/[0.06] text-[#22c55e]",
+    neutral: "border-white/10 bg-white/[0.03] text-neutral-300",
+  };
+  return (
+    <div className={cn("rounded-xl border px-4 py-3 text-sm", styles[tone])}>
+      {children}
+    </div>
+  );
 }

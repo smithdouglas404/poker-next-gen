@@ -1,10 +1,10 @@
 "use client";
-
+// ── Loyalty UI primitives v2 — Premium dark-casino design system ─────────────
+// Eyebrow, GoldHeading, GlassCard, StatTile, ProgressBar, Pill, EmptyState
 import type { ReactNode } from "react";
-
 import { GLASS_PANEL, GLASS_PANEL_HOVER, cn } from "@/features/ui/tokens";
 
-/** Uppercase, wide-tracked section eyebrow matching the HUD. */
+/** Uppercase, wide-tracked section eyebrow. */
 export function Eyebrow({
   children,
   className,
@@ -15,27 +15,23 @@ export function Eyebrow({
   tone?: "gold" | "green" | "muted";
 }) {
   const color =
-    tone === "gold" ? "text-gold/80" : tone === "green" ? "text-green/80" : "text-neutral-400";
+    tone === "gold"  ? "text-[#f5c518]/80" :
+    tone === "green" ? "text-[#22c55e]/80" :
+    "text-neutral-400";
   return (
-    <p
-      className={cn(
-        "font-display text-[11px] font-bold uppercase tracking-[0.28em]",
-        color,
-        className,
-      )}
-    >
+    <p className={cn("font-display text-[11px] font-bold uppercase tracking-[0.30em]", color, className)}>
       {children}
     </p>
   );
 }
 
-/** Gold-gradient display heading (Space Grotesk, uppercase, wide tracking). */
+/** Gold-gradient display heading. */
 export function GoldHeading({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <h2
       className={cn(
         "font-display font-bold uppercase tracking-wide",
-        "bg-gradient-to-b from-[#ffd54a] via-[#f5c518] to-[#d4a80f] bg-clip-text text-transparent",
+        "bg-gradient-to-b from-[#ffe9a8] via-[#f5c518] to-[#c99700] bg-clip-text text-transparent",
         className,
       )}
     >
@@ -44,7 +40,7 @@ export function GoldHeading({ children, className }: { children: ReactNode; clas
   );
 }
 
-/** Card wrapper with the standard GG surface border + optional hover glow. */
+/** Card wrapper with standard surface border + optional hover glow. */
 export function GlassCard({
   children,
   className,
@@ -57,7 +53,7 @@ export function GlassCard({
   return <div className={cn(GLASS_PANEL, hover && GLASS_PANEL_HOVER, className)}>{children}</div>;
 }
 
-/** A compact labelled stat tile. */
+/** Compact labelled stat tile with accent glow. */
 export function StatTile({
   label,
   value,
@@ -68,18 +64,36 @@ export function StatTile({
   accent?: "default" | "gold" | "green";
 }) {
   const valueColor =
-    accent === "gold" ? "text-gold" : accent === "green" ? "text-green" : "text-white";
+    accent === "gold"  ? "text-[#f5c518]" :
+    accent === "green" ? "text-[#22c55e]" :
+    "text-white";
+
+  const borderColor =
+    accent === "gold"  ? "rgba(245,197,24,0.20)" :
+    accent === "green" ? "rgba(34,197,94,0.20)"  :
+    "rgba(255,255,255,0.08)";
+
+  const bgColor =
+    accent === "gold"  ? "rgba(245,197,24,0.05)" :
+    accent === "green" ? "rgba(34,197,94,0.05)"  :
+    "rgba(0,0,0,0.25)";
+
   return (
-    <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-center">
-      <p className={cn("text-lg font-bold tabular-nums", valueColor)}>{value}</p>
-      <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-500">
-        {label}
-      </p>
+    <div
+      className="relative overflow-hidden rounded-xl px-3 py-3 text-center transition hover:-translate-y-0.5"
+      style={{ border: `1px solid ${borderColor}`, background: bgColor }}
+    >
+      <div
+        className="absolute inset-x-0 top-0 h-px"
+        style={{ background: `linear-gradient(90deg,transparent,${borderColor === "rgba(255,255,255,0.08)" ? "rgba(255,255,255,0.15)" : borderColor.replace("0.20","0.50")},transparent)` }}
+      />
+      <p className={cn("font-display text-lg font-bold tabular-nums leading-none", valueColor)}>{value}</p>
+      <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500">{label}</p>
     </div>
   );
 }
 
-/** Themeable progress bar with a soft gradient fill. */
+/** Themeable progress bar with soft gradient fill and glow. */
 export function ProgressBar({
   value,
   tone = "gold",
@@ -91,16 +105,18 @@ export function ProgressBar({
 }) {
   const pct = Math.max(0, Math.min(1, value)) * 100;
   const fill =
-    tone === "green"
-      ? "from-green/70 to-green"
-      : tone === "emerald"
-        ? "from-emerald-500 to-emerald-300"
-        : "from-[#d4a80f] via-[#f5c518] to-[#ffd54a]";
+    tone === "green"   ? "from-[#16a34a] to-[#22c55e]" :
+    tone === "emerald" ? "from-emerald-600 to-emerald-400" :
+    "from-[#c99700] via-[#f5c518] to-[#ffe066]";
+  const glow =
+    tone === "green"   ? "rgba(34,197,94,0.35)"   :
+    tone === "emerald" ? "rgba(52,211,153,0.35)"  :
+    "rgba(245,197,24,0.35)";
   return (
-    <div className={cn("h-2 overflow-hidden rounded-full bg-white/10", className)}>
+    <div className={cn("h-2 overflow-hidden rounded-full bg-white/[0.07]", className)}>
       <div
         className={cn("h-full rounded-full bg-gradient-to-r transition-[width] duration-700", fill)}
-        style={{ width: `${pct}%` }}
+        style={{ width: `${pct}%`, boxShadow: `0 0 8px ${glow}` }}
       />
     </div>
   );
@@ -117,10 +133,10 @@ export function Pill({
   className?: string;
 }) {
   const styles: Record<string, string> = {
-    gold: "border-gold/40 bg-gold/10 text-gold",
-    green: "border-green/40 bg-green/10 text-green",
+    gold:    "border-[#f5c518]/40 bg-[#f5c518]/[0.08] text-[#f5c518]",
+    green:   "border-[#22c55e]/40 bg-[#22c55e]/[0.08] text-[#22c55e]",
     emerald: "border-emerald-500/40 bg-emerald-950/40 text-emerald-300",
-    muted: "border-white/10 bg-white/5 text-neutral-400",
+    muted:   "border-white/10 bg-white/[0.04] text-neutral-400",
   };
   return (
     <span
@@ -135,11 +151,11 @@ export function Pill({
   );
 }
 
-/** Centered empty-state used when a server list comes back empty. */
+/** Centered empty-state for empty server lists. */
 export function EmptyState({ icon, children }: { icon?: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 bg-white/[0.015] px-6 py-10 text-center">
-      {icon && <span className="text-2xl opacity-60">{icon}</span>}
+    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.01] px-6 py-12 text-center">
+      {icon && <span className="text-3xl opacity-50">{icon}</span>}
       <p className="text-sm text-neutral-500">{children}</p>
     </div>
   );

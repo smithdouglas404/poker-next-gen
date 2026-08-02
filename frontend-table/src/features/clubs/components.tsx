@@ -83,20 +83,27 @@ export function StatTile({
   sub?: string;
 }) {
   return (
-    <div className={cn(GLASS_PANEL, "p-4")}>
+    <div
+      className="relative overflow-hidden rounded-2xl p-4 shadow-[0_2px_12px_rgba(0,0,0,0.40)] transition hover:-translate-y-0.5"
+      style={{
+        background: `${accent}08`,
+        border: `1px solid ${accent}20`,
+      }}
+    >
+      <div className="absolute inset-x-0 top-0 h-px" style={{ background: `linear-gradient(90deg,transparent,${accent}50,transparent)` }} />
       <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-neutral-500">{label}</p>
-      <p className="font-display mt-1.5 text-2xl font-bold" style={{ color: accent }}>
+      <p className="font-display mt-1.5 text-2xl font-bold leading-none" style={{ color: accent }}>
         {value}
       </p>
-      {sub && <p className="mt-0.5 text-[11px] text-neutral-500">{sub}</p>}
+      {sub && <p className="mt-1 text-[11px] text-neutral-500">{sub}</p>}
     </div>
   );
 }
 
 export function CardHeader({ children, badge }: { children: ReactNode; badge?: ReactNode }) {
   return (
-    <div className="mb-3 flex items-center justify-between">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/50">{children}</span>
+    <div className="mb-4 flex items-center justify-between">
+      <span className="font-display text-xs font-bold uppercase tracking-[0.25em] text-white/60">{children}</span>
       {badge}
     </div>
   );
@@ -104,8 +111,8 @@ export function CardHeader({ children, badge }: { children: ReactNode; badge?: R
 
 export function EmptyState({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.01] px-4 py-8 text-center text-sm text-neutral-500">
-      {children}
+    <div className="rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.01] px-6 py-10 text-center">
+      <p className="text-sm text-neutral-500">{children}</p>
     </div>
   );
 }

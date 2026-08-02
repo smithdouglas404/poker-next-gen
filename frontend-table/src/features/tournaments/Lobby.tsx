@@ -63,8 +63,8 @@ function HeroCard({
       className={cn(
         "group relative overflow-hidden rounded-xl border p-6 text-left transition-all duration-200",
         selected
-          ? "border-brand/60 shadow-[0_4px_18px_rgba(0,0,0,0.5)]"
-          : "border-white/[0.06] hover:border-white/[0.14]",
+          ? "border-[#e01e2b]/60 shadow-[0_4px_24px_rgba(224,30,43,0.25),0_0_0_1px_rgba(224,30,43,0.20)]"
+          : "border-white/[0.07] hover:border-[#f5c518]/30 hover:shadow-[0_4px_20px_rgba(245,197,24,0.08)]",
       )}
       style={{ background: t.meta?.heroArt ?? "#262d38" }}
     >
@@ -76,7 +76,7 @@ function HeroCard({
             {startsLabel(t.scheduled_at, t.status)}
           </span>
         </div>
-        <h3 className="font-display text-3xl font-bold uppercase leading-none tracking-tight text-white">
+        <h3 className="font-display text-3xl font-bold uppercase leading-none tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.60)]">
           {t.name}
         </h3>
         <div className="flex flex-wrap items-end gap-x-8 gap-y-3">

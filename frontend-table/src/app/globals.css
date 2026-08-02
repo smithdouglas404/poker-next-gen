@@ -1,115 +1,231 @@
 @import "tailwindcss";
+/* ── HIGH ROLLERS CLUB — Global Design System v2 ────────────────────────────
+   Premium dark casino aesthetic. Deep near-black base, layered surface
+   elevation, gold brand, GG red action, poker green for money.
+   Typography: Playfair Display (display) + Inter (body).
+   Dark-only by design — no light mode. ────────────────────────────────── */
 
-/* ── GGPoker theme (global) ─────────────────────────────────────────────────
-   Near-black app base, solid charcoal surfaces, GG red brand, poker green for
-   money, gold/amber for rewards. Clean + high-contrast, dark-only by design.
-   Cyan is retired as a primary and demoted to a muted "provably-fair" tech
-   accent only. */
 :root {
-  /* Elevation ramp (dark-only). Panels sit a clear step above the base so cards
-     read as surfaces, not voids; muted text meets WCAG AA on the base. */
-  --background: #191d25;   /* dark slate base — lifted well off near-black */
-  --foreground: #f6f7f8;
-  --surface: #262d38;      /* card / panel base — a clear step above --background */
-  --surface-2: #313a46;    /* elevated: modals, hovered cards, popovers */
-  --brand: #e01e2b;
-  --brand-bright: #ff2d3f;
-  --green: #22c55e;
-  --green-deep: #0a7d43;
-  --gold: #f5c518;
-  --gold-lite: #ffd54a;
-  --muted: #c2c8d0;        /* meets WCAG AA (>7:1) on the slate base */
-  /* demoted: muted cyan for a verified/provably-fair tech badge only */
-  --cyan: #4a9eb0;
+  /* ── Elevation ramp ──────────────────────────────────────────────────── */
+  --background:  #0f1318;   /* near-black base */
+  --surface:     #1a2030;   /* card / panel */
+  --surface-2:   #222a38;   /* elevated: hover states, nested panels */
+  --surface-3:   #2a3344;   /* modal / popover / drawer */
+  --surface-4:   #333d50;   /* tooltip / highest elevation */
+
+  /* ── Brand palette ───────────────────────────────────────────────────── */
+  --brand:        #e01e2b;
+  --brand-bright: #ff4455;
+  --gold:         #f5c518;
+  --gold-lite:    #ffe066;
+  --gold-dark:    #c9a000;
+  --green:        #22c55e;
+  --green-deep:   #0a7d43;
+  --cyan:         #4a9eb0;
+  --purple:       #a78bfa;
+  --orange:       #f97316;
+
+  /* ── Text ────────────────────────────────────────────────────────────── */
+  --foreground:   #f0f2f5;
+  --muted:        #c2c8d0;
+  --muted-2:      #8892a0;
+  --muted-3:      #525c6a;
+
+  /* ── Border ──────────────────────────────────────────────────────────── */
+  --border:       rgba(255,255,255,0.08);
+  --border-2:     rgba(255,255,255,0.14);
+
+  /* ── Glow ────────────────────────────────────────────────────────────── */
+  --glow-gold:   0 0 32px rgba(245,197,24,0.40);
+  --glow-red:    0 0 32px rgba(224,30,43,0.40);
+  --glow-green:  0 0 32px rgba(34,197,94,0.35);
+  --glow-cyan:   0 0 32px rgba(74,158,176,0.35);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-surface: var(--surface);
-  --color-surface-2: var(--surface-2);
-  --color-brand: var(--brand);
-  --color-green: var(--green);
-  --color-gold: var(--gold);
-  --color-cyan: var(--cyan);
-  --color-muted: var(--muted);
-  --font-sans: var(--font-body);
-  --font-display: var(--font-display);
-  --font-body: var(--font-body);
+  --color-surface:    var(--surface);
+  --color-surface-2:  var(--surface-2);
+  --color-surface-3:  var(--surface-3);
+  --color-brand:      var(--brand);
+  --color-green:      var(--green);
+  --color-gold:       var(--gold);
+  --color-cyan:       var(--cyan);
+  --color-muted:      var(--muted);
+  --color-purple:     var(--purple);
+  --font-sans:        var(--font-body);
+  --font-display:     var(--font-display);
+  --font-body:        var(--font-body);
 }
 
+/* ── Base body ─────────────────────────────────────────────────────────── */
 body {
   background:
-    radial-gradient(1200px 600px at 50% -10%, rgba(255, 255, 255, 0.025), transparent 60%),
-    radial-gradient(900px 500px at 100% 0%, rgba(255, 255, 255, 0.015), transparent 55%),
+    radial-gradient(ellipse 1400px 700px at 50% -8%, rgba(245,197,24,0.030), transparent 60%),
+    radial-gradient(ellipse 900px 500px at 100% 0%,  rgba(224,30,43,0.025),  transparent 55%),
+    radial-gradient(ellipse 600px 400px at 0%   80%, rgba(34,197,94,0.018),  transparent 50%),
     var(--background);
   background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-h1, h2, h3, .font-display {
+h1, h2, h3, h4, .font-display {
   font-family: var(--font-display), var(--font-body), sans-serif;
+  letter-spacing: -0.01em;
 }
 
-/* ── Accessibility (UI review P1-5) ────────────────────────────────────────
-   A visible keyboard-focus ring — the dark theme hides the browser default, so
-   keyboard users were flying blind. Applies only to keyboard focus so mouse
-   clicks stay clean. */
+/* ── Selection ─────────────────────────────────────────────────────────── */
+::selection {
+  background: rgba(245,197,24,0.25);
+  color: #fff;
+}
+
+/* ── Focus rings ───────────────────────────────────────────────────────── */
 :focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
-/* Inputs/selects get a cyan ring to distinguish field focus from action focus. */
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline-color: var(--cyan);
+  outline-color: var(--gold);
+  outline-offset: 0;
 }
-/* Respect reduced-motion for all non-essential animation. */
+
+/* ── Scrollbars ────────────────────────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.12) transparent;
+}
+*::-webkit-scrollbar       { width: 6px; height: 6px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+  border-radius: 999px;
+  transition: background 0.2s;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+
+/* ── Reduced motion ────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-    scroll-behavior: auto !important;
+  *, *::before, *::after {
+    animation-duration:       0.001ms !important;
+    animation-iteration-count: 1      !important;
+    transition-duration:      0.001ms !important;
+    scroll-behavior:          auto    !important;
   }
 }
 
-/* ── Character (2.5D) animations ───────────────────────────────────────── */
+/* ── Global utility animations ─────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1);    }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0);    }
+}
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0);     }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+@keyframes pulse-gold {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245,197,24,0.0); }
+  50%       { box-shadow: 0 0 0 6px rgba(245,197,24,0.25); }
+}
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0px);  }
+  50%       { transform: translateY(-6px); }
+}
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+/* ── Character (2.5D table) animations ─────────────────────────────────── */
 @keyframes seatIdleFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
+  0%, 100% { transform: translateY(0);    }
+  50%       { transform: translateY(-3px); }
 }
 @keyframes seatTurnBob {
   0%, 100% { transform: translateY(-4px) scale(1.04); }
-  50% { transform: translateY(-8px) scale(1.05); }
+  50%       { transform: translateY(-8px) scale(1.05); }
 }
 @keyframes seatWinPulse {
-  0% { transform: scale(1); }
-  30% { transform: scale(1.12) rotate(-1.5deg); }
-  60% { transform: scale(1.06) rotate(1.5deg); }
-  100% { transform: scale(1.05); }
+  0%   { transform: scale(1);                      }
+  30%  { transform: scale(1.12) rotate(-1.5deg);   }
+  60%  { transform: scale(1.06) rotate( 1.5deg);   }
+  100% { transform: scale(1.05);                   }
 }
 @keyframes winSparkle {
-  0% { opacity: 0; transform: scale(0.4); }
-  40% { opacity: 1; }
+  0%   { opacity: 0; transform: scale(0.4); }
+  40%  { opacity: 1; }
   100% { opacity: 0; transform: scale(1.6); }
 }
 
-/* Thin, premium scrollbars */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+/* ── Utility classes ───────────────────────────────────────────────────── */
+.animate-fade-in-up  { animation: fadeInUp     0.35s ease both; }
+.animate-fade-in     { animation: fadeIn       0.25s ease both; }
+.animate-scale-in    { animation: scaleIn      0.25s ease both; }
+.animate-slide-right { animation: slideInRight 0.30s ease both; }
+.animate-slide-left  { animation: slideInLeft  0.30s ease both; }
+.animate-float       { animation: float        3.0s ease-in-out infinite; }
+.animate-spin-slow   { animation: spin-slow    8.0s linear infinite; }
+.animate-pulse-gold  { animation: pulse-gold   2.0s ease-in-out infinite; }
+
+/* Skeleton / loading shimmer */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.04) 25%,
+    rgba(255,255,255,0.09) 50%,
+    rgba(255,255,255,0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: 8px;
 }
-*::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+
+/* Gold gradient text */
+.text-gold-gradient {
+  background: linear-gradient(135deg, var(--gold-lite), var(--gold), var(--gold-dark));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
-*::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 999px;
+
+/* Subtle inner glow on panels */
+.panel-inner-glow {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 4px 24px rgba(0,0,0,0.50);
 }
+
+/* Stagger animation delays for lists */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.10s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.20s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.30s; }
