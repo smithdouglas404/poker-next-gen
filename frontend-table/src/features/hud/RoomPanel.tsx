@@ -13,7 +13,6 @@ import {
   MIN_SEATS,
 } from "@/features/game/protocol";
 import { Button, Input, SectionHeader, cn } from "@/features/ui";
-import { getTableGraphics } from "@/features/table/tableGraphics";
 import { useRoomPanelOpen } from "@/features/hud/roomPanelState";
 import { listSponsorClubs, type SponsorClub } from "@/features/clubs/sponsorClub";
 
@@ -47,7 +46,7 @@ export function RoomPanel() {
   // classic mode it stays open as before. A stored preference still wins.
   // Shared with SeatHud (roomPanelState.ts) so the seat ring can shift clear
   // of the drawer while it's open, instead of open seats landing underneath it.
-  const [open, setOpen] = useRoomPanelOpen(getTableGraphics() !== "cinematic");
+  const [open, setOpen] = useRoomPanelOpen(true);
 
   // Create-table parameters (blinds in cents, consistent with the buy-in).
   const [smallBlind, setSmallBlind] = useState(DEFAULT_SMALL_BLIND_CENTS);

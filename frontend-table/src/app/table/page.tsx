@@ -19,8 +19,6 @@ const HrcTable = dynamic(() => import("@/features/hrc/HrcTable"), { ssr: false }
 function TableSurface() {
   const sp = useSearchParams();
   const demo = sp.get("demo") === "1";
-  // 3D is deferred — force the 2.5D flat-image renderer regardless of what a
-  // table's stored render_style says, until 3D work resumes.
   return (
     <SoundProvider>
       {/* Always behind HrcTable — HrcTable itself renders nothing until a
@@ -28,7 +26,7 @@ function TableSurface() {
           the pre-seat "This table is open" / "Sit Here" screen with no table
           graphic under it at all. */}
       <TableFeltBackdrop />
-      <HrcTable demo={demo} override="2.5d" />
+      <HrcTable demo={demo} />
       <HandHistoryPanel />
       <ChatStatsPanel />
     </SoundProvider>

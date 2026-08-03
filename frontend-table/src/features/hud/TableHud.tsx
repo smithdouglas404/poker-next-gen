@@ -6,7 +6,6 @@ import { SeatHud } from "@/features/hud/SeatHud";
 import { ActionBar } from "@/features/hud/ActionBar";
 import { PreActionBar } from "@/features/hud/PreActionBar";
 import { ActionTimer } from "@/features/hud/ActionTimer";
-import { GameStatusRail } from "@/features/hud/GameStatusRail";
 import { HeroControlsDock } from "@/features/hud/HeroControlsDock";
 import { EquityPanel } from "@/features/hud/EquityPanel";
 import { SidebetPanel } from "@/features/hud/SidebetPanel";
@@ -25,12 +24,10 @@ import { EmotePicker } from "@/features/hrc/components/EmoteSystem";
 import { usePokerKeyboard } from "@/features/hud/usePokerKeyboard";
 import { useGameSounds } from "@/features/sound/useGameSounds";
 import { useGame } from "@/features/game/GameProvider";
-import { useTableGraphics } from "@/features/table/tableGraphics";
 import { useSearchParams } from "next/navigation";
 
 export function TableHud({ children }: { children: React.ReactNode }) {
-  const { error, snapshot, connected, matchId } = useGame();
-  const [graphics] = useTableGraphics();
+  const { error } = useGame();
   // ?demo=1 renders the reference table headless-populated (no real
   // room/chat/spectator data exists to show), and the legacy sidebar's
   // top-left corner collides with the floating HandHistoryPanel — hide the
@@ -38,20 +35,6 @@ export function TableHud({ children }: { children: React.ReactNode }) {
   const demo = useSearchParams().get("demo") === "1";
   usePokerKeyboard();
   useGameSounds();
-
-  // In cinematic mode the R3F scene owns the seats, community board, and pot,
-  // so the legacy DOM chrome for those (SeatHud seat cards, CommunityCards
-  // placeholders, the center pot label) must not double up over the felt.
-  // We keep only the interactive glass controls the 3D layer does NOT provide,
-  // parked as restrained overlays around the edges.
-  const cinematic = graphics === "cinematic";
-
-  // Panels that render empty-state chrome ("Waiting for table events…", buy-in
-  // slider, hand-audit placeholder) only earn their space once there is a live
-  // table. In cinematic idle/demo they would just clutter the felt edge, so we
-  // gate them on an active game. Classic mode is unchanged.
-  const hasGame = connected || !!matchId || !!snapshot;
-  const showGamePanels = !cinematic || hasGame;
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-background">
@@ -70,44 +53,40 @@ export function TableHud({ children }: { children: React.ReactNode }) {
           {!demo && (
           <div className="flex w-full max-w-xs flex-col gap-3">
             <RoomPanel />
-            {showGamePanels && <BuyInSlider />}
+            <BuyInSlider />
             <EquityPanel />
-            {showGamePanels && <SidebetPanel />}
-            {showGamePanels && <HandVerifyPanel />}
-            {showGamePanels && <ShowdownVerifyCTA />}
-            {showGamePanels && <TableLog />}
+            <SidebetPanel />
+            <HandVerifyPanel />
+            <ShowdownVerifyCTA />
+            <TableLog />
             <ChatPanel />
           <SpectatorBar />
           <TotalInPlay />
             <TauntBar />
             <EmotePicker />
-            {/* Music + display settings are tall always-expanded panels; in a
-                cinematic idle/demo they occlude the left seats, so hold them
-                until a live table is up. Mute stays reachable via the header. */}
-            {showGamePanels && <MusicPicker />}
-            {showGamePanels && <TableSettings />}
+            <MusicPicker />
+            <TableSettings />
           </div>
           )}
           <div className="relative flex-1">
-            {/* Seats + board are drawn by the 3D scene in cinematic mode; SeatHud
-                still renders classic-mode seat plaques when not cinematic. The
-                2.5D/3D/Mix render-mode switcher itself lives in TableSettings
-                now, not here. */}
+            {/* SeatHud draws the seat plaques and the empty "SIT HERE" cards.
+                The 2D/3D/Mix AVATAR switcher lives in TableSettings, not here. */}
             <SeatHud />
             {/* Path to the money action while the hero isn't seated (self-hides
                 once seated) — P0-7. */}
             <TableEmptyState />
             <ActionTimer />
-            {/* Live-hand status chrome (current bet / hand strength / sit-out) —
-                cinematic-only, matching the HRC flop-dealt master. */}
-            {cinematic && <GameStatusRail />}
-            {/* The board is drawn by whichever table renderer is mounted —
-                the R3F scene in cinematic mode, ImageTable in 2.5D. This used
-                to also mount hud/CommunityCards under `!cinematic`, from when
-                the 2.5D path didn't draw its own board. It does now, so that
-                guard was stale and BOTH rendered: ImageTable's real cards at
-                45% of the felt, plus a second row of dashed FLOP/TURN/RIVER
-                slots at 42% of the viewport, bleeding through behind them. */}
+            {/* NOT MOUNTED: hud/GameStatusRail.tsx (current bet / hand strength
+                / sit-out pills) was gated on `cinematic`, a table-graphics mode
+                nothing ever set, so it has never rendered. The gate is gone with
+                the 3D table; the FILE is kept and left unmounted on purpose,
+                because mounting it is a visible design change and therefore the
+                owner's call, not a cleanup. */}
+            {/* The board is drawn by ImageTable. This used to ALSO mount
+                hud/CommunityCards under `!cinematic`, from when the 2.5D path
+                didn't draw its own board — so both rendered: the real cards at
+                45% of the felt plus a second row of dashed FLOP/TURN/RIVER
+                slots at 42% of the viewport bleeding through behind them. */}
           </div>
         </div>
 
@@ -124,9 +103,7 @@ export function TableHud({ children }: { children: React.ReactNode }) {
           <HeroControlsDock />
         </div>
 
-        {/* The offline "Failed to fetch" toast is noise on the demo/cinematic
-            showcase (no server by design); keep it only for the classic path. */}
-        {!cinematic && error && (
+        {error && (
           <div className="pointer-events-auto absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border border-brand/40 bg-brand/15 px-4 py-2 text-xs text-[#ff9ba1]">
             {error}
           </div>

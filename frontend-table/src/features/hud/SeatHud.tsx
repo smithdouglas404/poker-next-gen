@@ -7,16 +7,14 @@ import { DEFAULT_MAX_SEATS, MAX_SEATS, MIN_SEATS, type SeatView } from "@/featur
 import { formatCents, useGame } from "@/features/game/GameProvider";
 import { computeTableLayout } from "@/features/table/tableLayout";
 import { getSeatPositions } from "@/features/table/seatLayout";
-import { layoutFromFeltRect, seatPointFromFelt, FELT_SURFACE_ATTR } from "@/features/hud/feltLayout";
+import { seatPointFromFelt, FELT_SURFACE_ATTR } from "@/features/hud/feltLayout";
 import { avatarDef, avatarForKey } from "@/features/table/avatars";
 import { ChipStack } from "@/features/hud/ChipStack";
 import { formatStack, useStackUnit } from "@/features/table/stackDisplay";
 import { Character3D } from "@/features/table/Character3D";
 import { Character3DGL } from "@/features/table/Character3DGL";
 import { useRenderMode } from "@/features/table/renderMode";
-import { useTableGraphics } from "@/features/table/tableGraphics";
 import { useRoomPanelOpen, ROOM_PANEL_WIDTH_PX } from "@/features/hud/roomPanelState";
-import { getTableGraphics } from "@/features/table/tableGraphics";
 
 function SeatCard({
   seat,
@@ -122,8 +120,6 @@ export function SeatHud() {
   const buyInLabel = formatCents(buyInCents);
 
   const [mode] = useRenderMode();
-  const [graphics] = useTableGraphics();
-  const cinematic = graphics === "cinematic";
   const [stackUnit] = useStackUnit();
   const bigBlind = snapshot?.big_blind ?? 0;
   const activeSeat = snapshot?.action_seat;
@@ -134,7 +130,7 @@ export function SeatHud() {
   // so the ring shifts right instead of leaving left-side seats unreachable
   // underneath it.
   const demo = useSearchParams().get("demo") === "1";
-  const [roomPanelOpen] = useRoomPanelOpen(getTableGraphics() !== "cinematic");
+  const [roomPanelOpen] = useRoomPanelOpen(true);
   const insetLeft = !demo && roomPanelOpen ? ROOM_PANEL_WIDTH_PX : 0;
 
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
@@ -142,7 +138,7 @@ export function SeatHud() {
   // sit-down boxes stay locked to the table image at every window size —
   // previously the ring was computed from the raw viewport while the felt was
   // positioned by static CSS, two coordinate systems that only agreed at one
-  // size. Null in cinematic mode (no ImageTable), where we fall back to the
+  // size. Null before the felt has mounted, where we fall back to the
   // viewport math below.
   const [feltRect, setFeltRect] = useState<DOMRect | null>(null);
   useEffect(() => {
@@ -190,7 +186,7 @@ export function SeatHud() {
   // table" without crowding the community cards.
   // Prefer the measured felt (exact, and automatically tracks any future
   // change to FELT_BOUNDS); fall back to the viewport computation only when
-  // no felt is on screen (cinematic mode).
+  // no felt is on screen yet.
   // Empty-seat cards must land exactly where the avatar appears once the seat
   // is taken. Occupied seats use TABLE_SEATS percentages inside FELT_BOUNDS
   // (HrcTable), so map those same percentages through the felt's measured rect
@@ -217,14 +213,12 @@ export function SeatHud() {
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10">
-      {/* The render-mode (2.5D/3D/Mix) switcher used to float here — moved into
+      {/* The avatar-mode (2D/3D/Mix) switcher used to float here — moved into
           TableSettings.tsx (still the only place to change it; CLAUDE.md
-          requires all three modes stay switchable) so this top-right corner is
-          free for GameStatusRail's Current Bet / Hand Strength pills.
-          Cinematic mode: the R3F scene draws seats/avatars/stacks, so nothing
-          else renders here. Classic mode: full seat plaques. */}
-      {!cinematic &&
-        positions.length > 0 &&
+          requires all three AVATAR modes stay switchable) so this top-right
+          corner is free for GameStatusRail's Current Bet / Hand Strength
+          pills. */}
+      {positions.length > 0 &&
         seats.slice(0, seatCount).map((seat) => {
           const pos = positions[seat.index] ?? positions[seat.index % positions.length];
           if (!pos) return null;

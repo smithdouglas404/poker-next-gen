@@ -1,30 +1,26 @@
 "use client";
 
-// The HRC table bound to live Nakama state, with the 2.5D / 3D switch.
+// The HRC table bound to live Nakama state.
 //
-// The renderer is chosen at TABLE SETUP: the owner picks "Table Look" in
-// PrivateTableSetup, which ships render_style ("2.5d" | "3d") through
-// TableCreateRequest -> MatchState -> snapshot. `override` exists only so the proof
-// page can preview either without creating a table.
+// There is exactly ONE table renderer: ImageTable, the flat 2.5D felt image with
+// a DOM/framer-motion overlay. There is no 3D table and no renderer switch. An
+// R3F cinematic scene used to live behind a `render_style` / `override` branch,
+// but /table hard-pinned override="2.5d" so that branch was unreachable for
+// months while CLAUDE.md still documented the 3D scene as the design contract —
+// which is precisely how "the table" came to mean two different things. The
+// scene and the switch are both deleted; see CLAUDE.md "The table".
 //
-// Both branches consume the SAME adapted view model — ImageTable takes it as props,
-// the R3F scene takes it via useSceneSync's store — so switching can never show two
-// different games.
-//
-// Client-only: framer-motion, three and drei all touch the DOM/WebGL, so mount this
-// via next/dynamic with ssr:false (CLAUDE.md golden rule 3).
+// Client-only: framer-motion touches the DOM, so mount this via next/dynamic
+// with ssr:false (CLAUDE.md golden rule 3).
 
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { useGame } from "@/features/game/GameProvider";
 import { useFeltStyle } from "@/features/hud/feltLayout";
-import { getTableGraphics } from "@/features/table/tableGraphics";
 import { ImageTable } from "./components/ImageTable";
-import { PokerSceneCanvas } from "./scene/canvas/PokerSceneCanvas";
 import { GameUIProvider } from "./lib/game-ui-context";
 import { adaptSnapshot, toCards } from "./adapter";
 import type { CardType, Player } from "./lib/poker-types";
-import { useSceneSync } from "./useSceneSync";
 import { avatarSrc } from "@/features/table/avatars";
 import { Seat } from "./components/Seat";
 import { HeroHoleCards } from "./components/HeroHoleCards";
@@ -35,8 +31,6 @@ import { TABLE_SEATS, FELT_BOUNDS } from "./lib/table-constants";
 import { seatId } from "./adapter";
 import { DEMO_HOLE, DEMO_SNAPSHOT } from "@/features/table3d/demoSnapshot";
 import type { TableSnapshot } from "@/features/game/protocol";
-
-export type HrcRenderStyle = "2.5d" | "3d";
 
 // DEMO_SNAPSHOT (features/table3d, shared/frozen) doesn't carry per-seat
 // `bet` — it predates the bet-chip-stack rendering in Seat.tsx, so the demo
@@ -59,12 +53,10 @@ const DEMO_SNAPSHOT_WITH_BETS: TableSnapshot = {
 };
 
 export default function HrcTable({
-  override,
   demo = false,
 }: {
-  override?: HrcRenderStyle;
-  /** Preview against DEMO_SNAPSHOT instead of the live match, same as
-   *  LiveCinematicTable's ?demo=1 — lets the renderers be reviewed without a table. */
+  /** Preview against DEMO_SNAPSHOT instead of the live match — lets the table
+   *  be reviewed without standing up a real match. */
   demo?: boolean;
 }) {
   const live = useGame();
@@ -75,10 +67,6 @@ export default function HrcTable({
   // and the seat layer below — so they cannot drift apart.
   const snapshot = demo ? DEMO_SNAPSHOT_WITH_BETS : live.snapshot;
   const holeCards = demo ? DEMO_HOLE : live.holeCards;
-
-  // Keep the 3D store in step regardless of which branch renders, so toggling mid-hand
-  // does not show a stale table for a frame.
-  useSceneSync(snapshot);
 
   const adapted = useMemo(
     () =>
@@ -150,17 +138,9 @@ export default function HrcTable({
       ? (adapted.dealerSeatIndex - heroSeatIdx + adapted.maxSeats) % adapted.maxSeats
       : -1;
 
-  const style: HrcRenderStyle = override ?? (snapshot.render_style === "3d" ? "3d" : "2.5d");
-
   return (
     <GameUIProvider>
       <div className="relative h-full w-full">
-        {style === "3d" ? (
-          <PokerSceneCanvas
-            className="absolute inset-0"
-            activeSeat={snapshot.action_seat}
-          />
-        ) : (
           <>
             <ImageTable
           insetLeft={insetLeft}
@@ -270,7 +250,6 @@ export default function HrcTable({
               />
             )}
           </>
-        )}
       </div>
     </GameUIProvider>
   );
