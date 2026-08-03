@@ -218,6 +218,40 @@ export default function HrcTable({
                   />
                 );
               })}
+
+              {/* EVERY seat position is drawn by this one layer — occupied by
+                  the <Seat> above, empty by the marker below — so a vacant slot
+                  is exactly where its avatar will appear. SeatHud used to draw
+                  the empty ones separately on its own computed ellipse, which
+                  is how the "SIT HERE" squares ended up somewhere other than
+                  the seats, and why a table whose snapshot lists fewer seats
+                  than max_seats (DEMO_SNAPSHOT: 8 seats, max_seats 10) showed
+                  no markers at all for the remainder. */}
+              {Array.from({ length: adapted.maxSeats }, (_, visual) => visual)
+                .filter((visual) => !occupiedSeatIndices.includes(visual))
+                .map((visual) => {
+                  const pose = TABLE_SEATS[visual % TABLE_SEATS.length];
+                  return (
+                    <div
+                      key={`empty-${visual}`}
+                      className="absolute flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed"
+                      style={{
+                        left: `${pose.x}%`,
+                        top: `${pose.y}%`,
+                        transform: `translate(-50%, -50%) scale(${pose.scale})`,
+                        width: 104,
+                        height: 104,
+                        borderColor: "rgba(212,175,55,0.5)",
+                        background: "rgba(212,175,55,0.08)",
+                      }}
+                    >
+                      <span className="text-lg leading-none text-gold/80">+</span>
+                      <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-gold/70">
+                        Seat {visual + 1}
+                      </span>
+                    </div>
+                  );
+                })}
             </div>
 
             {selectedPlayer && (
