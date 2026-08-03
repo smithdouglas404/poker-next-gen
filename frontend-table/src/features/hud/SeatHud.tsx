@@ -1,18 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { DEFAULT_MAX_SEATS, MAX_SEATS, MIN_SEATS, type SeatView } from "@/features/game/protocol";
 import { formatCents, useGame } from "@/features/game/GameProvider";
 import { computeTableLayout } from "@/features/table/tableLayout";
 import { getSeatPositions } from "@/features/table/seatLayout";
+import { seatPointFromFelt, FELT_SURFACE_ATTR } from "@/features/hud/feltLayout";
 import { avatarDef, avatarForKey } from "@/features/table/avatars";
 import { ChipStack } from "@/features/hud/ChipStack";
 import { formatStack, useStackUnit } from "@/features/table/stackDisplay";
 import { Character3D } from "@/features/table/Character3D";
 import { Character3DGL } from "@/features/table/Character3DGL";
 import { useRenderMode } from "@/features/table/renderMode";
-import { useTableGraphics } from "@/features/table/tableGraphics";
+import { useRoomPanelOpen, ROOM_PANEL_WIDTH_PX } from "@/features/hud/roomPanelState";
 
 function SeatCard({
   seat,
@@ -118,20 +120,54 @@ export function SeatHud() {
   const buyInLabel = formatCents(buyInCents);
 
   const [mode] = useRenderMode();
-  const [graphics] = useTableGraphics();
-  const cinematic = graphics === "cinematic";
   const [stackUnit] = useStackUnit();
   const bigBlind = snapshot?.big_blind ?? 0;
   const activeSeat = snapshot?.action_seat;
   const winnerSeats = new Set((showdown?.winners ?? []).map((w) => w.seat));
 
+  // RoomPanel (the "Room Control" drawer) renders only when !demo and sits
+  // above the seat layer (z-40 vs z-10) — when it's open, reserve its width
+  // so the ring shifts right instead of leaving left-side seats unreachable
+  // underneath it.
+  const demo = useSearchParams().get("demo") === "1";
+  const [roomPanelOpen] = useRoomPanelOpen(true);
+  const insetLeft = !demo && roomPanelOpen ? ROOM_PANEL_WIDTH_PX : 0;
+
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
+  // The felt's REAL rendered rect. The seat ring is inscribed in it so the
+  // sit-down boxes stay locked to the table image at every window size —
+  // previously the ring was computed from the raw viewport while the felt was
+  // positioned by static CSS, two coordinate systems that only agreed at one
+  // size. Null before the felt has mounted, where we fall back to the
+  // viewport math below.
+  const [feltRect, setFeltRect] = useState<DOMRect | null>(null);
   useEffect(() => {
-    const update = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    const update = () => {
+      setViewport({ w: window.innerWidth, h: window.innerHeight });
+      const el = document.querySelector(`[${FELT_SURFACE_ATTR}]`);
+      setFeltRect(el ? el.getBoundingClientRect() : null);
+    };
     update();
+    // rAF catches the first paint, when the felt image has laid out but the
+    // effect has already run.
+    const raf = requestAnimationFrame(update);
     window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
+    // The felt also moves when the Room drawer opens/closes, which is a layout
+    // change rather than a window resize — observe the element itself.
+    const ro = new ResizeObserver(update);
+    const el = document.querySelector(`[${FELT_SURFACE_ATTR}]`);
+    if (el) ro.observe(el);
+    ro.observe(document.body);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", update);
+      ro.disconnect();
+    };
+    // insetLeft is a dependency because opening/closing the Room drawer MOVES
+    // the felt without resizing it — ResizeObserver fires on size, not
+    // position, so without this the ring keeps a stale rect and drifts off the
+    // rail the moment the drawer is toggled.
+  }, [insetLeft]);
 
   // Authoritative seat count from the table snapshot when seated/created;
   // otherwise the count the hero picked in the create form (live preview).
@@ -148,21 +184,41 @@ export function SeatHud() {
 
   // orbitScale 1.04 pushes plaques just onto the rail so they read as "on the
   // table" without crowding the community cards.
-  const positions =
-    viewport.w > 0
-      ? getSeatPositions(computeTableLayout(viewport.w, viewport.h), seatCount, 1.04)
+  // Prefer the measured felt (exact, and automatically tracks any future
+  // change to FELT_BOUNDS); fall back to the viewport computation only when
+  // no felt is on screen yet.
+  // Empty-seat cards must land exactly where the avatar appears once the seat
+  // is taken. Occupied seats use TABLE_SEATS percentages inside FELT_BOUNDS
+  // (HrcTable), so map those same percentages through the felt's measured rect
+  // rather than placing these on a separate computed ellipse — that mismatch is
+  // why the "SIT HERE" squares sat apart from the avatars. Indexed by REAL seat
+  // index, hero-rotated the same way HrcTable rotates.
+  // In ?demo=1 the table is driven by DEMO_SNAPSHOT inside HrcTable, which
+  // SeatHud never sees — so it would treat every seat as empty and stamp a
+  // "SIT HERE" card on top of each demo avatar. Those cards are also dead in
+  // demo (no match to sitDown into), so render none: HrcTable owns the demo
+  // table completely.
+  const heroIdx = heroSeat ?? 0;
+  const positions = demo
+    ? []
+    : feltRect
+    ? Array.from({ length: seatCount }, (_, index) => {
+        const visual = (index - heroIdx + seatCount) % seatCount;
+        const p = seatPointFromFelt(feltRect, visual);
+        return { index, x: p.x, y: p.y, angle: 0 };
+      })
+    : viewport.w > 0
+      ? getSeatPositions(computeTableLayout(viewport.w, viewport.h, insetLeft), seatCount, 1.04)
       : [];
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10">
-      {/* The render-mode (2.5D/3D/Mix) switcher used to float here — moved into
+      {/* The avatar-mode (2D/3D/Mix) switcher used to float here — moved into
           TableSettings.tsx (still the only place to change it; CLAUDE.md
-          requires all three modes stay switchable) so this top-right corner is
-          free for GameStatusRail's Current Bet / Hand Strength pills.
-          Cinematic mode: the R3F scene draws seats/avatars/stacks, so nothing
-          else renders here. Classic mode: full seat plaques. */}
-      {!cinematic &&
-        positions.length > 0 &&
+          requires all three AVATAR modes stay switchable) so this top-right
+          corner is free for GameStatusRail's Current Bet / Hand Strength
+          pills. */}
+      {positions.length > 0 &&
         seats.slice(0, seatCount).map((seat) => {
           const pos = positions[seat.index] ?? positions[seat.index % positions.length];
           if (!pos) return null;

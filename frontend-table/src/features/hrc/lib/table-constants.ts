@@ -11,6 +11,25 @@ import type { CSSProperties } from "react";
 // half the PlayerHeader's rendered height (~45px) since the game canvas
 // spans the full h-screen behind the header, which visually overlaps its
 // top edge otherwise.
+// How an absolutely-positioned MOTION element centres itself on its left/top
+// anchor. It must be the standalone CSS `translate` property, NEVER
+// `transform: translate(-50%,-50%)`.
+//
+// framer-motion composes the entire `transform` property from the motion values
+// it is handed (x/y/scale/rotate), so a `transform` written in `style` alongside
+// them is replaced the moment the element animates — and the element silently
+// loses its centring, landing half its own size down-and-right. That is what put
+// the pot cluster at cx 932 against a felt centre of 800, the dealer button and
+// burn card 22px off their anchors, the per-seat bet chips off their seats, and
+// the showdown spotlight off centre by up to 400px.
+//
+// `translate` is a separate CSS property framer does not manage, and the spec
+// applies it BEFORE `transform`, so the element is centred first and the
+// animation's scale/rotate then act about that centre — exactly the intent.
+//
+// Enforced by `scripts/check-table-invariants.mjs` (check: motion-transform).
+export const CENTRING_TRANSLATE: CSSProperties = { translate: "-50% -50%" };
+
 export const FELT_BOUNDS: CSSProperties = {
   position: "absolute",
   left: "50%",

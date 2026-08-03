@@ -1,3 +1,4 @@
+import { CENTRING_TRANSLATE } from "@/features/hrc/lib/table-constants";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, Sparkles, Crown } from "lucide-react";
 import { Player } from "@/features/hrc/lib/poker-types";
@@ -256,7 +257,10 @@ export function ShowdownOverlay({ visible, results, players, pot, onDismiss, aut
               height: "800px",
               top: "50%",
               left: "50%",
-              transform: "translate(-50%, -50%)",
+              // Animates `scale` 0.3 -> 1, so a CSS transform here was
+              // overwritten by framer and this 800x800 beam sat up to 400px
+              // off centre in each axis.
+              ...CENTRING_TRANSLATE,
               background: "radial-gradient(circle, rgba(255,215,0,0.25) 0%, rgba(255,215,0,0.06) 35%, transparent 65%)",
             }}
           />

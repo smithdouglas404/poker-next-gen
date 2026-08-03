@@ -1,38 +1,36 @@
 "use client";
 
-// The HRC table bound to live Nakama state, with the 2.5D / 3D switch.
+// The HRC table bound to live Nakama state.
 //
-// The renderer is chosen at TABLE SETUP: the owner picks "Table Look" in
-// PrivateTableSetup, which ships render_style ("2.5d" | "3d") through
-// TableCreateRequest -> MatchState -> snapshot. `override` exists only so the proof
-// page can preview either without creating a table.
+// There is exactly ONE table renderer: ImageTable, the flat 2.5D felt image with
+// a DOM/framer-motion overlay. There is no 3D table and no renderer switch. An
+// R3F cinematic scene used to live behind a `render_style` / `override` branch,
+// but /table hard-pinned override="2.5d" so that branch was unreachable for
+// months while CLAUDE.md still documented the 3D scene as the design contract —
+// which is precisely how "the table" came to mean two different things. The
+// scene and the switch are both deleted; see CLAUDE.md "The table".
 //
-// Both branches consume the SAME adapted view model — ImageTable takes it as props,
-// the R3F scene takes it via useSceneSync's store — so switching can never show two
-// different games.
-//
-// Client-only: framer-motion, three and drei all touch the DOM/WebGL, so mount this
-// via next/dynamic with ssr:false (CLAUDE.md golden rule 3).
+// Client-only: framer-motion touches the DOM, so mount this via next/dynamic
+// with ssr:false (CLAUDE.md golden rule 3).
 
 import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import { useGame } from "@/features/game/GameProvider";
+import { useFeltStyle } from "@/features/hud/feltLayout";
 import { ImageTable } from "./components/ImageTable";
-import { PokerSceneCanvas } from "./scene/canvas/PokerSceneCanvas";
 import { GameUIProvider } from "./lib/game-ui-context";
 import { adaptSnapshot, toCards } from "./adapter";
-import type { CardType } from "./lib/poker-types";
-import { useSceneSync } from "./useSceneSync";
+import type { CardType, Player } from "./lib/poker-types";
 import { avatarSrc } from "@/features/table/avatars";
 import { Seat } from "./components/Seat";
 import { HeroHoleCards } from "./components/HeroHoleCards";
 import { ShowdownOverlay } from "./components/ShowdownOverlay";
+import { PlayerDetailModal } from "@/features/hud/PlayerDetailModal";
 import { adaptShowdown } from "./lib/showdownAdapter";
 import { TABLE_SEATS, FELT_BOUNDS } from "./lib/table-constants";
 import { seatId } from "./adapter";
 import { DEMO_HOLE, DEMO_SNAPSHOT } from "@/features/table3d/demoSnapshot";
 import type { TableSnapshot } from "@/features/game/protocol";
-
-export type HrcRenderStyle = "2.5d" | "3d";
 
 // DEMO_SNAPSHOT (features/table3d, shared/frozen) doesn't carry per-seat
 // `bet` — it predates the bet-chip-stack rendering in Seat.tsx, so the demo
@@ -55,21 +53,20 @@ const DEMO_SNAPSHOT_WITH_BETS: TableSnapshot = {
 };
 
 export default function HrcTable({
-  override,
   demo = false,
 }: {
-  override?: HrcRenderStyle;
-  /** Preview against DEMO_SNAPSHOT instead of the live match, same as
-   *  LiveCinematicTable's ?demo=1 — lets the renderers be reviewed without a table. */
+  /** Preview against DEMO_SNAPSHOT instead of the live match — lets the table
+   *  be reviewed without standing up a real match. */
   demo?: boolean;
 }) {
   const live = useGame();
+  // The felt must shift by the same amount SeatHud shifts the seat ring when
+  // the Room Control drawer is open, or the table and its seats drift apart.
+  const { style: feltStyle } = useFeltStyle();
+  // One box for every FELT_BOUNDS consumer — felt image, ImageTable's overlay,
+  // and the seat layer below — so they cannot drift apart.
   const snapshot = demo ? DEMO_SNAPSHOT_WITH_BETS : live.snapshot;
   const holeCards = demo ? DEMO_HOLE : live.holeCards;
-
-  // Keep the 3D store in step regardless of which branch renders, so toggling mid-hand
-  // does not show a stale table for a frame.
-  useSceneSync(snapshot);
 
   const adapted = useMemo(
     () =>
@@ -89,6 +86,10 @@ export default function HrcTable({
   // never shows it (CLAUDE.md: demo data is opt-in, never a fallback).
   const showdown = demo ? null : live.showdown;
   const [showdownDismissed, setShowdownDismissed] = useState(false);
+  // Player detail popup — click any seated player's avatar/name to see their
+  // session state + real stats (player_stats RPC). See PlayerDetailModal.tsx
+  // for why this stays scoped to stats only, no mute/report/friend actions.
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   useEffect(() => {
     if (showdown) setShowdownDismissed(false);
   }, [showdown]);
@@ -137,17 +138,9 @@ export default function HrcTable({
       ? (adapted.dealerSeatIndex - heroSeatIdx + adapted.maxSeats) % adapted.maxSeats
       : -1;
 
-  const style: HrcRenderStyle = override ?? (snapshot.render_style === "3d" ? "3d" : "2.5d");
-
   return (
     <GameUIProvider>
       <div className="relative h-full w-full">
-        {style === "3d" ? (
-          <PokerSceneCanvas
-            className="absolute inset-0"
-            activeSeat={snapshot.action_seat}
-          />
-        ) : (
           <>
             <ImageTable
             communityCards={adapted.gameState.communityCards}
@@ -175,7 +168,11 @@ export default function HrcTable({
                 use — previously this was a separately-duplicated copy of the same
                 style, which is exactly how the three layers could drift out of sync
                 with each other. */}
-            <div style={{ ...FELT_BOUNDS, zIndex: 20 }}>
+            {/* MUST use the same inset-shifted box as the felt image and
+                ImageTable's layers. This div was left on plain FELT_BOUNDS
+                while the others shifted with the Room drawer, which put the
+                avatars 144px (half the drawer width) left of the seat ring. */}
+            <div style={{ ...feltStyle, zIndex: 20 }}>
               {adapted.players.map((player) => {
                 // Rotate so the hero is always at visual seat 0 (bottom centre).
                 // HRC rotates over players.length; we rotate over SEAT index and
@@ -196,10 +193,49 @@ export default function HrcTable({
                     // reference (`showVideo={isMultiplayer && !player.isBot}`);
                     // demo has no real match to join a video room for.
                     showVideo={!demo && !player.isBot}
+                    onPlayerClick={setSelectedPlayer}
                   />
                 );
               })}
+
+              {/* EVERY seat position is drawn by this one layer — occupied by
+                  the <Seat> above, empty by the marker below — so a vacant slot
+                  is exactly where its avatar will appear. SeatHud used to draw
+                  the empty ones separately on its own computed ellipse, which
+                  is how the "SIT HERE" squares ended up somewhere other than
+                  the seats, and why a table whose snapshot lists fewer seats
+                  than max_seats (DEMO_SNAPSHOT: 8 seats, max_seats 10) showed
+                  no markers at all for the remainder. */}
+              {Array.from({ length: adapted.maxSeats }, (_, visual) => visual)
+                .filter((visual) => !occupiedSeatIndices.includes(visual))
+                .map((visual) => {
+                  const pose = TABLE_SEATS[visual % TABLE_SEATS.length];
+                  return (
+                    <div
+                      key={`empty-${visual}`}
+                      className="absolute flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed"
+                      style={{
+                        left: `${pose.x}%`,
+                        top: `${pose.y}%`,
+                        transform: `translate(-50%, -50%) scale(${pose.scale})`,
+                        width: 104,
+                        height: 104,
+                        borderColor: "rgba(212,175,55,0.5)",
+                        background: "rgba(212,175,55,0.08)",
+                      }}
+                    >
+                      <span className="text-lg leading-none text-gold/80">+</span>
+                      <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-gold/70">
+                        Seat {visual + 1}
+                      </span>
+                    </div>
+                  );
+                })}
             </div>
+
+            {selectedPlayer && (
+              <PlayerDetailModal player={selectedPlayer} onClose={() => setSelectedPlayer(null)} />
+            )}
 
             <HeroHoleCards cards={heroCards} communityCards={adapted.gameState.communityCards} />
 
@@ -213,7 +249,6 @@ export default function HrcTable({
               />
             )}
           </>
-        )}
       </div>
     </GameUIProvider>
   );

@@ -43,6 +43,12 @@ function getCardFaceUrl(rank: string, suit: string): string {
 const CARD_BACK_URL = "/cardbacks/cardback_royal.webp";
 const CARD_BACK_FALLBACK = "/cardbacks/cardback_classic.webp";
 
+// A card at rest: square on its flex position, no leftover deal offset or tilt.
+// Module-level so the object identity is stable across renders, for the same
+// reason COMMUNITY_DEAL_FROM is hoisted in ImageTable — framer-motion restarts
+// an in-flight animation when handed a new `animate` object identity.
+const CARD_REST = { rotateY: 0, scale: 1, opacity: 1, x: 0, y: 0, rotate: 0 };
+
 /* ── Card face: SVG card with realistic styling ── */
 function CardFace({ card, isHero }: { card: CardType; isHero: boolean }) {
   return (
@@ -238,10 +244,27 @@ export function Card({
   const glow = suitGlow[card.suit];
   const skipEntrance = hasFlipped || compactMode;
 
+  // Branch 1 (the face-down deal) animates x/y/rotate via dealAnimation. When
+  // the flip completes mid-deal, React reconciles that same motion.div into
+  // THIS branch — whose animate target used to mention only rotateY/scale/
+  // opacity. framer-motion leaves a motion value it is not told about exactly
+  // where it is, so the in-flight deal spring was abandoned and x/y/rotate
+  // froze forever at whatever partial value they held.
+  //
+  // That is why the community row rendered as a scatter: the row container
+  // measured dead centre (cx 800, w 390) while its five children sat at
+  // cy 421/428/514/517/510, the first two stuck at translate(183.5, -91.8) —
+  // partway along COMMUNITY_DEAL_FROM's {x:200, y:-100} path — with ~18deg of
+  // the -20deg deal tilt still on them.
+  //
+  // Restating the full resting pose (CARD_REST — x/y/rotate = 0, the same end
+  // state Branch 1 already declares) means every card lands on its flex
+  // position no matter which branch it is in when the deal spring is
+  // interrupted.
   return (
     <motion.div
-      initial={skipEntrance ? { rotateY: 0, scale: 1, opacity: 1 } : { rotateY: 180, scale: 0.6, opacity: 0 }}
-      animate={{ rotateY: 0, scale: 1, opacity: 1 }}
+      initial={skipEntrance ? CARD_REST : { rotateY: 180, scale: 0.6, opacity: 0 }}
+      animate={CARD_REST}
       transition={skipEntrance ? { duration: 0 } : { type: "spring", stiffness: 200, damping: 20, delay }}
       whileHover={isHero && !compactMode ? {
         rotateY: -15,
