@@ -62,7 +62,7 @@ export default function HrcTable({
   const live = useGame();
   // The felt must shift by the same amount SeatHud shifts the seat ring when
   // the Room Control drawer is open, or the table and its seats drift apart.
-  const { style: feltStyle, insetLeft } = useFeltStyle();
+  const { style: feltStyle } = useFeltStyle();
   // One box for every FELT_BOUNDS consumer — felt image, ImageTable's overlay,
   // and the seat layer below — so they cannot drift apart.
   const snapshot = demo ? DEMO_SNAPSHOT_WITH_BETS : live.snapshot;
@@ -143,7 +143,6 @@ export default function HrcTable({
       <div className="relative h-full w-full">
           <>
             <ImageTable
-          insetLeft={insetLeft}
             communityCards={adapted.gameState.communityCards}
             pot={adapted.gameState.pot}
             playerCount={adapted.players.length}

@@ -1,40 +1,19 @@
 import { useState, useEffect, useRef } from "react";
-import type { CSSProperties } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "./Card";
 import type { CardType } from "@/features/hrc/lib/poker-types";
 import type { Player } from "@/features/hrc/lib/poker-types";
-import { TABLE_SEATS, DEALER_POSITIONS, FELT_BOUNDS } from "@/features/hrc/lib/table-constants";
+import { TABLE_SEATS, DEALER_POSITIONS, CENTRING_TRANSLATE } from "@/features/hrc/lib/table-constants";
 import { useGameUI } from "@/features/hrc/lib/game-ui-context";
 import { useAnimatedCounter } from "@/features/hrc/hooks/useAnimatedCounter";
-import { FELT_SURFACE_ATTR } from "@/features/hud/feltLayout";
+import { FELT_SURFACE_ATTR, useFeltStyle } from "@/features/hud/feltLayout";
 
 // Hoisted module-level so it's the SAME object reference on every render —
 // Card's dealAnimation is memoized on this, and a fresh literal here would
 // still defeat that memoization every time ImageTable re-renders.
 const COMMUNITY_DEAL_FROM = { x: 200, y: -100 };
 
-// How an absolutely-positioned MOTION element centres itself on its left/top
-// anchor. It must be the standalone CSS `translate` property, never
-// `transform: translate(-50%,-50%)`.
-//
-// framer-motion composes the entire `transform` property from the motion values
-// it is handed (x/y/scale/rotate). Any `transform` written in `style` alongside
-// them is simply replaced the moment the element animates — so an element that
-// animated `scale` silently lost its centring and hung half its own width right
-// and half its height low. That is what put the pot cluster at cx 932 against a
-// felt centre of 800 (exactly half its 264px width), and it was doing the same
-// to the dealer button and the burn card.
-//
-// `translate` is a separate CSS property that framer does not manage, and the
-// spec applies it before `transform`, so the element is centred first and the
-// animation's scale/rotate then act about that centre — exactly the intent.
-const CENTRING_TRANSLATE: CSSProperties = { translate: "-50% -50%" };
-
 interface ImageTableProps {
-  /** Width (px) of the Room Control drawer overlaying the left edge, so the
-   *  felt shifts with SeatHud's seat ring instead of drifting apart from it. */
-  insetLeft?: number;
   communityCards: CardType[];
   pot: number;
   playerCount: number;
@@ -149,7 +128,6 @@ export function ImageTable({
   dealPhase,
   handNumber,
   blinds,
-  insetLeft = 0,
 }: ImageTableProps) {
   const { compactMode, feltPreset } = useGameUI();
   const occupiedCount = players?.length || playerCount;
@@ -189,14 +167,12 @@ export function ImageTable({
   const dealerChanged = dealerSeatIndex !== prevDealerRef.current;
   useEffect(() => { prevDealerRef.current = dealerSeatIndex; }, [dealerSeatIndex]);
 
-  // The Room Control drawer overlays the left edge. SeatHud shifts the seat
-  // ring right by its width so seats don't land underneath it — the felt has
-  // to make the SAME shift or the two drift apart (the seats slide right while
-  // the table stays centred). Shifting by half the inset keeps the felt centred
-  // in the remaining usable width, matching computeTableLayout's `cx`.
-  const feltStyle: CSSProperties = insetLeft
-    ? { ...FELT_BOUNDS, left: `calc(50% + ${insetLeft / 2}px)` }
-    : FELT_BOUNDS;
+  // THE box for the table, from the one hook that owns it. This used to
+  // re-derive the Room-drawer shift locally from an `insetLeft` prop — a second
+  // copy of the rule, and four components each keeping their own copy is exactly
+  // what put the felt and its seat ring 144px apart. Enforced by
+  // scripts/check-table-invariants.mjs (check: one-felt-box).
+  const { style: feltStyle } = useFeltStyle();
 
   return (
     <>
@@ -296,7 +272,11 @@ export function ImageTable({
                 style={{
                   left: "50%",
                   top: "45%",
-                  transform: "translate(-50%, -50%)",
+                  // Only `opacity` animates today, so framer does not yet write
+                  // `transform` and this row measures dead centre — but the day
+                  // anyone adds scale/x/y here the whole board would jump 195px
+                  // left. Use the property framer cannot clobber.
+                  ...CENTRING_TRANSLATE,
                   filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.7))",
                 }}
               >

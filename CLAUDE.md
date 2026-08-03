@@ -50,7 +50,7 @@ This section is the contract for **all** UI. It is not aspirational styling advi
 **The reference is the running app, not a mock-up.** Open `/table` (or `/table?demo=1`, which drives the identical renderer off `DEMO_SNAPSHOT` with no backend) and match it. There is no `/proof` route and no separate showcase to compare against — if a document, comment or commit message tells you to "match the proof", it is stale and you should fix it.
 
 > **Read this before touching the table.** This file used to describe the table
-> as a React Three Fiber cinematic scene, anchored to a `src/app/proof/`
+> as a React Three Fiber cinematic scene, anchored to a "src/app/proof/"
 > directory that had been deleted. Meanwhile `/table` hard-pinned the flat 2.5D
 > renderer, so the "binding" design contract described something the app never
 > rendered. That single inconsistency cost a full day: the table was rebuilt,
@@ -117,13 +117,25 @@ per Golden rule 3.
 
 There is **no 3D table**. A React Three Fiber cinematic scene once existed behind a
 `render_style` / `override` branch; `/table` pinned `override="2.5d"`, so it was
-dead for months while this file still called it the design contract. All of it —
-`hrc/scene/`, `table3d/CinematicScene.tsx`, `table3d/LiveCinematicTable.tsx`,
-`table3d/textures.ts`, `hrc/components/CSSPokerTable.tsx`, `table/tableGraphics.ts`
-(a `"cinematic" | "classic"` preset nothing ever set), `useSceneSync`,
-`store/useGameStore`, and the "Table Look" picker in `PrivateTableSetup` — is
-deleted. **Do not reintroduce a second table renderer, a `render_style` branch, or
-a graphics preset that selects between tables.** three/R3F remain in
+dead for months while this file still called it the design contract. All of it is
+deleted — these paths no longer exist and must not come back:
+
+```
+src/features/hrc/scene/                      the whole R3F scene
+src/features/table3d/CinematicScene.tsx
+src/features/table3d/LiveCinematicTable.tsx
+src/features/table3d/textures.ts
+src/features/hrc/components/CSSPokerTable.tsx
+src/features/table/tableGraphics.ts          "cinematic" | "classic", never set
+src/features/hrc/useSceneSync.ts
+src/features/hrc/store/useGameStore.ts
+src/app/proof/                               the old "design reference"
+HrcTable's `override` prop + HrcRenderStyle + the 3D branch
+PrivateTableSetup's "Table Look" picker
+```
+
+**Do not reintroduce a second table renderer, a `render_style` branch, or a
+graphics preset that selects between tables.** three/R3F remain in
 `package.json` for 3D *avatars* only (see below); they are not for the table.
 
 The composition, as it actually runs:
