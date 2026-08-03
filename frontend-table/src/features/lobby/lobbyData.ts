@@ -33,7 +33,10 @@ export interface PublicTableRow {
   name: string;
   seated: number;
   capacity: number;
-  buy_in_minor: number;
+  // Optional: the match label (backend buildLabel) carries blinds, not a buy-in.
+  // A live row therefore has no buy-in to show, and the UI must omit it rather
+  // than invent one. Demo rows set it explicitly.
+  buy_in_minor?: number;
   host: string;
   small_blind_minor?: number;
   big_blind_minor?: number;
@@ -123,7 +126,9 @@ export function rowsFromLiveTables(
       name: label?.room_id || t.room_id || t.label || "Hold'em Table",
       seated,
       capacity: seated + open || 10,
-      buy_in_minor: 100_000,
+      // No buy_in_minor: the label has no buy-in field, so any number here would
+      // be a client-side guess rendered as live server state. Left undefined so
+      // the row shows its real blinds instead.
       small_blind_minor: label?.sb,
       big_blind_minor: label?.bb,
       variant: label?.variant,
