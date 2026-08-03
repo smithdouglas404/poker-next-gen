@@ -275,6 +275,32 @@ Timeline/UI animation uses **GSAP** as the standard motion layer (chip flights, 
 3. **State never drifts.** The rendered UI is a pure projection of authoritative server state. No optimistic values that can disagree with the backend, no client-side "guesses" at stacks/pot/turn. Consistent with Golden rule 4 (no math fallbacks): the display reflects server truth or it shows nothing.
 4. **Every rendered control binds to a real RPC — no dead buttons.** If a control is on screen (fold/check/call/raise/all-in, presets, host controls, membership, deposits), it is wired to a registered `backend-core` RPC and reflects real capability/permission gating. Ship no placeholder or decorative buttons. `?demo=1` uses static demo data precisely because it is a preview — production surfaces must be live. A control that selects a code path which no longer exists is a dead button too: when a renderer or mode is deleted, delete the picker that chose it.
 
+## Landing page — never a place to play (BINDING)
+
+The landing page (`/` -> `features/landing/LandingClient.tsx`) is a MARKETING
+surface. **You cannot join, create or play a game from it.** No link to
+`/table`, no table code box, no "deal me in", no room builder.
+
+It shipped with an "Enter a table" CTA pointing straight at `/table`, which put
+an anonymous visitor on a felt carrying a Create/Join drawer. The owner has
+reported this more than once; it kept coming back because this file never said
+it. It says it now.
+
+Where each thing belongs:
+
+| Job | Screen |
+|---|---|
+| Marketing / sign-in / sign-up | `/` (landing) |
+| Start playing | `/login` |
+| Create a game (private, public, play-money) | `/lobby` — `PrivateTableSetup`, four modes |
+| Join by code | `/lobby` (`JoinPrivateGame`) or the centre card on `/table` |
+| Create a tournament | `/tournaments` — `CreateTournamentPanel` |
+| Play | `/table` |
+
+**One job per screen.** Game setup does not belong on the felt either: the
+`RoomPanel` Create/Join drawer was a third copy of what `/lobby` already does,
+stacked over the table, and is now unmounted (`SHOW_LEFT_PANEL_COLUMN`).
+
 ## Working rules for agents (learned the hard way, 2026-08-02/03)
 
 These are not style preferences. Each one is here because breaking it cost real

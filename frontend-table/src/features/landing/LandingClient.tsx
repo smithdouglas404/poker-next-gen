@@ -130,16 +130,12 @@ export function LandingClient() {
           >
             Play now
           </Link>
-          <Link
-            href="/table"
-            className={cn(
-              GLASS_PANEL,
-              GLASS_PANEL_HOVER,
-              "rounded-xl px-7 py-3.5 text-sm font-bold text-white",
-            )}
-          >
-            Enter a table
-          </Link>
+          {/* NO "Enter a table" here. The landing page must not join, create or
+              play a game — it is a marketing surface. It linked straight to
+              /table, which drops an anonymous visitor onto a felt with a
+              Create/Join drawer. Playing starts at /login; game setup is
+              /lobby; tournaments are /tournaments. See CLAUDE.md > Landing
+              page. */}
           <Link
             href="/hub"
             className="rounded-xl px-7 py-3.5 text-sm font-semibold text-neutral-300 transition hover:text-white"
