@@ -76,12 +76,22 @@ export function TableHud({ children }: { children: React.ReactNode }) {
                 once seated) — P0-7. */}
             <TableEmptyState />
             <ActionTimer />
-            {/* NOT MOUNTED: hud/GameStatusRail.tsx (current bet / hand strength
-                / sit-out pills) was gated on `cinematic`, a table-graphics mode
-                nothing ever set, so it has never rendered. The gate is gone with
-                the 3D table; the FILE is kept and left unmounted on purpose,
-                because mounting it is a visible design change and therefore the
-                owner's call, not a cleanup. */}
+            {/* DELIBERATELY NOT MOUNTED: hud/GameStatusRail.tsx (current bet +
+                hand strength pills). Decided by the owner on 2026-08-03 — do
+                not mount it, and do not treat its absence as an oversight to
+                "fix".
+
+                It was originally gated on `cinematic`, a table-graphics mode
+                nothing ever set, so it had never rendered once. When that mode
+                was deleted the question became live, and the answer is no: its
+                hand-strength pill duplicates the one HeroHoleCards already
+                shows above the hero's cards, and its current-bet figure is
+                already on screen as ActionBar's "TO CALL". Two surfaces naming
+                the same thing is how they drift apart.
+
+                The file stays so the work isn't lost, and it shares
+                useHandCategory with HeroHoleCards so the two could not
+                disagree if it ever were mounted. */}
             {/* The board is drawn by ImageTable. This used to ALSO mount
                 hud/CommunityCards under `!cinematic`, from when the 2.5D path
                 didn't draw its own board — so both rendered: the real cards at
