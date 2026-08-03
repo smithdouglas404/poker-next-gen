@@ -15,8 +15,9 @@
 // via next/dynamic with ssr:false (CLAUDE.md golden rule 3).
 
 import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import { useGame } from "@/features/game/GameProvider";
-import { useRoomPanelOpen, ROOM_PANEL_WIDTH_PX } from "@/features/hud/roomPanelState";
+import { useFeltStyle } from "@/features/hud/feltLayout";
 import { getTableGraphics } from "@/features/table/tableGraphics";
 import { ImageTable } from "./components/ImageTable";
 import { PokerSceneCanvas } from "./scene/canvas/PokerSceneCanvas";
@@ -69,8 +70,9 @@ export default function HrcTable({
   const live = useGame();
   // The felt must shift by the same amount SeatHud shifts the seat ring when
   // the Room Control drawer is open, or the table and its seats drift apart.
-  const [roomPanelOpen] = useRoomPanelOpen(getTableGraphics() !== "cinematic");
-  const insetLeft = !demo && roomPanelOpen ? ROOM_PANEL_WIDTH_PX : 0;
+  const { style: feltStyle, insetLeft } = useFeltStyle();
+  // One box for every FELT_BOUNDS consumer — felt image, ImageTable's overlay,
+  // and the seat layer below — so they cannot drift apart.
   const snapshot = demo ? DEMO_SNAPSHOT_WITH_BETS : live.snapshot;
   const holeCards = demo ? DEMO_HOLE : live.holeCards;
 
@@ -187,7 +189,11 @@ export default function HrcTable({
                 use — previously this was a separately-duplicated copy of the same
                 style, which is exactly how the three layers could drift out of sync
                 with each other. */}
-            <div style={{ ...FELT_BOUNDS, zIndex: 20 }}>
+            {/* MUST use the same inset-shifted box as the felt image and
+                ImageTable's layers. This div was left on plain FELT_BOUNDS
+                while the others shifted with the Room drawer, which put the
+                avatars 144px (half the drawer width) left of the seat ring. */}
+            <div style={{ ...feltStyle, zIndex: 20 }}>
               {adapted.players.map((player) => {
                 // Rotate so the hero is always at visual seat 0 (bottom centre).
                 // HRC rotates over players.length; we rotate over SEAT index and

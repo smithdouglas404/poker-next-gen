@@ -1,6 +1,5 @@
 "use client";
 
-import { CommunityCards } from "@/features/hud/CommunityCards";
 import { PlayerHeader } from "@/features/hud/PlayerHeader";
 import { RoomPanel } from "@/features/hud/RoomPanel";
 import { SeatHud } from "@/features/hud/SeatHud";
@@ -102,9 +101,13 @@ export function TableHud({ children }: { children: React.ReactNode }) {
             {/* Live-hand status chrome (current bet / hand strength / sit-out) —
                 cinematic-only, matching the HRC flop-dealt master. */}
             {cinematic && <GameStatusRail />}
-            {!cinematic && (
-              <CommunityCards board={snapshot?.board ?? []} phase={snapshot?.phase ?? "waiting"} />
-            )}
+            {/* The board is drawn by whichever table renderer is mounted —
+                the R3F scene in cinematic mode, ImageTable in 2.5D. This used
+                to also mount hud/CommunityCards under `!cinematic`, from when
+                the 2.5D path didn't draw its own board. It does now, so that
+                guard was stale and BOTH rendered: ImageTable's real cards at
+                45% of the felt, plus a second row of dashed FLOP/TURN/RIVER
+                slots at 42% of the viewport, bleeding through behind them. */}
           </div>
         </div>
 

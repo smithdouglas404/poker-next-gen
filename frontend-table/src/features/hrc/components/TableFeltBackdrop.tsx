@@ -2,9 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { FELT_BOUNDS } from "@/features/hrc/lib/table-constants";
-import { FELT_SURFACE_ATTR } from "@/features/hud/feltLayout";
-import { useRoomPanelOpen, ROOM_PANEL_WIDTH_PX } from "@/features/hud/roomPanelState";
-import { getTableGraphics } from "@/features/table/tableGraphics";
+import { FELT_SURFACE_ATTR, useFeltStyle } from "@/features/hud/feltLayout";
 
 // The felt/table image is pure decoration — no game state — so unlike
 // ImageTable (which HrcTable refuses to mount without a real snapshot, per
@@ -22,11 +20,7 @@ import { getTableGraphics } from "@/features/table/tableGraphics";
 export function TableFeltBackdrop() {
   // Match SeatHud's shift when the Room Control drawer overlays the left edge,
   // so the table and its seat ring move together instead of drifting apart.
-  const [roomPanelOpen] = useRoomPanelOpen(getTableGraphics() !== "cinematic");
-  const insetLeft = roomPanelOpen ? ROOM_PANEL_WIDTH_PX : 0;
-  const feltStyle: CSSProperties = insetLeft
-    ? { ...FELT_BOUNDS, left: `calc(50% + ${insetLeft / 2}px)` }
-    : FELT_BOUNDS;
+  const { style: feltStyle } = useFeltStyle();
 
   return (
     <div className="pointer-events-none absolute inset-0 z-0">

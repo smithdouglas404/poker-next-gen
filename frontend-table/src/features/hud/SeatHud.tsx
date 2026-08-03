@@ -197,8 +197,15 @@ export function SeatHud() {
   // rather than placing these on a separate computed ellipse — that mismatch is
   // why the "SIT HERE" squares sat apart from the avatars. Indexed by REAL seat
   // index, hero-rotated the same way HrcTable rotates.
+  // In ?demo=1 the table is driven by DEMO_SNAPSHOT inside HrcTable, which
+  // SeatHud never sees — so it would treat every seat as empty and stamp a
+  // "SIT HERE" card on top of each demo avatar. Those cards are also dead in
+  // demo (no match to sitDown into), so render none: HrcTable owns the demo
+  // table completely.
   const heroIdx = heroSeat ?? 0;
-  const positions = feltRect
+  const positions = demo
+    ? []
+    : feltRect
     ? Array.from({ length: seatCount }, (_, index) => {
         const visual = (index - heroIdx + seatCount) % seatCount;
         const p = seatPointFromFelt(feltRect, visual);

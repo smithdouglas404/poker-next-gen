@@ -1,5 +1,9 @@
 import type { TableLayout } from "@/features/table/tableLayout";
-import { TABLE_SEATS } from "@/features/hrc/lib/table-constants";
+import { useSearchParams } from "next/navigation";
+import type { CSSProperties } from "react";
+import { TABLE_SEATS, FELT_BOUNDS } from "@/features/hrc/lib/table-constants";
+import { useRoomPanelOpen, ROOM_PANEL_WIDTH_PX } from "@/features/hud/roomPanelState";
+import { getTableGraphics } from "@/features/table/tableGraphics";
 
 /** The DOM attribute ImageTable stamps on the felt image's wrapper so the seat
  *  layer can find and measure it. */
@@ -70,5 +74,27 @@ export function seatPointFromFelt(
     x: rect.left + (pose.x / 100) * rect.width,
     y: rect.top + (pose.y / 100) * rect.height,
     scale: pose.scale,
+  };
+}
+
+/**
+ * THE box for the table. Every FELT_BOUNDS consumer must use this and nothing
+ * else — the felt image (TableFeltBackdrop), ImageTable's two layers, and
+ * HrcTable's seat layer.
+ *
+ * Four components previously each decided for themselves whether the Room
+ * drawer was open and whether `?demo=1` suppressed it. Any disagreement put
+ * the layers 144px (half the drawer width) apart — which is exactly what
+ * happened: the felt shifted while the avatars did not.
+ */
+export function useFeltStyle(): { style: CSSProperties; insetLeft: number } {
+  const demo = useSearchParams().get("demo") === "1";
+  const [roomPanelOpen] = useRoomPanelOpen(getTableGraphics() !== "cinematic");
+  const insetLeft = !demo && roomPanelOpen ? ROOM_PANEL_WIDTH_PX : 0;
+  return {
+    insetLeft,
+    style: insetLeft
+      ? { ...FELT_BOUNDS, left: `calc(50% + ${insetLeft / 2}px)` }
+      : FELT_BOUNDS,
   };
 }
