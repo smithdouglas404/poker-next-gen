@@ -25,6 +25,12 @@ import { useGameSounds } from "@/features/sound/useGameSounds";
 import { useGame } from "@/features/game/GameProvider";
 import { useSearchParams } from "next/navigation";
 
+// The stacked left-hand panel column. Off: the owner asked for the felt clear,
+// and game setup belongs on its own screen the way tournaments have one —
+// PrivateTableSetup already lives at /lobby, tournaments at /tournaments.
+// Flip to true to bring the column back.
+const SHOW_LEFT_PANEL_COLUMN = false;
+
 export function TableHud({ children }: { children: React.ReactNode }) {
   const { error } = useGame();
   // ?demo=1 renders the reference table headless-populated (no real
@@ -49,7 +55,19 @@ export function TableHud({ children }: { children: React.ReactNode }) {
         <PlayerHeader />
 
         <div className="mt-4 flex flex-1 gap-4">
-          {!demo && (
+          {/* The felt is not a shelf for panels. This column used to render on
+              every real table — RoomPanel's Create/Join builder, buy-in,
+              equity, sidebets, verify, log, chat, spectator, taunts, music and
+              table settings, thirteen stacked panels over the left of the
+              table. It was hidden under `!demo`, which is exactly why every
+              ?demo=1 screenshot looked clean while /table never did, and why
+              "the table" meant two different things for days.
+              The reference (AFTER1600x1000.png) has none of it: HAND HISTORY
+              top-left and chat bottom-left, both mounted separately in
+              app/table/page.tsx. Room Control stays reachable through its own
+              collapsed ROOM tab; nothing here is deleted, it just stops
+              covering the felt. */}
+          {SHOW_LEFT_PANEL_COLUMN && (
           <div className="flex w-full max-w-xs flex-col gap-3">
             <RoomPanel />
             <BuyInSlider />
