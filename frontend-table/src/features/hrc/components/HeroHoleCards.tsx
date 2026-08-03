@@ -8,7 +8,7 @@
 
 import type { CardType } from "@/features/hrc/lib/poker-types";
 import { Card } from "./Card";
-import { evaluateHandForVariant } from "@/features/hrc/lib/hand-evaluator";
+import { useHandCategory } from "@/features/hrc/lib/useHandCategory";
 
 // cards.length is 2 for Hold'em, 4 for PLO — the backend always deals
 // exactly one or the other (backend-core/poker/table.go holeCount()), so
@@ -21,8 +21,9 @@ export function HeroHoleCards({
   cards?: CardType[];
   communityCards: CardType[];
 }) {
+  // Hooks must run before any early return.
+  const category = useHandCategory(cards, communityCards);
   if (!cards || cards.length === 0) return null;
-  const hand = evaluateHandForVariant(cards, communityCards);
   // Fan the cards evenly around center; 2 cards keep the original ±8deg tilt,
   // 4 cards (PLO) spread a bit wider so they don't overlap illegibly.
   const spread = cards.length <= 2 ? 8 : 12;
@@ -33,23 +34,32 @@ export function HeroHoleCards({
       className="pointer-events-none flex flex-col items-center"
       style={{ position: "fixed", left: "50%", bottom: 215, transform: "translateX(-50%)", zIndex: 45 }}
     >
-      {/* mb-3, not mb-1.5: each card is rotated about its own centre, which
+      {/* Rendered only when engine-math has actually named the hand. Absent
+          pre-flop (rs_poker needs >=5 cards) and whenever the sidecar is
+          unreachable — Golden rule 4 forbids falling back to a local eval, and
+          non-negotiable 3 says show nothing rather than a client-side guess.
+          The container is bottom-anchored, so the cards do not move when this
+          appears on the flop.
+
+          mb-3, not mb-1.5: each card is rotated about its own centre, which
           lifts the outer top corner of the fanned cards above the unrotated
           card top by roughly (width/2)·sin(spread). The old 6px gap was
           smaller than that lift, so the fan rode up over this label and hid
           the hand the player actually holds. */}
-      <div
-        className="mb-3 rounded-full px-3 py-1 font-display text-xs font-black uppercase tracking-[0.15em]"
-        style={{
-          color: "#ffd700",
-          background: "rgba(10,10,12,0.85)",
-          border: "1px solid rgba(212,175,55,0.4)",
-          textShadow: "0 0 10px rgba(212,175,55,0.5)",
-          boxShadow: "0 0 16px rgba(212,175,55,0.25)",
-        }}
-      >
-        {hand.description}
-      </div>
+      {category && (
+        <div
+          className="mb-3 rounded-full px-3 py-1 font-display text-xs font-black uppercase tracking-[0.15em]"
+          style={{
+            color: "#ffd700",
+            background: "rgba(10,10,12,0.85)",
+            border: "1px solid rgba(212,175,55,0.4)",
+            textShadow: "0 0 10px rgba(212,175,55,0.5)",
+            boxShadow: "0 0 16px rgba(212,175,55,0.25)",
+          }}
+        >
+          {category}
+        </div>
+      )}
       {/* Scaled off the "lg" preset (90x135) rather than switching size tokens,
           so the card art keeps its 2:3 ratio and gold hero border weight. At
           0.88 the fan was large enough to sit over the hand-strength label and
