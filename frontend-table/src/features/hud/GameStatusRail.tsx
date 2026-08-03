@@ -14,53 +14,21 @@
 // Sit Out / Extend Time / Exit Table live in HeroControlsDock.tsx now, docked
 // to the action bar instead of floating over the felt (see that file).
 
-import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { useGame, formatCents } from "@/features/game/GameProvider";
-import { callSessionRpc } from "@/lib/nakama/sessionRpc";
+import { useHandCategory } from "@/features/hrc/lib/useHandCategory";
+import { toCards } from "@/features/hrc/adapter";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
-function formatCategory(raw: string): string {
-  return raw
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/_/g, " ")
-    .toUpperCase();
-}
-
-function HandStrengthPill({ demo }: { demo: boolean }) {
+// The hero's made hand comes from the shared engine-math hook — same source as
+// HeroHoleCards, so the two can never disagree. This file used to carry its own
+// copy of the RPC call plus a formatter that split on /([a-z])([A-Z])/, which
+// leaves consecutive capitals joined and rendered `ThreeOfAKind` as
+// "THREE OF AKIND".
+function HandStrengthPill() {
   const { snapshot, holeCards } = useGame();
-  const [category, setCategory] = useState<string | null>(null);
-
-  const hole = holeCards.map((c) => c.code).join("");
-  const board = (snapshot?.board ?? []).map((c) => c.code).join("");
-
-  useEffect(() => {
-    if (demo) {
-      // DEMO_SNAPSHOT deals Ah/Ad with As on the board — trip aces — so this
-      // stays an honest label for what's actually on the felt rather than an
-      // arbitrary placeholder. No RPC call in demo (no local math fallback).
-      setCategory("THREE OF A KIND");
-      return;
-    }
-    if (hole.length < 4) {
-      setCategory(null);
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      try {
-        const rank = (await callSessionRpc("hand_rank", { cards: hole + board })) as { category?: string };
-        if (!cancelled && rank.category) setCategory(formatCategory(rank.category));
-      } catch {
-        if (!cancelled) setCategory(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [demo, hole, board]);
-
+  const category = useHandCategory(toCards(holeCards), toCards(snapshot?.board));
   if (!category) return null;
   return (
     <div
@@ -95,7 +63,7 @@ export function GameStatusRail() {
   return (
     <div className="pointer-events-none absolute right-4 top-20 z-20 flex flex-col items-end gap-2">
       <CurrentBetPill demo={demo} />
-      <HandStrengthPill demo={demo} />
+      <HandStrengthPill />
     </div>
   );
 }

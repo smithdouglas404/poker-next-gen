@@ -88,7 +88,6 @@ export function PrivateTableSetup({
   const [noMaxBuyIn, setNoMaxBuyIn] = useState(false);
   // Owner-chosen table look: every seat renders in this style (no per-player mixing).
   // "" => players keep their per-device render preference.
-  const [renderStyle, setRenderStyle] = useState<"" | "2.5d" | "3d">("");
   // Owner-chosen baked table plate (photoreal backdrop). "" => cinematic felt.
   const [tableArt, setTableArt] = useState("");
   const [seats, setSeats] = useState(6);
@@ -206,8 +205,6 @@ export function PrivateTableSetup({
       // (private games, home games) needs no licence, only permission to act
       // for the club.
       stake_mode: isPlayMoney ? "play" : "cash",
-      // Owner-chosen table look (overrides each player's per-device renderMode).
-      render_style: renderStyle || undefined,
       // Owner-chosen baked photoreal table plate (empty => cinematic felt).
       table_art: tableArt || undefined,
       // EVERY table is hosted by a club — table_create rejects a request without
@@ -310,35 +307,6 @@ export function PrivateTableSetup({
           </div>
         )}
 
-        <Section
-          title="Table Look"
-          hint="You choose the whole table's style. Every seat renders the same way — no per-player mixing. Leave on Player's choice to let each player keep their own device preference."
-        >
-          <div className="grid gap-2 sm:grid-cols-3">
-            {[
-              { value: "", label: "Player's choice", sub: "Each device decides" },
-              { value: "2.5d", label: "2.5D portraits", sub: "HRC character art" },
-              { value: "3d", label: "3D avatars", sub: "GLB figures" },
-            ].map((opt) => (
-              <button
-                key={opt.value || "auto"}
-                type="button"
-                onClick={() => setRenderStyle(opt.value as "" | "2.5d" | "3d")}
-                className={cn(
-                  "rounded-xl border px-4 py-3 text-left text-sm font-semibold transition",
-                  renderStyle === opt.value
-                    ? "border-gold/50 bg-gold/10 text-gold"
-                    : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25",
-                )}
-              >
-                <span className="block">{opt.label}</span>
-                <span className="mt-0.5 block text-[11px] font-normal uppercase tracking-[0.15em] text-neutral-500">
-                  {opt.sub}
-                </span>
-              </button>
-            ))}
-          </div>
-        </Section>
 
         <Section
           title="Choose a Table"

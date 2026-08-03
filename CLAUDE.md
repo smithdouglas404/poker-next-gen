@@ -34,16 +34,30 @@ Three first-class services live in their own top-level directories:
 2. **Railway is the primary run target.** Production and recommended dev =
    `.railway/railway.ts` (`railway config apply`). Optional local Docker =
    `docker-compose.yml`. Keep build/start behavior aligned when both paths exist.
-3. **Frontend rendering is client-only.** Pixi.js touches WebGPU/WebGL and must
-   never be imported during SSR. `src/app/table/page.tsx` is a `"use client"`
-   component that lazily `import()`s Pixi inside a `useEffect`.
+3. **Frontend rendering is client-only.** `src/app/table/page.tsx` is `"use client"`
+   and mounts `HrcTable` via `dynamic(..., { ssr: false })`. The table itself is
+   DOM + framer-motion (see DESIGN-SYSTEM). Pixi.js (`features/table/*`) and
+   three/R3F (3D avatars only) touch WebGPU/WebGL and must never be imported
+   during SSR.
 4. **No math fallbacks.** Shuffle, hand rank, showdown, and equity always go
    through `engine-math` (rs_poker). If the sidecar is down, operations fail —
    the Go backend must not silently use local eval or `crypto/rand` shuffles.
 
 ## DESIGN-SYSTEM — the guaranteed look (BINDING)
 
-This section is the contract for **all** UI. It is not aspirational styling advice — it is the definition of "done" for anything a player sees. The reference implementation is the cinematic proof under `frontend-table/src/app/proof/` (`CinematicTable.tsx`, `textures.ts`, `proofData.ts`, `ClubDashboard.tsx`, reachable at `/proof` and `/proof?screen=club`). When in doubt, open the proof and match it. Deviating from these values is a defect, not a preference.
+This section is the contract for **all** UI. It is not aspirational styling advice — it is the definition of "done" for anything a player sees. Deviating from these values is a defect, not a preference.
+
+**The reference is the running app, not a mock-up.** Open `/table` (or `/table?demo=1`, which drives the identical renderer off `DEMO_SNAPSHOT` with no backend) and match it. There is no `/proof` route and no separate showcase to compare against — if a document, comment or commit message tells you to "match the proof", it is stale and you should fix it.
+
+> **Read this before touching the table.** This file used to describe the table
+> as a React Three Fiber cinematic scene, anchored to a "src/app/proof/"
+> directory that had been deleted. Meanwhile `/table` hard-pinned the flat 2.5D
+> renderer, so the "binding" design contract described something the app never
+> rendered. That single inconsistency cost a full day: the table was rebuilt,
+> reverted, and rebuilt again while agent and owner meant different things by
+> "the table". The 3D table and every switch that selected it are now deleted.
+> **There is exactly one table renderer.** Keep it that way, and keep this
+> section true to what actually runs.
 
 ### Palette — GGPoker (dark slate / red / green / gold)
 
@@ -78,15 +92,12 @@ above — a screen that hardcodes off-palette hexes instead is a defect.
 
 The `body` background is fixed (`background-attachment: fixed`) and layers two faint radials over the base: red `rgba(224,30,43,0.06)` from top-center and gold `rgba(212,175,55,0.05)` from top-right. Reproduce, do not "improve."
 
-**Scene / 3D palette** (from `proof/CinematicTable.tsx` + `proof/textures.ts`) — these are the exact material colors and are part of the look:
-- Scene background & fog: `#05070c` (fog range `[12, 26]`); page gradient base `linear-gradient(180deg,#04060a,#070b12 60%,#04060a)`.
-- Felt: radial `#1c7d4e` center → `#0f5f39` → `#053821` edge, plus weave noise (±14) and a `rgba(212,175,55,0.85)` gold inner ring and faint `♦` club mark.
-- Gold ring (flat): `#f1cf6b`, emissive `#8a6a1e` @ `0.5`, `metalness 1`, `roughness 0.28`.
-- Red neon rim: `#ff2d3f`, `meshBasicMaterial`, `toneMapped={false}` (glow must not be tone-mapped down). This is the table's signature GGPoker-red brand glow.
-- Gunmetal outer rail: `#171b22`, `metalness 0.95`, `roughness 0.32`; gold pinstripe `#e9c46a` emissive `#6b501a`.
-- Four-color deck (both canvas cards and DOM hero cards): spades `#101317`, hearts `#e5484d`, diamonds `#2f6bff` (blue), clubs `#1fa85a` (green). (The blue diamond is a functional suit color, NOT a brand accent — it stays.)
-- Rim lighting: warm white key + **red** accent light (`#ff2d3f`) + **gold** accent light (`#ffcf6a`) + a deep-red back light (`#c8102e`); Environment Lightformers white key + red left rim + gold right rim. Two-tone red/gold — never cyan/purple.
-- Action / state tones: active/turn gold `#f3c14b`, **call green `#22c55e`** (kept distinct from all-in red), raise/gold `#e9c46a`, all-in red `#ff3b46` (`#ef4444` for the seat ring), fold/muted `#3a4250`, **idle seat ring neutral steel `#5b6472`** (red is reserved for all-in/danger — idle seats never glow red).
+**Felt / card / state colours** — these live in the running components
+(`ImageTable.tsx`, `Card.tsx`, `Seat.tsx`, `table-constants.ts`), not in a mock-up:
+- Four-color deck: spades `#101317`, hearts `#e5484d`, diamonds `#2f6bff` (blue), clubs `#1fa85a` (green). The blue diamond is a functional SUIT colour, not a brand accent — it stays.
+- Action / state tones: active/turn gold `#f3c14b`, **call green `#22c55e`** (kept distinct from all-in red), raise/gold `#e9c46a`, all-in red `#ff3b46` (`#ef4444` for the seat ring), fold/muted `#3a4250`, **idle seat ring neutral steel `#5b6472`** — red is reserved for all-in/danger, so idle seats never glow red.
+- Gold accents on the felt (rings, empty-seat markers, pot pill, hero card border) are `#d4af37` / `rgba(212,175,55,…)`.
+- Suit glow on hero cards (`Card.tsx` `suitGlow`): hearts `rgba(220,38,38,.5)`, diamonds `rgba(59,130,246,.5)`, clubs `rgba(34,197,94,.45)`, spades `rgba(148,163,184,.4)`.
 
 ### Typography — Space Grotesk + Manrope
 
@@ -96,31 +107,144 @@ Loaded once in `frontend-table/src/app/layout.tsx` via `next/font/google` and ex
 
 Do not introduce a third typeface. Section eyebrows/labels are `text-[11px]` uppercase with `tracking-[0.2em]`–`[0.3em]`, matching the HUD.
 
-### Cinematic R3F table architecture (the reference is `proof/`)
+### The table — ONE renderer, flat 2.5D (`ImageTable`)
 
-The live table is a **React Three Fiber** scene (`@react-three/fiber` v9, `@react-three/drei` v10, `three` 0.171, `@react-three/postprocessing`). It is client-only (`dynamic(... { ssr: false })`, `"use client"`) — never import it during SSR (Golden rule 3). The mandated composition, exactly as in `CinematicTable.tsx`:
+**There is exactly one table renderer and no switch.** `/table` renders
+`features/hrc/HrcTable.tsx`, which renders `features/hrc/components/ImageTable.tsx`:
+a flat felt **image** with an absolutely-positioned DOM overlay, animated with
+framer-motion. It is client-only (`dynamic(..., { ssr: false })`, `"use client"`)
+per Golden rule 3.
 
-- **Felt** — radial-lit green canvas texture (`feltTexture()`), `roughness 0.92`, `metalness 0.02`, on a 128-segment circle scaled `[5.35, 3.55]`.
-- **Gunmetal rail** — `torusGeometry`, `#171b22`, high metalness, with a thin emissive **gold pinstripe** torus above it.
-- **Gold ring** — flat emissive `ringGeometry` (`#f1cf6b`) inset in the felt.
-- **Neon seat rings** — each seat portrait wears a colored ring whose color encodes state (active `#f3c14b`, all-in `#ff3b46`, folded `#3a4250`, idle neutral steel `#5b6472`, else the character's `ring`) with a matching `box-shadow` glow; the felt edge carries the red `#ff2d3f` neon rim.
-- **Beveled 4-color cards** — board cards are real `boxGeometry` `[0.66, 0.03, 0.92]` slabs with a per-face material array (white edges, textured top via `cardFaceTexture`, faint `emissiveMap` @ `0.14`). Faces use the four-color deck. Not sprites.
-- **Instanced chip stacks** — `ChipStack` renders `cylinderGeometry` chips stacked at `y = i*0.032`; the pot is five colored stacks (`#c9302c`, `#1f2937`, `#2f6bff`, `#e9c46a`, `#1fa85a`). Keep chips as real stacked geometry.
-- **Restrained bloom** — `EffectComposer` with `Bloom intensity={0.55} luminanceThreshold={0.55} luminanceSmoothing={0.2} mipmapBlur` and `Vignette offset={0.28} darkness={0.82}`. Bloom is subtle and threshold-gated — only true neon/emissive surfaces bloom. Do **not** crank intensity or drop the threshold.
-- **Fixed hero camera** — `camera={{ position: [0, 6.9, 7.9], fov: 42 }}`, `ACESFilmicToneMapping`, `toneMappingExposure 1.15`, `dpr={[1,2]}`, `shadows`. The camera is a fixed cinematic hero angle — no free-orbit `OrbitControls` at the live table.
-- **Lighting** — warm key `spotLight` (`#fff4d8`, casts shadow) + red/gold accent `pointLight`s (red `#ff2d3f`, gold `#ffcf6a`, deep-red back `#c8102e`) + an `Environment` of three `Lightformer` rects (white key, red `#ff2d3f` left, gold `#ffcf6a` right) + `ContactShadows` (`opacity 0.5`). This red/gold rim lighting is part of the identity.
+There is **no 3D table**. A React Three Fiber cinematic scene once existed behind a
+`render_style` / `override` branch; `/table` pinned `override="2.5d"`, so it was
+dead for months while this file still called it the design contract. All of it is
+deleted — these paths no longer exist and must not come back:
 
-Seats sit on an ellipse (`SX=4.95`, `SZ=3.2`); seat 0 is the hero at bottom-center.
+```
+src/features/hrc/scene/                      the whole R3F scene
+src/features/table3d/CinematicScene.tsx
+src/features/table3d/LiveCinematicTable.tsx
+src/features/table3d/textures.ts
+src/features/hrc/components/CSSPokerTable.tsx
+src/features/table/tableGraphics.ts          "cinematic" | "classic", never set
+src/features/hrc/useSceneSync.ts
+src/features/hrc/store/useGameStore.ts
+src/app/proof/                               the old "design reference"
+HrcTable's `override` prop + HrcRenderStyle + the 3D branch
+PrivateTableSetup's "Table Look" picker
+```
 
-### Three avatar modes — a player-selectable graphics preset
+**Do not reintroduce a second table renderer, a `render_style` branch, or a
+graphics preset that selects between tables.** three/R3F remain in
+`package.json` for 3D *avatars* only (see below); they are not for the table.
 
-Character rendering is a **graphics preset the player chooses**, persisted per-device in `frontend-table/src/features/table/renderMode.ts` (`localStorage` key `"poker.render.mode"`; `useRenderMode()` hook + cross-component listeners). All three modes are first-class; the scene branches per-seat on `mode` (`is3d = mode === "3d" || (mode === "mix" && seat.use3d)`):
+The composition, as it actually runs:
 
-1. **2.5D — HRC portraits (DEFAULT).** `SeatPortrait2D`: 104×104 circular WebP portrait from `avatarSrc(id)` (`/avatars/<id>.webp`), neon ring + glow + gold owned-badge, rendered via drei `<Html>`. Catalog, rarity tiers, and ring/glow colors are in `src/features/table/avatars.ts` (`AVATARS`, `avatarForKey`, `avatarGradient` fallback). This is the default and must always look intentional even if a portrait 404s (monogram-gradient fallback).
-2. **3D — GLB via Tripo.** `GlbFigure`: `useGLTF` GLB (`seat.model` from the Tripo pipeline, else `/models/house.glb`), yawed to face table center, `<Suspense>`-wrapped, name/stack pill floating above via `<Html>`. The premium upgrade.
-3. **MIX.** 3D GLB for seats flagged `use3d`, 2.5D portraits for the rest — a mixed table of Tripo characters and HRC portraits.
+- **Felt** — `/images/poker-table-felt.webp`, `object-fill`, inside `FELT_BOUNDS`.
+  Mounted by `TableFeltBackdrop` (always, so the pre-seat screen has a table under
+  it) and by `ImageTable` once a snapshot exists.
+- **THE box** — `FELT_BOUNDS` in `hrc/lib/table-constants.ts`: `left:50%`,
+  `top:calc(50% + 45px)`, `width:72.9%`, `aspect-ratio:1408/768`, `maxHeight:90%`.
+  The `+45px` is half the PlayerHeader's height. **Never re-derive the table box.**
+- **Seats** — `TABLE_SEATS`, 10 hand-tuned entries expressed as PERCENTAGES OF THE
+  FELT BOX, seat 0 = hero at bottom centre. Some are deliberately outside `0–100`
+  (seats 2/3/7/8 sit at `x: -0.8` / `100.8`, just past the felt edge). This is an
+  irregular hand-tuned ring, **not** a computed ellipse — do not "improve" it into
+  trigonometry.
+- **A table with fewer than 10 seats must SPREAD over that ring, never take the
+  first N.** `TABLE_SEATS[0..5]` is hero-bottom, bottom-left, left-bottom,
+  left-top, top-left, top-centre — the whole left and bottom of the felt, with
+  the entire right half bare. A 6-max table rendered exactly that way in
+  production: six "SIT HERE" cards bunched down the left side. Go through
+  `seatRingIndex()` / `seatPose()` / `dealerPose()` in `table-constants.ts`,
+  which walk `seatCount` seats evenly around the ten positions and keep hero at
+  index 0 (6 → `0,2,3,5,7,8`; heads-up → `0,5`; 10 → unchanged). The seat layer,
+  the empty "SIT HERE" markers and the dealer button must all use it, or they
+  land on different rings again.
+  **Test every layout change at 6 seats, not just the 10-seat `DEMO_SNAPSHOT`.**
+  `?demo=1` is a 10-max fixture, so it cannot show this class of bug at all —
+  that is precisely how it reached production.
+- **Community cards** — a centred flex row at `left:50% top:45%`, `gap-2.5`, `md`
+  cards (70×105), dealt via `COMMUNITY_DEAL_FROM`.
+- **Pot cluster** — a centred flex column at `left:50% top:25%`: `HAND n | POT: $x`,
+  the phase label, then the chip stacks + gold pot pill.
+- **Hero hole cards** — `HeroHoleCards`, fixed bottom-centre above the action dock,
+  `lg` cards at `scale(0.72)`, fanned ±8° (±12° for 4-card PLO), with the
+  hand-strength pill above them.
+- **Dealer button** — `DEALER_POSITIONS`, same percentage-of-felt scheme.
 
-Note: `renderMode.ts` currently persists `"2d" | "3d"`; `"mix"` is the third selectable value the table honors (`AvatarMode = "2d" | "3d" | "mix"`). Any avatar/graphics work must keep all three paths rendering and switchable — never hard-code one mode.
+### The felt-coordinate rule (this caused a full day of damage)
+
+**Everything on the table is a percentage of ONE measured felt rectangle. There is
+never a second coordinate system.**
+
+There used to be two: the felt placed by static CSS (`FELT_BOUNDS`) and the seat
+ring computed independently from the raw viewport (`computeTableLayout`:
+`cy = height/2`, `ry = rx*0.56`, an 8% margin). Different centres, different aspect
+ratios (1.833 vs 1.786), and only one of them honoured the Room-drawer inset — so
+opening the drawer slid the seats 144px away from the table. They agreed at exactly
+one window size.
+
+The rules that keep it fixed:
+
+1. **`useFeltStyle()` (`features/hud/feltLayout.ts`) is the ONLY source of the
+   table's box.** Every consumer uses it: `TableFeltBackdrop`, `ImageTable`'s two
+   layers, and `HrcTable`'s seat layer. Four components each deciding for
+   themselves whether the drawer was open is what put the layers 144px apart.
+2. **The felt wrapper carries `FELT_SURFACE_ATTR` (`data-felt-surface`).** Anything
+   that needs table coordinates *measures that element* — `seatPointFromFelt()`,
+   `layoutFromFeltRect()` — instead of recomputing them.
+3. **`ResizeObserver` alone is not enough.** It fires on size changes, not position
+   changes, so it misses the drawer sliding the felt sideways. `insetLeft` must be
+   in the effect's dependency array. (Found by measurement: seat-to-centre ratios
+   were `0.71–1.25` with the drawer closed vs `0.93/0.97` open.)
+4. **One layer draws every seat.** Occupied seats and empty "SIT HERE" markers are
+   both drawn by `HrcTable`'s seat layer from `TABLE_SEATS`. When `SeatHud` drew the
+   empty ones separately, a vacant slot and the avatar that replaced it landed in
+   different places, and positions beyond the snapshot's seat count vanished
+   entirely (a 10-seat table showed 8).
+
+### framer-motion owns `transform` — never fight it
+
+**On a `motion` element, never write `transform` in `style`.** framer-motion
+composes the entire `transform` property from the motion values it is given, so any
+CSS `transform` on the same element is silently replaced the moment it animates.
+
+To centre an absolutely-positioned motion element, use the standalone CSS
+`translate` property (`CENTRING_TRANSLATE` in `ImageTable.tsx`), which framer does
+not manage and which the spec applies *before* `transform`. Put rotation in the
+motion props, not in `style`.
+
+This one mistake mis-placed three things at once: the pot cluster sat at cx 932
+against a felt centre of 800 — exactly half its own 264px width — and the dealer
+button and burn card each hung 22px down-and-right of their anchors.
+
+**Also: an `animate` target must name every value that branch owns.** framer leaves
+a motion value it is *not* told about exactly where it is. `Card.tsx` animates
+`x/y/rotate` while dealing face-down, then React reconciles the same element into
+the face-up branch; that branch's `animate` listed only `rotateY/scale/opacity`, so
+the deal spring was abandoned and the cards froze mid-flight forever (measured:
+`translate(183.5, -91.8)`, a 95.9px vertical scatter across the board). Branches
+restate the full resting pose — see `CARD_REST`.
+
+### Three avatar modes — a player-selectable preset (avatars only, not the table)
+
+Character rendering is a preset the player chooses, persisted per-device in
+`features/table/renderMode.ts` (`localStorage` key `"poker.render.mode"`,
+`useRenderMode()` hook + cross-component listeners), changed in
+`hud/TableSettings.tsx`. This is about **avatars**; the table itself never changes.
+
+1. **2D — HRC portraits (DEFAULT).** 104×104 circular WebP from `avatarSrc(id)`
+   (`/avatars/<id>.webp`), neon ring + glow + gold owned-badge. Catalog, rarity
+   tiers and ring/glow colours live in `features/table/avatars.ts` (`AVATARS`,
+   `avatarForKey`, `avatarGradient` fallback). Must look intentional even if a
+   portrait 404s (monogram-gradient fallback).
+2. **3D — GLB via Tripo.** `features/table/Character3DGL.tsx` — `useGLTF` GLB from
+   the Tripo pipeline, `<Suspense>`-wrapped, name/stack pill above. This is the only
+   remaining R3F consumer in the app.
+3. **MIX.** GLB for seats flagged `use3d`, portraits for the rest.
+
+Keep all three switchable — never hard-code one mode.
 
 ### Glass-HUD panel system
 
@@ -146,10 +270,43 @@ Timeline/UI animation uses **GSAP** as the standard motion layer (chip flights, 
 
 ### Non-negotiables
 
-1. **No HTML/CSS faking the cinematic.** The table's 3D look must come from real R3F geometry, materials, lighting, and post-processing — not gradient `div`s or box-shadows pretending to be a 3D table. The proof is the bar.
-2. **Glow = hierarchy.** Bloom/glow encodes importance and state (active seat, all-in, premium/gold, red primary). It is threshold-gated and restrained (`Bloom` threshold `0.55`, intensity `0.55`). Never use glow as ambient decoration — if everything glows, nothing does.
+1. **One table renderer, and the felt is its only coordinate system.** Do not add a second table renderer, a `render_style` branch, or a graphics preset that switches between tables — that ambiguity is what made "the table" mean two different things for a full day. Everything on the felt is a percentage of the ONE measured felt rect (see "The felt-coordinate rule"). Never re-derive the table box from the viewport.
+2. **Glow = hierarchy.** Glow encodes importance and state (active seat, all-in, premium/gold, red primary) via `box-shadow`/`drop-shadow` on the DOM layer. It is restrained. Never use glow as ambient decoration — if everything glows, nothing does.
 3. **State never drifts.** The rendered UI is a pure projection of authoritative server state. No optimistic values that can disagree with the backend, no client-side "guesses" at stacks/pot/turn. Consistent with Golden rule 4 (no math fallbacks): the display reflects server truth or it shows nothing.
-4. **Every rendered control binds to a real RPC — no dead buttons.** If a control is on screen (fold/check/call/raise/all-in, presets, host controls, membership, deposits), it is wired to a registered `backend-core` RPC and reflects real capability/permission gating. Ship no placeholder or decorative buttons. The proof uses static demo data precisely because it is a showcase — production surfaces must be live.
+4. **Every rendered control binds to a real RPC — no dead buttons.** If a control is on screen (fold/check/call/raise/all-in, presets, host controls, membership, deposits), it is wired to a registered `backend-core` RPC and reflects real capability/permission gating. Ship no placeholder or decorative buttons. `?demo=1` uses static demo data precisely because it is a preview — production surfaces must be live. A control that selects a code path which no longer exists is a dead button too: when a renderer or mode is deleted, delete the picker that chose it.
+
+## Working rules for agents (learned the hard way, 2026-08-02/03)
+
+These are not style preferences. Each one is here because breaking it cost real
+time and real trust.
+
+1. **`main` is the deploy branch. Pushing to `main` IS deploying to Railway.**
+   Nothing goes on `main` without being asked for, explicitly, for that specific
+   change. "Merge and push" for one thing is not permission for whatever rides
+   along with it. Develop on a branch; a branch push is inert and safe.
+2. **A merge can change files your commits never touched.** When asked "did you
+   change X", diffing only your own commits is not an answer — check the merge
+   commits too (`git log --merges`, and diff the merge against *both* parents).
+   Saying "nothing changed" while the owner is looking at a changed screen
+   destroys the conversation. Verify before asserting, every time.
+3. **Show, don't describe.** When the owner asks what a screen looks like, render
+   it and screenshot it. `/table?demo=1` needs no backend. Do not reason about
+   what the UI "should" show.
+4. **Measure, don't infer.** Every real fix in this file's DESIGN-SYSTEM section
+   was found by reading `getBoundingClientRect()` out of the live DOM, and every
+   false one by reasoning from source. Numbers in the commit message; if a fix
+   can't be measured, say so plainly instead of claiming it works.
+5. **Verify against the right reference.** "Verified to the pixel" against the
+   wrong baseline is worse than no claim. Check that what you measured is the
+   thing the owner is looking at.
+6. **Report what is NOT fixed, in the commit.** A commit that quietly fixes 2 of
+   4 reported items reads as fixing all 4.
+7. **Don't delete to "restore".** Rolling back to an older commit to undo a
+   change silently discards everything landed since. Find the specific commit
+   that introduced the regression.
+8. **If a doc and the code disagree, the code wins — then fix the doc in the same
+   change.** A stale binding doc is not harmless; it is an instruction to build
+   the wrong thing. That is exactly what happened here.
 
 ## Railway deployment
 

@@ -8,7 +8,7 @@
 
 import type { CardType } from "@/features/hrc/lib/poker-types";
 import { Card } from "./Card";
-import { evaluateHandForVariant } from "@/features/hrc/lib/hand-evaluator";
+import { useHandCategory } from "@/features/hrc/lib/useHandCategory";
 
 // cards.length is 2 for Hold'em, 4 for PLO — the backend always deals
 // exactly one or the other (backend-core/poker/table.go holeCount()), so
@@ -21,8 +21,9 @@ export function HeroHoleCards({
   cards?: CardType[];
   communityCards: CardType[];
 }) {
+  // Hooks must run before any early return.
+  const category = useHandCategory(cards, communityCards);
   if (!cards || cards.length === 0) return null;
-  const hand = evaluateHandForVariant(cards, communityCards);
   // Fan the cards evenly around center; 2 cards keep the original ±8deg tilt,
   // 4 cards (PLO) spread a bit wider so they don't overlap illegibly.
   const spread = cards.length <= 2 ? 8 : 12;
@@ -33,21 +34,38 @@ export function HeroHoleCards({
       className="pointer-events-none flex flex-col items-center"
       style={{ position: "fixed", left: "50%", bottom: 215, transform: "translateX(-50%)", zIndex: 45 }}
     >
-      <div
-        className="mb-1.5 rounded-full px-3 py-1 font-display text-xs font-black uppercase tracking-[0.15em]"
-        style={{
-          color: "#ffd700",
-          background: "rgba(10,10,12,0.85)",
-          border: "1px solid rgba(212,175,55,0.4)",
-          textShadow: "0 0 10px rgba(212,175,55,0.5)",
-          boxShadow: "0 0 16px rgba(212,175,55,0.25)",
-        }}
-      >
-        {hand.description}
-      </div>
-      {/* Scaled down slightly from the "lg" preset (90x135) rather than
-          jumping to "md" (70x105, a ~22% drop) — a smaller, deliberate nudge. */}
-      <div className="flex" style={{ transform: "scale(0.88)", transformOrigin: "top center" }}>
+      {/* Rendered only when engine-math has actually named the hand. Absent
+          pre-flop (rs_poker needs >=5 cards) and whenever the sidecar is
+          unreachable — Golden rule 4 forbids falling back to a local eval, and
+          non-negotiable 3 says show nothing rather than a client-side guess.
+          The container is bottom-anchored, so the cards do not move when this
+          appears on the flop.
+
+          mb-3, not mb-1.5: each card is rotated about its own centre, which
+          lifts the outer top corner of the fanned cards above the unrotated
+          card top by roughly (width/2)·sin(spread). The old 6px gap was
+          smaller than that lift, so the fan rode up over this label and hid
+          the hand the player actually holds. */}
+      {category && (
+        <div
+          className="mb-3 rounded-full px-3 py-1 font-display text-xs font-black uppercase tracking-[0.15em]"
+          style={{
+            color: "#ffd700",
+            background: "rgba(10,10,12,0.85)",
+            border: "1px solid rgba(212,175,55,0.4)",
+            textShadow: "0 0 10px rgba(212,175,55,0.5)",
+            boxShadow: "0 0 16px rgba(212,175,55,0.25)",
+          }}
+        >
+          {category}
+        </div>
+      )}
+      {/* Scaled off the "lg" preset (90x135) rather than switching size tokens,
+          so the card art keeps its 2:3 ratio and gold hero border weight. At
+          0.88 the fan was large enough to sit over the hand-strength label and
+          crowd the board; 0.72 gives ~65x97 — clearly the player's own cards,
+          without owning the bottom third of the felt. */}
+      <div className="flex" style={{ transform: "scale(0.72)", transformOrigin: "top center" }}>
         {cards.map((card, i) => {
           const angle = cards.length === 1 ? 0 : -spread + (i * (2 * spread)) / (cards.length - 1);
           return (

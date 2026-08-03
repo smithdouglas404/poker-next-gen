@@ -3,15 +3,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "./Card";
 import type { CardType } from "@/features/hrc/lib/poker-types";
 import type { Player } from "@/features/hrc/lib/poker-types";
-import { TABLE_SEATS, DEALER_POSITIONS, FELT_BOUNDS } from "@/features/hrc/lib/table-constants";
+import { CENTRING_TRANSLATE, seatPose, dealerPose } from "@/features/hrc/lib/table-constants";
 import { useGameUI } from "@/features/hrc/lib/game-ui-context";
 import { useAnimatedCounter } from "@/features/hrc/hooks/useAnimatedCounter";
+import { FELT_SURFACE_ATTR, useFeltStyle } from "@/features/hud/feltLayout";
 
 // Hoisted module-level so it's the SAME object reference on every render —
 // Card's dealAnimation is memoized on this, and a fresh literal here would
 // still defeat that memoization every time ImageTable re-renders.
 const COMMUNITY_DEAL_FROM = { x: 200, y: -100 };
-
 
 interface ImageTableProps {
   communityCards: CardType[];
@@ -135,9 +135,7 @@ export function ImageTable({
   // filled out of order); falls back to the old "first N slots" approximation
   // only if the caller doesn't pass it.
   const occupiedSet = occupiedSeatIndices ? new Set(occupiedSeatIndices) : null;
-  const dealerPos = dealerSeatIndex >= 0 && dealerSeatIndex < DEALER_POSITIONS.length
-    ? DEALER_POSITIONS[dealerSeatIndex]
-    : null;
+  const dealerPos = dealerSeatIndex >= 0 ? dealerPose(dealerSeatIndex, maxSeats) : null;
 
   // Animated pot counter — smooth count-up/down when pot changes
   const { value: animatedPot, animating: potAnimating, delta: potDelta } = useAnimatedCounter(pot, 500);
@@ -167,10 +165,21 @@ export function ImageTable({
   const dealerChanged = dealerSeatIndex !== prevDealerRef.current;
   useEffect(() => { prevDealerRef.current = dealerSeatIndex; }, [dealerSeatIndex]);
 
+  // THE box for the table, from the one hook that owns it. This used to
+  // re-derive the Room-drawer shift locally from an `insetLeft` prop — a second
+  // copy of the rule, and four components each keeping their own copy is exactly
+  // what put the felt and its seat ring 144px apart. Enforced by
+  // scripts/check-table-invariants.mjs (check: one-felt-box).
+  const { style: feltStyle } = useFeltStyle();
+
   return (
     <>
       {/* ══ Poker Table — image-based (GGPoker-style) ══ */}
-      <div className="z-[1]" style={FELT_BOUNDS}>
+      {/* FELT_SURFACE_ATTR: SeatHud measures this element's real rect and
+          inscribes the seat ring in it, so the sit-down boxes stay locked to
+          the table at every window size instead of being computed separately
+          from the viewport. */}
+      <div className="z-[1]" style={feltStyle} {...{ [FELT_SURFACE_ATTR]: "" }}>
         <img
           src="/images/poker-table-felt.webp"
           alt=""
@@ -183,71 +192,36 @@ export function ImageTable({
       </div>
 
       {/* ── Game elements overlay — matches table image position exactly ── */}
-      <div className="pointer-events-none" style={{ ...FELT_BOUNDS, zIndex: 10 }}>
+      <div className="pointer-events-none" style={{ ...feltStyle, zIndex: 10 }}>
 
-        {/* Seat slots — rendered as HTML squares (never misalign on resize) */}
-        {Array.from({ length: maxSeats }).map((_, i) => {
-          const seat = TABLE_SEATS[i];
-          if (!seat) return null;
-          const isOccupied = occupiedSet ? occupiedSet.has(i) : i < occupiedCount;
-          // Empty seats are clickable
-          if (!isOccupied) {
-            const s = seat.scale;
-            // Match an occupied seat's FULL footprint, not just the portrait
-            // square — a real seat is the 100px portrait PLUS the attached
-            // name/chip pill below it (~139px total, per measured DOM). A
-            // 100x100 vacant box is shorter than that, so it still reads as
-            // undersized next to a real seat even though it's now visible.
-            return (
-              <div
-                key={`empty-${i}`}
-                className="absolute pointer-events-auto cursor-pointer group"
-                style={{
-                  left: `${seat.x}%`,
-                  top: `${seat.y}%`,
-                  transform: `translate(-50%, -50%) scale(${s})`,
-                }}
-              >
-                <div
-                  className="flex flex-col items-center justify-center gap-2.5 rounded-xl border-2 border-dashed transition-all group-hover:scale-105"
-                  style={{
-                    width: 130,
-                    height: 139,
-                    borderColor: "rgba(212,175,55,0.55)",
-                    background: "rgba(212,175,55,0.1)",
-                    boxShadow: "0 0 14px rgba(212,175,55,0.15)",
-                  }}
-                >
-                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.75 }}>
-                    <circle cx="12" cy="8" r="4" stroke="#f5c518" strokeWidth="1.8" />
-                    <path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7" stroke="#f5c518" strokeWidth="1.8" strokeLinecap="round" />
-                  </svg>
-                  <span
-                    className="font-bold uppercase tracking-[0.15em]"
-                    style={{ fontSize: "0.6875rem", color: "rgba(245,197,24,0.85)" }}
-                  >
-                    Vacant
-                  </span>
-                </div>
-              </div>
-            );
-          }
-          return null; // Occupied seats rendered by Seat component
-        })}
+        {/* Empty-seat markers are NOT rendered here — SeatHud.tsx's SeatCard
+            already draws a real, clickable "Sit Here" card for every empty
+            seat (wired to the real sitDown RPC), positioned via its own
+            computeTableLayout/getSeatPositions geometry. This file used to
+            also draw a purely decorative "Vacant" box (dashed border, no
+            onClick) at the same seats via the older TABLE_SEATS coordinates,
+            which didn't line up with SeatHud's layout and produced two
+            stacked, conflicting empty-seat indicators. Removed rather than
+            reconciled — SeatHud's card is the one that actually works. */}
 
         {/* ── Burn card visual ── */}
         <AnimatePresence>
           {showBurnCard && !compactMode && (
             <motion.div
-              initial={{ opacity: 0, x: 80, y: -40, scale: 0.5 }}
-              animate={{ opacity: 0.8, x: 0, y: 0, scale: 0.7 }}
-              exit={{ opacity: 0, scale: 0.3 }}
+              // rotate rides in the motion props, not in `style` — framer reads
+              // a `rotate` in style as a transform motion value anyway, so
+              // stating it here is the unambiguous form.
+              initial={{ opacity: 0, x: 80, y: -40, scale: 0.5, rotate: -5 }}
+              animate={{ opacity: 0.8, x: 0, y: 0, scale: 0.7, rotate: -5 }}
+              exit={{ opacity: 0, scale: 0.3, rotate: -5 }}
               transition={{ duration: 0.25 }}
               className="absolute"
               style={{
                 left: "42%",
                 top: "32%",
-                transform: "translate(-50%, -50%) rotate(-5deg)",
+                // See CENTRING_TRANSLATE — this element animates x/y/scale, so
+                // a `transform` here would be overwritten.
+                ...CENTRING_TRANSLATE,
                 zIndex: 11,
               }}
             >
@@ -296,7 +270,11 @@ export function ImageTable({
                 style={{
                   left: "50%",
                   top: "45%",
-                  transform: "translate(-50%, -50%)",
+                  // Only `opacity` animates today, so framer does not yet write
+                  // `transform` and this row measures dead centre — but the day
+                  // anyone adds scale/x/y here the whole board would jump 195px
+                  // left. Use the property framer cannot clobber.
+                  ...CENTRING_TRANSLATE,
                   filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.7))",
                 }}
               >
@@ -326,7 +304,13 @@ export function ImageTable({
               exit={{ opacity: 0, scale: 0.85 }}
               transition={compactMode ? { duration: 0 } : undefined}
               className="absolute flex flex-col items-center gap-1"
-              style={{ left: "50%", top: "25%", transform: "translate(-50%, -50%)" }}
+              // CENTRING_TRANSLATE, not `transform: translate(-50%,-50%)`:
+              // framer-motion owns the whole `transform` property on a motion
+              // element, so animating `scale` here overwrote the CSS translate
+              // outright and the cluster hung half its own width right and half
+              // its height low — measured cx 932 against a felt centre of 800,
+              // exactly 264/2.
+              style={{ left: "50%", top: "25%", ...CENTRING_TRANSLATE }}
             >
               {/* Hand / pot text header — sits above the chip stacks so they never
                   overlap the community card row below (top:45%). */}
@@ -448,7 +432,10 @@ export function ImageTable({
                 rotate: { duration: 0.6, ease: "easeInOut" },
               }}
               className="absolute"
-              style={{ transform: "translate(-50%, -50%)", zIndex: 15 }}
+              // See CENTRING_TRANSLATE — this element animates scale and rotate,
+              // so a `transform` here was overwritten and the dealer button sat
+              // half its own size (22px) down-and-right of the seat it marks.
+              style={{ ...CENTRING_TRANSLATE, zIndex: 15 }}
             >
               <div
                 className="w-11 h-11 rounded-full flex items-center justify-center font-black text-base text-gray-900"

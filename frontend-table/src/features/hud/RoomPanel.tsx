@@ -13,9 +13,8 @@ import {
   MIN_SEATS,
 } from "@/features/game/protocol";
 import { Button, Input, SectionHeader, cn } from "@/features/ui";
-import { getTableGraphics } from "@/features/table/tableGraphics";
-
-const OPEN_STORAGE_KEY = "pkr:roomPanelOpen";
+import { useRoomPanelOpen } from "@/features/hud/roomPanelState";
+import { listSponsorClubs, type SponsorClub } from "@/features/clubs/sponsorClub";
 
 export function RoomPanel() {
   const {
@@ -45,7 +44,9 @@ export function RoomPanel() {
   // Cinematic is the default look and the felt must stay clear, so the Room
   // Control drawer starts collapsed there (reachable via the ⚙ Room tab). In
   // classic mode it stays open as before. A stored preference still wins.
-  const [open, setOpen] = useState(() => getTableGraphics() !== "cinematic");
+  // Shared with SeatHud (roomPanelState.ts) so the seat ring can shift clear
+  // of the drawer while it's open, instead of open seats landing underneath it.
+  const [open, setOpen] = useRoomPanelOpen(true);
 
   // Create-table parameters (blinds in cents, consistent with the buy-in).
   const [smallBlind, setSmallBlind] = useState(DEFAULT_SMALL_BLIND_CENTS);
@@ -67,27 +68,27 @@ export function RoomPanel() {
   const seatsValid = seats >= MIN_SEATS && seats <= MAX_SEATS;
   const createValid = blindsValid && seatsValid;
 
-  // Restore drawer state from localStorage on mount.
-  useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(OPEN_STORAGE_KEY);
-      if (stored !== null) setOpen(stored === "1");
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(OPEN_STORAGE_KEY, open ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
-  }, [open]);
-
   useEffect(() => {
     if (connected) void listTables();
   }, [connected, listTables]);
+
+  // Proactive gate for Create Room: table_create requires the caller to
+  // sponsor a club (server-enforced — see rpc/table.go), which a caller with
+  // no operator seat on any club will never satisfy. Rather than let them
+  // click through to a NoSponsorClubError, disable the button up front once
+  // we know for sure (null = still checking, so it doesn't flash disabled).
+  const [sponsorClubs, setSponsorClubs] = useState<SponsorClub[] | null>(null);
+  useEffect(() => {
+    if (!connected) return;
+    let cancelled = false;
+    void listSponsorClubs().then((clubs) => {
+      if (!cancelled) setSponsorClubs(clubs);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [connected]);
+  const canHost = sponsorClubs === null || sponsorClubs.length > 0;
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -233,11 +234,24 @@ export function RoomPanel() {
           {!blindsValid && (
             <p className="mt-2 text-[10px] text-[#ff9ba1]">Big blind must be ≥ small blind.</p>
           )}
+
+          {/* This quick form only exposes blinds/variant/seats/duration.
+              PrivateTableSetup (the /lobby builder) covers everything else
+              TableCreateRequest actually supports — access control, KYC,
+              geo-restriction, spectators, wallet limits, auto buy-back,
+              straddle/bomb-pot/insurance, club/tournament binding — so send
+              players there instead of duplicating that form here. */}
+          <Link
+            href="/lobby?view=private"
+            className="mt-2 flex items-center justify-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-gold/80 hover:text-gold"
+          >
+            More options →
+          </Link>
         </div>
 
         <div className="mt-4 flex flex-col gap-2">
           <Button
-            disabled={busy || !createValid}
+            disabled={busy || !createValid || !canHost}
             onClick={() =>
               run(() =>
                 createRoom({
@@ -254,6 +268,16 @@ export function RoomPanel() {
           >
             Create Room
           </Button>
+
+          {!canHost && (
+            <p className="text-[10px] text-neutral-500">
+              Hosting needs a club to sponsor the table.{" "}
+              <Link href="/clubs/new" className="text-gold/80 hover:text-gold">
+                Create one
+              </Link>{" "}
+              or ask an operator to add you to theirs.
+            </p>
+          )}
 
           <Button
             variant="outline"
@@ -408,7 +432,7 @@ export function RoomPanel() {
 
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-label={open ? "Close room control" : "Open room control"}
         className="pointer-events-auto mt-2 flex items-center gap-1 rounded-r-xl border border-l-0 border-white/[0.08] bg-surface px-2 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted shadow-lg transition hover:bg-white/5 hover:text-foreground [writing-mode:vertical-rl]"
