@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "./Card";
 import type { CardType } from "@/features/hrc/lib/poker-types";
 import type { Player } from "@/features/hrc/lib/poker-types";
-import { TABLE_SEATS, DEALER_POSITIONS, CENTRING_TRANSLATE } from "@/features/hrc/lib/table-constants";
+import { CENTRING_TRANSLATE, seatPose, dealerPose } from "@/features/hrc/lib/table-constants";
 import { useGameUI } from "@/features/hrc/lib/game-ui-context";
 import { useAnimatedCounter } from "@/features/hrc/hooks/useAnimatedCounter";
 import { FELT_SURFACE_ATTR, useFeltStyle } from "@/features/hud/feltLayout";
@@ -135,9 +135,7 @@ export function ImageTable({
   // filled out of order); falls back to the old "first N slots" approximation
   // only if the caller doesn't pass it.
   const occupiedSet = occupiedSeatIndices ? new Set(occupiedSeatIndices) : null;
-  const dealerPos = dealerSeatIndex >= 0 && dealerSeatIndex < DEALER_POSITIONS.length
-    ? DEALER_POSITIONS[dealerSeatIndex]
-    : null;
+  const dealerPos = dealerSeatIndex >= 0 ? dealerPose(dealerSeatIndex, maxSeats) : null;
 
   // Animated pot counter — smooth count-up/down when pot changes
   const { value: animatedPot, animating: potAnimating, delta: potDelta } = useAnimatedCounter(pot, 500);

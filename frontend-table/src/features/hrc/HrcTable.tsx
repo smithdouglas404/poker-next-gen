@@ -27,7 +27,7 @@ import { HeroHoleCards } from "./components/HeroHoleCards";
 import { ShowdownOverlay } from "./components/ShowdownOverlay";
 import { PlayerDetailModal } from "@/features/hud/PlayerDetailModal";
 import { adaptShowdown } from "./lib/showdownAdapter";
-import { TABLE_SEATS, FELT_BOUNDS } from "./lib/table-constants";
+import { FELT_BOUNDS, seatPose } from "./lib/table-constants";
 import { seatId } from "./adapter";
 import { DEMO_HOLE, DEMO_SNAPSHOT } from "@/features/table3d/demoSnapshot";
 import type { TableSnapshot } from "@/features/game/protocol";
@@ -180,7 +180,7 @@ export default function HrcTable({
                 // half-empty table doesn't bunch everyone together.
                 const seatIdx = seatIndexOf(snapshot, player.id);
                 const visual = (seatIdx - heroSeatIdx + adapted.maxSeats) % adapted.maxSeats;
-                const pose = TABLE_SEATS[visual % TABLE_SEATS.length];
+                const pose = seatPose(visual, adapted.maxSeats);
                 return (
                   <Seat
                     key={player.id}
@@ -209,7 +209,7 @@ export default function HrcTable({
               {Array.from({ length: adapted.maxSeats }, (_, visual) => visual)
                 .filter((visual) => !occupiedSeatIndices.includes(visual))
                 .map((visual) => {
-                  const pose = TABLE_SEATS[visual % TABLE_SEATS.length];
+                  const pose = seatPose(visual, adapted.maxSeats);
                   return (
                     <div
                       key={`empty-${visual}`}

@@ -1,6 +1,6 @@
 import { useSearchParams } from "next/navigation";
 import type { CSSProperties } from "react";
-import { TABLE_SEATS, FELT_BOUNDS } from "@/features/hrc/lib/table-constants";
+import { FELT_BOUNDS, seatPose } from "@/features/hrc/lib/table-constants";
 import { useRoomPanelOpen, ROOM_PANEL_WIDTH_PX } from "@/features/hud/roomPanelState";
 
 /** The DOM attribute ImageTable stamps on the felt image's wrapper so the seat
@@ -31,8 +31,12 @@ export const FELT_SURFACE_ATTR = "data-felt-surface";
 export function seatPointFromFelt(
   rect: DOMRect,
   visualIndex: number,
+  seatCount: number,
 ): { x: number; y: number; scale: number } {
-  const pose = TABLE_SEATS[visualIndex % TABLE_SEATS.length];
+  // seatCount matters: TABLE_SEATS is a TEN-seat ring, and taking its first N
+  // entries for a smaller table puts every seat on the left and bottom. See
+  // seatRingIndex.
+  const pose = seatPose(visualIndex, seatCount);
   return {
     x: rect.left + (pose.x / 100) * rect.width,
     y: rect.top + (pose.y / 100) * rect.height,

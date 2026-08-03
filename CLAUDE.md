@@ -151,6 +151,19 @@ The composition, as it actually runs:
   (seats 2/3/7/8 sit at `x: -0.8` / `100.8`, just past the felt edge). This is an
   irregular hand-tuned ring, **not** a computed ellipse — do not "improve" it into
   trigonometry.
+- **A table with fewer than 10 seats must SPREAD over that ring, never take the
+  first N.** `TABLE_SEATS[0..5]` is hero-bottom, bottom-left, left-bottom,
+  left-top, top-left, top-centre — the whole left and bottom of the felt, with
+  the entire right half bare. A 6-max table rendered exactly that way in
+  production: six "SIT HERE" cards bunched down the left side. Go through
+  `seatRingIndex()` / `seatPose()` / `dealerPose()` in `table-constants.ts`,
+  which walk `seatCount` seats evenly around the ten positions and keep hero at
+  index 0 (6 → `0,2,3,5,7,8`; heads-up → `0,5`; 10 → unchanged). The seat layer,
+  the empty "SIT HERE" markers and the dealer button must all use it, or they
+  land on different rings again.
+  **Test every layout change at 6 seats, not just the 10-seat `DEMO_SNAPSHOT`.**
+  `?demo=1` is a 10-max fixture, so it cannot show this class of bug at all —
+  that is precisely how it reached production.
 - **Community cards** — a centred flex row at `left:50% top:45%`, `gap-2.5`, `md`
   cards (70×105), dealt via `COMMUNITY_DEAL_FROM`.
 - **Pot cluster** — a centred flex column at `left:50% top:25%`: `HAND n | POT: $x`,

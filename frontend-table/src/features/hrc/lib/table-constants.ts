@@ -84,6 +84,44 @@ export const DEALER_POSITIONS = [
   { x: 88,   y: 50 },   // 9: Bottom Right
 ];
 
+/**
+ * Which of the 10 hand-tuned ring positions a table of `seatCount` uses.
+ *
+ * TABLE_SEATS / DEALER_POSITIONS describe a TEN-seat ring. Taking the first N
+ * entries for a smaller table is wrong: TABLE_SEATS[0..5] is hero-bottom,
+ * bottom-left, left-bottom, left-top, top-left, top-centre — the whole left and
+ * bottom of the felt, with the entire right half empty. That is exactly how a
+ * 6-max table rendered live: six "SIT HERE" cards bunched down the left side.
+ *
+ * Spreading `seatCount` seats evenly over the ring instead keeps hero at index 0
+ * (bottom centre, where the action dock is) and walks the rest around the oval:
+ *
+ *   6 seats -> 0, 2, 3, 5, 7, 8   bottom, left-low, left-high, top, right-high, right-low
+ *   2 seats -> 0, 5               heads-up, facing each other
+ *  10 seats -> 0..9               unchanged
+ *
+ * Every consumer must go through this — the seat layer, the empty "SIT HERE"
+ * markers and the dealer button — or they land on different rings, which is the
+ * split this whole coordinate system exists to prevent.
+ */
+export function seatRingIndex(visualIndex: number, seatCount: number): number {
+  const ring = TABLE_SEATS.length;
+  if (!Number.isFinite(seatCount) || seatCount <= 0 || seatCount >= ring) {
+    return ((visualIndex % ring) + ring) % ring;
+  }
+  return Math.round((visualIndex * ring) / seatCount) % ring;
+}
+
+/** The pose (percent-of-felt) for a visual seat index on a `seatCount` table. */
+export function seatPose(visualIndex: number, seatCount: number) {
+  return TABLE_SEATS[seatRingIndex(visualIndex, seatCount)];
+}
+
+/** Dealer-button pose for a visual seat index on a `seatCount` table. */
+export function dealerPose(visualIndex: number, seatCount: number) {
+  return DEALER_POSITIONS[seatRingIndex(visualIndex, seatCount)];
+}
+
 export type QualityLevel = "low" | "medium" | "high";
 
 export const QUALITY_CONFIG = {

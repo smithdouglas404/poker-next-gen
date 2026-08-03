@@ -204,7 +204,7 @@ export function SeatHud() {
     : feltRect
     ? Array.from({ length: seatCount }, (_, index) => {
         const visual = (index - heroIdx + seatCount) % seatCount;
-        const p = seatPointFromFelt(feltRect, visual);
+        const p = seatPointFromFelt(feltRect, visual, seatCount);
         return { index, x: p.x, y: p.y, angle: 0 };
       })
     : viewport.w > 0
