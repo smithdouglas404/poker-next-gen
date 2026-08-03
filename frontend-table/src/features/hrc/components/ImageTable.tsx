@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import type { CSSProperties } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "./Card";
 import type { CardType } from "@/features/hrc/lib/poker-types";
@@ -6,6 +7,7 @@ import type { Player } from "@/features/hrc/lib/poker-types";
 import { TABLE_SEATS, DEALER_POSITIONS, FELT_BOUNDS } from "@/features/hrc/lib/table-constants";
 import { useGameUI } from "@/features/hrc/lib/game-ui-context";
 import { useAnimatedCounter } from "@/features/hrc/hooks/useAnimatedCounter";
+import { FELT_SURFACE_ATTR } from "@/features/hud/feltLayout";
 
 // Hoisted module-level so it's the SAME object reference on every render —
 // Card's dealAnimation is memoized on this, and a fresh literal here would
@@ -14,6 +16,9 @@ const COMMUNITY_DEAL_FROM = { x: 200, y: -100 };
 
 
 interface ImageTableProps {
+  /** Width (px) of the Room Control drawer overlaying the left edge, so the
+   *  felt shifts with SeatHud's seat ring instead of drifting apart from it. */
+  insetLeft?: number;
   communityCards: CardType[];
   pot: number;
   playerCount: number;
@@ -128,6 +133,7 @@ export function ImageTable({
   dealPhase,
   handNumber,
   blinds,
+  insetLeft = 0,
 }: ImageTableProps) {
   const { compactMode, feltPreset } = useGameUI();
   const occupiedCount = players?.length || playerCount;
@@ -167,10 +173,23 @@ export function ImageTable({
   const dealerChanged = dealerSeatIndex !== prevDealerRef.current;
   useEffect(() => { prevDealerRef.current = dealerSeatIndex; }, [dealerSeatIndex]);
 
+  // The Room Control drawer overlays the left edge. SeatHud shifts the seat
+  // ring right by its width so seats don't land underneath it — the felt has
+  // to make the SAME shift or the two drift apart (the seats slide right while
+  // the table stays centred). Shifting by half the inset keeps the felt centred
+  // in the remaining usable width, matching computeTableLayout's `cx`.
+  const feltStyle: CSSProperties = insetLeft
+    ? { ...FELT_BOUNDS, left: `calc(50% + ${insetLeft / 2}px)` }
+    : FELT_BOUNDS;
+
   return (
     <>
       {/* ══ Poker Table — image-based (GGPoker-style) ══ */}
-      <div className="z-[1]" style={FELT_BOUNDS}>
+      {/* FELT_SURFACE_ATTR: SeatHud measures this element's real rect and
+          inscribes the seat ring in it, so the sit-down boxes stay locked to
+          the table at every window size instead of being computed separately
+          from the viewport. */}
+      <div className="z-[1]" style={feltStyle} {...{ [FELT_SURFACE_ATTR]: "" }}>
         <img
           src="/images/poker-table-felt.webp"
           alt=""
@@ -183,7 +202,7 @@ export function ImageTable({
       </div>
 
       {/* ── Game elements overlay — matches table image position exactly ── */}
-      <div className="pointer-events-none" style={{ ...FELT_BOUNDS, zIndex: 10 }}>
+      <div className="pointer-events-none" style={{ ...feltStyle, zIndex: 10 }}>
 
         {/* Empty-seat markers are NOT rendered here — SeatHud.tsx's SeatCard
             already draws a real, clickable "Sit Here" card for every empty

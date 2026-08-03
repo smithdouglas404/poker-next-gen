@@ -1,4 +1,10 @@
+"use client";
+
+import type { CSSProperties } from "react";
 import { FELT_BOUNDS } from "@/features/hrc/lib/table-constants";
+import { FELT_SURFACE_ATTR } from "@/features/hud/feltLayout";
+import { useRoomPanelOpen, ROOM_PANEL_WIDTH_PX } from "@/features/hud/roomPanelState";
+import { getTableGraphics } from "@/features/table/tableGraphics";
 
 // The felt/table image is pure decoration — no game state — so unlike
 // ImageTable (which HrcTable refuses to mount without a real snapshot, per
@@ -6,10 +12,25 @@ import { FELT_BOUNDS } from "@/features/hrc/lib/table-constants";
 // the pre-seat screen (TableEmptyState's "This table is open" card + SeatHud's
 // "Sit Here" markers, both mounted independently of a live snapshot) floats
 // over a plain dark background with no table visible at all.
+//
+// This is ALSO the felt a player looks at while choosing a seat — HrcTable
+// (and therefore ImageTable) doesn't mount until a real snapshot exists — so
+// it carries FELT_SURFACE_ATTR: SeatHud measures this element and inscribes
+// the "Sit Here" ring in it. Previously the ring was computed from the raw
+// viewport while this image was placed by static CSS, two independent
+// coordinate systems that only agreed at one window size.
 export function TableFeltBackdrop() {
+  // Match SeatHud's shift when the Room Control drawer overlays the left edge,
+  // so the table and its seat ring move together instead of drifting apart.
+  const [roomPanelOpen] = useRoomPanelOpen(getTableGraphics() !== "cinematic");
+  const insetLeft = roomPanelOpen ? ROOM_PANEL_WIDTH_PX : 0;
+  const feltStyle: CSSProperties = insetLeft
+    ? { ...FELT_BOUNDS, left: `calc(50% + ${insetLeft / 2}px)` }
+    : FELT_BOUNDS;
+
   return (
     <div className="pointer-events-none absolute inset-0 z-0">
-      <div style={FELT_BOUNDS}>
+      <div style={feltStyle} {...{ [FELT_SURFACE_ATTR]: "" }}>
         <img
           src="/images/poker-table-felt.webp"
           alt=""

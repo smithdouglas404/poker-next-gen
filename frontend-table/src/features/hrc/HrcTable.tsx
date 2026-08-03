@@ -16,6 +16,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useGame } from "@/features/game/GameProvider";
+import { useRoomPanelOpen, ROOM_PANEL_WIDTH_PX } from "@/features/hud/roomPanelState";
+import { getTableGraphics } from "@/features/table/tableGraphics";
 import { ImageTable } from "./components/ImageTable";
 import { PokerSceneCanvas } from "./scene/canvas/PokerSceneCanvas";
 import { GameUIProvider } from "./lib/game-ui-context";
@@ -65,6 +67,10 @@ export default function HrcTable({
   demo?: boolean;
 }) {
   const live = useGame();
+  // The felt must shift by the same amount SeatHud shifts the seat ring when
+  // the Room Control drawer is open, or the table and its seats drift apart.
+  const [roomPanelOpen] = useRoomPanelOpen(getTableGraphics() !== "cinematic");
+  const insetLeft = !demo && roomPanelOpen ? ROOM_PANEL_WIDTH_PX : 0;
   const snapshot = demo ? DEMO_SNAPSHOT_WITH_BETS : live.snapshot;
   const holeCards = demo ? DEMO_HOLE : live.holeCards;
 
@@ -155,6 +161,7 @@ export default function HrcTable({
         ) : (
           <>
             <ImageTable
+          insetLeft={insetLeft}
             communityCards={adapted.gameState.communityCards}
             pot={adapted.gameState.pot}
             playerCount={adapted.players.length}

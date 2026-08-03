@@ -7,6 +7,7 @@ import { DEFAULT_MAX_SEATS, MAX_SEATS, MIN_SEATS, type SeatView } from "@/featur
 import { formatCents, useGame } from "@/features/game/GameProvider";
 import { computeTableLayout } from "@/features/table/tableLayout";
 import { getSeatPositions } from "@/features/table/seatLayout";
+import { layoutFromFeltRect, seatPointFromFelt, FELT_SURFACE_ATTR } from "@/features/hud/feltLayout";
 import { avatarDef, avatarForKey } from "@/features/table/avatars";
 import { ChipStack } from "@/features/hud/ChipStack";
 import { formatStack, useStackUnit } from "@/features/table/stackDisplay";
@@ -137,12 +138,40 @@ export function SeatHud() {
   const insetLeft = !demo && roomPanelOpen ? ROOM_PANEL_WIDTH_PX : 0;
 
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
+  // The felt's REAL rendered rect. The seat ring is inscribed in it so the
+  // sit-down boxes stay locked to the table image at every window size —
+  // previously the ring was computed from the raw viewport while the felt was
+  // positioned by static CSS, two coordinate systems that only agreed at one
+  // size. Null in cinematic mode (no ImageTable), where we fall back to the
+  // viewport math below.
+  const [feltRect, setFeltRect] = useState<DOMRect | null>(null);
   useEffect(() => {
-    const update = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    const update = () => {
+      setViewport({ w: window.innerWidth, h: window.innerHeight });
+      const el = document.querySelector(`[${FELT_SURFACE_ATTR}]`);
+      setFeltRect(el ? el.getBoundingClientRect() : null);
+    };
     update();
+    // rAF catches the first paint, when the felt image has laid out but the
+    // effect has already run.
+    const raf = requestAnimationFrame(update);
     window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
+    // The felt also moves when the Room drawer opens/closes, which is a layout
+    // change rather than a window resize — observe the element itself.
+    const ro = new ResizeObserver(update);
+    const el = document.querySelector(`[${FELT_SURFACE_ATTR}]`);
+    if (el) ro.observe(el);
+    ro.observe(document.body);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", update);
+      ro.disconnect();
+    };
+    // insetLeft is a dependency because opening/closing the Room drawer MOVES
+    // the felt without resizing it — ResizeObserver fires on size, not
+    // position, so without this the ring keeps a stale rect and drifts off the
+    // rail the moment the drawer is toggled.
+  }, [insetLeft]);
 
   // Authoritative seat count from the table snapshot when seated/created;
   // otherwise the count the hero picked in the create form (live preview).
@@ -159,8 +188,23 @@ export function SeatHud() {
 
   // orbitScale 1.04 pushes plaques just onto the rail so they read as "on the
   // table" without crowding the community cards.
-  const positions =
-    viewport.w > 0
+  // Prefer the measured felt (exact, and automatically tracks any future
+  // change to FELT_BOUNDS); fall back to the viewport computation only when
+  // no felt is on screen (cinematic mode).
+  // Empty-seat cards must land exactly where the avatar appears once the seat
+  // is taken. Occupied seats use TABLE_SEATS percentages inside FELT_BOUNDS
+  // (HrcTable), so map those same percentages through the felt's measured rect
+  // rather than placing these on a separate computed ellipse — that mismatch is
+  // why the "SIT HERE" squares sat apart from the avatars. Indexed by REAL seat
+  // index, hero-rotated the same way HrcTable rotates.
+  const heroIdx = heroSeat ?? 0;
+  const positions = feltRect
+    ? Array.from({ length: seatCount }, (_, index) => {
+        const visual = (index - heroIdx + seatCount) % seatCount;
+        const p = seatPointFromFelt(feltRect, visual);
+        return { index, x: p.x, y: p.y, angle: 0 };
+      })
+    : viewport.w > 0
       ? getSeatPositions(computeTableLayout(viewport.w, viewport.h, insetLeft), seatCount, 1.04)
       : [];
 
