@@ -14,6 +14,22 @@ import { FELT_SURFACE_ATTR } from "@/features/hud/feltLayout";
 // still defeat that memoization every time ImageTable re-renders.
 const COMMUNITY_DEAL_FROM = { x: 200, y: -100 };
 
+// How an absolutely-positioned MOTION element centres itself on its left/top
+// anchor. It must be the standalone CSS `translate` property, never
+// `transform: translate(-50%,-50%)`.
+//
+// framer-motion composes the entire `transform` property from the motion values
+// it is handed (x/y/scale/rotate). Any `transform` written in `style` alongside
+// them is simply replaced the moment the element animates — so an element that
+// animated `scale` silently lost its centring and hung half its own width right
+// and half its height low. That is what put the pot cluster at cx 932 against a
+// felt centre of 800 (exactly half its 264px width), and it was doing the same
+// to the dealer button and the burn card.
+//
+// `translate` is a separate CSS property that framer does not manage, and the
+// spec applies it before `transform`, so the element is centred first and the
+// animation's scale/rotate then act about that centre — exactly the intent.
+const CENTRING_TRANSLATE: CSSProperties = { translate: "-50% -50%" };
 
 interface ImageTableProps {
   /** Width (px) of the Room Control drawer overlaying the left edge, so the
@@ -218,15 +234,20 @@ export function ImageTable({
         <AnimatePresence>
           {showBurnCard && !compactMode && (
             <motion.div
-              initial={{ opacity: 0, x: 80, y: -40, scale: 0.5 }}
-              animate={{ opacity: 0.8, x: 0, y: 0, scale: 0.7 }}
-              exit={{ opacity: 0, scale: 0.3 }}
+              // rotate rides in the motion props, not in `style` — framer reads
+              // a `rotate` in style as a transform motion value anyway, so
+              // stating it here is the unambiguous form.
+              initial={{ opacity: 0, x: 80, y: -40, scale: 0.5, rotate: -5 }}
+              animate={{ opacity: 0.8, x: 0, y: 0, scale: 0.7, rotate: -5 }}
+              exit={{ opacity: 0, scale: 0.3, rotate: -5 }}
               transition={{ duration: 0.25 }}
               className="absolute"
               style={{
                 left: "42%",
                 top: "32%",
-                transform: "translate(-50%, -50%) rotate(-5deg)",
+                // See CENTRING_TRANSLATE — this element animates x/y/scale, so
+                // a `transform` here would be overwritten.
+                ...CENTRING_TRANSLATE,
                 zIndex: 11,
               }}
             >
@@ -305,7 +326,13 @@ export function ImageTable({
               exit={{ opacity: 0, scale: 0.85 }}
               transition={compactMode ? { duration: 0 } : undefined}
               className="absolute flex flex-col items-center gap-1"
-              style={{ left: "50%", top: "25%", transform: "translate(-50%, -50%)" }}
+              // CENTRING_TRANSLATE, not `transform: translate(-50%,-50%)`:
+              // framer-motion owns the whole `transform` property on a motion
+              // element, so animating `scale` here overwrote the CSS translate
+              // outright and the cluster hung half its own width right and half
+              // its height low — measured cx 932 against a felt centre of 800,
+              // exactly 264/2.
+              style={{ left: "50%", top: "25%", ...CENTRING_TRANSLATE }}
             >
               {/* Hand / pot text header — sits above the chip stacks so they never
                   overlap the community card row below (top:45%). */}
@@ -427,7 +454,10 @@ export function ImageTable({
                 rotate: { duration: 0.6, ease: "easeInOut" },
               }}
               className="absolute"
-              style={{ transform: "translate(-50%, -50%)", zIndex: 15 }}
+              // See CENTRING_TRANSLATE — this element animates scale and rotate,
+              // so a `transform` here was overwritten and the dealer button sat
+              // half its own size (22px) down-and-right of the seat it marks.
+              style={{ ...CENTRING_TRANSLATE, zIndex: 15 }}
             >
               <div
                 className="w-11 h-11 rounded-full flex items-center justify-center font-black text-base text-gray-900"

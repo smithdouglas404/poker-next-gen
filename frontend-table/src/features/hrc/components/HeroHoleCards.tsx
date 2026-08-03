@@ -33,8 +33,13 @@ export function HeroHoleCards({
       className="pointer-events-none flex flex-col items-center"
       style={{ position: "fixed", left: "50%", bottom: 215, transform: "translateX(-50%)", zIndex: 45 }}
     >
+      {/* mb-3, not mb-1.5: each card is rotated about its own centre, which
+          lifts the outer top corner of the fanned cards above the unrotated
+          card top by roughly (width/2)·sin(spread). The old 6px gap was
+          smaller than that lift, so the fan rode up over this label and hid
+          the hand the player actually holds. */}
       <div
-        className="mb-1.5 rounded-full px-3 py-1 font-display text-xs font-black uppercase tracking-[0.15em]"
+        className="mb-3 rounded-full px-3 py-1 font-display text-xs font-black uppercase tracking-[0.15em]"
         style={{
           color: "#ffd700",
           background: "rgba(10,10,12,0.85)",
@@ -45,9 +50,12 @@ export function HeroHoleCards({
       >
         {hand.description}
       </div>
-      {/* Scaled down slightly from the "lg" preset (90x135) rather than
-          jumping to "md" (70x105, a ~22% drop) — a smaller, deliberate nudge. */}
-      <div className="flex" style={{ transform: "scale(0.88)", transformOrigin: "top center" }}>
+      {/* Scaled off the "lg" preset (90x135) rather than switching size tokens,
+          so the card art keeps its 2:3 ratio and gold hero border weight. At
+          0.88 the fan was large enough to sit over the hand-strength label and
+          crowd the board; 0.72 gives ~65x97 — clearly the player's own cards,
+          without owning the bottom third of the felt. */}
+      <div className="flex" style={{ transform: "scale(0.72)", transformOrigin: "top center" }}>
         {cards.map((card, i) => {
           const angle = cards.length === 1 ? 0 : -spread + (i * (2 * spread)) / (cards.length - 1);
           return (
