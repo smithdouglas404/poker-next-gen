@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useGame } from "@/features/game/GameProvider";
+import { DEMO_SNAPSHOT } from "@/features/table3d/demoSnapshot";
 
 export interface Emote {
   id: string;
@@ -106,32 +108,52 @@ export function EmoteBubble({ playerId }: { playerId: string }) {
 // trigger, so there's exactly one bubble per emote, never two.
 export function EmotePicker() {
   const { sendEmote, matchId } = useGame();
+  const demo = useSearchParams().get("demo") === "1";
   const [isOpen, setIsOpen] = useState(false);
   const [cooldown, setCooldown] = useState(false);
+
+  // Substitute the DATA (the match id), never the guard — ?demo=1 has a table
+  // (DEMO_SNAPSHOT), so the `if (!tableId)` below is identical on both pages
+  // and a demo screenshot actually shows where this control sits. Same pattern
+  // as ChatStatsPanel/HandHistoryPanel; see check:table's demo-is-data-only.
+  const tableId = demo ? DEMO_SNAPSHOT.match_id : matchId;
 
   const onSend = useCallback(
     (emote: Emote) => {
       if (cooldown) return;
-      void sendEmote(emote.id);
+      // No socket behind ?demo=1 — open/close and cool down, send nothing.
+      if (!demo) void sendEmote(emote.id);
       setCooldown(true);
       setIsOpen(false);
       setTimeout(() => setCooldown(false), 3000);
     },
-    [sendEmote, cooldown],
+    [sendEmote, cooldown, demo],
   );
 
-  if (!matchId) return null;
+  if (!tableId) return null;
 
+  // `relative` anchors the popup; no fixed width. This used to be
+  // `w-full max-w-xs`, sized for the stacked left-hand panel column — which is
+  // no longer mounted (SHOW_LEFT_PANEL_COLUMN). It now sits in
+  // HeroControlsDock's horizontal row, where a 320px block would dwarf EXTEND /
+  // ADD CHIPS / SIT OUT / EXIT beside it.
   return (
-    <div className="pointer-events-auto relative w-full max-w-xs">
+    <div className="pointer-events-auto relative">
       <AnimatePresence>
         {isOpen && (
           <motion.div
             initial={{ opacity: 0, y: 10, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.9 }}
-            className="glass mb-2 grid grid-cols-4 gap-1.5 rounded-xl p-2"
-            style={{ border: "1px solid rgba(255,255,255,0.08)" }}
+            // ABSOLUTE, not in flow. With `mb-2` alone the tray occupied real
+            // layout space inside HeroControlsDock's flex row: it made the
+            // picker two rows tall, dropped the "Emotes" button below EXTEND /
+            // ADD CHIPS / SIT OUT / EXIT, and shoved the whole action bar
+            // ~170px up the felt. Measured in ?demo=1 at 1600x1000. Anchored
+            // to the `relative` wrapper, it now floats above the row and
+            // changes nothing else on screen.
+            className="glass absolute bottom-full left-1/2 z-50 mb-2 grid w-max -translate-x-1/2 grid-cols-4 gap-1.5 rounded-xl p-2"
+            style={{ border: "1px solid rgba(255,255,255,0.08)", background: "#262d38" }}
           >
             {EMOTES.map(emote => (
               <motion.button
@@ -159,7 +181,10 @@ export function EmotePicker() {
         whileTap={{ scale: 0.98 }}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`glass flex w-full items-center gap-2 rounded-2xl border border-white/10 bg-black/60 px-3 py-2 text-[11px] text-neutral-200 backdrop-blur-md transition ${isOpen ? "border-amber-400/50 text-amber-100" : "hover:border-amber-400/50 hover:bg-amber-400/10 hover:text-amber-100"} ${cooldown ? "opacity-50" : ""}`}
+        // Matches the dock's other controls: GLASS_PANEL + px-3 py-1.5 text-xs
+        // on #262d38, so the row reads as one set of buttons.
+        className={`flex items-center gap-2 rounded-2xl border px-3 py-1.5 text-xs backdrop-blur-md transition ${isOpen ? "border-gold/50 text-gold" : "border-white/12 text-neutral-300 hover:border-white/25"} ${cooldown ? "opacity-50" : ""}`}
+        style={{ background: "#262d38" }}
         disabled={cooldown}
       >
         <MessageCircle className="h-4 w-4" />

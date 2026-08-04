@@ -14,6 +14,7 @@ import { useSearchParams } from "next/navigation";
 import { formatCents, useGame } from "@/features/game/GameProvider";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 import type { ActionRequiredMessage } from "@/features/game/protocol";
+import { EmotePicker } from "@/features/hrc/components/EmoteSystem";
 
 // ?demo=1 has no live socket, so the real per-seat/actionRequired state this
 // dock reads (sitting_out, time_bank_secs) never arrives — this stub mirrors
@@ -211,13 +212,22 @@ function AddChipsButton({ demo }: { demo: boolean }) {
   );
 }
 
-/** Slim row docked above the action bar: Extend Time (turn-gated), Sit Out
- *  (seated-gated), Exit Table (seated-gated), Add Chips (seated + between
- *  hands). */
+/** Slim row docked above the action bar: Emotes (match-gated), Extend Time
+ *  (turn-gated), Sit Out (seated-gated), Exit Table (seated-gated), Add Chips
+ *  (seated + between hands). */
 export function HeroControlsDock() {
   const demo = useSearchParams().get("demo") === "1";
   return (
     <div className="pointer-events-none flex items-center justify-center gap-2">
+      {/* The only way to SEND an emote. EmoteSystem renders incoming ones on
+          the seats, but its picker was referenced solely inside TableHud's
+          SHOW_LEFT_PANEL_COLUMN block — which is off — so it was imported and
+          rendered zero times: emotes displayed and nobody could send one.
+          This dock is the right home: it already sits centred under the action
+          bar, and EmotePicker's own `if (!matchId) return null` matches the
+          rest of the row. Its popup opens upward (mb-2), which is what a
+          bottom dock needs. */}
+      <EmotePicker />
       <ExtendTimeButton demo={demo} />
       <AddChipsButton demo={demo} />
       <SitOutToggle demo={demo} />
