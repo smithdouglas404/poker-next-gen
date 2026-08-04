@@ -1090,6 +1090,38 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			// Certification rule: registered players buy in from the certified
 			// global wallet; only guests use club-allocated comp chips.
 			guest := isGuest(ctx, nk, userID)
+			// Coded-guest gate. A visitor who arrived on a table code but has no
+			// registered account may watch (the join gate above already let them
+			// in) — sitting is what needs a human decision, because sitting is
+			// what gives them a balance the club has to answer for. A code that
+			// gets forwarded around otherwise seats an unbounded number of
+			// strangers, each holding chips, with the operator unable to say who
+			// any of them were.
+			//
+			// Queued HERE, on the first sit attempt, rather than on join: a
+			// railbird who only ever watches should not land in an operator's
+			// queue, and intent to sit is exactly what we want them to decide on.
+			//
+			// Before reserveBuyIn deliberately — do not move funds for a player
+			// who is not allowed to take the seat.
+			if guest && s.AccessType == "invite" {
+				ga := store.NewGuestApprovalStore(db)
+				matchKeyGA := matchIDForAudit(s)
+				if !ga.IsApproved(ctx, matchKeyGA, userID) {
+					if _, err := ga.Request(ctx, &store.GuestApproval{
+						ClubID:   s.ClubID,
+						MatchID:  matchKeyGA,
+						UserID:   userID,
+						Username: presence.GetUsername(),
+						JoinCode: s.JoinCode,
+					}); err != nil {
+						logger.Warn("guest approval request failed: %v", err)
+					}
+					sendError(dispatcher, presence, "guest_approval_pending",
+						"a table admin needs to approve you before you can sit — you can keep watching in the meantime")
+					continue
+				}
+			}
 			wallet, reserved := reserveBuyIn(ctx, db, s, userID, buyIn, req.Wallet, guest)
 			if wallet == "" {
 				msg := "not enough funds in the selected wallet"

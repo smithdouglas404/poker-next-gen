@@ -1332,6 +1332,40 @@ CREATE TABLE IF NOT EXISTS poker_guest_session (
 CREATE INDEX IF NOT EXISTS idx_poker_guest_session_club ON poker_guest_session(club_id, status, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_poker_guest_session_user ON poker_guest_session(user_id, created_at DESC);
 
+-- Guest sit-down approvals. A visitor who has a table CODE but no registered
+-- account may WATCH immediately; taking a seat requires a club operator (or the
+-- host) to approve them first. Without this, anyone a code is forwarded to sits
+-- down and holds a balance while the operator has no idea who they are — which
+-- is the operator's problem, not the visitor's, since the club is accountable
+-- for who played at its tables.
+--
+-- Distinct from poker_guest_session, which opens when a guest ALREADY sat and
+-- exists to settle their chips afterwards. This is the gate before that.
+--
+-- device_fp / join_ip are recorded so the approver decides with something in
+-- front of them — most usefully "this device is already seated as someone else".
+CREATE TABLE IF NOT EXISTS poker_guest_approval (
+    id          TEXT PRIMARY KEY,
+    club_id     TEXT NOT NULL DEFAULT '',
+    match_id    TEXT NOT NULL,
+    user_id     TEXT NOT NULL,
+    username    TEXT NOT NULL DEFAULT '',
+    email       TEXT NOT NULL DEFAULT '',   -- blank until the email tier ships
+    join_code   TEXT NOT NULL DEFAULT '',   -- the code they arrived on
+    device_fp   TEXT NOT NULL DEFAULT '',
+    join_ip     TEXT NOT NULL DEFAULT '',
+    status      TEXT NOT NULL DEFAULT 'pending',  -- pending | approved | denied
+    decided_by  TEXT NOT NULL DEFAULT '',
+    reason      TEXT NOT NULL DEFAULT '',
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    decided_at  TIMESTAMPTZ
+);
+-- One live request per (match, user): re-joining must not queue duplicates.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_poker_guest_approval_match_user
+    ON poker_guest_approval(match_id, user_id);
+CREATE INDEX IF NOT EXISTS idx_poker_guest_approval_queue
+    ON poker_guest_approval(club_id, status, created_at ASC);
+
 -- Seat sessions (Tier-1 C): one row per "sitting" (sit → leave) for ALL non-bot
 -- players, capturing play duration, hands played, stack-on-leave and net so an
 -- operator can spot hit-and-run (won a little, left after very few hands) and
