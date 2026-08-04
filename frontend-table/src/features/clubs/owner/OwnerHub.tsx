@@ -629,14 +629,23 @@ export function OwnerHub() {
                 whereas reconciliation below is settle-up after the fact. */}
             <GuestApprovals clubId={club?.id} canManage={canManage} />
             <GuestSessions clubId={club?.id} canManage={canManage} />
-            {/* Below the two guest queues: approvals block a live player and
-                reconciliation settles one guest, but this is the whole
-                table's loan position and it is what closes the game. */}
-            <TableSettlements clubId={club?.id} canManage={canManage} />
             <SeatSessions clubId={club?.id} canManage={canManage} />
             <ClubNights clubId={club?.id} canManage={canManage} />
           </div>
           <QuickStats data={emptyQuick} clubId={club?.id ?? null} />
+        </div>
+      )}
+
+      {/* FULL WIDTH, outside the [1fr_320px] grid on purpose. Every other panel
+          in that sidebar is a short list — a name and a verdict. A settlement
+          line carries four figures per player (advanced, back, the direction of
+          the debt, the amount) plus two club totals, and at 320px every one of
+          them wrapped: the heading broke across two lines and each player took
+          three. This is the one panel where an operator reads money and decides
+          who pays whom, so it gets the width. */}
+      {section === "members" && (
+        <div className="mt-6">
+          <TableSettlements clubId={club?.id} canManage={canManage} />
         </div>
       )}
 

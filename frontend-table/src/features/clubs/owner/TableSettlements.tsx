@@ -96,35 +96,44 @@ export function TableSettlements({ clubId, canManage }: { clubId?: string; canMa
                   </span>
                 </div>
 
-                <ul className="mt-3 flex flex-col gap-1">
-                  {s.lines.map((l) => (
-                    <li
-                      key={l.user_id}
-                      className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
-                    >
-                      <span className="text-foreground">
-                        {l.username || l.user_id.slice(0, 8)}
-                        <span className="ml-2 text-[11px] uppercase tracking-[0.15em] text-muted">
-                          {l.is_member ? "member" : "guest"}
+                {/* A real column grid, not wrapped prose. The figures are
+                    tabular-nums and right-aligned so advanced/back/net stack
+                    into scannable columns — an operator compares DOWN the
+                    money, not across one player at a time. */}
+                <div className="mt-3 overflow-x-auto">
+                  <div className="min-w-[34rem]">
+                    <div className="grid grid-cols-[1fr_7rem_7rem_11rem] gap-x-4 border-b border-white/10 pb-1.5 text-[11px] uppercase tracking-[0.15em] text-muted">
+                      <span>Player</span>
+                      <span className="text-right">Advanced</span>
+                      <span className="text-right">Back</span>
+                      <span className="text-right">Settlement</span>
+                    </div>
+                    {s.lines.map((l) => (
+                      <div
+                        key={l.user_id}
+                        className="grid grid-cols-[1fr_7rem_7rem_11rem] items-baseline gap-x-4 border-b border-white/[0.04] py-2 text-sm last:border-0"
+                      >
+                        <span className="truncate text-foreground">
+                          {l.username || l.user_id.slice(0, 8)}
+                          <span className="ml-2 text-[11px] uppercase tracking-[0.15em] text-muted">
+                            {l.is_member ? "member" : "guest"}
+                          </span>
                         </span>
-                      </span>
-                      <span className="text-muted">
-                        advanced {money(l.loaned_minor)} · back {money(l.returned_minor)} ·{" "}
-                        {l.net_minor < 0 ? (
-                          <span className="font-semibold text-brand">
-                            owes the club {money(l.net_minor)}
-                          </span>
-                        ) : l.net_minor > 0 ? (
-                          <span className="font-semibold text-green">
-                            club owes {money(l.net_minor)}
-                          </span>
-                        ) : (
-                          <span className="font-semibold text-muted">square</span>
-                        )}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                        <span className="text-right tabular-nums text-muted">{money(l.loaned_minor)}</span>
+                        <span className="text-right tabular-nums text-muted">{money(l.returned_minor)}</span>
+                        <span className="text-right tabular-nums font-semibold">
+                          {l.net_minor < 0 ? (
+                            <span className="text-brand">owes club {money(l.net_minor)}</span>
+                          ) : l.net_minor > 0 ? (
+                            <span className="text-green">club owes {money(l.net_minor)}</span>
+                          ) : (
+                            <span className="text-muted">square</span>
+                          )}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-3">
                   <p className="text-sm text-muted">

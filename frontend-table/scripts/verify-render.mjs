@@ -38,10 +38,35 @@ await ctx.addInitScript(() => {
   try { localStorage.setItem("hrc.age.ok", "1"); } catch { /* ignore */ }
 });
 
-async function shoot(path, name) {
+async function shoot(path, name, expectAvatars) {
   const p = await ctx.newPage();
   await p.goto(`http://localhost:3000${path}`, { waitUntil: "domcontentloaded", timeout: 120000 });
-  await p.waitForTimeout(13000);
+
+  // Wait on a CONDITION, never a fixed sleep.
+  //
+  // This used to be waitForTimeout(13000). Run on its own that was plenty; run
+  // straight after the e2e phase — which hammers Nakama and Postgres — the page
+  // had not finished and the suite reported "demo table is populated -> 0
+  // avatars" while the very same check passed standalone seconds later.
+  //
+  // A flaky check is worse than no check: it teaches you to ignore red, which
+  // is precisely how a real failure gets waved through. Poll for the felt (and
+  // the avatars, where they are expected) until they are actually there.
+  await p
+    .waitForFunction(
+      (wantAvatars) => {
+        const f = document.querySelector("[data-felt-surface]");
+        if (!f || f.getBoundingClientRect().width < 100) return false;
+        if (!wantAvatars) return true;
+        return [...document.querySelectorAll("img")]
+          .filter((i) => /avatars\//.test(i.getAttribute("src") || "")).length > 0;
+      },
+      expectAvatars,
+      { timeout: 60000, polling: 500 },
+    )
+    .catch(() => { /* fall through — the assertions below report what is actually there */ });
+  // Settle the deal springs so the shot is not mid-animation.
+  await p.waitForTimeout(3000);
   const m = await p.evaluate(() => {
     const t = document.body.innerText;
     const f = document.querySelector("[data-felt-surface]");
@@ -61,8 +86,8 @@ async function shoot(path, name) {
   return m;
 }
 
-const live = await shoot("/table", "verify-table-live");
-const demo = await shoot("/table?demo=1", "verify-table-demo");
+const live = await shoot("/table", "verify-table-live", false);
+const demo = await shoot("/table?demo=1", "verify-table-demo", true);
 
 // 800 is dead centre of a 1600px viewport. Hard-coded on purpose: this is the
 // number that was wrong, and a computed expectation would have been wrong too.

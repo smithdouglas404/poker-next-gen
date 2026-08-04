@@ -47,3 +47,6 @@ Thumbs.db
 # ---- Docker / data volumes ----
 data/
 postgres-data/
+
+# npm run verify's render evidence — regenerated every run, never committed.
+frontend-table/.verify-shots/

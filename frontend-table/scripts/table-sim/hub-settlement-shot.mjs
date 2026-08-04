@@ -92,7 +92,7 @@ const info = await p.evaluate(() => {
   const t = document.body.innerText;
   return {
     settlementsPanel: /Table settlements/i.test(t),
-    owesTheClub: /owes the club/i.test(t),
+    owesTheClub: /owes club/i.test(t),
     clubOwes: /club owes/i.test(t),
     confirmButton: /Confirm books balanced/i.test(t),
     couldntLoad: /COULDN'T LOAD/i.test(t),
