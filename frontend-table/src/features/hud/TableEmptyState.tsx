@@ -9,12 +9,19 @@ import { BuyInDialog } from "@/features/hud/BuyInDialog";
 
 // Empty-table path to the money action (UI review P0-7). The felt looked great
 // but had nothing to do on it — no seats, no "take a seat", no way in. This
-// overlay gives the empty table a clear path: practice vs. join by code, and a
-// buy-in that defaults to the table's minimum (not the max, which read as the
-// house nudging players to over-deposit).
+// overlay gives the empty table a clear path: take the open seat, or join a
+// friend's table by code, with a buy-in defaulting to the table's minimum (not
+// the max, which read as the house nudging players to over-deposit).
+//
+// It does NOT create a table. There was an "Add bots & deal me in" button here
+// calling createRoom({numBots:5}) — creating a game from the felt, which the
+// owner has ruled out repeatedly: you may LAND on a table to watch, join by
+// code, or sit if allowed, never to create one. Creating is /lobby's job (four
+// modes, where the who-may-host rules are actually applied) and /tournaments'.
+// See CLAUDE.md > "Landing page — never a place to play" for the screen map.
 
 export function TableEmptyState() {
-  const { snapshot, matchId, createRoom, joinByCode, profile, buyInCents } = useGame();
+  const { snapshot, matchId, joinByCode, profile, buyInCents } = useGame();
   const demo = useSearchParams().get("demo") === "1";
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -44,22 +51,6 @@ export function TableEmptyState() {
     );
     for (let i = 0; i < maxSeats; i++) if (!taken.has(i)) return i;
     return 0;
-  }
-
-  async function practice() {
-    setBusy(true);
-    setErr(null);
-    try {
-      // A practice table: 5 bots + the hero. createRoom auto-joins; the bots
-      // fill their seats, then the overlay flips to "take seat" for the hero's
-      // open chair (below). Leaving the actual sit to the button avoids racing
-      // the first snapshot.
-      await createRoom({ numBots: 5, maxSeats: 6 });
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Could not start a table.");
-    } finally {
-      setBusy(false);
-    }
   }
 
   // Seating goes through the buy-in dialog so the player picks wallet + amount
@@ -96,18 +87,16 @@ export function TableEmptyState() {
         </h2>
         <p className="mt-2 text-sm text-neutral-300">
           {matchId
-            ? "Add bots to practice now, or invite friends by code."
-            : "Practice against bots, or join a friend's table by code."}
+            ? "Invite friends by code, or take an open seat."
+            : "Enter a table code to join a game."}
         </p>
 
         <div className="mt-5 flex flex-col gap-3">
-          {matchId ? (
+          {/* Only rendered with a live match — sitting at a table that exists.
+              There is deliberately no create/start control here. */}
+          {matchId && (
             <button type="button" disabled={busy} onClick={takeSeat} className={gold}>
               Take seat · buy-in {formatCents(buyInCents)}
-            </button>
-          ) : (
-            <button type="button" disabled={busy} onClick={practice} className={gold}>
-              Add bots &amp; deal me in
             </button>
           )}
 

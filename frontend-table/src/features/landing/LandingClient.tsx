@@ -136,12 +136,10 @@ export function LandingClient() {
               Create/Join drawer. Playing starts at /login; game setup is
               /lobby; tournaments are /tournaments. See CLAUDE.md > Landing
               page. */}
-          <Link
-            href="/hub"
-            className="rounded-xl px-7 py-3.5 text-sm font-semibold text-neutral-300 transition hover:text-white"
-          >
-            Command Center →
-          </Link>
+          {/* NO "/hub" link either. Command Center is the operator surface —
+              club config, guest approvals, rake, reconciliation. It has no
+              business being a CTA on a public marketing page next to "Play
+              now". Operators reach it after signing in. */}
         </div>
       </section>
 

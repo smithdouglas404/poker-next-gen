@@ -23,21 +23,10 @@ import { TauntBar } from "@/features/sound/TauntBar";
 import { usePokerKeyboard } from "@/features/hud/usePokerKeyboard";
 import { useGameSounds } from "@/features/sound/useGameSounds";
 import { useGame } from "@/features/game/GameProvider";
-import { useSearchParams } from "next/navigation";
-
-// The stacked left-hand panel column. Off: the owner asked for the felt clear,
-// and game setup belongs on its own screen the way tournaments have one —
-// PrivateTableSetup already lives at /lobby, tournaments at /tournaments.
-// Flip to true to bring the column back.
-const SHOW_LEFT_PANEL_COLUMN = false;
+import { SHOW_LEFT_PANEL_COLUMN } from "@/features/hud/roomPanelState";
 
 export function TableHud({ children }: { children: React.ReactNode }) {
   const { error } = useGame();
-  // ?demo=1 renders the reference table headless-populated (no real
-  // room/chat/spectator data exists to show), and the legacy sidebar's
-  // top-left corner collides with the floating HandHistoryPanel — hide the
-  // whole legacy column rather than let them overlap.
-  const demo = useSearchParams().get("demo") === "1";
   usePokerKeyboard();
   useGameSounds();
 
@@ -116,7 +105,12 @@ export function TableHud({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <div className={`mt-auto flex flex-col gap-2 pb-2 ${demo ? "items-center" : "items-end pr-2"}`}>
+        {/* Centred on EVERY table. This used to read
+            `demo ? "items-center" : "items-end pr-2"`, so the action dock sat
+            centre-bottom in the preview and hard against the right edge on the
+            real table — one more way ?demo=1 and /table disagreed about what
+            "the table" looks like. The reference has it centred. */}
+        <div className="mt-auto flex flex-col items-center gap-2 pb-2">
           <p className="pointer-events-none text-[10px] uppercase tracking-wider text-neutral-600">
             Keys: F fold · C check/call · R raise
           </p>

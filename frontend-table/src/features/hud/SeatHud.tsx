@@ -14,7 +14,11 @@ import { formatStack, useStackUnit } from "@/features/table/stackDisplay";
 import { Character3D } from "@/features/table/Character3D";
 import { Character3DGL } from "@/features/table/Character3DGL";
 import { useRenderMode } from "@/features/table/renderMode";
-import { useRoomPanelOpen, ROOM_PANEL_WIDTH_PX } from "@/features/hud/roomPanelState";
+import {
+  useRoomPanelOpen,
+  ROOM_PANEL_WIDTH_PX,
+  SHOW_LEFT_PANEL_COLUMN,
+} from "@/features/hud/roomPanelState";
 
 function SeatCard({
   seat,
@@ -125,13 +129,15 @@ export function SeatHud() {
   const activeSeat = snapshot?.action_seat;
   const winnerSeats = new Set((showdown?.winners ?? []).map((w) => w.seat));
 
-  // RoomPanel (the "Room Control" drawer) renders only when !demo and sits
-  // above the seat layer (z-40 vs z-10) — when it's open, reserve its width
-  // so the ring shifts right instead of leaving left-side seats unreachable
-  // underneath it.
+  // RoomPanel (the "Room Control" drawer) sits above the seat layer (z-40 vs
+  // z-10), so while it is open the ring shifts right rather than leaving the
+  // left-hand seats unreachable underneath it. Must match useFeltStyle()
+  // exactly — the felt and the ring move together or they land on different
+  // coordinate systems (see CLAUDE.md > the felt-coordinate rule).
   const demo = useSearchParams().get("demo") === "1";
   const [roomPanelOpen] = useRoomPanelOpen(true);
-  const insetLeft = !demo && roomPanelOpen ? ROOM_PANEL_WIDTH_PX : 0;
+  const insetLeft =
+    SHOW_LEFT_PANEL_COLUMN && !demo && roomPanelOpen ? ROOM_PANEL_WIDTH_PX : 0;
 
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
   // The felt's REAL rendered rect. The seat ring is inscribed in it so the

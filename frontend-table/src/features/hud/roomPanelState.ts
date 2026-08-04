@@ -11,6 +11,18 @@ import { useEffect, useState } from "react";
 // the seat ring — keep this in sync with RoomPanel.tsx's `w-72` class.
 export const ROOM_PANEL_WIDTH_PX = 288;
 
+// Whether TableHud mounts the stacked left-hand panel column at all (RoomPanel,
+// buy-in, equity, sidebets, verify, log, chat, spectator, taunts, music,
+// settings). Off: the owner asked for the felt clear, and game setup belongs on
+// its own screen — PrivateTableSetup is at /lobby, tournaments at /tournaments.
+//
+// It lives HERE, not in TableHud, because the felt and the seat ring both have
+// to reserve space for that column and must never disagree with whether it is
+// rendered. When this was a private const in TableHud, feltLayout and SeatHud
+// each kept insetting 288px for a drawer that had stopped mounting, pushing the
+// whole table 144px right of centre. One flag, three consumers, no drift.
+export const SHOW_LEFT_PANEL_COLUMN = false;
+
 const KEY = "pkr:roomPanelOpen";
 const listeners = new Set<(open: boolean) => void>();
 let current: boolean | null = null;

@@ -1,7 +1,11 @@
 import { useSearchParams } from "next/navigation";
 import type { CSSProperties } from "react";
 import { FELT_BOUNDS, seatPose } from "@/features/hrc/lib/table-constants";
-import { useRoomPanelOpen, ROOM_PANEL_WIDTH_PX } from "@/features/hud/roomPanelState";
+import {
+  useRoomPanelOpen,
+  ROOM_PANEL_WIDTH_PX,
+  SHOW_LEFT_PANEL_COLUMN,
+} from "@/features/hud/roomPanelState";
 
 /** The DOM attribute ImageTable stamps on the felt image's wrapper so the seat
  *  layer can find and measure it. */
@@ -57,7 +61,17 @@ export function seatPointFromFelt(
 export function useFeltStyle(): { style: CSSProperties; insetLeft: number } {
   const demo = useSearchParams().get("demo") === "1";
   const [roomPanelOpen] = useRoomPanelOpen(true);
-  const insetLeft = !demo && roomPanelOpen ? ROOM_PANEL_WIDTH_PX : 0;
+  // Only reserve the drawer's width if the drawer is actually MOUNTED.
+  //
+  // RoomPanel renders solely inside TableHud's `SHOW_LEFT_PANEL_COLUMN && (…)`
+  // block, which is off. While this read `!demo && roomPanelOpen` the real
+  // /table shifted `left: calc(50% + 144px)` to clear a drawer that no longer
+  // existed — measured: felt centre 944 on /table vs 800 on ?demo=1, in a
+  // 1600px viewport. And because the condition carried `!demo`, ?demo=1 was
+  // exempt, so the preview looked right while the live table did not. That is
+  // the same `!demo` divergence that hid the panel column itself.
+  const insetLeft =
+    SHOW_LEFT_PANEL_COLUMN && !demo && roomPanelOpen ? ROOM_PANEL_WIDTH_PX : 0;
   return {
     insetLeft,
     style: insetLeft
