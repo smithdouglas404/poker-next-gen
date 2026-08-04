@@ -76,6 +76,12 @@ export interface TableSnapshot {
   min_buy_in?: number;
   max_buy_in?: number;
   accepts_global_wallet?: boolean;
+  /** Present only on CLUB tables. Distinguishes a club table whose available
+   *  balance is 0 from a table with no club behind it. */
+  club_id?: string;
+  /** AVAILABLE club balance (allocated - locked). While the hero is seated
+   *  this EXCLUDES the chips already carried to the table — those sit in
+   *  their stack until SettleSeat runs at stand-up. */
   hero_club_balance?: number;
   hand_no: number;
   hero_wallet_cents?: number;

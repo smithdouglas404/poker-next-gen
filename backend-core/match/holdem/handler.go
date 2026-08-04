@@ -3670,6 +3670,7 @@ func snapshotFor(ctx context.Context, db *sql.DB, s *MatchState, heroID string) 
 		MinBuyIn:            s.minBuyIn(),
 		MaxBuyIn:            s.maxBuyIn(),
 		AcceptsGlobalWallet: acceptsGlobal,
+		ClubID:              s.ClubID,
 		HeroClubBalance:     heroClubBalance,
 		Phase:               poker.HandPhaseForTable(s.Table, s.Phase),
 		Seats:               seats,

@@ -22,7 +22,12 @@ export function BuyInDialog({
   const { snapshot, profile, sitDown } = useGame();
   const min = snapshot?.min_buy_in ?? 10000;
   const max = snapshot?.max_buy_in ?? Math.max(min, 30000);
-  const isClubTable = Boolean(snapshot?.room_id) && (snapshot?.hero_club_balance ?? 0) >= 0 && snapshot?.accepts_global_wallet !== undefined;
+  // A club table says so. This used to be inferred from
+  // `room_id && (hero_club_balance ?? 0) >= 0 && accepts_global_wallet !== undefined`
+  // — the middle term is true for every number, so it really only tested
+  // "has a room and the server sent accepts_global_wallet", which is any room.
+  // The snapshot now carries club_id for exactly this question.
+  const isClubTable = Boolean(snapshot?.club_id);
   const clubBalance = snapshot?.hero_club_balance ?? 0;
   const globalBalance = profile.walletCents;
   const acceptsGlobal = snapshot?.accepts_global_wallet ?? true;

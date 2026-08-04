@@ -81,7 +81,15 @@ type TableSnapshot struct {
 	MinBuyIn            int64  `json:"min_buy_in"`
 	MaxBuyIn            int64  `json:"max_buy_in"`
 	AcceptsGlobalWallet bool   `json:"accepts_global_wallet"`
-	HeroClubBalance     int64  `json:"hero_club_balance,omitempty"` // available club-issued balance (club tables)
+	// ClubID marks this as a CLUB table. Without it the client cannot tell a
+	// club table whose available balance happens to be 0 from a table with no
+	// club at all — `omitempty` erases that difference on the wire.
+	ClubID              string `json:"club_id,omitempty"`
+	// Available club balance = allocated - locked. NOT the player's total club
+	// money while they are seated: chips already carried to the table live in
+	// their stack until SettleSeat runs at stand-up. No omitempty — a real 0 has
+	// to reach the client.
+	HeroClubBalance     int64  `json:"hero_club_balance"`
 	HandNo              int    `json:"hand_no"`
 	DeckCommitHash      string `json:"deck_commit_hash,omitempty"`
 	Variant             string `json:"variant,omitempty"` // "holdem" | "plo"

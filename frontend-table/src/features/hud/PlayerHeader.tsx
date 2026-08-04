@@ -47,11 +47,29 @@ export function PlayerHeader() {
   const rebuyRoom = heroSeat ? Math.max(0, Math.min(maxBuyIn - heroSeat.stack, profile.walletCents)) : 0;
   const canRebuy = !!heroSeat && !liveInHand && rebuyRoom > 0;
 
-  // Only a CLUB table has a club balance. Same source BuyInDialog reads; null
-  // (not 0) when there is no club wallet, so the header shows nothing rather
-  // than an invented "$0.00" balance at a table that has no club behind it.
-  const clubBalanceCents =
-    typeof snapshot?.hero_club_balance === "number" ? snapshot.hero_club_balance : null;
+  // The player's club money, INCLUDING the chips already on the table.
+  //
+  // `hero_club_balance` is AVAILABLE balance — allocated minus locked — and the
+  // club ledger does not move again until SettleSeat runs at stand-up. So a
+  // player allocated 2,000 who buys in for 1,000 and then loses 800 reads:
+  //
+  //   allocated 2,000 | locked 1,000 | hero_club_balance 1,000 | stack 200
+  //
+  // They actually have 1,200. Printing the bare 1,000 under "Club" tells them
+  // they still hold money they have already lost, and it would not move as the
+  // hand played out. Available + stack is what they can still walk away with,
+  // and it matches what SettleSeat writes back (2,000 - 1,000 + 200 = 1,200).
+  //
+  // Both terms come from the SAME snapshot, so this is a sum of two
+  // server-authoritative numbers, not a client-side guess (non-negotiable 3).
+  //
+  // Gated on club_id, not on the balance: `hero_club_balance` used to carry
+  // `omitempty`, so a club player with 0 available vanished from the wire
+  // entirely and looked identical to a table with no club.
+  const isClubTable = !!snapshot?.club_id;
+  const clubBalanceCents = isClubTable
+    ? (snapshot?.hero_club_balance ?? 0) + (heroSeat?.stack ?? 0)
+    : null;
 
   const isHost = !!snapshot?.host_user_id && snapshot.host_user_id === profile.userId;
   const playerIds = (snapshot?.seats ?? []).filter((s) => s.user_id && !s.is_bot).map((s) => s.user_id!);
@@ -164,7 +182,10 @@ export function PlayerHeader() {
           <p className="text-lg font-semibold text-green">{formatCents(profile.walletCents)}</p>
         </Link>
         {clubBalanceCents !== null && (
-          <div className="text-right" title="Club chips allocated to you at this table">
+          <div
+            className="text-right"
+            title="Your club balance, including the chips currently on the table"
+          >
             <p className="text-[10px] uppercase tracking-wider text-muted">Club</p>
             <p className="text-lg font-semibold text-gold">{formatCents(clubBalanceCents)}</p>
           </div>
