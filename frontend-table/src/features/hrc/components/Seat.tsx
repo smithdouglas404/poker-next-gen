@@ -916,11 +916,29 @@ export function Seat({ player, position, isHero = false, isWinner = false, seatI
               initial={{ opacity: 0, scale: 0.7 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.7 }}
+              // ANCHORED BY ITS TOP-LEFT CORNER, deliberately — do not "fix"
+              // this by centring it.
+              //
+              // This carried `transform: "translate(-50%, -50%)"` in `style`
+              // on a <motion.div> that animates `scale`. framer-motion
+              // composes the entire transform property from its motion values,
+              // so that CSS translate was overwritten on the first frame and
+              // never applied: measured in the live DOM, `style.transform`
+              // reads `none`. The chips have therefore ALWAYS rendered from
+              // their top-left, and BET_PUSH_PX (85 * perspectiveScale, above)
+              // was tuned against that rendering to clear the ~130x139 seat
+              // card.
+              //
+              // Adding real centring now would move every chip by exactly
+              // (-35,-32) — half its own 70x64 — back onto the seat card the
+              // push exists to clear. These positions are the approved ones
+              // (AFTER1600x1000.png), so the dead declaration goes and the
+              // geometry stays. Baseline chip centres at 1600x1000:
+              // 835,766 / 439,771 / 319,463 / 478,352 / 1350,463.
               className="absolute z-40 flex flex-col items-center gap-0.5"
               style={{
                 left: `calc(50% + ${betOffsetX}px)`,
                 top: `calc(50% + ${betOffsetY}px)`,
-                transform: "translate(-50%, -50%)",
               }}
             >
               <BetChipStack amount={player.currentBet} />

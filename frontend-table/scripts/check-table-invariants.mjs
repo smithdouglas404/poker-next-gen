@@ -129,14 +129,15 @@ const rel = (p) => p.slice(FRONTEND.length + 1);
   // calibrated against the broken rendering, so correcting the transform alone
   // MOVES the design. Fixing one of these means retuning its constants too, and
   // that is a visible change the owner has to want.
-  const KNOWN = {
-    "src/features/hrc/components/Seat.tsx":
-      "per-seat bet chips: BET_PUSH_PX=85 was tuned against the un-centred box " +
-      "(framer wiped the CSS translate, so the chip's TOP-LEFT sat on the anchor). " +
-      "Measured: centring alone moves every chip by exactly (-35,-32) — half the " +
-      "chip's own 70x64 — onto the seat card the push exists to clear. Needs the " +
-      "push retuned in the same change.",
-  };
+  // Empty. Seat.tsx's per-seat bet chips used to live here: BET_PUSH_PX=85 was
+  // tuned against a box framer had already un-centred, so correcting the
+  // transform alone would have moved every chip by (-35,-32) — half its own
+  // 70x64 — onto the seat card the push exists to clear. Resolved by measuring
+  // instead of reasoning: `style.transform` read `none` in the live DOM, i.e.
+  // the declaration had never applied. Deleting it was a zero-pixel change and
+  // the exception went with it. Add an entry here only when correcting a
+  // transform would demonstrably MOVE the design.
+  const KNOWN = {};
   const warnings = [];
   for (const f of files) {
     const body = readFileSync(f, "utf8");
