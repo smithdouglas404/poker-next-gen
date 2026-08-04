@@ -78,21 +78,21 @@ type TableSnapshot struct {
 	MaxSeats   int        `json:"max_seats"`
 	HeroWallet int64      `json:"hero_wallet_cents"`
 	// Buy-in band + wallet options so the client can render a real buy-in dialog.
-	MinBuyIn            int64  `json:"min_buy_in"`
-	MaxBuyIn            int64  `json:"max_buy_in"`
-	AcceptsGlobalWallet bool   `json:"accepts_global_wallet"`
+	MinBuyIn            int64 `json:"min_buy_in"`
+	MaxBuyIn            int64 `json:"max_buy_in"`
+	AcceptsGlobalWallet bool  `json:"accepts_global_wallet"`
 	// ClubID marks this as a CLUB table. Without it the client cannot tell a
 	// club table whose available balance happens to be 0 from a table with no
 	// club at all — `omitempty` erases that difference on the wire.
-	ClubID              string `json:"club_id,omitempty"`
+	ClubID string `json:"club_id,omitempty"`
 	// Available club balance = allocated - locked. NOT the player's total club
 	// money while they are seated: chips already carried to the table live in
 	// their stack until SettleSeat runs at stand-up. No omitempty — a real 0 has
 	// to reach the client.
-	HeroClubBalance     int64  `json:"hero_club_balance"`
-	HandNo              int    `json:"hand_no"`
-	DeckCommitHash      string `json:"deck_commit_hash,omitempty"`
-	Variant             string `json:"variant,omitempty"` // "holdem" | "plo"
+	HeroClubBalance int64  `json:"hero_club_balance"`
+	HandNo          int    `json:"hand_no"`
+	DeckCommitHash  string `json:"deck_commit_hash,omitempty"`
+	Variant         string `json:"variant,omitempty"` // "holdem" | "plo"
 	// RenderStyle is the owner-chosen table look ("2.5d" | "3d") — every seat at the
 	// table renders in this style; empty falls back to the player's device preference.
 	RenderStyle string `json:"render_style,omitempty"`
@@ -201,18 +201,39 @@ type TableCreateRequest struct {
 	//  - GeoRestricted: re-check the seating player's jurisdiction at sit-down.
 	//  - WalletLimitCents: cap total chips a single player may bring to the table.
 	//  - AutoBuyBackCents: auto top-up a busted player to this stack (0 => off).
-	AccessType       string `json:"access_type,omitempty" enum:"public,members,invite" label:"Access Type"`
-	JoinCode         string `json:"join_code,omitempty" label:"Table Join Code"`
-	AllowSpectators  bool   `json:"allow_spectators,omitempty" label:"Allow Spectators"`
+	AccessType      string `json:"access_type,omitempty" enum:"public,members,invite" label:"Access Type"`
+	JoinCode        string `json:"join_code,omitempty" label:"Table Join Code"`
+	AllowSpectators bool   `json:"allow_spectators,omitempty" label:"Allow Spectators"`
 	// Opt out of the coded-guest approval gate: anyone holding this table's
 	// code may sit immediately, no operator decision. Default FALSE — a home
 	// game turns it on so friends are not queued; a public coded table leaves
 	// it off so strangers are not seated unseen.
-	TrustCodeGuests  bool   `json:"trust_code_guests,omitempty" label:"Trust Code Holders"`
-	KYCRequired      bool   `json:"kyc_required,omitempty" label:"Require KYC to sit"`
-	GeoRestricted    bool   `json:"geo_restricted,omitempty" label:"Geo-Restricted"`
-	WalletLimitCents int64  `json:"wallet_limit_cents,omitempty" validate:"min=0" unit:"money_minor" label:"Universal Wallet Limit"`
-	AutoBuyBackCents int64  `json:"auto_buy_back_cents,omitempty" validate:"min=0" unit:"money_minor" label:"Auto Buy-Back"`
+	TrustCodeGuests bool `json:"trust_code_guests,omitempty" label:"Trust Code Holders"`
+	// AutoApproveNonMembers: seat an identified NON-MEMBER on club chips (a
+	// loan) without waiting for an operator decision.
+	//
+	// Two effects, and they belong together. Approval alone is not enough: a
+	// non-member who verified an email is not `isGuest`, so reserveBuyIn sends
+	// them to their GLOBAL wallet — approve a visitor with no deposited funds
+	// and they still cannot sit. This also puts them on club-issued chips, and
+	// they settle in the table settlement like everyone else on loan.
+	//
+	// Does NOT relax tier 1: a visitor with no identity at all is still refused.
+	// Default FALSE — extending club credit to strangers is opt-in.
+	AutoApproveNonMembers bool `json:"auto_approve_non_members,omitempty" label:"Auto-approve non-members (club loan)"`
+	// NonMemberLoanCents: how much club credit to extend to an auto-approved
+	// non-member who holds no club balance yet.
+	//
+	// Without this the option is inert for the people it exists for. A stranger
+	// has no poker_player_balance row, so LockBalanceForTable returns
+	// "insufficient club balance" and the seat fails the instant after they were
+	// approved. This is the LOAN in "sit with loan": a hard per-player cap the
+	// club chooses, not an open line of credit.
+	NonMemberLoanCents int64 `json:"non_member_loan_cents,omitempty" validate:"min=0" unit:"money_minor" label:"Loan per non-member"`
+	KYCRequired        bool  `json:"kyc_required,omitempty" label:"Require KYC to sit"`
+	GeoRestricted      bool  `json:"geo_restricted,omitempty" label:"Geo-Restricted"`
+	WalletLimitCents   int64 `json:"wallet_limit_cents,omitempty" validate:"min=0" unit:"money_minor" label:"Universal Wallet Limit"`
+	AutoBuyBackCents   int64 `json:"auto_buy_back_cents,omitempty" validate:"min=0" unit:"money_minor" label:"Auto Buy-Back"`
 	//  - NoMaxBuyIn: unlimited buy-in (no max) — honored on PLAY-MONEY tables only.
 	NoMaxBuyIn bool `json:"no_max_buyin,omitempty" label:"Unlimited buy-in (play money)"`
 	//  - StakeMode: "cash" (real money — requires a LICENSED club) or "play"

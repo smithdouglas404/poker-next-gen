@@ -114,5 +114,53 @@ check(!e3.some((e) => e.code === "guest_identity_required" || e.code === "guest_
   "tier 3 bypasses the coded-guest gate entirely", P(e3.map((e) => e.code)));
 check(approvalRows(memberS.user_id) === 0, "tier 3 wrote NO approval row");
 
+// ── auto-approve non-members: skips the queue, NEVER skips tier 1 ────────────
+console.log("\n── auto_approve_non_members table ──");
+const autoTable = await rpc(hostS, "table_create", {
+  club_id: clubId, small_blind: 100, big_blind: 200, max_seats: 6,
+  access_type: "invite", join_code: "AUTO99", allow_spectators: true,
+  stake_mode: "play", trust_code_guests: false, auto_approve_non_members: true,
+  non_member_loan_cents: 200000, // $2,000 club credit per stranger
+});
+const autoMatch = autoTable?.match_id ?? autoTable?.table?.match_id;
+
+async function trySitAt(session, matchId, code, seat) {
+  const sock = client.createSocket(false, false);
+  const errs = [];
+  sock.onmatchdata = (md) => {
+    if (md.op_code !== OP_ERROR) return;
+    try { errs.push(JSON.parse(new TextDecoder().decode(md.data))); } catch { /* ignore */ }
+  };
+  await sock.connect(session, true);
+  await sock.joinMatch(matchId, undefined, { join_code: code });
+  await sock.sendMatchState(matchId, OP_SIT, JSON.stringify({ seat, buy_in_cents: 100000 }));
+  await new Promise((r) => setTimeout(r, 4000));
+  return errs;
+}
+
+// An identified non-member sits with no operator decision.
+const auto1 = await client.authenticateEmail(`auto_${stamp}@t.local`, "Passw0rd!123", true);
+const eA = await trySitAt(auto1, autoMatch, "AUTO99", 1);
+check(!eA.some((e) => e.code === "guest_approval_pending"),
+  "auto-approve: identified non-member is NOT queued", P(eA.map((e) => e.code)));
+// Still recorded, decided by "system" — the audit trail must never have a hole.
+const decidedBy = sql(`SELECT decided_by FROM poker_guest_approval WHERE user_id='${auto1.user_id}'`);
+check(decidedBy === "system", "auto-approve still WRITES the approval, decided by system", decidedBy || "(none)");
+
+// Tier 1 is untouched: no identity is still refused, even here.
+const anon2 = await client.authenticateDevice(`anon2_${stamp}`, true);
+const eB = await trySitAt(anon2, autoMatch, "AUTO99", 2);
+check(eB.some((e) => e.code === "guest_identity_required"),
+  "auto-approve does NOT relax tier 1", P(eB[0]?.code));
+
+// The LOAN itself: a stranger holds no club balance, so without this the seat
+// dies with buy_in_failed the instant after they are approved.
+check(!eA.some((e) => e.code === "buy_in_failed"),
+  "auto-approve LOAN lets the non-member actually sit", P(eA.map((e) => e.code)));
+const bal = sql(`SELECT balance, locked_amount FROM poker_player_balance WHERE club_id='${clubId}' AND user_id='${auto1.user_id}'`);
+check(bal !== "", "club credit was allocated to the stranger", bal || "(no row)");
+check(Number(sql(`SELECT count(*) FROM poker_guest_approval WHERE user_id='${anon2.user_id}'`)) === 0,
+  "tier 1 still writes NO approval row on an auto-approve table");
+
 console.log(`\n=== ${fails.length ? `${fails.length} FAILURE(S): ${fails.join(", ")}` : "ALL TIERS PASS"} ===`);
 process.exit(fails.length ? 2 : 0);

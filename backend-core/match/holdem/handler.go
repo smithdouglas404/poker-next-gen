@@ -24,6 +24,7 @@ import (
 	"github.com/smithdouglas404/poker-next-gen/backend-core/geo"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/integrations"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/loyalty"
+	"github.com/smithdouglas404/poker-next-gen/backend-core/models"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/poker"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/poker/enginemath"
 	"github.com/smithdouglas404/poker-next-gen/backend-core/protocol"
@@ -206,25 +207,31 @@ type MatchState struct {
 	InsOffered map[string]insurancePolicy // userID -> standing (unaccepted) offer
 	// Access & seating policy (#83). Configured at MatchInit; enforced at the
 	// join gate (JoinCode) and the sit-down gate (KYC / members / geo / wallet cap).
-	AccessType       string // "public" | "members" | "invite" (empty => public)
-	JoinCode         string // required in join metadata when AccessType == "invite"
-	AllowSpectators  bool   // when false, non-seated presences are not sent table state
+	AccessType      string // "public" | "members" | "invite" (empty => public)
+	JoinCode        string // required in join metadata when AccessType == "invite"
+	AllowSpectators bool   // when false, non-seated presences are not sent table state
 	// When true this table skips the coded-guest approval queue and seats any
 	// code holder straight away. Still RECORDED as an approval decision by
 	// "system" rather than bypassing the trail, so the operator can still say
 	// who sat and on whose authority.
-	TrustCodeGuests  bool
+	TrustCodeGuests bool
 	// MemberPlayOnLoan: this club seats its MEMBERS on club-issued chips (a
 	// loan) rather than requiring their own global wallet. Per-club setting.
 	// Guests always use club chips; this only decides members.
 	MemberPlayOnLoan bool
-	KYCRequired      bool   // table-level KYC floor (adds to the platform floor)
-	GeoRestricted    bool   // re-check the seating player's jurisdiction at sit-down
-	WalletLimitCents int64  // cap on total chips one player may bring (0 => no cap)
-	AutoBuyBackCents int64  // auto top-up a busted player to this stack (0 => off)
-	NoMaxBuyIn       bool   // unlimited buy-in (no max) — PLAY-MONEY tables only
-	RenderStyle      string // owner-chosen table look: "2.5d" | "3d" (empty => per-device)
-	TableArt         string // owner-chosen baked table plate id (empty => cinematic felt)
+	// AutoApproveNonMembers: identified non-members are seated on club chips
+	// without an operator decision. Never relaxes tier 1.
+	AutoApproveNonMembers bool
+	// NonMemberLoanCents caps the club credit extended to one auto-approved
+	// non-member. 0 means extend nothing.
+	NonMemberLoanCents int64
+	KYCRequired        bool   // table-level KYC floor (adds to the platform floor)
+	GeoRestricted      bool   // re-check the seating player's jurisdiction at sit-down
+	WalletLimitCents   int64  // cap on total chips one player may bring (0 => no cap)
+	AutoBuyBackCents   int64  // auto top-up a busted player to this stack (0 => off)
+	NoMaxBuyIn         bool   // unlimited buy-in (no max) — PLAY-MONEY tables only
+	RenderStyle        string // owner-chosen table look: "2.5d" | "3d" (empty => per-device)
+	TableArt           string // owner-chosen baked table plate id (empty => cinematic felt)
 	// StakeMode is what this table plays for: store.StakeCash (real money) or
 	// store.StakePlay (chips). Cash tables require the club to be licensed, and
 	// re-check at sit-down because a licence can lapse while a table is running.
@@ -471,6 +478,17 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	if v, ok := params["member_play_on_loan"].(bool); ok {
 		memberPlayOnLoan = v
 	}
+	autoApproveNonMembers := false
+	if v, ok := params["auto_approve_non_members"].(bool); ok {
+		autoApproveNonMembers = v
+	}
+	var nonMemberLoanCents int64
+	switch v := params["non_member_loan_cents"].(type) {
+	case int64:
+		nonMemberLoanCents = v
+	case float64:
+		nonMemberLoanCents = int64(v)
+	}
 	kycRequired := false
 	if v, ok := params["kyc_required"].(bool); ok {
 		kycRequired = v
@@ -574,18 +592,20 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		AutoDeal:   tournamentID == "",
 		HostUserID: hostUserID,
 		// Access & seating policy (#83).
-		AccessType:       accessType,
-		JoinCode:         joinCode,
-		AllowSpectators:  allowSpectators,
-		TrustCodeGuests:  trustCodeGuests,
-		MemberPlayOnLoan: memberPlayOnLoan,
-		KYCRequired:      kycRequired,
-		GeoRestricted:    geoRestricted,
-		WalletLimitCents: walletLimitCents,
-		AutoBuyBackCents: autoBuyBackCents,
-		NoMaxBuyIn:       noMaxBuyIn,
-		RenderStyle:      renderStyle,
-		TableArt:         tableArt,
+		AccessType:            accessType,
+		JoinCode:              joinCode,
+		AllowSpectators:       allowSpectators,
+		TrustCodeGuests:       trustCodeGuests,
+		MemberPlayOnLoan:      memberPlayOnLoan,
+		AutoApproveNonMembers: autoApproveNonMembers,
+		NonMemberLoanCents:    nonMemberLoanCents,
+		KYCRequired:           kycRequired,
+		GeoRestricted:         geoRestricted,
+		WalletLimitCents:      walletLimitCents,
+		AutoBuyBackCents:      autoBuyBackCents,
+		NoMaxBuyIn:            noMaxBuyIn,
+		RenderStyle:           renderStyle,
+		TableArt:              tableArt,
 	}
 	label := buildLabel(state)
 	// 10 ticks/sec: a 1 Hz loop made deals, chip moves, and action prompts update
@@ -1174,6 +1194,16 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 				// Skipping the record entirely would leave the operator unable to
 				// say who sat at their table, which is the thing this whole gate
 				// exists to preserve.
+				// The table opted into seating identified non-members on club
+				// credit without waiting for a decision. Note this branch is
+				// reached only AFTER the tier-1 email check above, so
+				// auto-approval can never seat someone with no identity — the
+				// operator still gets a named, contactable person in the record.
+				if s.AutoApproveNonMembers {
+					if err := ga.AutoApprove(ctx, req); err != nil {
+						logger.Warn("non-member auto-approve failed: %v", err)
+					}
+				}
 				if s.TrustCodeGuests {
 					if err := ga.AutoApprove(ctx, req); err != nil {
 						logger.Warn("guest auto-approve failed: %v", err)
@@ -2611,10 +2641,42 @@ func reserveBuyIn(ctx context.Context, db *sql.DB, s *MatchState, userID string,
 	// buys in from their own global wallet, exactly as before. Either way the
 	// club branch below records a settlement line at cash-out, because a loan
 	// has to be squared afterwards.
-	if s.ClubID != "" && (guest || (s.MemberPlayOnLoan && isClubMember(ctx, db, s.ClubID, userID))) {
+	clubMember := s.ClubID != "" && isClubMember(ctx, db, s.ClubID, userID)
+	if s.ClubID != "" && (guest ||
+		(s.MemberPlayOnLoan && clubMember) ||
+		(s.AutoApproveNonMembers && !clubMember)) {
 		// Club-allocated chips, under the operator's limit.
-		if err := store.NewClubStore(db).LockBalanceForTable(ctx, s.ClubID, userID, amount, matchIDForAudit(s)); err != nil {
-			return "", 0
+		cs := store.NewClubStore(db)
+		if err := cs.LockBalanceForTable(ctx, s.ClubID, userID, amount, matchIDForAudit(s)); err != nil {
+			// A stranger has no poker_player_balance row at all, so the lock
+			// fails with "insufficient club balance" and the seat dies the
+			// instant after they were approved — the option would be inert for
+			// exactly the people it exists for. Extend the table's configured
+			// loan, once, then retry.
+			//
+			// Bounded on purpose: NonMemberLoanCents is a per-player cap the
+			// club chose, not an open line of credit, and this only fires for a
+			// non-member on a table that opted in. The allocation is a normal
+			// AllocateBalance, so it lands in the ledger with a reason like
+			// every other club-chip movement, and the loan settles in the
+			// table settlement afterwards.
+			if !s.AutoApproveNonMembers || clubMember || s.NonMemberLoanCents <= 0 {
+				return "", 0
+			}
+			loan := s.NonMemberLoanCents
+			if amount > loan {
+				// Never advance more than the club agreed to lend. Buy in for
+				// the loan instead of failing outright.
+				amount = loan
+			}
+			if err := cs.AllocateBalance(ctx, &models.PlayerAllocatedBalance{
+				ClubID: s.ClubID, UserID: userID, Balance: loan,
+			}, "auto loan: non-member seated on club credit"); err != nil {
+				return "", 0
+			}
+			if err := cs.LockBalanceForTable(ctx, s.ClubID, userID, amount, matchIDForAudit(s)); err != nil {
+				return "", 0
+			}
 		}
 		return "club", amount
 	}
@@ -2988,8 +3050,8 @@ func equippedAvatarID(ctx context.Context, db *sql.DB, userID string) string {
 // achievements. HRP is earned by PLAYING, so losers still progress. Called before
 // ResetBetweenHands, while seats still carry the hand's state.
 func accrueLoyalty(ctx context.Context, db *sql.DB, nk runtime.NakamaModule, s *MatchState, res poker.ShowdownResult) {
-	winners := map[int]string{}    // seat -> winning hand category ("" = won uncontested/no showdown)
-	winnings := map[int]int64{}    // seat -> this hand's total cents won (split evenly across a pot's winners)
+	winners := map[int]string{} // seat -> winning hand category ("" = won uncontested/no showdown)
+	winnings := map[int]int64{} // seat -> this hand's total cents won (split evenly across a pot's winners)
 	for _, r := range res.Resolutions {
 		if len(r.Winners) == 0 {
 			continue

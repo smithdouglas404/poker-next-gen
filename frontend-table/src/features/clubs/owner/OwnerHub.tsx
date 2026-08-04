@@ -15,6 +15,7 @@ import { MemberAnalytics } from "./MemberAnalytics";
 import { CreditRequests } from "./CreditRequests";
 import { GuestApprovals } from "./GuestApprovals";
 import { GuestSessions } from "./GuestSessions";
+import { TableSettlements } from "./TableSettlements";
 import { SeatSessions } from "./SeatSessions";
 import { ClubNights } from "./ClubNights";
 import { MemberManagement } from "./MemberManagement";
@@ -628,6 +629,10 @@ export function OwnerHub() {
                 whereas reconciliation below is settle-up after the fact. */}
             <GuestApprovals clubId={club?.id} canManage={canManage} />
             <GuestSessions clubId={club?.id} canManage={canManage} />
+            {/* Below the two guest queues: approvals block a live player and
+                reconciliation settles one guest, but this is the whole
+                table's loan position and it is what closes the game. */}
+            <TableSettlements clubId={club?.id} canManage={canManage} />
             <SeatSessions clubId={club?.id} canManage={canManage} />
             <ClubNights clubId={club?.id} canManage={canManage} />
           </div>

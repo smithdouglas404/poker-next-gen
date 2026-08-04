@@ -98,6 +98,8 @@ export function PrivateTableSetup({
   // without a human looking at them. A host running a game for friends turns
   // it on so nobody waits in a queue.
   const [trustCodeGuests, setTrustCodeGuests] = useState(false);
+  const [autoApproveNonMembers, setAutoApproveNonMembers] = useState(false);
+  const [nonMemberLoanDollars, setNonMemberLoanDollars] = useState("");
 
   // ---- Advanced Table Access Configuration (detailed_8 master) ----
   const [accessType, setAccessType] = useState<AccessType>(
@@ -202,6 +204,13 @@ export function PrivateTableSetup({
       // Only meaningful on a coded table — that is the only place the
       // guest-approval gate runs.
       trust_code_guests: accessType === "invite" ? trustCodeGuests : false,
+      // Only meaningful on a CLUB table — the loan it extends is club-issued
+      // chips, so a table with no club behind it has nothing to lend.
+      auto_approve_non_members: sponsorClub ? autoApproveNonMembers : false,
+      // The loan itself. Without an amount the toggle is inert: a stranger
+      // holds no club balance, so the seat fails right after they are approved.
+      non_member_loan_cents:
+        sponsorClub && autoApproveNonMembers ? dollarsToCents(nonMemberLoanDollars) : 0,
       geo_restricted: geoRestricted,
       kyc_required: kycRequired,
       wallet_limit_cents: dollarsToCents(walletLimitDollars),
@@ -657,6 +666,12 @@ export function PrivateTableSetup({
               />
             )}
             <ToggleRow
+              label="Auto-approve non-members (club loan)"
+              blurb="Seat identified non-members straight away on club chips, instead of queuing them for approval. They still have to verify an email first — a visitor with no identity is never seated. Club chips are a loan: whatever they win or lose appears in this game's settlement for you to sign off."
+              on={autoApproveNonMembers}
+              onToggle={() => setAutoApproveNonMembers((v) => !v)}
+            />
+            <ToggleRow
               label="KYC Required"
               blurb="Only identity-verified players may take a seat at this table."
               on={kycRequired}
@@ -766,6 +781,24 @@ export function PrivateTableSetup({
 
           {/* Financials — wallet limit + auto buy-back */}
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            {autoApproveNonMembers && (
+              <Field
+                label="Loan per non-member"
+                hint="Club credit advanced to each auto-approved non-member. Required — with no amount they are approved and then cannot sit, because a stranger holds no club balance."
+              >
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-neutral-500">$</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={nonMemberLoanDollars}
+                    onChange={(e) => setNonMemberLoanDollars(e.target.value)}
+                    placeholder="1,000"
+                    className="pl-7"
+                  />
+                </div>
+              </Field>
+            )}
             <Field label="Universal Wallet Limit" hint="Cap the total a player may bring to this table.">
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-neutral-500">$</span>

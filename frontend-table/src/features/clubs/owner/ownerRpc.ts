@@ -114,6 +114,19 @@ export const ownerApi = {
       reason,
     }),
 
+  /** Club-chip settlement: games whose books the owner has not signed off yet. */
+  tableSettlementList: (clubId: string) =>
+    call<{ settlements: import("./types").Settlement[]; count: number }>(
+      "table_settlement_list",
+      { club_id: clubId },
+    ),
+  /** Record the owner's "books balanced" sign-off for one game. */
+  tableSettlementConfirm: (clubId: string, matchId: string) =>
+    call<{ settlement: import("./types").Settlement }>("table_settlement_confirm", {
+      club_id: clubId,
+      match_id: matchId,
+    }),
+
   /** Seat sessions (Tier-1 C): recent sittings at the club's tables with hit-and-run / rathole flags. */
   seatSessionsList: (clubId: string) =>
     call<{ sessions: import("./types").SeatSession[] }>("seat_sessions_list", { club_id: clubId }),

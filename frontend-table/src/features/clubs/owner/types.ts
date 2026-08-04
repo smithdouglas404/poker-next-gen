@@ -315,3 +315,32 @@ export interface GuestApproval {
   decided_at?: string;
   same_device_seated: number;
 }
+
+/** One player's position against the club chips they were ADVANCED.
+ *  Club chips are a loan; net = returned - loaned. Negative means the player
+ *  owes the club, positive means the club owes the player. */
+export interface SettlementLine {
+  user_id: string;
+  username: string;
+  is_member: boolean;
+  loaned_minor: number;
+  returned_minor: number;
+  net_minor: number;
+}
+
+/** A club table's whole loan position, plus the operator's sign-off.
+ *  total_owed_to_club and total_owed_to_players are reported separately, not
+ *  netted: in a closed table they are equal, and a difference means chips
+ *  leaked — which the operator needs to see rather than have hidden. */
+export interface Settlement {
+  id: string;
+  club_id: string;
+  match_id: string;
+  status: "open" | "confirmed";
+  confirmed_by: string;
+  created_at: string;
+  confirmed_at?: string;
+  lines: SettlementLine[];
+  total_owed_to_club: number;
+  total_owed_to_players: number;
+}

@@ -210,10 +210,12 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		"allow_insurance":    req.AllowInsurance,
 		"allow_run_it_twice": req.AllowRunItTwice,
 		// Access & seating policy (#83) — previously dropped by the backend.
-		"access_type":         req.AccessType,
-		"join_code":           strings.ToUpper(strings.TrimSpace(req.JoinCode)),
-		"allow_spectators":    req.AllowSpectators,
-		"trust_code_guests":   req.TrustCodeGuests,
+		"access_type":              req.AccessType,
+		"join_code":                strings.ToUpper(strings.TrimSpace(req.JoinCode)),
+		"allow_spectators":         req.AllowSpectators,
+		"trust_code_guests":        req.TrustCodeGuests,
+		"auto_approve_non_members": req.AutoApproveNonMembers,
+		"non_member_loan_cents":    req.NonMemberLoanCents,
 		// Per-CLUB, not per-table: whether this club's members play on
 		// club-issued chips (a loan the club squares up afterwards) or from
 		// their own global wallet. Read from the club's settings so every table
