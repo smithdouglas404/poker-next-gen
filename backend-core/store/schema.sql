@@ -1432,3 +1432,54 @@ CREATE TABLE IF NOT EXISTS poker_consent (
     UNIQUE (user_id, kind, version)
 );
 CREATE INDEX IF NOT EXISTS idx_poker_consent_user ON poker_consent(user_id);
+
+-- Club table settlement — the LOAN ledger for club-issued chips.
+--
+-- Club chips are a LOAN the club extends, not the player's own money (that is
+-- the global wallet, real funds the player deposited). So at the end of a club
+-- game the books do not balance themselves: every player who drew club chips
+-- has a position against what they were advanced, and somebody has to pay
+-- somebody. A player advanced 1,000 who carries off 200 owes the club 800; one
+-- who carries off 1,800 is owed 800 by the club.
+--
+-- One header row per (club, match) plus one line per player. The header carries
+-- the operator's sign-off: nothing is final until an owner has looked at the
+-- who-pays-whom list and confirmed the books balance.
+--
+-- Distinct from poker_guest_session, which tracks whether a GUEST has been
+-- reconciled at all. This is the money arithmetic, and it covers members too
+-- when the club has member_play_on_loan enabled.
+CREATE TABLE IF NOT EXISTS poker_table_settlement (
+    id           TEXT PRIMARY KEY,
+    club_id      TEXT NOT NULL,
+    match_id     TEXT NOT NULL,
+    status       TEXT NOT NULL DEFAULT 'open',  -- open | confirmed
+    confirmed_by TEXT NOT NULL DEFAULT '',
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    confirmed_at TIMESTAMPTZ,
+    UNIQUE (club_id, match_id)
+);
+CREATE INDEX IF NOT EXISTS idx_poker_table_settlement_club
+    ON poker_table_settlement(club_id, status, created_at DESC);
+
+-- One player's position in a settlement.
+--
+-- loaned_minor accumulates every club-chip buy-in they took to the table
+-- (including re-buys); returned_minor accumulates every stack that came back.
+-- net = returned - loaned: negative means the PLAYER OWES THE CLUB, positive
+-- means the CLUB OWES THE PLAYER. Both sides are accumulated rather than
+-- overwritten, so a player who sits, stands and sits again settles once on
+-- their whole session.
+CREATE TABLE IF NOT EXISTS poker_table_settlement_line (
+    id             TEXT PRIMARY KEY,
+    settlement_id  TEXT NOT NULL REFERENCES poker_table_settlement(id) ON DELETE CASCADE,
+    user_id        TEXT NOT NULL,
+    username       TEXT NOT NULL DEFAULT '',
+    is_member      BOOLEAN NOT NULL DEFAULT FALSE,
+    loaned_minor   BIGINT NOT NULL DEFAULT 0,
+    returned_minor BIGINT NOT NULL DEFAULT 0,
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (settlement_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_poker_table_settlement_line_user
+    ON poker_table_settlement_line(user_id);

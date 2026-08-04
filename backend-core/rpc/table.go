@@ -214,6 +214,11 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		"join_code":           strings.ToUpper(strings.TrimSpace(req.JoinCode)),
 		"allow_spectators":    req.AllowSpectators,
 		"trust_code_guests":   req.TrustCodeGuests,
+		// Per-CLUB, not per-table: whether this club's members play on
+		// club-issued chips (a loan the club squares up afterwards) or from
+		// their own global wallet. Read from the club's settings so every table
+		// the club opens answers the same way.
+		"member_play_on_loan": clubMemberPlayOnLoan(ctx, db, req.ClubID),
 		"kyc_required":        req.KYCRequired,
 		"geo_restricted":      req.GeoRestricted,
 		"wallet_limit_cents":  req.WalletLimitCents,

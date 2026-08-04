@@ -214,6 +214,10 @@ type MatchState struct {
 	// "system" rather than bypassing the trail, so the operator can still say
 	// who sat and on whose authority.
 	TrustCodeGuests  bool
+	// MemberPlayOnLoan: this club seats its MEMBERS on club-issued chips (a
+	// loan) rather than requiring their own global wallet. Per-club setting.
+	// Guests always use club chips; this only decides members.
+	MemberPlayOnLoan bool
 	KYCRequired      bool   // table-level KYC floor (adds to the platform floor)
 	GeoRestricted    bool   // re-check the seating player's jurisdiction at sit-down
 	WalletLimitCents int64  // cap on total chips one player may bring (0 => no cap)
@@ -463,6 +467,10 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	if v, ok := params["trust_code_guests"].(bool); ok {
 		trustCodeGuests = v
 	}
+	memberPlayOnLoan := false
+	if v, ok := params["member_play_on_loan"].(bool); ok {
+		memberPlayOnLoan = v
+	}
 	kycRequired := false
 	if v, ok := params["kyc_required"].(bool); ok {
 		kycRequired = v
@@ -570,6 +578,7 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		JoinCode:         joinCode,
 		AllowSpectators:  allowSpectators,
 		TrustCodeGuests:  trustCodeGuests,
+		MemberPlayOnLoan: memberPlayOnLoan,
 		KYCRequired:      kycRequired,
 		GeoRestricted:    geoRestricted,
 		WalletLimitCents: walletLimitCents,
@@ -2596,8 +2605,14 @@ func reserveBuyIn(ctx context.Context, db *sql.DB, s *MatchState, userID string,
 	if s.TournamentID != "" {
 		return "tournament", amount // director-managed; no wallet debit
 	}
-	if s.ClubID != "" && guest {
-		// Guest / comp seat only: club-allocated chips, under the operator's limit.
+	// Club-issued chips are a LOAN. Guests always draw them — they have no
+	// certified wallet to draw from. MEMBERS draw them only when this club has
+	// member_play_on_loan set; otherwise a member is a certified cash player and
+	// buys in from their own global wallet, exactly as before. Either way the
+	// club branch below records a settlement line at cash-out, because a loan
+	// has to be squared afterwards.
+	if s.ClubID != "" && (guest || (s.MemberPlayOnLoan && isClubMember(ctx, db, s.ClubID, userID))) {
+		// Club-allocated chips, under the operator's limit.
 		if err := store.NewClubStore(db).LockBalanceForTable(ctx, s.ClubID, userID, amount, matchIDForAudit(s)); err != nil {
 			return "", 0
 		}
@@ -2661,6 +2676,19 @@ func releaseBuyInAs(ctx context.Context, logger runtime.Logger, db *sql.DB, s *M
 		if err := store.NewClubStore(db).SettleSeatAtTable(ctx, s.ClubID, userID, locked, amount, matchIDForAudit(s)); err != nil {
 			logger.Error("CASHOUT FAILED match=%s club=%s user=%s amount_cents=%d: %v",
 				matchIDForAudit(s), s.ClubID, userID, amount, err)
+		}
+		// Club chips are a LOAN, so the ledger move above is not the end of it:
+		// the club is now up or down against what it advanced, and an operator
+		// has to be told who pays whom before the books close. `locked` is what
+		// was advanced, `amount` is what came back — net is the position.
+		//
+		// Bookkeeping only, and deliberately after the cash-out: a settlement
+		// line failing to write must never stop a player collecting their
+		// chips, so this logs and carries on.
+		if err := store.NewSettlementStore(db).RecordSeat(ctx, s.ClubID, matchIDForAudit(s),
+			userID, seatUsername(s, userID), isClubMember(ctx, db, s.ClubID, userID),
+			locked, amount); err != nil {
+			logger.Warn("settlement line failed match=%s user=%s: %v", matchIDForAudit(s), userID, err)
 		}
 		return
 	}
@@ -2881,6 +2909,24 @@ func accountEmail(ctx context.Context, nk runtime.NakamaModule, userID string) s
 	}
 	if cid := acct.GetCustomId(); strings.HasPrefix(cid, "clerk:") {
 		return cid
+	}
+	return ""
+}
+
+// seatUsername returns the display name the table knows for a player, or "".
+//
+// Best effort by design: a settlement line is worth writing with a blank name
+// (the operator still has the user id) and worth nothing if a missing name
+// stopped it. RecordSeat keeps whatever name it already had rather than
+// blanking a good one.
+func seatUsername(s *MatchState, userID string) string {
+	if s == nil || s.Table == nil {
+		return ""
+	}
+	for _, seat := range s.Table.Seats {
+		if seat.UserID == userID {
+			return seat.Username
+		}
 	}
 	return ""
 }

@@ -50,6 +50,11 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		"guest_sessions_pending":   rpc.GuestSessionsPending,
 		"guest_approvals_pending":  rpc.GuestApprovalsPending,
 		"guest_approval_decide":    rpc.GuestApprovalDecide,
+		// Club-chip settlement: club chips are a LOAN, so an operator has to see
+		// who pays whom and sign the books off before a club game is closed.
+		"table_settlement_list":    rpc.TableSettlementList,
+		"table_settlement_get":     rpc.TableSettlementGet,
+		"table_settlement_confirm": rpc.TableSettlementConfirm,
 		"guest_approval_status":    rpc.GuestApprovalStatus,
 		"guest_session_reconcile":  rpc.GuestSessionReconcile,
 		"seat_sessions_list":       rpc.SeatSessionsList,
