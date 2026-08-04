@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-import { DEFAULT_MAX_SEATS, MAX_SEATS, MIN_SEATS, type SeatView } from "@/features/game/protocol";
+import { MAX_SEATS, MIN_SEATS, type SeatView } from "@/features/game/protocol";
 import { formatCents, useGame } from "@/features/game/GameProvider";
 import { seatPointFromFelt, FELT_SURFACE_ATTR } from "@/features/hud/feltLayout";
 import { avatarDef, avatarForKey } from "@/features/table/avatars";
@@ -118,7 +118,7 @@ function SeatCard({
  * count (2–9) and rescale correctly on resize — no hardcoded per-count layouts.
  */
 export function SeatHud() {
-  const { snapshot, sitDown, profile, buyInCents, maxSeats, showdown } = useGame();
+  const { snapshot, sitDown, profile, buyInCents, showdown } = useGame();
   const buyInLabel = formatCents(buyInCents);
 
   const [mode] = useRenderMode();
@@ -174,16 +174,29 @@ export function SeatHud() {
     // rail the moment the drawer is toggled.
   }, [insetLeft]);
 
-  // Authoritative seat count from the table snapshot when seated/created;
-  // otherwise the count the hero picked in the create form (live preview).
+  // Seat count comes from the TABLE, never from a default.
+  //
+  // This used to fall through to `maxSeats ?? DEFAULT_MAX_SEATS`, so /table with
+  // no match drew SIX "SIT HERE" cards — each advertising a $1,000 buy-in — at a
+  // table that does not exist. DEFAULT_MAX_SEATS is the /lobby create form's
+  // starting value (6 of a possible 2–10); it is not a property of any table,
+  // and leaking it onto the felt invents state the server never sent. It also
+  // made the empty felt look like a 6-max table when the room the operator
+  // eventually creates might be any size up to 10.
+  //
+  // Those cards were dead as well as wrong: sitDown() calls
+  // sendMatch(OpSitDown, …), and with no match there is nothing to send to.
+  // Six clickable buy-in buttons that cannot seat anyone.
+  //
+  // No snapshot => no seats. The felt still renders (TableFeltBackdrop) and
+  // TableEmptyState still offers "Table code -> JOIN", which is the only real
+  // action available at that point. See CLAUDE.md non-negotiables 3 and 4.
   const seatCount = Math.min(
     MAX_SEATS,
-    Math.max(MIN_SEATS, snapshot?.max_seats ?? snapshot?.seats.length ?? maxSeats ?? DEFAULT_MAX_SEATS),
+    Math.max(MIN_SEATS, snapshot?.max_seats ?? snapshot?.seats.length ?? MIN_SEATS),
   );
 
-  const seats: SeatView[] =
-    snapshot?.seats ??
-    Array.from({ length: seatCount }, (_, index) => ({ index, stack: 0, status: "empty" }));
+  const seats: SeatView[] = snapshot?.seats ?? [];
 
   const heroSeat = seats.find((s) => s.user_id === profile.userId)?.index;
 
