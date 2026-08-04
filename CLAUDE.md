@@ -161,9 +161,22 @@ The composition, as it actually runs:
   index 0 (6 → `0,2,3,5,7,8`; heads-up → `0,5`; 10 → unchanged). The seat layer,
   the empty "SIT HERE" markers and the dealer button must all use it, or they
   land on different rings again.
-  **Test every layout change at 6 seats, not just the 10-seat `DEMO_SNAPSHOT`.**
+  `npm run check:table`'s **`seat-ring-spread`** check now proves this for every
+  count 2–10 by evaluating the real `seatRingIndex` against the real
+  `TABLE_SEATS`: no two seats may share a position, hero stays at 0, and from 4
+  seats up both halves of the felt must be used. It fails on the naive
+  `visualIndex % ring` mapping that shipped.
   `?demo=1` is a 10-max fixture, so it cannot show this class of bug at all —
-  that is precisely how it reached production.
+  that is precisely how it reached production. **A rendered screenshot of a
+  non-10 table still needs the local stack**; the check proves the geometry, not
+  the render.
+- **Seat count comes from the TABLE, never from a default.** `SeatHud` reads
+  `snapshot.max_seats`, and **no snapshot means no seats** — not
+  `DEFAULT_MAX_SEATS`. That constant is the /lobby create form's starting value
+  (6 of 2–10), not a property of any table. Falling through to it drew six "SIT
+  HERE" cards advertising a $1,000 buy-in on `/table` with no match: fabricated
+  state (non-negotiable 3) *and* six dead buttons, since `sitDown()` calls
+  `sendMatch(OpSitDown, …)` and there is no match to send to (non-negotiable 4).
 - **Community cards** — a centred flex row at `left:50% top:45%`, `gap-2.5`, `md`
   cards (70×105), dealt via `COMMUNITY_DEAL_FROM`.
 - **Pot cluster** — a centred flex column at `left:50% top:25%`: `HAND n | POT: $x`,
@@ -435,11 +448,87 @@ carry — those are set in the Railway dashboard.
 `docker compose up --build` boot order: `postgres` → `engine-math` →
 `backend-core` → `frontend-table`. See `docs/DOCKER.md` and `docker-compose.yml`.
 
+## A player has TWO wallets — never show a bare "Wallet" figure (BINDING)
+
+1. **Global wallet** — `profile.walletCents`, the certified balance that follows
+   the player everywhere. Funded by deposits, gated by KYC.
+2. **Club wallet** — `snapshot.hero_club_balance`, chips a club has allocated to
+   this player at this table. Table-local.
+
+`BuyInDialog` is the reference: it offers whichever are available, labelled
+**"Global wallet"** and **"Club wallet"**, and `sitDown(seat, buyIn, wallet)`
+carries the choice to the server, which is the authority on both.
+
+The header used to print `profile.walletCents` under the single word "Wallet",
+and the club balance appeared **nowhere** outside the buy-in dialog — so at a
+club table a player could not see their club chips at all, and the owner read
+the header figure as the club balance when it was the global one. An unlabelled
+money figure gets read as whichever wallet the reader has in mind.
+
+**Any surface showing a balance must say which wallet it is.** `PlayerHeader`
+now shows "Global" always and "Club" only when the table actually has a club
+balance (`null`, not `0`, when there is none — never invent a $0.00 club wallet
+at a table with no club behind it).
+
+Related rule already in the engine: registered players buy in from the certified
+global wallet; club-allocated comp chips are for guests (see the certification
+comment in `match/holdem/handler.go`).
+
+## Automated design checks — `npm run check:table` (BINDING)
+
+`frontend-table/scripts/check-table-invariants.mjs`. **Run it after any table
+change.** These exist because a doc alone already failed once: CLAUDE.md pointed
+at a design-reference directory that had been deleted, for months, and nothing
+complained. (Check 1 is why that path cannot be named here in prose — only
+inside a fenced block, where this file records what it deleted.)
+
+| # | check | what it prevents |
+|---|---|---|
+| 1 | `doc-paths` | CLAUDE.md naming a file that does not exist |
+| 2 | `one-renderer` | a second table renderer / `render_style` branch coming back |
+| 3 | `r3f-scope` | three/R3F leaking out of 3D **avatars** into the table |
+| 4 | `motion-transform` | `transform` in `style` on a `<motion.*>` — framer overwrites it |
+| 5 | `one-felt-box` | a second coordinate system (`FELT_BOUNDS` spread without `useFeltStyle()`, or any `computeTableLayout` caller) |
+| 6 | `demo-is-data-only` | `?demo=1` changing LAYOUT or VISIBILITY instead of only DATA |
+| 7 | `seat-ring-spread` | seats bunching on one side at any count 2–10 |
+
+Two rules about this script:
+
+- **A check that has never failed is not a check.** When adding one, deliberately
+  reintroduce the bug, confirm it fails, then revert. Checks 6 and 7 were both
+  proved that way.
+- The `KNOWN` maps are for cases where fixing the code would demonstrably MOVE
+  the design — not for silencing noise. `motion-transform`'s map is currently
+  **empty**: its one entry (Seat.tsx bet chips) was resolved by measuring
+  `style.transform` in the live DOM, finding `none`, and deleting a declaration
+  that had never applied — zero pixels moved.
+
+### `?demo=1` may substitute DATA. It may never change LAYOUT or VISIBILITY.
+
+This is check 6, and it is the single most expensive lesson in this file. Three
+separate `!demo` branches — the 13-panel column, the felt's 144px inset, and the
+action dock's alignment — each made the preview render a *different layout* from
+`/table`, so every screenshot taken against `?demo=1` "confirmed" a table the
+owner was never looking at. The felt sat at centre 800 in demo and 944 live.
+
+Substituting data is what a preview IS: swap `DEMO_SNAPSHOT` for the live
+snapshot, fake `actionRequired`, stub `sendAction`. The pattern for a component
+that gates on a match is `const tableId = demo ? DEMO_SNAPSHOT.match_id :
+matchId` — substitute the **id**, then run one guard identical on both pages.
+See `ChatStatsPanel`, `HandHistoryPanel`, `EmotePicker`.
+
 ## Build & verify commands
+
+> **Never run `npm run build` while `npm run dev` is running.** Both write
+> `.next`, so the build replaces the chunks the dev server is serving and it
+> starts throwing `Cannot find module './<id>.js'`. The symptom looks exactly
+> like a UI regression — hero cards vanish, stray blank rectangles appear where
+> cards should be — and it is not one. Stop dev, or `rm -rf .next` and restart.
 
 ```bash
 # Frontend
 cd frontend-table && npm install && npm run build
+cd frontend-table && npm run check:table    # 7/7, after ANY table change
 
 # Backend (plugin — must match Nakama 3.31.0)
 cd backend-core && go vet ./... && go build -buildmode=plugin -trimpath -o backend-core.so .

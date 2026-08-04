@@ -47,6 +47,12 @@ export function PlayerHeader() {
   const rebuyRoom = heroSeat ? Math.max(0, Math.min(maxBuyIn - heroSeat.stack, profile.walletCents)) : 0;
   const canRebuy = !!heroSeat && !liveInHand && rebuyRoom > 0;
 
+  // Only a CLUB table has a club balance. Same source BuyInDialog reads; null
+  // (not 0) when there is no club wallet, so the header shows nothing rather
+  // than an invented "$0.00" balance at a table that has no club behind it.
+  const clubBalanceCents =
+    typeof snapshot?.hero_club_balance === "number" ? snapshot.hero_club_balance : null;
+
   const isHost = !!snapshot?.host_user_id && snapshot.host_user_id === profile.userId;
   const playerIds = (snapshot?.seats ?? []).filter((s) => s.user_id && !s.is_bot).map((s) => s.user_id!);
 
@@ -144,10 +150,25 @@ export function PlayerHeader() {
       </div>
 
       <div className="flex flex-wrap items-center gap-6">
-        <Link href="/wallet" className="text-right transition hover:opacity-80" title="Update your wallet balance">
-          <p className="text-[10px] uppercase tracking-wider text-muted">Wallet</p>
+        {/* A player has TWO balances and this header used to name neither: it
+            read "Wallet" over profile.walletCents, which is the GLOBAL wallet.
+            The club balance (snapshot.hero_club_balance) was visible only
+            inside BuyInDialog, so at a club table a player could not see it at
+            all — and an unlabelled figure gets read as whichever wallet the
+            reader has in mind. Name the global one, and show the club one
+            beside it whenever the table actually has one. BuyInDialog already
+            uses exactly these two sources with the labels "Global wallet" /
+            "Club wallet"; keep the wording aligned. */}
+        <Link href="/wallet" className="text-right transition hover:opacity-80" title="Your global wallet balance">
+          <p className="text-[10px] uppercase tracking-wider text-muted">Global</p>
           <p className="text-lg font-semibold text-green">{formatCents(profile.walletCents)}</p>
         </Link>
+        {clubBalanceCents !== null && (
+          <div className="text-right" title="Club chips allocated to you at this table">
+            <p className="text-[10px] uppercase tracking-wider text-muted">Club</p>
+            <p className="text-lg font-semibold text-gold">{formatCents(clubBalanceCents)}</p>
+          </div>
+        )}
         <div className="text-right">
           <p className="text-[10px] uppercase tracking-wider text-muted">Room</p>
           <p className="font-mono text-sm text-gold">{roomId ?? matchId?.slice(0, 8) ?? "—"}</p>
