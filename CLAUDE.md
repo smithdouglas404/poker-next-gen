@@ -275,6 +275,35 @@ Timeline/UI animation uses **GSAP** as the standard motion layer (chip flights, 
 3. **State never drifts.** The rendered UI is a pure projection of authoritative server state. No optimistic values that can disagree with the backend, no client-side "guesses" at stacks/pot/turn. Consistent with Golden rule 4 (no math fallbacks): the display reflects server truth or it shows nothing.
 4. **Every rendered control binds to a real RPC — no dead buttons.** If a control is on screen (fold/check/call/raise/all-in, presets, host controls, membership, deposits), it is wired to a registered `backend-core` RPC and reflects real capability/permission gating. Ship no placeholder or decorative buttons. `?demo=1` uses static demo data precisely because it is a preview — production surfaces must be live. A control that selects a code path which no longer exists is a dead button too: when a renderer or mode is deleted, delete the picker that chose it.
 
+## Coded guests must be approved before they sit (BINDING)
+
+A visitor holding a table code but **no registered account** may WATCH a table
+immediately. **Taking a seat requires a club operator to approve them.**
+
+Why: a code gets forwarded. Without the gate, an unbounded number of strangers
+sit down holding chips at a table the club is legally accountable for, and the
+operator cannot say who any of them were.
+
+- **Enforcement is the sit-down gate in `match/holdem/handler.go`** — the only
+  place a seat is granted. It runs BEFORE `reserveBuyIn`, so no funds move for a
+  player who cannot sit. An RPC that records a decision is not a gate.
+- **Queued on the first SIT ATTEMPT, not on join** — a railbird who only watches
+  must not fill the operator's queue.
+- **`IsApproved` fails CLOSED.** A DB error means *not approved*. A wrong `false`
+  costs one person a wait; a wrong `true` seats an unidentified player with a
+  balance.
+- **Decisions are atomic** (`status='pending'` in the UPDATE). Two operators
+  clicking opposite buttons produce one winner and one explicit conflict.
+- **`trust_code_guests`** (per table, **default false**) seats code holders
+  immediately — but still WRITES the approval, decided by `"system"`, so the
+  audit trail never has a hole. Home games turn it on; public coded tables leave
+  it off.
+- The operator queue is `OwnerHub > GuestApprovals`, above `GuestSessions`:
+  approvals block a live player, reconciliation is settle-up afterwards.
+
+Do not confuse `poker_guest_approval` (this gate) with `poker_guest_session`
+(opens once a guest HAS sat, to settle their chips afterwards).
+
 ## Working rules for agents (learned the hard way, 2026-08-02/03)
 
 These are not style preferences. Each one is here because breaking it cost real

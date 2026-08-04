@@ -448,6 +448,21 @@ func (s *AiprocStore) RegisterDevice(ctx context.Context, userID, fingerprint, i
 	return err
 }
 
+// LatestFingerprint returns the most recently seen device fingerprint (and its
+// IP) for a user, or empty strings when the client never registered one.
+//
+// Read at the coded-guest approval gate so the operator deciding whether to
+// seat a stranger can be shown "this device is already here under another
+// name". Empty is a normal answer, not an error: an older client that never
+// calls device_register simply gives the approver less to go on.
+func (s *AiprocStore) LatestFingerprint(ctx context.Context, userID string) (fingerprint, ip string) {
+	_ = s.db.QueryRowContext(ctx, `
+		SELECT fingerprint, ip FROM poker_device_fingerprint
+		 WHERE user_id = $1 ORDER BY last_seen_at DESC LIMIT 1`, userID,
+	).Scan(&fingerprint, &ip)
+	return fingerprint, ip
+}
+
 // AiprocMultiAccount is a fingerprint shared by two or more distinct accounts.
 type AiprocMultiAccount struct {
 	Fingerprint string    `json:"fingerprint"`

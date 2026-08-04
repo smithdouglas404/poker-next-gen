@@ -106,6 +106,9 @@ interface GameContextValue extends GameState {
   sendChat: (text: string) => Promise<void>;
   sendTaunt: (key: string) => Promise<void>;
   addBot: () => Promise<void>;
+  /** True once the coded-guest gate has parked this player pending approval. */
+  guestApprovalPending: boolean;
+  clearGuestApprovalPending: () => void;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);
@@ -143,6 +146,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [actionRequired]);
   const [showdown, setShowdown] = useState<ShowdownMessage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Set when the sit-down gate refuses a coded guest pending operator
+  // approval. A toast alone would tell them once and then vanish, leaving
+  // them with no idea whether anyone ever decided.
+  const [guestApprovalPending, setGuestApprovalPending] = useState(false);
   const [buyInCents, setBuyInCentsState] = useState(INITIAL_WALLET_CENTS);
   const [maxSeats, setMaxSeats] = useState(DEFAULT_MAX_SEATS);
   const [gameLog, setGameLog] = useState<GameLogEntry[]>([]);
@@ -300,6 +307,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
             // OpActionRequired in that case, so restore what sendAction cleared
             // optimistically — otherwise the action bar stays gone and the shot
             // clock auto-folds a player who is sitting right there.
+            if (payload?.code === "guest_approval_pending") {
+              setGuestApprovalPending(true);
+            }
             if (payload?.code === "action_failed" && lastActionRequiredRef.current) {
               setActionRequired(lastActionRequiredRef.current);
               lastActionRequiredRef.current = null;
@@ -648,6 +658,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       sendChat,
       sendTaunt,
       addBot,
+      guestApprovalPending,
+      clearGuestApprovalPending: () => setGuestApprovalPending(false),
     }),
     [
       connected,
@@ -688,6 +700,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       sendChat,
       sendTaunt,
       addBot,
+      guestApprovalPending,
     ],
   );
 

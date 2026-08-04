@@ -213,6 +213,7 @@ func TableCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runt
 		"access_type":         req.AccessType,
 		"join_code":           strings.ToUpper(strings.TrimSpace(req.JoinCode)),
 		"allow_spectators":    req.AllowSpectators,
+		"trust_code_guests":   req.TrustCodeGuests,
 		"kyc_required":        req.KYCRequired,
 		"geo_restricted":      req.GeoRestricted,
 		"wallet_limit_cents":  req.WalletLimitCents,

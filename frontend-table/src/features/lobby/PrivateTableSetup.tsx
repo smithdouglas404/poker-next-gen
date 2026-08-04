@@ -94,6 +94,10 @@ export function PrivateTableSetup({
   const [bots, setBots] = useState(0);
   const [durationMins, setDurationMins] = useState(0);
   const [spectators, setSpectators] = useState(true);
+  // Default FALSE: a code that gets forwarded should not seat a stranger
+  // without a human looking at them. A host running a game for friends turns
+  // it on so nobody waits in a queue.
+  const [trustCodeGuests, setTrustCodeGuests] = useState(false);
 
   // ---- Advanced Table Access Configuration (detailed_8 master) ----
   const [accessType, setAccessType] = useState<AccessType>(
@@ -195,6 +199,9 @@ export function PrivateTableSetup({
       access_type: accessType,
       join_code: accessType === "invite" ? joinCode.trim().toUpperCase() || undefined : undefined,
       allow_spectators: spectators,
+      // Only meaningful on a coded table — that is the only place the
+      // guest-approval gate runs.
+      trust_code_guests: accessType === "invite" ? trustCodeGuests : false,
       geo_restricted: geoRestricted,
       kyc_required: kycRequired,
       wallet_limit_cents: dollarsToCents(walletLimitDollars),
@@ -641,6 +648,14 @@ export function PrivateTableSetup({
               on={spectators}
               onToggle={() => setSpectators((v) => !v)}
             />
+            {accessType === "invite" && (
+              <ToggleRow
+                label="Trust Code Holders"
+                blurb="Seat anyone with the code immediately. Leave off and a club operator approves each unregistered guest before they can sit — they can still watch while they wait."
+                on={trustCodeGuests}
+                onToggle={() => setTrustCodeGuests((v) => !v)}
+              />
+            )}
             <ToggleRow
               label="KYC Required"
               blurb="Only identity-verified players may take a seat at this table."

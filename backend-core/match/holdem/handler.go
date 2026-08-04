@@ -209,6 +209,11 @@ type MatchState struct {
 	AccessType       string // "public" | "members" | "invite" (empty => public)
 	JoinCode         string // required in join metadata when AccessType == "invite"
 	AllowSpectators  bool   // when false, non-seated presences are not sent table state
+	// When true this table skips the coded-guest approval queue and seats any
+	// code holder straight away. Still RECORDED as an approval decision by
+	// "system" rather than bypassing the trail, so the operator can still say
+	// who sat and on whose authority.
+	TrustCodeGuests  bool
 	KYCRequired      bool   // table-level KYC floor (adds to the platform floor)
 	GeoRestricted    bool   // re-check the seating player's jurisdiction at sit-down
 	WalletLimitCents int64  // cap on total chips one player may bring (0 => no cap)
@@ -452,6 +457,12 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 	if v, ok := params["allow_spectators"].(bool); ok {
 		allowSpectators = v
 	}
+	// Default FALSE, deliberately: the safe default is that a stranger holding a
+	// forwarded code does NOT get seated without a human looking at them.
+	trustCodeGuests := false
+	if v, ok := params["trust_code_guests"].(bool); ok {
+		trustCodeGuests = v
+	}
 	kycRequired := false
 	if v, ok := params["kyc_required"].(bool); ok {
 		kycRequired = v
@@ -558,6 +569,7 @@ func (h *Handler) MatchInit(ctx context.Context, logger runtime.Logger, db *sql.
 		AccessType:       accessType,
 		JoinCode:         joinCode,
 		AllowSpectators:  allowSpectators,
+		TrustCodeGuests:  trustCodeGuests,
 		KYCRequired:      kycRequired,
 		GeoRestricted:    geoRestricted,
 		WalletLimitCents: walletLimitCents,
@@ -1107,14 +1119,30 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			if guest && s.AccessType == "invite" {
 				ga := store.NewGuestApprovalStore(db)
 				matchKeyGA := matchIDForAudit(s)
+				// Best-effort: empty when the client never called device_register,
+				// which just means the approver sees less. Never a reason to block.
+				guestFP, guestIP := store.NewAiprocStore(db).LatestFingerprint(ctx, userID)
+				req := &store.GuestApproval{
+					ClubID:   s.ClubID,
+					MatchID:  matchKeyGA,
+					UserID:   userID,
+					Username: presence.GetUsername(),
+					JoinCode: s.JoinCode,
+					DeviceFP: guestFP,
+					JoinIP:   guestIP,
+				}
+				// The host opted into trusting anyone with the code, so seat them
+				// now — but still WRITE the approval, marked decided by "system".
+				// Skipping the record entirely would leave the operator unable to
+				// say who sat at their table, which is the thing this whole gate
+				// exists to preserve.
+				if s.TrustCodeGuests {
+					if err := ga.AutoApprove(ctx, req); err != nil {
+						logger.Warn("guest auto-approve failed: %v", err)
+					}
+				}
 				if !ga.IsApproved(ctx, matchKeyGA, userID) {
-					if _, err := ga.Request(ctx, &store.GuestApproval{
-						ClubID:   s.ClubID,
-						MatchID:  matchKeyGA,
-						UserID:   userID,
-						Username: presence.GetUsername(),
-						JoinCode: s.JoinCode,
-					}); err != nil {
+					if _, err := ga.Request(ctx, req); err != nil {
 						logger.Warn("guest approval request failed: %v", err)
 					}
 					sendError(dispatcher, presence, "guest_approval_pending",
