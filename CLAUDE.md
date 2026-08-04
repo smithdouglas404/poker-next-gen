@@ -517,6 +517,75 @@ that gates on a match is `const tableId = demo ? DEMO_SNAPSHOT.match_id :
 matchId` — substitute the **id**, then run one guard identical on both pages.
 See `ChatStatsPanel`, `HandHistoryPanel`, `EmotePicker`.
 
+## `npm run verify` — run this before you claim anything works (BINDING)
+
+```bash
+cd frontend-table && npm run verify            # full run (needs the local stack)
+cd frontend-table && npm run verify -- --static # static only, no stack, no browser
+```
+
+**Why it exists.** A nil-pointer dereference in `seatUsername` shipped to `main`
+and SIGSEGV'd the **whole Nakama process** whenever a player left a club table
+with an empty chair — nearly every club table. It passed `go vet`, the plugin
+build, `tsc`, `npm run build`, and a 17/17 sit-down suite. Every gate was green,
+because every gate answered *"does it compile / does the code I was thinking
+about work"* and none answered *"does the app survive being used"*.
+
+Four phases, in this order:
+
+| phase | what it proves |
+|---|---|
+| 1 static | `tsc`, `check:table` (7 invariants), `go vet`, plugin builds |
+| 2 e2e | seat lifecycle, three-tier gate, club loan settlement — against the REAL stack |
+| 3 render | `/table` + `/table?demo=1` measured off the live DOM, not eyeballed |
+| 4 build | `next build` — LAST, because it clobbers a running dev server's `.next` |
+
+**A SKIP IS NOT A PASS.** When the stack or dev server is down, those phases
+report `SKIP` with the reason and the summary says *"green, but INCOMPLETE"*.
+Reading a partial green as "it works" is the exact mistake this file exists to
+stop.
+
+### The three gaps it closes — each one shipped a bug
+
+1. **No full-lifecycle test.** Sitting down was tested exhaustively; standing up
+   was never exercised once. `scripts/table-sim/lifecycle-e2e.mjs` runs
+   join → sit → stand → MatchLeave → settle, and asserts **the server is still
+   alive afterwards** — a panic in a runtime plugin kills the process, so
+   "assertions passed" and "the server survived" are different questions.
+   Verified to catch the real bug: reintroducing the nil deref makes it fail
+   with `NAKAMA SURVIVED THE STAND-UP` and one panic in the log.
+2. **No render step.** Screenshots were taken by hand and skipped under
+   pressure, which is how an unverified table reached `main`.
+   `scripts/verify-render.mjs` **asserts** felt centre = 800 on both pages, that
+   demo and live agree on the felt box, no panel column, no create control, no
+   phantom seats. Every assertion is a bug that actually shipped.
+3. **No single command.** Stack setup was ~10 manual minutes, so it did not get
+   run.
+
+### Local stack
+
+```bash
+initdb -D /var/lib/pgdata -U postgres --auth=trust      # once
+pg_ctl -D /var/lib/pgdata -o '-c listen_addresses=127.0.0.1 -p 5433' start
+nakama migrate up --database.address postgres:postgres@127.0.0.1:5433/nakama
+psql -h 127.0.0.1 -p 5433 -U postgres -d nakama -f backend-core/store/schema.sql
+cd backend-core && go build -buildmode=plugin -trimpath -o /tmp/modules/backend-core.so .
+nakama --database.address postgres:postgres@127.0.0.1:5433/nakama --runtime.path /tmp/modules
+./engine-math/target/release/engine-math-server                     # :8080
+```
+
+Nakama must be **3.31.0** — the plugin only loads into a server built from the
+same `nakama-common`. Harnesses expect Postgres on **5433**.
+
+> The Owner Hub needs an authenticated club owner and Clerk cannot authenticate
+> locally. `scripts/table-sim/hub-settlement-shot.mjs` works around it by writing
+> a real Nakama session into `localStorage` under `png-nakama-session`, in the
+> exact shape `lib/nakama/auth.ts`'s `persistSession()` uses — drop
+> `refresh_token`/`user_id` and `ensureSession()` discards it, silently falls
+> back to a fresh device account with no club, and the page renders
+> "COULDN'T LOAD". The settlement panel also lives under the **Member Registry**
+> section, which is state nav rather than a route, so it has to be clicked.
+
 ## Build & verify commands
 
 > **Never run `npm run build` while `npm run dev` is running.** Both write

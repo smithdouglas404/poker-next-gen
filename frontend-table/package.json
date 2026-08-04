@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "check:table": "node scripts/check-table-invariants.mjs"
+    "check:table": "node scripts/check-table-invariants.mjs",
+    "verify": "node scripts/verify.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.6.1",
