@@ -208,6 +208,70 @@ const rel = (p) => p.slice(FRONTEND.length + 1);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 7. A table of ANY size must spread its seats around the whole ring.
+//
+// Seat count is not a constant — the operator picks it per table in
+// PrivateTableSetup (MIN_SEATS 2 … MAX_SEATS 10, default 6), so all nine counts
+// are reachable in production.
+//
+// TABLE_SEATS is a TEN-position hand-tuned ring. Taking its first N entries for
+// a smaller table walks 0,1,2,3,4,5 = hero-bottom, bottom-left, left-bottom,
+// left-top, top-left, top-centre — the entire left and bottom of the felt with
+// the whole right half bare. A 6-max table shipped exactly that way: six "SIT
+// HERE" cards bunched down the left side. ?demo=1 is a 10-max fixture, so it
+// cannot show this class of bug at all — which is precisely how it reached
+// production.
+//
+// This evaluates the REAL seatRingIndex from table-constants.ts against the
+// REAL TABLE_SEATS coordinates, so editing either one re-runs the proof.
+// ─────────────────────────────────────────────────────────────────────────────
+{
+  const src = readFileSync(join(SRC, "features/hrc/lib/table-constants.ts"), "utf8");
+
+  const seatsBlock = src.match(/export const TABLE_SEATS\s*=\s*\[([\s\S]*?)\n\];/);
+  const fnBlock = src.match(/export function seatRingIndex\s*\(([\s\S]*?)\n\}/);
+  if (!seatsBlock || !fnBlock) {
+    fail("seat-ring-spread", "could not find TABLE_SEATS / seatRingIndex in table-constants.ts — this check must be updated with them");
+  } else {
+    const xs = [...seatsBlock[1].matchAll(/x:\s*(-?[\d.]+)/g)].map((m) => Number(m[1]));
+    // Strip TS annotations so the real function body runs as JS.
+    const js = ("function seatRingIndex(" + fnBlock[1] + "\n}")
+      .replace(/:\s*number/g, "")
+      .replace(/TABLE_SEATS\.length/g, String(xs.length));
+    let seatRingIndex;
+    try {
+      seatRingIndex = new Function(`${js}; return seatRingIndex;`)();
+    } catch (e) {
+      fail("seat-ring-spread", `seatRingIndex could not be evaluated: ${e.message}`);
+    }
+    if (seatRingIndex) {
+      for (let n = 2; n <= xs.length; n++) {
+        const ids = Array.from({ length: n }, (_, v) => seatRingIndex(v, n));
+        if (new Set(ids).size !== ids.length) {
+          fail("seat-ring-spread", `${n} seats map to duplicate ring positions [${ids}] — two players would share a chair`);
+          continue;
+        }
+        if (ids[0] !== 0) {
+          fail("seat-ring-spread", `${n} seats put the hero at ring position ${ids[0]}, not 0 (bottom centre)`);
+        }
+        // Once there are four or more seats, both halves of the felt must be used.
+        if (n >= 4) {
+          const left = ids.filter((i) => xs[i] < 35).length;
+          const right = ids.filter((i) => xs[i] > 65).length;
+          if (left === 0 || right === 0) {
+            fail(
+              "seat-ring-spread",
+              `${n} seats occupy ring positions [${ids}] — ${left} on the left, ${right} on the right. ` +
+                `They bunch on one side of the felt instead of walking the ring.`,
+            );
+          }
+        }
+      }
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 6. `?demo=1` may substitute DATA. It may never change LAYOUT or VISIBILITY.
 //
 // This is the check that would have caught eight days of damage on day one.
@@ -289,7 +353,7 @@ for (const f of failures) {
 }
 
 if (failures.length === 0) {
-  console.log(`table invariants OK — ${files.length} files checked, 6/6 checks pass`);
+  console.log(`table invariants OK — ${files.length} files checked, 7/7 checks pass`);
   process.exit(0);
 }
 console.error(`\ntable invariants FAILED — ${failures.length} problem(s)\n`);
