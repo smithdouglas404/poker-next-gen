@@ -181,6 +181,103 @@ const rel = (p) => p.slice(FRONTEND.length + 1);
   for (const f of offenders) {
     fail("one-felt-box", `${rel(f)} spreads FELT_BOUNDS without useFeltStyle() — the felt box has exactly one source`);
   }
+
+  // No second, VIEWPORT-derived seat ring on the table path.
+  //
+  // SeatHud used to fall back to computeTableLayout(window.innerWidth, …) when
+  // the felt rect wasn't measured yet: a ring with a different centre and a
+  // different aspect ratio (1.833 vs 1.786) than the felt it was supposed to
+  // sit on. They agreed at exactly one window size. Everything on the table is
+  // a percentage of the ONE measured felt rect — map through
+  // seatPointFromFelt(), or render nothing until the felt has been measured.
+  const RING_PATH = /^src\/(features\/(hrc|hud)|app\/table)\//;
+  for (const f of files) {
+    const r = rel(f);
+    if (!RING_PATH.test(r)) continue;
+    const body = readFileSync(f, "utf8").replace(/\/\/[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
+    if (/\bcomputeTableLayout\s*\(/.test(body)) {
+      fail(
+        "one-felt-box",
+        `${r} calls computeTableLayout() — that derives a seat ring from the ` +
+          `VIEWPORT, a second coordinate system beside the measured felt. Use ` +
+          `seatPointFromFelt() (features/hud/feltLayout.ts) instead.`,
+      );
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. `?demo=1` may substitute DATA. It may never change LAYOUT or VISIBILITY.
+//
+// This is the check that would have caught eight days of damage on day one.
+// Every bug that survived was one `!demo` hid, in three separate places, all the
+// same shape:
+//
+//   TableHud.tsx    {!demo && (<the 13-panel left column>)}
+//   feltLayout.ts   insetLeft = !demo && roomPanelOpen ? 288 : 0
+//   TableHud.tsx    demo ? "items-center" : "items-end pr-2"
+//
+// Each made ?demo=1 render a DIFFERENT LAYOUT from /table, so every screenshot
+// taken against ?demo=1 "confirmed" a table the owner was never looking at. The
+// felt sat at centre 800 in demo and 944 on the real page and nothing complained.
+//
+// Data substitution is fine — that is what a preview IS. Swapping DEMO_SNAPSHOT
+// for the live snapshot, faking actionRequired, stubbing sendAction: all fine.
+// The moment `demo` reaches a className, a style object, or a `return null`
+// guard, the two pages stop being the same screen and the preview stops being
+// evidence.
+// ─────────────────────────────────────────────────────────────────────────────
+{
+  // KNOWN, DELIBERATE EXCEPTIONS — reported as warnings, never silently allowed.
+  // Both are visibility decisions FORCED by the data substitution, not layout
+  // drift: in demo, HrcTable owns the whole table from DEMO_SNAPSHOT.
+  const KNOWN_DEMO = {
+    "src/features/hud/SeatHud.tsx":
+      "`demo ? [] : …` — HrcTable draws every seat from DEMO_SNAPSHOT, which " +
+      "SeatHud never sees, so it would treat all of them as empty and stamp a " +
+      "'SIT HERE' card on top of each demo avatar. Rendering none is required " +
+      "BY the data substitution, not a layout difference.",
+    "src/features/hud/TableEmptyState.tsx":
+      "`iAmSeated || demo` — the demo felt is already fully populated, so the " +
+      "'take a seat' overlay has nothing to offer and no matchId to sit into.",
+  };
+  // Only the table path. /tournaments and /marketplace have their own unrelated
+  // `demo` flags for offline fixtures; they are not this screen.
+  const TABLE_PATH = /^src\/(features\/(hrc|hud|game)|app\/table)\//;
+  const warnings = [];
+  for (const f of files) {
+    const r = rel(f);
+    if (!TABLE_PATH.test(r)) continue;
+    const body = readFileSync(f, "utf8");
+    if (!/\bdemo\b/.test(body)) continue;
+
+    const lines = body.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Comments explain these bugs at length — don't flag the explanations.
+      if (/^\s*(\/\/|\*|\/\*)/.test(line)) continue;
+      if (!/\bdemo\b/.test(line)) continue;
+
+      const inClassName = /className=\{[^}]*\bdemo\b/.test(line) || /className="[^"]*\$\{[^}]*\bdemo\b/.test(line);
+      const inStyle = /style=\{\{[^}]*\bdemo\b/.test(line);
+      const inNullGuard = /\bdemo\b[^\n]*\breturn null\b/.test(line);
+      if (!inClassName && !inStyle && !inNullGuard) continue;
+
+      const why = inClassName ? "a className" : inStyle ? "a style object" : "a `return null` guard";
+      if (KNOWN_DEMO[r]) { warnings.push(`${r}:${i + 1} — ${KNOWN_DEMO[r]}`); continue; }
+      fail(
+        "demo-is-data-only",
+        `${r}:${i + 1} branches on \`demo\` inside ${why} — ?demo=1 may substitute ` +
+          `DATA, never LAYOUT or VISIBILITY. Otherwise the preview and /table are ` +
+          `different screens and no screenshot of one proves anything about the other.`,
+      );
+    }
+  }
+  if (warnings.length) {
+    console.warn("\nKNOWN demo-branch exceptions (forced by the data substitution, not layout):");
+    for (const w of warnings) console.warn(`  ! ${w}`);
+    console.warn("");
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -191,7 +288,7 @@ for (const f of failures) {
 }
 
 if (failures.length === 0) {
-  console.log(`table invariants OK — ${files.length} files checked, 5/5 checks pass`);
+  console.log(`table invariants OK — ${files.length} files checked, 6/6 checks pass`);
   process.exit(0);
 }
 console.error(`\ntable invariants FAILED — ${failures.length} problem(s)\n`);

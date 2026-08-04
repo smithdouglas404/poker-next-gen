@@ -44,7 +44,11 @@ function HandStrengthPill() {
 function CurrentBetPill({ demo }: { demo: boolean }) {
   const { snapshot } = useGame();
   const bet = demo ? 250_000 : (snapshot?.current_bet ?? 0);
-  if ((!demo && !snapshot) || bet <= 0) return null;
+  // `bet <= 0` already covers "no snapshot" (the ?? 0 falls through), so the
+  // old `(!demo && !snapshot) ||` prefix was a redundant VISIBILITY branch on
+  // top of a value that was already data-substituted. Same rule as the rest of
+  // the table path: demo swaps data, never what renders.
+  if (bet <= 0) return null;
   return (
     <div
       className={cn(GLASS_PANEL, "pointer-events-none border-white/12 px-4 py-1.5 text-right")}

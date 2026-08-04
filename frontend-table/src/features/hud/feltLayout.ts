@@ -1,4 +1,3 @@
-import { useSearchParams } from "next/navigation";
 import type { CSSProperties } from "react";
 import { FELT_BOUNDS, seatPose } from "@/features/hrc/lib/table-constants";
 import {
@@ -59,7 +58,6 @@ export function seatPointFromFelt(
  * happened: the felt shifted while the avatars did not.
  */
 export function useFeltStyle(): { style: CSSProperties; insetLeft: number } {
-  const demo = useSearchParams().get("demo") === "1";
   const [roomPanelOpen] = useRoomPanelOpen(true);
   // Only reserve the drawer's width if the drawer is actually MOUNTED.
   //
@@ -68,10 +66,13 @@ export function useFeltStyle(): { style: CSSProperties; insetLeft: number } {
   // /table shifted `left: calc(50% + 144px)` to clear a drawer that no longer
   // existed — measured: felt centre 944 on /table vs 800 on ?demo=1, in a
   // 1600px viewport. And because the condition carried `!demo`, ?demo=1 was
-  // exempt, so the preview looked right while the live table did not. That is
-  // the same `!demo` divergence that hid the panel column itself.
-  const insetLeft =
-    SHOW_LEFT_PANEL_COLUMN && !demo && roomPanelOpen ? ROOM_PANEL_WIDTH_PX : 0;
+  // exempt, so the preview looked right while the live table did not: the same
+  // `!demo` divergence that hid the panel column itself.
+  //
+  // The `!demo` is GONE, not merely made unreachable. The felt box is pure
+  // layout, so demo must have no say in it at all — see check:table's
+  // demo-is-data-only rule.
+  const insetLeft = SHOW_LEFT_PANEL_COLUMN && roomPanelOpen ? ROOM_PANEL_WIDTH_PX : 0;
   return {
     insetLeft,
     style: insetLeft

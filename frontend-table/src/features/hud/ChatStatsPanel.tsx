@@ -12,6 +12,7 @@ import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { useGame } from "@/features/game/GameProvider";
+import { DEMO_SNAPSHOT } from "@/features/table3d/demoSnapshot";
 
 // ?demo=1 has no live socket, so chatMessages never arrives — this mirrors
 // HandHistoryPanel's DEMO_GROUPS approach so the panel has something
@@ -43,7 +44,14 @@ export function ChatStatsPanel() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  if (!matchId && !demo) return null;
+  // Substitute the DATA (the match id), not the visibility rule. In ?demo=1
+  // there IS a table — DEMO_SNAPSHOT, whose match_id is "demo-match" — so the
+  // guard below is byte-identical on both pages. This used to read
+  // `if (!matchId && !demo) return null`, a VISIBILITY branch: chat appeared in
+  // the preview and vanished on /table, which is why the owner asked where his
+  // chat had gone. See check:table's demo-is-data-only rule.
+  const tableId = demo ? DEMO_SNAPSHOT.match_id : matchId;
+  if (!tableId) return null;
 
   const submit = () => {
     const text = draft.trim();

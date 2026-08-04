@@ -5,8 +5,6 @@ import { useSearchParams } from "next/navigation";
 
 import { DEFAULT_MAX_SEATS, MAX_SEATS, MIN_SEATS, type SeatView } from "@/features/game/protocol";
 import { formatCents, useGame } from "@/features/game/GameProvider";
-import { computeTableLayout } from "@/features/table/tableLayout";
-import { getSeatPositions } from "@/features/table/seatLayout";
 import { seatPointFromFelt, FELT_SURFACE_ATTR } from "@/features/hud/feltLayout";
 import { avatarDef, avatarForKey } from "@/features/table/avatars";
 import { ChipStack } from "@/features/hud/ChipStack";
@@ -114,9 +112,9 @@ function SeatCard({
  *
  * The previous version positioned seats inside a flex box (offset + smaller than
  * the screen) using a hardcoded near-circular ellipse — so they never lined up
- * with the flat felt and drifted on resize. Now seats use the SAME geometry the
- * Pixi renderer uses (`computeTableLayout` + `getSeatPositions`) measured against
- * the full viewport the canvas fills. They sit on the felt ring for any seat
+ * with the flat felt and drifted on resize. Now seats are mapped through the
+ * felt's own measured rect (`seatPointFromFelt`), the single coordinate system
+ * every table layer shares. They sit on the felt ring for any seat
  * count (2–9) and rescale correctly on resize — no hardcoded per-count layouts.
  */
 export function SeatHud() {
@@ -136,20 +134,21 @@ export function SeatHud() {
   // coordinate systems (see CLAUDE.md > the felt-coordinate rule).
   const demo = useSearchParams().get("demo") === "1";
   const [roomPanelOpen] = useRoomPanelOpen(true);
-  const insetLeft =
-    SHOW_LEFT_PANEL_COLUMN && !demo && roomPanelOpen ? ROOM_PANEL_WIDTH_PX : 0;
+  // No `!demo` here either — must stay byte-identical to useFeltStyle()'s
+  // insetLeft, or the felt and the seat ring land on different coordinate
+  // systems (CLAUDE.md > the felt-coordinate rule).
+  const insetLeft = SHOW_LEFT_PANEL_COLUMN && roomPanelOpen ? ROOM_PANEL_WIDTH_PX : 0;
 
-  const [viewport, setViewport] = useState({ w: 0, h: 0 });
-  // The felt's REAL rendered rect. The seat ring is inscribed in it so the
-  // sit-down boxes stay locked to the table image at every window size —
-  // previously the ring was computed from the raw viewport while the felt was
-  // positioned by static CSS, two coordinate systems that only agreed at one
-  // size. Null before the felt has mounted, where we fall back to the
-  // viewport math below.
+  // The felt's REAL rendered rect, and the ONLY geometry this component has.
+  // The seat ring is inscribed in it so the sit-down boxes stay locked to the
+  // table image at every window size — previously the ring was computed from
+  // the raw viewport while the felt was positioned by static CSS, two
+  // coordinate systems that only agreed at one size. Null until the felt has
+  // mounted, and then nothing renders (see `positions` below) rather than
+  // falling back to viewport maths.
   const [feltRect, setFeltRect] = useState<DOMRect | null>(null);
   useEffect(() => {
     const update = () => {
-      setViewport({ w: window.innerWidth, h: window.innerHeight });
       const el = document.querySelector(`[${FELT_SURFACE_ATTR}]`);
       setFeltRect(el ? el.getBoundingClientRect() : null);
     };
@@ -188,11 +187,8 @@ export function SeatHud() {
 
   const heroSeat = seats.find((s) => s.user_id === profile.userId)?.index;
 
-  // orbitScale 1.04 pushes plaques just onto the rail so they read as "on the
-  // table" without crowding the community cards.
-  // Prefer the measured felt (exact, and automatically tracks any future
-  // change to FELT_BOUNDS); fall back to the viewport computation only when
-  // no felt is on screen yet.
+  // The measured felt is exact and automatically tracks any future change to
+  // FELT_BOUNDS — no second geometry to keep in sync.
   // Empty-seat cards must land exactly where the avatar appears once the seat
   // is taken. Occupied seats use TABLE_SEATS percentages inside FELT_BOUNDS
   // (HrcTable), so map those same percentages through the felt's measured rect
@@ -205,16 +201,29 @@ export function SeatHud() {
   // demo (no match to sitDown into), so render none: HrcTable owns the demo
   // table completely.
   const heroIdx = heroSeat ?? 0;
+  // THE felt rect or nothing. There is no viewport-derived fallback.
+  //
+  // This used to fall back to
+  // `getSeatPositions(computeTableLayout(viewport.w, viewport.h, insetLeft), …)`
+  // when feltRect was null — a seat ring computed from the raw VIEWPORT while
+  // the felt itself was placed by CSS. Two coordinate systems with different
+  // centres and different aspect ratios (1.833 vs 1.786) that agreed at exactly
+  // one window size; that is the bug CLAUDE.md's felt-coordinate rule was
+  // written about. Unreachable today only because TableFeltBackdrop always
+  // mounts and always carries FELT_SURFACE_ATTR — one deleted component away
+  // from being live again.
+  //
+  // Rendering nothing for the one frame before the felt is measured costs a
+  // single frame of empty seat markers. Rendering them in the WRONG PLACE costs
+  // a day.
   const positions = demo
     ? []
     : feltRect
-    ? Array.from({ length: seatCount }, (_, index) => {
-        const visual = (index - heroIdx + seatCount) % seatCount;
-        const p = seatPointFromFelt(feltRect, visual, seatCount);
-        return { index, x: p.x, y: p.y, angle: 0 };
-      })
-    : viewport.w > 0
-      ? getSeatPositions(computeTableLayout(viewport.w, viewport.h, insetLeft), seatCount, 1.04)
+      ? Array.from({ length: seatCount }, (_, index) => {
+          const visual = (index - heroIdx + seatCount) % seatCount;
+          const p = seatPointFromFelt(feltRect, visual, seatCount);
+          return { index, x: p.x, y: p.y, angle: 0 };
+        })
       : [];
 
   return (

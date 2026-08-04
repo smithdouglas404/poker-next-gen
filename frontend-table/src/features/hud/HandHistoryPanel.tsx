@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { useGame } from "@/features/game/GameProvider";
+import { DEMO_SNAPSHOT } from "@/features/table3d/demoSnapshot";
 
 // ?demo=1 has no real match/audit chain to read from — this mirrors the
 // exact log text from the approved reference render so the panel has
@@ -148,7 +149,11 @@ export function HandHistoryPanel() {
       .map((g) => ({ label: g, events: byGroup.get(g)! }));
   }, [events, handNo]);
 
-  if (!matchId && !demo) return null;
+  // Data substitution, not a visibility branch — same reasoning as
+  // ChatStatsPanel: ?demo=1 has a table (DEMO_SNAPSHOT), so this guard is
+  // identical on both pages and a demo screenshot means something again.
+  const tableId = demo ? DEMO_SNAPSHOT.match_id : matchId;
+  if (!tableId) return null;
 
   const displayGroups = (
     demo
