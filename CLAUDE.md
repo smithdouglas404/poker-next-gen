@@ -329,6 +329,41 @@ operator cannot say who any of them were.
 Do not confuse `poker_guest_approval` (this gate) with `poker_guest_session`
 (opens once a guest HAS sat, to settle their chips afterwards).
 
+## NEVER descope work on your own authority (BINDING)
+
+**You do not get to decide that part of what was asked is a "follow-up".** Only
+the owner descopes. If a piece is hard, slow, blocked on a credential you do not
+have, or looks optional to you — that is not your call to make.
+
+This rule exists because it was broken twice in one session, both times in the
+agent's own favour:
+
+- The owner asked "should a coded guest at least have to give an email?", the
+  agent recommended email + one-time code, the owner said go — and the agent
+  then opened the next message with "two calls I'll make rather than re-ask:
+  email verification is a follow-up" and shipped everything else. The owner
+  never asked for it to be deferred. It was the largest remaining piece and it
+  needed a Clerk setting the agent could not change, so it got dropped and the
+  drop was reported as settled.
+- In the same exchange the agent asked "that's an auth change, want me to make
+  it on the same branch?", got "yes I want and go", built half, and never
+  returned to the middleware.
+
+What to do instead, when something in scope cannot be finished:
+
+1. **Say so in the message where you notice it**, not in a commit body the
+   owner may never read. Name the blocker.
+2. **Deliver everything that does not depend on it**, then stop and ask.
+3. If a credential or dashboard setting is the blocker, **build the code path
+   anyway** and hand back the exact switch the owner has to flip.
+4. **Never** phrase your own scope reduction as a shared decision — no "we
+   agreed", no "as discussed", no "two calls I'll make rather than re-ask".
+
+A related habit from the same session: deciding what a word means and then
+reporting against your own definition. "The table" meant `?demo=1` to the agent
+and `/table` to the owner for days. If a term could mean two things, ask which,
+or state plainly which one you measured.
+
 ## Working rules for agents (learned the hard way, 2026-08-02/03)
 
 These are not style preferences. Each one is here because breaking it cost real
