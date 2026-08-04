@@ -1116,7 +1116,32 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 			//
 			// Before reserveBuyIn deliberately — do not move funds for a player
 			// who is not allowed to take the seat.
-			if guest && s.AccessType == "invite" {
+			//
+			// THREE TIERS, and they are not the same as `isGuest`:
+			//
+			//   no identity at all              -> WATCH ONLY, never seated
+			//   email verified + code, non-member -> seat after operator approval
+			//   club member                      -> existing KYC/geo/wallet rules
+			//
+			// Gated on HOW THEY ARRIVED (a table code, not a club member), not on
+			// what identity they hold. Keying off `isGuest` breaks in both
+			// directions: it means "no email AND no clerk: prefix", so the moment
+			// a coded visitor verifies an email they stop matching it and walk
+			// straight past the gate — the opposite of the intent.
+			if s.AccessType == "invite" && !isClubMember(ctx, db, s.ClubID, userID) {
+				// TIER 1: nobody. Refused outright, and deliberately NO approval
+				// row is written — an operator cannot meaningfully approve a
+				// person they have no way to identify or contact, and letting
+				// them queue is what handed tier 1 tier 2's rights. They keep
+				// watching; the join gate above already allowed that.
+				email := accountEmail(ctx, nk, userID)
+				if email == "" {
+					sendError(dispatcher, presence, "guest_identity_required",
+						"verify an email address before you can take a seat — you can keep watching in the meantime")
+					continue
+				}
+				// TIER 2: identified, but not a member of this club. A human
+				// decides. Everything below is that decision.
 				ga := store.NewGuestApprovalStore(db)
 				matchKeyGA := matchIDForAudit(s)
 				// Best-effort: empty when the client never called device_register,
@@ -1127,6 +1152,10 @@ func (h *Handler) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.
 					MatchID:  matchKeyGA,
 					UserID:   userID,
 					Username: presence.GetUsername(),
+					// The whole point of tier 2: the operator is approving a
+					// contactable PERSON, not an anonymous browser session. This
+					// column existed and was always blank until now.
+					Email:    email,
 					JoinCode: s.JoinCode,
 					DeviceFP: guestFP,
 					JoinIP:   guestIP,
@@ -2829,6 +2858,50 @@ func processTournamentEliminations(ctx context.Context, logger runtime.Logger, d
 // email identity AND not a Clerk-linked account. Best-effort — on any error we
 // treat the user as non-guest so a guest session is never over-recorded. Mirrors
 // the account-type checks in rpc/recovery.go and rpc/security.go.
+// accountEmail returns the player's verified email, or "" when they have none.
+//
+// A Clerk-bridged account counts as identified even if Nakama's own email field
+// is blank: Clerk verified them before rpc/clerk.go ever minted the session, so
+// the `clerk:` custom id IS the proof. Without that branch a fully registered
+// member would read as anonymous.
+//
+// Fails CLOSED, exactly like GuestApprovalStore.IsApproved: any error means no
+// identity, which costs one person a wait. The opposite mistake seats an
+// unidentified player at a table the club is accountable for.
+func accountEmail(ctx context.Context, nk runtime.NakamaModule, userID string) string {
+	if userID == "" {
+		return ""
+	}
+	acct, err := nk.AccountGetId(ctx, userID)
+	if err != nil {
+		return ""
+	}
+	if e := strings.TrimSpace(acct.GetEmail()); e != "" {
+		return e
+	}
+	if cid := acct.GetCustomId(); strings.HasPrefix(cid, "clerk:") {
+		return cid
+	}
+	return ""
+}
+
+// isClubMember reports whether the player already belongs to this table's club.
+//
+// Members are governed by the club's own rules and must never be sent to the
+// coded-guest queue. A table with no club (ClubID "") has no membership to
+// check, so nobody is a member and the code path applies to everyone who
+// arrived on the code.
+//
+// Fails CLOSED in the safe direction: a DB error means "not a member", so the
+// caller applies the stricter guest path rather than waving someone through.
+func isClubMember(ctx context.Context, db *sql.DB, clubID, userID string) bool {
+	if clubID == "" || userID == "" {
+		return false
+	}
+	m, err := store.NewClubStore(db).GetMembership(ctx, clubID, userID)
+	return err == nil && m != nil
+}
+
 func isGuest(ctx context.Context, nk runtime.NakamaModule, userID string) bool {
 	if userID == "" {
 		return false
