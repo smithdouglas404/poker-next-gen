@@ -92,6 +92,28 @@ export const ownerApi = {
   guestSessionReconcile: (id: string) =>
     call<{ ok: boolean; net_minor: number }>("guest_session_reconcile", { id }),
 
+  /** Coded guests waiting for permission to SIT (distinct from the
+   *  reconciliation queue above, which is guests who already sat). */
+  guestApprovalsPending: (clubId: string) =>
+    call<{ pending: import("./types").GuestApproval[]; count: number }>(
+      "guest_approvals_pending",
+      { club_id: clubId },
+    ),
+  guestApprovalDecide: (
+    clubId: string,
+    matchId: string,
+    userId: string,
+    approve: boolean,
+    reason = "",
+  ) =>
+    call<{ approval: import("./types").GuestApproval }>("guest_approval_decide", {
+      club_id: clubId,
+      match_id: matchId,
+      user_id: userId,
+      approve,
+      reason,
+    }),
+
   /** Seat sessions (Tier-1 C): recent sittings at the club's tables with hit-and-run / rathole flags. */
   seatSessionsList: (clubId: string) =>
     call<{ sessions: import("./types").SeatSession[] }>("seat_sessions_list", { club_id: clubId }),

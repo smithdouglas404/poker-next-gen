@@ -11,6 +11,7 @@ import { SoundProvider } from "@/features/hrc/lib/sound-context";
 import { HandHistoryPanel } from "@/features/hud/HandHistoryPanel";
 import { ChatStatsPanel } from "@/features/hud/ChatStatsPanel";
 import { TableFeltBackdrop } from "@/features/hrc/components/TableFeltBackdrop";
+import { GuestApprovalBanner } from "@/features/game/GuestApprovalBanner";
 
 // framer-motion/three/drei all touch the DOM/WebGL — never import during SSR
 // (Golden rule 3).
@@ -27,6 +28,9 @@ function TableSurface() {
           graphic under it at all. */}
       <TableFeltBackdrop />
       <HrcTable demo={demo} />
+      {/* Tells a coded guest why they can't sit, and clears itself the moment
+          an operator approves them. */}
+      <GuestApprovalBanner />
       <HandHistoryPanel />
       <ChatStatsPanel />
     </SoundProvider>

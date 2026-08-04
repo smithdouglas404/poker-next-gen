@@ -294,3 +294,24 @@ export interface ClubPermissionsPayload {
   roles: string[];
   role_preset: Record<string, ClubPermission[]>;
 }
+
+/** A coded guest waiting on an operator before they may take a seat.
+ *  same_device_seated is the signal worth reading: how many OTHER users at this
+ *  club already arrived on the same device fingerprint. */
+export interface GuestApproval {
+  id: string;
+  club_id: string;
+  match_id: string;
+  user_id: string;
+  username: string;
+  email: string;
+  join_code: string;
+  device_fp: string;
+  join_ip: string;
+  status: "pending" | "approved" | "denied";
+  decided_by: string;
+  reason: string;
+  created_at: string;
+  decided_at?: string;
+  same_device_seated: number;
+}

@@ -196,6 +196,11 @@ type TableCreateRequest struct {
 	AccessType       string `json:"access_type,omitempty" enum:"public,members,invite" label:"Access Type"`
 	JoinCode         string `json:"join_code,omitempty" label:"Table Join Code"`
 	AllowSpectators  bool   `json:"allow_spectators,omitempty" label:"Allow Spectators"`
+	// Opt out of the coded-guest approval gate: anyone holding this table's
+	// code may sit immediately, no operator decision. Default FALSE — a home
+	// game turns it on so friends are not queued; a public coded table leaves
+	// it off so strangers are not seated unseen.
+	TrustCodeGuests  bool   `json:"trust_code_guests,omitempty" label:"Trust Code Holders"`
 	KYCRequired      bool   `json:"kyc_required,omitempty" label:"Require KYC to sit"`
 	GeoRestricted    bool   `json:"geo_restricted,omitempty" label:"Geo-Restricted"`
 	WalletLimitCents int64  `json:"wallet_limit_cents,omitempty" validate:"min=0" unit:"money_minor" label:"Universal Wallet Limit"`

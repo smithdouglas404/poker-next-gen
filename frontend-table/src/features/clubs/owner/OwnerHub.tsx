@@ -13,6 +13,7 @@ import { GlobalSettings } from "./GlobalSettings";
 import { GuestGate } from "./GuestGate";
 import { MemberAnalytics } from "./MemberAnalytics";
 import { CreditRequests } from "./CreditRequests";
+import { GuestApprovals } from "./GuestApprovals";
 import { GuestSessions } from "./GuestSessions";
 import { SeatSessions } from "./SeatSessions";
 import { ClubNights } from "./ClubNights";
@@ -623,6 +624,9 @@ export function OwnerHub() {
           />
           <div className="mt-6">
             <CreditRequests clubId={club?.id} canManage={canManage} />
+            {/* Approvals FIRST: someone is sitting at a table waiting on it,
+                whereas reconciliation below is settle-up after the fact. */}
+            <GuestApprovals clubId={club?.id} canManage={canManage} />
             <GuestSessions clubId={club?.id} canManage={canManage} />
             <SeatSessions clubId={club?.id} canManage={canManage} />
             <ClubNights clubId={club?.id} canManage={canManage} />
