@@ -2985,7 +2985,15 @@ func seatUsername(s *MatchState, userID string) string {
 	if s == nil || s.Table == nil {
 		return ""
 	}
+	// Table.Seats is [MaxSeats]*Seat — a FIXED array of POINTERS where every
+	// unoccupied seat is nil. Ranging it and reading seat.UserID without this
+	// check segfaults the whole Nakama process, not just the match: it crashed
+	// the server on MatchLeave at any club table that had an empty chair, which
+	// is nearly all of them.
 	for _, seat := range s.Table.Seats {
+		if seat == nil {
+			continue
+		}
 		if seat.UserID == userID {
 			return seat.Username
 		}
