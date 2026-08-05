@@ -78,7 +78,7 @@ export default function LiveStackPage() {
             >
               {busy ? "Checking…" : "Refresh"}
             </button>
-            <Link href="/hub" className="rounded-xl border border-emerald-500/40 px-4 py-2 text-sm text-emerald-200">
+            <Link href="/dashboard" className="rounded-xl border border-emerald-500/40 px-4 py-2 text-sm text-emerald-200">
               Command Center
             </Link>
           </div>

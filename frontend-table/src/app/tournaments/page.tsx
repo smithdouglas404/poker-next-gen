@@ -344,7 +344,7 @@ export default function TournamentsPage() {
       <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#262d38]">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
           <div className="flex items-center gap-8">
-            <Link href="/hub" className="font-display text-lg font-bold uppercase tracking-wider text-brand">
+            <Link href="/dashboard" className="font-display text-lg font-bold uppercase tracking-wider text-brand">
               High Rollers
             </Link>
             <nav className="flex items-center gap-1">
@@ -376,8 +376,8 @@ export default function TournamentsPage() {
                 Schedule unavailable
               </span>
             )}
-            <Link href="/hub" className="text-sm text-muted transition-colors hover:text-foreground">
-              ← Command Center
+            <Link href="/dashboard" className="text-sm text-muted transition-colors hover:text-foreground">
+              ← Dashboard
             </Link>
           </div>
         </div>

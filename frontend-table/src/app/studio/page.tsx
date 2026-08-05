@@ -90,8 +90,8 @@ function StudioHome() {
             >
               Render Monitor
             </Link>
-            <Link href="/hub" className="text-sm text-muted transition-colors hover:text-foreground">
-              ← Command Center
+            <Link href="/dashboard" className="text-sm text-muted transition-colors hover:text-foreground">
+              ← Dashboard
             </Link>
           </div>
         </div>

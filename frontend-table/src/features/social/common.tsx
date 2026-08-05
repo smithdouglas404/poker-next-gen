@@ -98,10 +98,10 @@ export function SocialShell({
               <p className="mt-2 max-w-2xl text-sm text-neutral-400">{subtitle}</p>
             </div>
             <Link
-              href="/hub"
+              href="/dashboard"
               className="shrink-0 text-sm text-neutral-400 transition hover:text-white"
             >
-              ← Command Center
+              ← Dashboard
             </Link>
           </div>
           <nav className="mt-5 inline-flex gap-1 rounded-xl border border-white/[0.06] bg-[#262d38] p-1">

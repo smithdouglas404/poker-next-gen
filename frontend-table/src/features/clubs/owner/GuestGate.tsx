@@ -82,7 +82,10 @@ export function GuestGate({
         <Button variant="outline" onClick={() => void load()}>
           Search
         </Button>
-        <Link href="/hub">
+        {/* /clubs/new, not /hub. This is a player-facing CTA and the console
+            is ops-only; club creation has had its own screen all along
+            (RICH_HOME maps club_create there). */}
+        <Link href="/clubs/new">
           <Button variant="ghost">Start a club</Button>
         </Link>
       </div>

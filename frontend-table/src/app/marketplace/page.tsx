@@ -323,8 +323,8 @@ export default function MarketplacePage() {
               <Link href="/studio" className="text-gold hover:underline">
                 Studio
               </Link>
-              <Link href="/hub" className="text-muted hover:text-foreground hover:underline">
-                ← Command Center
+              <Link href="/dashboard" className="text-muted hover:text-foreground hover:underline">
+                ← Dashboard
               </Link>
             </div>
           </div>

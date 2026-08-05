@@ -63,7 +63,10 @@ interface NavItem {
 
 // The eight destinations a player uses constantly. Always expanded.
 const PRIMARY: NavItem[] = [
-  { icon: LayoutDashboard, label: "My Dashboard", href: "/dashboard", match: ["/dashboard", "/hub"] },
+  // /hub deliberately NOT matched here any more: it is the ops console, not a
+  // player screen, and highlighting "My Dashboard" while standing on it told
+  // players it was theirs.
+  { icon: LayoutDashboard, label: "My Dashboard", href: "/dashboard", match: ["/dashboard"] },
   { icon: Trophy, label: "Games & Tables", href: "/lobby", match: ["/lobby", "/table"] },
   { icon: Medal, label: "Tournaments", href: "/tournaments" },
   { icon: Users, label: "Clubs", href: "/clubs" },

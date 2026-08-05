@@ -72,7 +72,7 @@ export function Landing() {
             Enter a table →
           </Link>
           <Link
-            href="/hub"
+            href="/dashboard"
             className="rounded-xl border border-white/10 px-7 py-3.5 text-sm font-semibold text-neutral-300 transition hover:bg-white/5"
           >
             Command Center

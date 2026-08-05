@@ -82,8 +82,8 @@ export default function ProvablyFairPage() {
                 Open hand audit →
               </button>
             )}
-            <Link href="/hub" className="text-sm text-neutral-400 hover:text-foreground">
-              ← Command Center
+            <Link href="/dashboard" className="text-sm text-neutral-400 hover:text-foreground">
+              ← Dashboard
             </Link>
           </div>
         </div>

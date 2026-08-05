@@ -151,7 +151,7 @@ function CommandCorePageInner() {
                 <p className="mt-2 text-[11px] text-neutral-500">
                   USD is the settlement ledger; crypto funds via NOWPayments deposit/withdraw rails.
                 </p>
-                <Link href="/hub" className="mt-3 inline-block text-xs text-brand hover:underline">
+                <Link href="/dashboard" className="mt-3 inline-block text-xs text-brand hover:underline">
                   Configure rake per club →
                 </Link>
               </div>

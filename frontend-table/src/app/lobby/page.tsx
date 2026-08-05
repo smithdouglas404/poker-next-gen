@@ -201,7 +201,7 @@ function LobbyContent() {
       <header className="border-b border-white/[0.06] px-6 py-5">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
           <Link
-            href="/hub"
+            href="/dashboard"
             className={cn(
               GLASS_PANEL,
               "inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:border-white/20 hover:text-white",

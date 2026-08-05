@@ -122,8 +122,8 @@ export default function IntegrityPage() {
         <div className="mx-auto flex max-w-6xl flex-col gap-4">
           <div className="flex items-center justify-between">
             <SectionHeader>Game Integrity &amp; Tools</SectionHeader>
-            <Link href="/hub" className="text-sm text-neutral-400 transition hover:text-white">
-              ← Command Center
+            <Link href="/dashboard" className="text-sm text-neutral-400 transition hover:text-white">
+              ← Dashboard
             </Link>
           </div>
           <h1 className="font-display text-4xl font-bold md:text-5xl">

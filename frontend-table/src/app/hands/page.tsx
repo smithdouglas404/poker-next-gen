@@ -96,10 +96,10 @@ export default function HandsPage() {
             </p>
           </div>
           <Link
-            href="/hub"
+            href="/dashboard"
             className="rounded-xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-semibold text-neutral-200 transition hover:border-white/20"
           >
-            ← Command Center
+            ← Dashboard
           </Link>
         </div>
       </header>

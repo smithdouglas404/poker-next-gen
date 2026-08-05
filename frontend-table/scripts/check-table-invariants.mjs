@@ -355,19 +355,24 @@ const rel = (p) => p.slice(FRONTEND.length + 1);
 // /privacy routes), which is what the landing footer already uses.
 // ─────────────────────────────────────────────────────────────────────────────
 {
-  const LEGAL = /\b(About Us|Terms|Privacy|Responsible Gambling)\b/;
+  // /hub is OPS ONLY. Operator surfaces may link to it; player surfaces may not.
+  //
+  // It was reachable from ~24 player pages as "← Command Center", which made a
+  // generated wall of RPC forms the app's de-facto home — and /lobby's footer
+  // sent About Us, Terms and Privacy there, so a player clicking "Privacy"
+  // landed on an operator tool. Player pages now go to /dashboard, and legal
+  // copy opens LegalDialog (the component the landing footer already used).
+  const OPS_SURFACE = /^src\/(app\/(hub|admin)|features\/(admin|clubs\/owner|commands)\/)/;
   for (const f of files) {
     const r = rel(f);
-    if (r.startsWith("src/app/hub") || r.includes("commands/")) continue;
+    if (OPS_SURFACE.test(r)) continue;
     const body = readFileSync(f, "utf8");
-    // A <Link href="/hub" …>Terms</Link> on one line, or split across lines.
-    for (const m of body.matchAll(/<Link[^>]*href=["']\/hub["'][\s\S]{0,200}?<\/Link>/g)) {
-      if (!LEGAL.test(m[0])) continue;
+    for (const m of body.matchAll(/href=["']\/hub["']/g)) {
       const line = body.slice(0, m.index).split("\n").length;
       fail(
-        "no-legal-links-to-console",
-        `${r}:${line} points a legal/marketing link at /hub (the operator console). ` +
-          `Use LegalDialog (features/landing/LegalDialog.tsx) — the same one the landing footer uses.`,
+        "hub-is-ops-only",
+        `${r}:${line} links a PLAYER surface to /hub (the operator console). ` +
+          `Send players to /dashboard; legal copy opens LegalDialog; club creation is /clubs/new.`,
       );
     }
   }

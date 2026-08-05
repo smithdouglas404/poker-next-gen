@@ -38,7 +38,7 @@ export function HandAuditDetail({ matchId, handNo }: Props) {
             </span>
           </div>
           <div className="flex items-center gap-5 text-xs font-bold uppercase tracking-wider">
-            <Link href="/hub" className="text-neutral-400 transition hover:text-white">
+            <Link href="/dashboard" className="text-neutral-400 transition hover:text-white">
               Lobby
             </Link>
             <Link href="/provably-fair" className="text-brand">

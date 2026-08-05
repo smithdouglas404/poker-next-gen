@@ -225,10 +225,10 @@ export default function LoyaltyPage() {
             <GoldHeading className="mt-1 text-3xl sm:text-4xl">Loyalty</GoldHeading>
           </div>
           <Link
-            href="/hub"
+            href="/dashboard"
             className="shrink-0 text-sm text-brand transition hover:text-brand/80"
           >
-            ← Command Center
+            ← Dashboard
           </Link>
         </div>
       </header>

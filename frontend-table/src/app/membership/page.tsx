@@ -211,10 +211,10 @@ export default function MembershipPage() {
             <h1 className={cn(HEADING_LG, "mt-1 text-2xl")}>High Rollers Club</h1>
           </div>
           <Link
-            href="/hub"
+            href="/dashboard"
             className="text-xs font-semibold uppercase tracking-wider text-muted transition hover:text-foreground"
           >
-            ← Command Center
+            ← Dashboard
           </Link>
         </div>
       </header>

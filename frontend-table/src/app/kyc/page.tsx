@@ -81,10 +81,10 @@ export default function KycPage() {
             </p>
           </div>
           <Link
-            href="/hub"
+            href="/dashboard"
             className="rounded-xl border border-white/15 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-neutral-300 transition hover:border-white/25 hover:text-foreground"
           >
-            ← Command Center
+            ← Dashboard
           </Link>
         </div>
 
