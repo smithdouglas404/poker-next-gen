@@ -106,7 +106,7 @@ console.log("\n━━ 2. END-TO-END (real stack) ━━");
 if (!stackUp) {
   const missing = [!pg && "postgres:5433", !nakama && "nakama:7350", !engine && "engine-math:8080"].filter(Boolean).join(", ");
   const why = STATIC_ONLY ? "--static" : `stack down: ${missing}`;
-  for (const n of ["seat lifecycle (join→sit→stand→settle)", "full hand (blinds→streets→showdown→pot)", "three-tier sit-down gate", "club loan settlement"]) {
+  for (const n of ["seat lifecycle (join→sit→stand→settle)", "full hand (blinds→streets→showdown→pot)", "side pots (short all-in over-bet)", "three-tier sit-down gate", "club loan settlement"]) {
     record("e2e", n, "skip", why);
   }
 } else {
@@ -118,6 +118,9 @@ if (!stackUp) {
   // Plays an actual hand: blinds, betting, streets, showdown, pot award, and
   // chip conservation. Everything above only ever seated players.
   run("node scripts/table-sim/handplay-e2e.mjs", FRONTEND, "full hand (blinds→streets→showdown→pot)", "e2e");
+  // A short stack all-in for less, over-bet by two deeper players — the pot
+  // split the passive hand above can never produce.
+  run("node scripts/table-sim/sidepot-e2e.mjs", FRONTEND, "side pots (short all-in over-bet)", "e2e");
   run("node scripts/table-sim/guest-tiers-e2e.mjs", FRONTEND, "three-tier sit-down gate", "e2e");
   run("node scripts/table-sim/club-settlement-e2e.mjs", FRONTEND, "club loan settlement", "e2e");
 }
