@@ -37,10 +37,12 @@ if (existsSync(IDFILE) && !IDS_ONLY) {
 
 const admin = await client.authenticateEmail(creds.admin, "Passw0rd!123", true);
 const player = await client.authenticateEmail(creds.player, "Passw0rd!123", true);
-// A CLUB OWNER: not in ADMIN_USER_IDS, but granted ops responsibility. /hub
-// gates on "club_admin" (platform_admin OR administers a club), so this account
-// must get IN while the plain player stays out — that middle case is the whole
-// point of the wider gate and testing only the extremes would miss it.
+// A CLUB OWNER. /hub is PLATFORM ADMIN ONLY, so this account must be DENIED —
+// club operators have their own designed product at /clubs (Owner Hub: club
+// overview, live tables, member registry with edit/promote/kick, credit
+// requests, guest approvals, settlements, revenue reports). Sending them to a
+// generated list of RPC forms instead is a downgrade, not access. This is the
+// case worth testing: the extremes would pass either way.
 const owner = await client.authenticateEmail(creds.owner ?? (creds.owner = `hubowner_${Date.now()}@t.local`), "Passw0rd!123", true);
 creds.ownerId = owner.user_id;
 creds.adminId = admin.user_id;
@@ -98,6 +100,7 @@ async function shoot(session, name) {
     return {
       console: /Command Center/i.test(t) && /LIVE COMMANDS|Workspaces/i.test(t),
       denied: /Not authorized|don't have access|no access/i.test(t),
+      toOwnerHub: /Go to your Owner Hub/i.test(t),
     };
   });
   console.log(`${name}:`, JSON.stringify(m));
@@ -112,6 +115,7 @@ const o = await shoot(owner, "HUB-gate-clubowner");
 const p2 = await shoot(player, "HUB-gate-player");
 await b.close();
 
-const ok = a.console && !a.denied && o.console && !o.denied && p2.denied && !p2.console;
-console.log(ok ? "\n=== GATE HOLDS: admin + club owner get in, plain player is denied ===" : "\n=== GATE WRONG ===");
+// admin in; club owner DENIED but pointed at their own hub; player denied.
+const ok = a.console && !a.denied && o.denied && !o.console && o.toOwnerHub && p2.denied && !p2.console;
+console.log(ok ? "\n=== GATE HOLDS: only the platform admin gets the console; the club owner is sent to their Owner Hub ===" : "\n=== GATE WRONG ===");
 process.exit(ok ? 0 : 2);

@@ -29,6 +29,11 @@ export function RequireRole({
   children: React.ReactNode;
 }) {
   const [gate, setGate] = useState<Gate>("checking");
+  // Whether the denied caller runs a club. A club owner refused from the
+  // platform console should be sent to THEIR hub, not a generic dashboard —
+  // /clubs is a designed product (overview, live tables, member registry,
+  // approvals, settlements, revenue) and is where their work actually lives.
+  const [runsAClub, setRunsAClub] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -40,6 +45,7 @@ export function RequireRole({
           req === "platform_admin"
             ? Boolean(roles.platform_admin)
             : Boolean(roles.platform_admin) || (roles.club_admin_of?.length ?? 0) > 0;
+        setRunsAClub((roles.club_admin_of?.length ?? 0) > 0);
         setGate(ok ? "granted" : "denied");
       } catch {
         if (alive) setGate("denied");
@@ -70,15 +76,15 @@ export function RequireRole({
                 ? "This area is for platform administrators."
                 : "This area is for club owners and operators."}
             </p>
+            {/* NOT "Back to Command Center" — this screen IS the refusal from
+                the Command Center, and offering a trip back to the page that
+                just refused you is a loop. A club operator goes to their Owner
+                Hub; everyone else to the player dashboard. */}
             <Link
-              href="/dashboard"
+              href={runsAClub ? "/clubs" : "/dashboard"}
               className="mt-6 inline-block rounded-xl border border-white/15 px-5 py-2.5 text-sm font-semibold hover:border-white/30"
             >
-              {/* NOT "Back to Command Center" — this screen IS the refusal
-                  from the Command Center, and offering to send someone back to
-                  the page that just denied them is a loop. Dashboard is the
-                  player home. */}
-              ← Back to Dashboard
+              {runsAClub ? "→ Go to your Owner Hub" : "← Back to Dashboard"}
             </Link>
           </>
         )}

@@ -26,15 +26,22 @@ import { RequireRole } from "@/features/auth/RequireRole";
 //
 // NOTHING IS REMOVED. All 40 commands stay; this is an access change only.
 //
-// Gated on "club_admin", which RequireRole reads as platform_admin OR anyone
-// administering a club — the super admin plus anyone granted ops
-// responsibility. Not platform_admin alone: that is the ADMIN_USER_IDS env list
-// and would lock out every club operator who has legitimate back-office work.
+// PLATFORM ADMIN ONLY (ADMIN_USER_IDS). Club owners do NOT belong here.
 //
-// Per-COMMAND visibility is already handled a layer down by canSeeCommand
-// (`requires: platform_admin | club_admin`) and canRunInClub, so a club
-// operator who gets in sees only their own commands, not the platform ones.
-// This gate is about the door; that one is about the rooms.
+// This was briefly widened to club operators on the reasoning that they have
+// back-office work to do. They do — but they already have a designed surface
+// for it: the Owner Hub at /clubs, with Club Overview, Live Tables, Tournament
+// Center, Member Registry, Operators & Equity, Announcements, Member Analytics,
+// Revenue Reports and Global Settings, plus the approval, guest-session and
+// settlement queues.
+//
+// Sending a club owner to a generated list of RPC forms when a real hub exists
+// is a downgrade, not access. The console is the platform operator's raw tool;
+// the Owner Hub is the club operator's product.
+//
+// Per-COMMAND visibility still exists a layer down (canSeeCommand's
+// `requires: platform_admin | club_admin`, canRunInClub). That stays: it is
+// what keeps the console honest for the one role that does reach it.
 //
 // The backend enforces every action regardless (adminCaller /
 // requireClubConfigurer → 403), so this is UI defense-in-depth, not the
@@ -46,7 +53,7 @@ import { RequireRole } from "@/features/auth/RequireRole";
 // It skips the wizard, not the rules.
 export default function HubPage() {
   return (
-    <RequireRole require="club_admin">
+    <RequireRole require="platform_admin">
       <CommandCenter />
     </RequireRole>
   );
