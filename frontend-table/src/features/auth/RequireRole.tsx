@@ -74,7 +74,11 @@ export function RequireRole({
               href="/dashboard"
               className="mt-6 inline-block rounded-xl border border-white/15 px-5 py-2.5 text-sm font-semibold hover:border-white/30"
             >
-              ← Back to Command Center
+              {/* NOT "Back to Command Center" — this screen IS the refusal
+                  from the Command Center, and offering to send someone back to
+                  the page that just denied them is a loop. Dashboard is the
+                  player home. */}
+              ← Back to Dashboard
             </Link>
           </>
         )}

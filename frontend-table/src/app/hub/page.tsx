@@ -24,12 +24,29 @@ import { RequireRole } from "@/features/auth/RequireRole";
 //
 // Plus liveness (healthz / stack_health), which also has /stack.
 //
-// Gated on platform_admin. The backend already enforces every action
-// (adminCaller / requireClubConfigurer → 403), so this is UI defense-in-depth,
-// not the security boundary — it stops players landing on an operator tool.
+// NOTHING IS REMOVED. All 40 commands stay; this is an access change only.
+//
+// Gated on "club_admin", which RequireRole reads as platform_admin OR anyone
+// administering a club — the super admin plus anyone granted ops
+// responsibility. Not platform_admin alone: that is the ADMIN_USER_IDS env list
+// and would lock out every club operator who has legitimate back-office work.
+//
+// Per-COMMAND visibility is already handled a layer down by canSeeCommand
+// (`requires: platform_admin | club_admin`) and canRunInClub, so a club
+// operator who gets in sees only their own commands, not the platform ones.
+// This gate is about the door; that one is about the rooms.
+//
+// The backend enforces every action regardless (adminCaller /
+// requireClubConfigurer → 403), so this is UI defense-in-depth, not the
+// security boundary. It stops PLAYERS landing on an operator tool.
+//
+// Worth being precise about what this console is and is not: it is a FASTER
+// path to the same RPCs, not an override. `club_create` from here runs exactly
+// the same server-side validation as /clubs/new — same checks, same refusals.
+// It skips the wizard, not the rules.
 export default function HubPage() {
   return (
-    <RequireRole require="platform_admin">
+    <RequireRole require="club_admin">
       <CommandCenter />
     </RequireRole>
   );
