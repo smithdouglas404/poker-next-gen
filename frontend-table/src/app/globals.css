@@ -21,6 +21,12 @@
   --muted: #c2c8d0;        /* meets WCAG AA (>7:1) on the slate base */
   /* demoted: muted cyan for a verified/provably-fair tech badge only */
   --cyan: #4a9eb0;
+  /* Ornament gold — the hairline/bracket/rule gold. Distinct from --gold, which
+     is the FILL. This value was already pasted 18× as a raw hex with no token
+     behind it; naming it is what stops the 19th. */
+  --gold-orn: #d4af37;
+  /* Nav rail. Was hardcoded #12161d in AppShell with no token at all. */
+  --rail: #12161d;
 }
 
 @theme inline {
@@ -33,6 +39,15 @@
   --color-gold: var(--gold);
   --color-cyan: var(--cyan);
   --color-muted: var(--muted);
+  /* These three were declared in :root but NEVER mapped here, so no
+     `text-gold-lite` / `bg-brand-bright` / `bg-green-deep` utility existed. That
+     omission is the reason #ffd54a appears 41×, #ff2d3f 27× and #0a7d43 ~15× as
+     raw arbitrary values: there was nothing else to reach for. */
+  --color-brand-bright: var(--brand-bright);
+  --color-green-deep: var(--green-deep);
+  --color-gold-lite: var(--gold-lite);
+  --color-gold-orn: var(--gold-orn);
+  --color-rail: var(--rail);
   --font-sans: var(--font-body);
   --font-display: var(--font-display);
   --font-body: var(--font-body);
