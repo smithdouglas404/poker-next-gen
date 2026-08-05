@@ -17,8 +17,8 @@ import { useState, type ReactNode } from "react";
 
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
-export type ConsoleNavStateItem = { id: string; label: string; icon?: string; group?: string };
-export type ConsoleNavRouteItem = { href: string; label: string; icon?: string };
+export type ConsoleNavStateItem = { id: string; label: string; icon?: ReactNode; group?: string };
+export type ConsoleNavRouteItem = { href: string; label: string; icon?: ReactNode };
 export type ConsoleNav =
   | { mode: "state"; active: string; onSelect: (id: string) => void; items: ConsoleNavStateItem[] }
   | { mode: "route"; items: ConsoleNavRouteItem[] };
@@ -36,8 +36,12 @@ export type ConsoleBrand = {
 export type ConsoleAccent = "redGradient" | "gold" | "brand";
 
 const ACTIVE_CLS: Record<ConsoleAccent, string> = {
+  // Gold-led active pill with a 2px left edge. This was a solid red gradient:
+  // under the corrected colour roles red is destructive/danger ONLY, so the
+  // permanently-red "you are here" marker read as a warning on every owner page.
   redGradient:
-    "border border-transparent bg-gradient-to-r from-[#e01e2b] to-[#b3151f] text-white shadow-[0_6px_18px_-8px_rgba(224,30,43,0.5)]",
+    "relative border border-gold/40 bg-gold/[0.10] font-semibold text-gold-lite " +
+    "before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-gold-lite",
   gold: "border border-gold/40 bg-gold/[0.08] font-semibold text-gold",
   brand: "border border-brand/40 bg-brand/[0.1] text-brand",
 };
@@ -87,7 +91,7 @@ function NavItem({
   href,
 }: {
   label: string;
-  icon?: string;
+  icon?: ReactNode;
   active: boolean;
   accent: ConsoleAccent;
   grouped: boolean;
@@ -103,7 +107,7 @@ function NavItem({
     <>
       {icon &&
         (grouped ? (
-          <span className={cn("text-base", active ? "text-brand" : "text-neutral-500")}>{icon}</span>
+          <span className={cn("text-base", active ? "text-gold-lite" : "text-neutral-500")}>{icon}</span>
         ) : (
           <span className="w-5 text-center opacity-80">{icon}</span>
         ))}

@@ -44,9 +44,16 @@ export function OwnerShell({
     <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-[#262d38]">
       <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-4 px-4 md:px-6">
         <div className="flex items-center gap-3">
+          {/* Club crest. Was a solid red gradient square — under the corrected
+              colour roles red is destructive/danger only, so the club's own
+              identity mark was rendered in the danger colour on every owner
+              page. Gold plate with a hairline, matching the M1 tier. */}
           <div
-            className="flex h-10 w-10 items-center justify-center rounded-xl font-display text-base font-bold text-white"
-            style={{ background: "linear-gradient(180deg,#ff2d3f,#b3151f)", boxShadow: "0 4px 14px -4px rgba(224,30,43,0.4)" }}
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-gold-orn/45 font-display text-base font-bold text-[#1a1206]"
+            style={{
+              background: "linear-gradient(160deg,#ffd54a,#f5c518 45%,#c9a00d)",
+              boxShadow: "0 4px 14px -5px rgba(245,197,24,0.45)",
+            }}
           >
             {(clubName.slice(0, 2) || "CL").toUpperCase()}
           </div>

@@ -7,7 +7,7 @@ import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { Button } from "@/features/ui";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
-import { Sparkbars } from "../charts";
+import { StatCards } from "./StatCards";
 import { compact, relTime, usd, usdCompact } from "./ownerRpc";
 import { MemberAvatar, SectionTitle } from "./ui";
 import type { ClubActivity, ClubChatMessage, QuickStats, RosterRow } from "./types";
@@ -84,20 +84,19 @@ export function Overview({
     <div className="space-y-6">
       <SectionTitle eyebrow="Club Overview" title={clubName} />
 
-      {/* Five KPI sparkline cards */}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {cards.map((c) => (
-          <div key={c.label} className={cn(GLASS_PANEL, "p-4")}>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">
-              {c.label}
-            </p>
-            <p className="font-display mt-1 text-2xl font-bold leading-none text-white">{c.value}</p>
-            <div className="mt-3 -mb-1">
-              <Sparkbars values={c.spark.length ? c.spark : SPARK_DEFAULT} color={c.color} height={40} />
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Five KPI plates (M1). This block used to be a hand-rolled copy of
+          StatCards living here — same idea, 24px value, M2 grey, so it carried
+          no more weight than the panels beneath it. Routing it through the
+          shared component is what makes it the one gold group on the screen,
+          and removes the second implementation. */}
+      <StatCards
+        cols={5}
+        cards={cards.map((c) => ({
+          label: c.label,
+          value: c.value,
+          series: c.spark.length ? c.spark : SPARK_DEFAULT,
+        }))}
+      />
 
       <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
         {/* Tabbed featured panel */}
