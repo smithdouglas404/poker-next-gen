@@ -520,9 +520,18 @@ See `ChatStatsPanel`, `HandHistoryPanel`, `EmotePicker`.
 ## `npm run verify` — run this before you claim anything works (BINDING)
 
 ```bash
-cd frontend-table && npm run verify            # full run (needs the local stack)
+cd frontend-table && npm run verify             # starts the stack itself, then runs everything
 cd frontend-table && npm run verify -- --static # static only, no stack, no browser
+cd frontend-table && npm run stack:up           # just the stack
+cd frontend-table && npm run stack:status       # what is running, change nothing
 ```
+
+**It starts the stack for you.** `scripts/stack-up.mjs` is idempotent and brings
+up Postgres (initdb + `nakama migrate up` + `schema.sql` on first run),
+engine-math, and Nakama with a freshly built `backend-core.so`. Proven from a
+completely cold machine: all three stopped, one `npm run verify`, 8 passed.
+Anything it cannot do — no Nakama binary, engine-math not built — is reported
+with the exact command to fix it, never silently skipped.
 
 **Why it exists.** A nil-pointer dereference in `seatUsername` shipped to `main`
 and SIGSEGV'd the **whole Nakama process** whenever a player left a club table

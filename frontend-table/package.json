@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "check:table": "node scripts/check-table-invariants.mjs",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "stack:up": "node scripts/stack-up.mjs",
+    "stack:status": "node scripts/stack-up.mjs --status"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.6.1",

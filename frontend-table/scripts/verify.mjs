@@ -78,6 +78,25 @@ run("go vet ./...", BACKEND, "go vet", "static");
 run("go build -buildmode=plugin -trimpath -o /tmp/verify-plugin.so .", BACKEND, "nakama plugin builds", "static");
 
 // ── runtime ─────────────────────────────────────────────────────────────────
+//
+// Bring the stack up rather than demanding the caller did it by hand. This was
+// the gap that made "one command" untrue: verify needed Postgres, Nakama with
+// the plugin, and engine-math already running, and standing those up was ~10
+// minutes of hand-typed setup documented only in prose. A verification tool
+// nobody can start is a tool nobody runs.
+if (!STATIC_ONLY) {
+  const alreadyUp = (await up("http://127.0.0.1:7350/")) && (await up("http://127.0.0.1:8080/health")) && pgUp();
+  if (!alreadyUp) {
+    console.log("\n━━ 0. STACK ━━");
+    try {
+      execSync("node scripts/stack-up.mjs", { cwd: FRONTEND, stdio: "inherit", timeout: 600_000 });
+    } catch {
+      // stack-up prints exactly what is missing and how to fix it; the phases
+      // below will report SKIP with the reason rather than pretending to pass.
+    }
+  }
+}
+
 const nakama = STATIC_ONLY ? false : await up("http://127.0.0.1:7350/");
 const engine = STATIC_ONLY ? false : await up("http://127.0.0.1:8080/health");
 const pg = STATIC_ONLY ? false : pgUp();
@@ -147,4 +166,11 @@ if (failed.length) {
   for (const f of failed) console.log(`    - ${f.name} — ${f.detail}`);
   process.exit(1);
 }
-console.log(skipped.length ? "\n  green, but INCOMPLETE — bring the stack up for a full run\n" : "\n  all green\n");
+// Only the build skip is deliberate (it would break a running dev server).
+// Any OTHER skip means something genuinely went unverified, and the summary has
+// to say which — a partial green read as "it works" is the whole failure this
+// suite exists to stop.
+const onlyBuildSkipped = skipped.length > 0 && skipped.every((s) => s.phase === "build");
+if (!skipped.length) console.log("\n  all green\n");
+else if (onlyBuildSkipped) console.log("\n  all green — production build skipped on purpose (dev server is running)\n");
+else console.log("\n  green, but INCOMPLETE — see SKIPPED above\n");
