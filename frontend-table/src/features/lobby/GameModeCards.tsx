@@ -5,16 +5,20 @@ import { GLASS_PANEL, GLASS_PANEL_HOVER, cn } from "@/features/ui/tokens";
 // The HRC "Game Mode Selection" hero: three large cards — Private Table,
 // Public Game (Club Owner Sponsored, locked unless the caller can sponsor),
 // and Tournament. Clean GGPoker cards on near-black; accent encodes intent —
-// red = primary, gold = club/premium, green = play/positive.
+// Accent roles, corrected: GOLD = primary/premium, green = play-money/positive.
+// "red" is retained as a key so callers keep compiling, but it now renders gold.
+// It used to paint the Private Table title AND its CREATE PRIVATE TABLE button
+// solid red — the app's main creation action rendered in the danger colour, on
+// the screen a player hits first. Red is destructive/danger only.
 
 type Accent = "red" | "gold" | "green";
 
 const ACCENT: Record<Accent, { ring: string; text: string; glow: string; dot: string }> = {
   red: {
-    ring: "hover:border-brand/50 hover:shadow-[0_4px_18px_rgba(0,0,0,0.5)]",
-    text: "text-brand",
-    glow: "rgba(224,30,43,0.18)",
-    dot: "bg-brand",
+    ring: "hover:border-gold/50 hover:shadow-[0_4px_18px_rgba(0,0,0,0.5)]",
+    text: "text-gold-lite",
+    glow: "rgba(245,197,24,0.18)",
+    dot: "bg-gold",
   },
   gold: {
     ring: "hover:border-gold/50 hover:shadow-[0_4px_18px_rgba(0,0,0,0.5)]",
@@ -126,7 +130,7 @@ function ModeCard({ def, onSelect }: { def: ModeCardDef; onSelect: () => void })
             : def.accent === "gold"
               ? "bg-gradient-to-b from-[#ffd54a] via-[#f5c518] to-[#d4a80f] text-[#231b00] hover:shadow-[0_6px_18px_-6px_rgba(245,197,24,0.4)] hover:-translate-y-px"
               : def.accent === "red"
-                ? "bg-gradient-to-b from-[#ff2d3f] via-[#e01e2b] to-[#b3151f] text-white hover:shadow-[0_6px_18px_-6px_rgba(224,30,43,0.4)] hover:-translate-y-px"
+                ? "bg-gradient-to-b from-[#ffd54a] via-[#f5c518] to-[#d4a80f] text-[#231b00] hover:shadow-[0_6px_18px_-6px_rgba(245,197,24,0.4)] hover:-translate-y-px"
                 : "border border-green/40 text-green hover:bg-green/5",
         )}
       >
@@ -160,7 +164,7 @@ function SceneArt({ scene, muted }: { scene: "lounge" | "casino" | "arena"; mute
       )}
       {scene === "casino" && (
         <div className="absolute inset-x-0 bottom-0 flex justify-center gap-1.5 pb-4">
-          {["#e01e2b", "#f5c518", "#22c55e", "#9aa0a6", "#e01e2b"].map((c, i) => (
+          {["#f5c518", "#ffd54a", "#22c55e", "#9aa0a6", "#f5c518"].map((c, i) => (
             <span
               key={i}
               className="h-8 w-6 rounded-sm"

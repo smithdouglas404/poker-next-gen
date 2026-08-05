@@ -11,7 +11,6 @@ import {
   MIN_SEATS,
 } from "@/features/game/protocol";
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
-import { BAKED_PLATE_LIST } from "@/features/table/bakedTable";
 import { Button, Field, Input, Select } from "@/features/ui";
 import { BTN_GOLD, GLASS_PANEL, HEADING_SM, cn } from "@/features/ui/tokens";
 
@@ -89,7 +88,6 @@ export function PrivateTableSetup({
   // Owner-chosen table look: every seat renders in this style (no per-player mixing).
   // "" => players keep their per-device render preference.
   // Owner-chosen baked table plate (photoreal backdrop). "" => cinematic felt.
-  const [tableArt, setTableArt] = useState("");
   const [seats, setSeats] = useState(6);
   const [bots, setBots] = useState(0);
   const [durationMins, setDurationMins] = useState(0);
@@ -222,7 +220,6 @@ export function PrivateTableSetup({
       // for the club.
       stake_mode: isPlayMoney ? "play" : "cash",
       // Owner-chosen baked photoreal table plate (empty => cinematic felt).
-      table_art: tableArt || undefined,
       // EVERY table is hosted by a club — table_create rejects a request without
       // one (rpc/table.go). This used to send `sponsor_club_id`, a key
       // TableCreateRequest does not map, and only when the table was public, so
@@ -323,50 +320,6 @@ export function PrivateTableSetup({
           </div>
         )}
 
-
-        <Section
-          title="Choose a Table"
-          hint="Pick a photoreal table backdrop. Players and cards composite over it. Leave on Cinematic for the default 3D felt."
-        >
-          <div className="grid gap-2 sm:grid-cols-3">
-            <button
-              type="button"
-              onClick={() => setTableArt("")}
-              className={cn(
-                "rounded-xl border px-4 py-3 text-left text-sm font-semibold transition",
-                tableArt === ""
-                  ? "border-gold/50 bg-gold/10 text-gold"
-                  : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25",
-              )}
-            >
-              <span className="block">Cinematic</span>
-              <span className="mt-0.5 block text-[11px] font-normal uppercase tracking-[0.15em] text-neutral-500">
-                Default 3D felt
-              </span>
-            </button>
-            {BAKED_PLATE_LIST.map((plate) => (
-              <button
-                key={plate.id}
-                type="button"
-                onClick={() => setTableArt(plate.id)}
-                className={cn(
-                  "overflow-hidden rounded-xl border text-left text-sm font-semibold transition",
-                  tableArt === plate.id
-                    ? "border-gold/50 ring-1 ring-gold/40"
-                    : "border-white/10 hover:border-white/25",
-                )}
-              >
-                <span
-                  className="block h-16 w-full bg-surface bg-cover bg-center"
-                  style={{ backgroundImage: `url(${plate.imageUrl})` }}
-                />
-                <span className={cn("block px-3 py-2", tableArt === plate.id ? "text-gold" : "text-neutral-300")}>
-                  {plate.label}
-                </span>
-              </button>
-            ))}
-          </div>
-        </Section>
 
         {/* Every table is hosted by a club — the server rejects a table without
             one — so this is required for every access type, not just public.

@@ -90,7 +90,19 @@ export interface TableSnapshot {
   variant?: string;
   /** Owner-chosen table look: "2.5d" | "3d". Absent => per-device renderMode. */
   render_style?: string;
-  /** Owner-chosen baked table plate id (bakedTable.ts). Absent => cinematic felt. */
+  /**
+   * DEAD FIELD — kept only so the wire stays compatible with servers that still
+   * send it. Nothing renders it.
+   *
+   * It was the id of a "baked plate": a pre-rendered table backdrop for the R3F
+   * scene that was deleted months ago. The server still accepts it, stores it on
+   * the match and echoes it back in every snapshot, but no client has read it
+   * since that scene went. The picker that wrote it (a "Choose a Table" section
+   * offering "Cinematic — Default 3D felt") advertised a renderer that no longer
+   * exists, and bakedTable.ts alongside it. Both are now removed.
+   *
+   * Do not wire this back up. `/table` has exactly one renderer.
+   */
   table_art?: string;
   host_user_id?: string;
   host_paused?: boolean;
