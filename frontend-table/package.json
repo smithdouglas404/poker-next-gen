@@ -10,7 +10,8 @@
     "check:table": "node scripts/check-table-invariants.mjs",
     "verify": "node scripts/verify.mjs",
     "stack:up": "node scripts/stack-up.mjs",
-    "stack:status": "node scripts/stack-up.mjs --status"
+    "stack:status": "node scripts/stack-up.mjs --status",
+    "check:env": "node scripts/check-env-drift.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.6.1",

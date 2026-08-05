@@ -544,7 +544,7 @@ Four phases, in this order:
 
 | phase | what it proves |
 |---|---|
-| 1 static | `tsc`, `check:table` (7 invariants), `go vet`, plugin builds |
+| 1 static | `tsc`, `check:table` (7 invariants), **`check:env`** (railway/compose drift), `go vet`, plugin builds |
 | 2 e2e | seat lifecycle, **a full hand**, three-tier gate, club loan settlement — against the REAL stack |
 | 3 render | `/table`, `?demo=1`, `/`, `/lobby`, `/clubs`, `/tournaments` measured off the live DOM |
 | 4 build | `next build` — LAST, because it clobbers a running dev server's `.next` |
@@ -614,6 +614,32 @@ same `nakama-common`. Harnesses expect Postgres on **5433**.
 > back to a fresh device account with no club, and the page renders
 > "COULDN'T LOAD". The settlement panel also lives under the **Member Registry**
 > section, which is state nav rather than a route, so it has to be clicked.
+
+### Railway vs docker-compose — keep them honest (`npm run check:env`)
+
+Railway is the deploy target, so `.railway/railway.ts` gets updated when someone
+adds a variable. `docker-compose.yml` is the path fewer people run, so it rots
+silently and you find out only when local behaves differently from production.
+
+`scripts/check-env-drift.mjs` fails when railway declares an env var compose
+lacks **and the code actually reads it**. Only code-read vars are enforced —
+Railway sets plumbing no source touches (the `PG*` family, its own domain
+interpolations), and demanding compose mirror those is noise that trains people
+to ignore the check.
+
+Three had already drifted, all silent, none crashing:
+
+| var | read by | what breaks under compose |
+|---|---|---|
+| `APP_BASE_URL` | `rpc/subscription_stripe.go` | Stripe redirects go to the placeholder `https://app.example.com` |
+| `NOWPAYMENTS_IPN_CALLBACK_URL` | `rpc/deposit.go` | empty callback — crypto deposits never credit the wallet |
+| `NEXT_PUBLIC_NAKAMA_SERVER_KEY` | `app/api/health/nakama/route.ts` | health endpoint reports `serverKey: undefined` (no fallback there, unlike `client.ts`) |
+
+The third was found only because the check's own grep was wrong first:
+`grep -rwl KEY backend-core --include=*.go frontend-table/src` applies
+`--include=*.go` to **every** path, silently excluding all TypeScript. A drift
+check that under-reports drift is worse than none — it certifies what it failed
+to look at.
 
 ## Build & verify commands
 

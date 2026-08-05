@@ -52,6 +52,18 @@ services:
       DATABASE_ADDRESS: postgres:localdb@postgres:5432/nakama
       NAKAMA_LOG_LEVEL: INFO
       ENGINE_MATH_URL: http://engine-math:8080
+      # Read by rpc/subscription_stripe.go for Stripe return/cancel URLs. Unset,
+      # it falls back to the placeholder https://app.example.com and every
+      # checkout redirect points at a domain nobody owns. Railway sets this to
+      # the frontend's public domain; under compose the frontend is on :3000.
+      APP_BASE_URL: http://localhost:3000
+      # Read by rpc/deposit.go and handed to NOWPayments as the IPN callback.
+      # Unset, it is empty and crypto deposit confirmations are never delivered
+      # — the invoice is created and the wallet is never credited. Mirrors the
+      # Railway value: backend-core's own nowpayments_webhook RPC. defaulthttpkey
+      # is Nakama's dev default (the server warns about it); production sets a
+      # real NAKAMA_HTTP_KEY.
+      NOWPAYMENTS_IPN_CALLBACK_URL: http://localhost:7350/v2/rpc/nowpayments_webhook?http_key=defaulthttpkey&unwrap
     ports:
       - "7349:7349"
       - "7350:7350"
@@ -75,6 +87,11 @@ services:
       NEXT_PUBLIC_NAKAMA_HOST: http://localhost:7350
       NAKAMA_HOST: http://backend-core:7350
       NAKAMA_SERVER_KEY: defaultkey
+      # Browser-visible twin of NAKAMA_SERVER_KEY. lib/nakama/client.ts and
+      # diag/page.tsx fall back to "defaultkey" if it is missing, but
+      # app/api/health/nakama/route.ts reads it with NO fallback and would
+      # report serverKey: undefined. Railway sets it; compose did not.
+      NEXT_PUBLIC_NAKAMA_SERVER_KEY: defaultkey
       ENGINE_MATH_URL: http://engine-math:8080
       ODDSLINGERS_URL: http://oddslingers-nginx:80
       RUNNING_IN_COMPOSE: "1"

@@ -74,6 +74,10 @@ function pgUp() {
 console.log("\n━━ 1. STATIC ━━");
 run("npx tsc --noEmit", FRONTEND, "frontend typecheck", "static");
 run("node scripts/check-table-invariants.mjs", FRONTEND, "table invariants (7 checks)", "static");
+// Railway is the deploy target so railway.ts gets updated; compose is the
+// path fewer people run, so it rots silently and you find out only when local
+// behaves differently from production.
+run("node scripts/check-env-drift.mjs", FRONTEND, "railway/compose env drift", "static");
 run("go vet ./...", BACKEND, "go vet", "static");
 run("go build -buildmode=plugin -trimpath -o /tmp/verify-plugin.so .", BACKEND, "nakama plugin builds", "static");
 
