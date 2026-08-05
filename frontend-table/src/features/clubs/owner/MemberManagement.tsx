@@ -138,7 +138,7 @@ export function MemberManagement({
 
       <div className={cn(GLASS_PANEL, "overflow-hidden")}>
         {/* Column header */}
-        <div className="hidden grid-cols-[1.6fr_0.9fr_0.9fr_1.1fr_0.7fr_auto] gap-3 border-b border-white/[0.08] px-5 py-3 text-[10px] font-bold uppercase tracking-[0.18em] text-white/40 lg:grid">
+        <div className="hidden grid-cols-[2.4fr_0.8fr_0.8fr_1.1fr_0.7fr_auto] gap-3 border-b border-white/[0.08] px-5 py-3 text-[10px] font-bold uppercase tracking-[0.18em] text-white/40 lg:grid">
           <span>Member</span>
           <span>Status</span>
           <span>Join Date</span>
@@ -202,7 +202,7 @@ export function MemberManagement({
               return (
                 <div
                   key={m.user_id}
-                  className="grid grid-cols-1 gap-3 border-b border-white/[0.05] px-5 py-4 last:border-0 lg:grid-cols-[1.6fr_0.9fr_0.9fr_1.1fr_0.7fr_auto] lg:items-center"
+                  className="grid grid-cols-1 gap-3 border-b border-white/[0.05] px-5 py-4 last:border-0 lg:grid-cols-[2.4fr_0.8fr_0.8fr_1.1fr_0.7fr_auto] lg:items-center"
                 >
                   {/* Member identity */}
                   <div className="flex min-w-0 items-center gap-3">

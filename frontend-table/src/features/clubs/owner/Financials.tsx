@@ -6,6 +6,7 @@ import { Button } from "@/features/ui";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
 import { relTime, usd, usdCompact } from "./ownerRpc";
+import { StatCards } from "./StatCards";
 import { EmptyState, SectionTitle } from "./ui";
 import type { RakeLedger, RakeReport } from "./types";
 
@@ -60,50 +61,50 @@ export function Financials({
         }
       />
 
-      {/* Rollup cards */}
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className={cn(GLASS_PANEL, "p-4")}>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/45">
-            Total Rake ({period})
-          </p>
-          <p className="font-display mt-1.5 text-3xl font-bold text-gold">
-            {usd(report?.total_rake ?? 0)}
-          </p>
-        </div>
-        <div className={cn(GLASS_PANEL, "p-4")}>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/45">
-            Hands Raked
-          </p>
-          <p className="font-display mt-1.5 text-3xl font-bold text-foreground">
-            {(report?.hand_count ?? 0).toLocaleString()}
-          </p>
-        </div>
-        <div className={cn(GLASS_PANEL, "p-4")}>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/45">
-            House Balance
-          </p>
-          <p className="font-display mt-1.5 text-3xl font-bold text-green">
-            {usd(ledger?.house_balance ?? 0)}
-          </p>
-        </div>
-      </div>
+      {/* Rollup plates (M1). These were three M2 grey cards with a 30px value,
+          so the money on the club's revenue screen weighed the same as the
+          ledger rows underneath it. Same component as the Club Overview ribbon,
+          so the two screens agree on what a KPI looks like. */}
+      <StatCards
+        cards={[
+          {
+            label: `Total Rake (${period})`,
+            value: usd(report?.total_rake ?? 0),
+            series: series.map((s) => s.amount),
+          },
+          { label: "Hands Raked", value: (report?.hand_count ?? 0).toLocaleString() },
+          { label: "House Balance", value: usd(ledger?.house_balance ?? 0) },
+        ]}
+      />
 
       {/* Rake trend bars */}
       <div className={cn(GLASS_PANEL, "p-5")}>
         <p className="font-display text-[11px] font-bold uppercase tracking-[0.25em] text-gold/80">
           Rake Trend
         </p>
-        {series.length === 0 ? (
+        {/* `maxAmount` floors at 1, so a series whose every point is zero used to
+            render a row of 0%-height bars under a full set of date labels — an
+            axis with nothing on it, which reads as a broken chart rather than as
+            "no rake yet". Check for volume, not just for length. */}
+        {series.length === 0 || !series.some((s) => s.amount > 0) ? (
           <EmptyState>No rake recorded for this period.</EmptyState>
         ) : (
-          <div className="mt-5 flex h-40 items-end gap-2">
+          // `items-end` on this row sized every column to its own content — the
+          // date label — so the `flex-1` bar area inside had zero height to fill
+          // and every bar computed to 0px regardless of its value. The chart has
+          // been blank for as long as this markup has existed. `items-stretch`
+          // gives the columns the full h-40; bars still grow from the baseline
+          // via `items-end` on the bar area itself.
+          <div className="mt-5 flex h-40 items-stretch gap-2">
             {series.map((pt) => (
               <div key={pt.day} className="flex flex-1 flex-col items-center gap-2">
                 <div className="relative flex w-full flex-1 items-end">
                   <div
                     className="w-full rounded-t-md"
                     style={{
-                      height: `${(pt.amount / maxAmount) * 100}%`,
+                      /* floor at 2% so a real but tiny day is still visible as a
+                         bar rather than vanishing into the axis */
+                      height: `${Math.max(2, (pt.amount / maxAmount) * 100)}%`,
                       background: "linear-gradient(180deg,#ffd54a,#f5c518)",
                     }}
                     title={`${usd(pt.amount)} · ${pt.hands.toLocaleString()} hands`}
