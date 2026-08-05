@@ -29,6 +29,17 @@ import {
 // (antibot_score), and the raw audit-event list (audit_list) — the console's
 // lasting "Tools & Diagnostics" role.
 const RICH_HOME: Record<string, { href: string; label: string }> = {
+  // Solvers. These already have a player-facing home — /trainer is a solo
+  // card-picker built on exactly these RPCs — they were simply never signposted,
+  // so they looked console-native when they are not. hand_rank is also called by
+  // the table itself (EquityPanel, useHandCategory's hand-strength pill).
+  hand_rank: { href: "/trainer", label: "GTO Trainer" },
+  gto_advise: { href: "/trainer", label: "GTO Trainer" },
+  coaching_tip: { href: "/trainer", label: "GTO Trainer" },
+  // PLO hand strength on the felt — useHandCategory routes 4-card hands here.
+  omaha_rank: { href: "/table", label: "Table" },
+  // Backend liveness has a real screen; the console form duplicated it.
+  healthz: { href: "/stack", label: "Stack Health" },
   profile_get: { href: "/profile", label: "Profile" },
   wallet_get: { href: "/wallet", label: "Wallet" },
   loyalty_get: { href: "/loyalty", label: "Loyalty" },

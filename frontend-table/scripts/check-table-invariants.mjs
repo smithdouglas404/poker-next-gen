@@ -346,6 +346,34 @@ const rel = (p) => p.slice(FRONTEND.length + 1);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 8. Legal / marketing links must never point at the operator console.
+//
+// /lobby's footer had About Us, Terms and Privacy all linking to `/hub` — the
+// Command Center, a generated page of raw RPC forms. A player clicking
+// "Privacy" landed on an operator tool, which is indefensible for a
+// compliance-facing link. The copy lives in LegalDialog (there are no /terms or
+// /privacy routes), which is what the landing footer already uses.
+// ─────────────────────────────────────────────────────────────────────────────
+{
+  const LEGAL = /\b(About Us|Terms|Privacy|Responsible Gambling)\b/;
+  for (const f of files) {
+    const r = rel(f);
+    if (r.startsWith("src/app/hub") || r.includes("commands/")) continue;
+    const body = readFileSync(f, "utf8");
+    // A <Link href="/hub" …>Terms</Link> on one line, or split across lines.
+    for (const m of body.matchAll(/<Link[^>]*href=["']\/hub["'][\s\S]{0,200}?<\/Link>/g)) {
+      if (!LEGAL.test(m[0])) continue;
+      const line = body.slice(0, m.index).split("\n").length;
+      fail(
+        "no-legal-links-to-console",
+        `${r}:${line} points a legal/marketing link at /hub (the operator console). ` +
+          `Use LegalDialog (features/landing/LegalDialog.tsx) — the same one the landing footer uses.`,
+      );
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 const byCheck = new Map();
 for (const f of failures) {
   if (!byCheck.has(f.check)) byCheck.set(f.check, []);
@@ -353,7 +381,7 @@ for (const f of failures) {
 }
 
 if (failures.length === 0) {
-  console.log(`table invariants OK — ${files.length} files checked, 7/7 checks pass`);
+  console.log(`table invariants OK — ${files.length} files checked, 8/8 checks pass`);
   process.exit(0);
 }
 console.error(`\ntable invariants FAILED — ${failures.length} problem(s)\n`);

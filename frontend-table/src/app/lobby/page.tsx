@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { LegalDialog, type LegalDoc } from "@/features/landing/LegalDialog";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -37,6 +38,7 @@ function LobbyContent() {
   } = useGame();
 
   const [view, setView] = useState<LobbyView>("select");
+  const [legal, setLegal] = useState<LegalDoc>(null);
   const [busy, setBusy] = useState(false);
 
   // roles + clubs (public-game gate), tournaments (teaser), demo flags
@@ -499,13 +501,19 @@ function LobbyContent() {
 
         {/* ---- footer ---- */}
         <footer className="flex flex-wrap items-center justify-center gap-4 border-t border-white/[0.06] pt-6 text-xs text-neutral-500">
-          <Link href="/hub" className="transition hover:text-foreground">About Us</Link>
-          <Link href="/hub" className="transition hover:text-foreground">Terms</Link>
-          <Link href="/hub" className="transition hover:text-foreground">Privacy</Link>
+          {/* These three pointed at /hub — the operator console. A player
+              clicking "Privacy" landed on a page of raw RPC forms, which is
+              indefensible for a compliance-facing link. LegalDialog is the same
+              component the landing page footer uses; there are no /terms or
+              /privacy routes, the copy lives in that dialog. */}
+          <button type="button" onClick={() => setLegal("about")} className="transition hover:text-foreground">About Us</button>
+          <button type="button" onClick={() => setLegal("terms")} className="transition hover:text-foreground">Terms</button>
+          <button type="button" onClick={() => setLegal("privacy")} className="transition hover:text-foreground">Privacy</button>
         </footer>
       </main>
 
       <JoinPrivateGame open={joinPrivateOpen} onClose={() => setJoinPrivateOpen(false)} />
+      <LegalDialog doc={legal} onClose={() => setLegal(null)} />
     </div>
   );
 }

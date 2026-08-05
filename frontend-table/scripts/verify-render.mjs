@@ -78,6 +78,18 @@ async function shoot(path, name, expectAvatars) {
       avatars: [...document.querySelectorAll("img")].filter((i) => /avatars\//.test(i.getAttribute("src") || "")).length,
       leftColumn: /ROOM CONTROL|SIDEBET|Four-color deck/i.test(t),
       addBots: /ADD BOTS|deal me in/i.test(t),
+      // DID THE STYLESHEET ACTUALLY LOAD?
+      //
+      // Geometry assertions pass on a page with NO CSS: absolutely-positioned
+      // percentages still resolve, so the felt still measured centre 800 while
+      // the page rendered as white background and native grey buttons. Seven of
+      // eight checks went green on a completely unstyled screen.
+      //
+      // The app is dark-only by design (CLAUDE.md palette: --background
+      // #191d25), so a light body background means the stylesheet is missing —
+      // which in dev is usually `next build` having clobbered the running dev
+      // server's .next.
+      bodyBg: getComputedStyle(document.body).backgroundColor,
     };
   });
   await p.addStyleTag({ content: "nextjs-portal,[data-next-badge-root],[data-nextjs-toast]{display:none!important}" }).catch(() => {});
@@ -88,6 +100,24 @@ async function shoot(path, name, expectAvatars) {
 
 const live = await shoot("/table", "verify-table-live", false);
 const demo = await shoot("/table?demo=1", "verify-table-demo", true);
+
+// CSS FIRST. Every assertion below is about geometry or text, and all of them
+// pass on an unstyled page — so check the stylesheet loaded before believing any
+// of them.
+function isDark(rgb) {
+  const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/.exec(rgb || "");
+  if (!m) return false;
+  // TRANSPARENT IS NOT DARK. `rgba(0,0,0,0)` is the browser default — no
+  // background painted at all — and a naive luminance test scores it 0 and
+  // calls it dark. That is exactly the unstyled page this check exists to
+  // catch, so the alpha test has to come first.
+  const alpha = m[4] === undefined ? 1 : Number(m[4]);
+  if (alpha < 0.9) return false;
+  const [r, g, b] = [+m[1], +m[2], +m[3]];
+  return (r * 0.299 + g * 0.587 + b * 0.114) < 90; // the app is dark-only
+}
+check(isDark(live.bodyBg), "/table stylesheet loaded (dark theme applied)", live.bodyBg);
+check(isDark(demo.bodyBg), "/table?demo=1 stylesheet loaded (dark theme applied)", demo.bodyBg);
 
 // 800 is dead centre of a 1600px viewport. Hard-coded on purpose: this is the
 // number that was wrong, and a computed expectation would have been wrong too.
