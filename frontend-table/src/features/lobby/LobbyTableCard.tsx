@@ -1,7 +1,7 @@
 "use client";
 
 import type { TableListItem } from "@/features/game/protocol";
-import { BTN_RED, GLASS_PANEL, GLASS_PANEL_HOVER, cn } from "@/features/ui/tokens";
+import { BTN_GOLD, GLASS_PANEL, GLASS_PANEL_HOVER, cn } from "@/features/ui/tokens";
 
 // Neon Vault glass table thumbnail for the lobby grid. Seat pips encode
 // occupancy; the join CTA is gated by real open-seat count from table_list.
@@ -91,7 +91,7 @@ export function LobbyTableCard({
           "disabled:cursor-not-allowed disabled:opacity-40",
           full
             ? "border border-white/15 text-neutral-400"
-            : cn(BTN_RED, "shadow-none"),
+            : cn(BTN_GOLD, "shadow-none"),
         )}
       >
         {full ? "Table Full" : busy ? "Joining…" : "Take a Seat"}

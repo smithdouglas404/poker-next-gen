@@ -11,7 +11,11 @@ type ButtonVariant = "primary" | "gold" | "green" | "outline" | "ghost" | "dange
 type ButtonSize = "sm" | "md" | "lg";
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
-  primary: BTN_RED,
+  // `primary` WAS BTN_RED, so every primary action in the app — join, register,
+  // verify, create — rendered in the danger colour, and `danger` itself had to
+  // settle for an outline to stay distinguishable. Under the corrected roles
+  // gold leads and red is destructive only. `danger` below is the red one.
+  primary: BTN_GOLD,
   gold: BTN_GOLD,
   green: BTN_GREEN,
   outline: "border border-white/15 text-white hover:bg-white/5",

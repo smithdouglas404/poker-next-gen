@@ -68,122 +68,155 @@ function ModeCard({ def, onSelect }: { def: ModeCardDef; onSelect: () => void })
   const a = ACCENT[def.accent];
   const locked = !!def.locked;
 
+  // Layout notes, because this card had three separate alignment faults:
+  //  1. The title rendered TWICE — once in the header, once again under the art
+  //     ("PRIVATE TABLE" over the tile and "PRIVATE TABLE" under it).
+  //  2. Everything was centre-aligned, so blurbs of different lengths produced
+  //     ragged edges on all four cards at once.
+  //  3. `min-h-[3rem]` on the blurb only set a floor. A 3-line blurb next to a
+  //     4-line one still pushed its CTA a row lower, so the four buttons sat at
+  //     four different heights.
+  // Now: art first, ONE title, left-aligned copy, and `mt-auto` on the button so
+  // every CTA lands on the same baseline whatever the blurb does.
   return (
     <article
       className={cn(
         GLASS_PANEL,
         GLASS_PANEL_HOVER,
-        "group relative flex flex-col overflow-hidden p-6 transition",
+        "group relative flex flex-col overflow-hidden transition",
         a.ring,
         locked && "opacity-95",
       )}
     >
-      <header className="text-center">
-        <h3
-          className={cn(
-            "font-display text-xl font-bold uppercase tracking-wider",
-            locked ? "text-neutral-400" : a.text,
-          )}
-        >
-          {def.title}
-        </h3>
-        {def.subtitle && (
-          <p className="mt-1 text-[11px] uppercase tracking-[0.25em] text-neutral-500">
-            {def.subtitle}
-          </p>
-        )}
-      </header>
-
-      {/* themed scene tile */}
-      <div className="relative mt-5 aspect-[16/10] overflow-hidden rounded-xl border border-white/10">
+      <div className="relative aspect-[16/10] overflow-hidden border-b border-white/[0.07]">
         <SceneArt scene={def.scene} muted={locked} />
         {locked && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/55 backdrop-blur-[2px]">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 bg-black/60 backdrop-blur-[2px]">
             <LockIcon />
-            <span className="max-w-[80%] rounded-lg border border-gold/30 bg-black/60 px-3 py-1.5 text-center text-[11px] font-semibold text-gold">
+            <span className="max-w-[86%] rounded-lg border border-gold/30 bg-black/70 px-3 py-1.5 text-center text-[11px] font-semibold leading-snug text-gold">
               {def.lockedHint ?? "Only Club Owners can sponsor Public Games"}
             </span>
           </div>
         )}
       </div>
 
-      <h4
-        className={cn(
-          "mt-5 text-center font-display text-lg font-bold uppercase tracking-wide",
-          locked ? "text-neutral-500" : "text-foreground",
+      <div className="flex flex-1 flex-col p-5">
+        <h3
+          className={cn(
+            "font-display text-[19px] font-bold uppercase tracking-wider",
+            locked ? "text-neutral-400" : a.text,
+          )}
+        >
+          {def.title}
+        </h3>
+        {def.subtitle && (
+          <p className="mt-1 text-[10px] uppercase tracking-[0.25em] text-neutral-500">
+            {def.subtitle}
+          </p>
         )}
-      >
-        {def.title}
-      </h4>
-      <p className="mt-2 min-h-[3rem] text-center text-sm leading-relaxed text-neutral-400">
-        {def.blurb}
-      </p>
+        <p className="mt-3 pb-6 text-[13.5px] leading-relaxed text-neutral-400">{def.blurb}</p>
 
-      <button
-        type="button"
-        onClick={onSelect}
-        disabled={locked}
-        className={cn(
-          "mt-5 w-full rounded-xl px-5 py-3 text-sm font-bold uppercase tracking-wide transition",
-          locked
-            ? "cursor-not-allowed border border-white/10 bg-white/[0.02] text-neutral-500"
-            : def.accent === "gold"
-              ? "bg-gradient-to-b from-[#ffd54a] via-[#f5c518] to-[#d4a80f] text-[#231b00] hover:shadow-[0_6px_18px_-6px_rgba(245,197,24,0.4)] hover:-translate-y-px"
-              : def.accent === "red"
-                ? "bg-gradient-to-b from-[#ffd54a] via-[#f5c518] to-[#d4a80f] text-[#231b00] hover:shadow-[0_6px_18px_-6px_rgba(245,197,24,0.4)] hover:-translate-y-px"
-                : "border border-green/40 text-green hover:bg-green/5",
-        )}
-      >
-        {def.cta}
-      </button>
+        <button
+          type="button"
+          onClick={onSelect}
+          disabled={locked}
+          className={cn(
+            // `mt-auto` pushes the button to the card's foot so all four land on
+            // one baseline. Spacing above it must be PADDING, not another margin —
+            // an `mt-6` here silently competed with `mt-auto` and the CTAs sat at
+            // four different heights.
+            "mt-auto w-full rounded-xl px-5 pt-3 text-sm font-bold uppercase tracking-wide transition",
+            "py-3",
+            locked
+              ? "cursor-not-allowed border border-white/10 bg-white/[0.02] text-neutral-500"
+              : def.accent === "green"
+                ? "border border-green/40 text-green hover:bg-green/5"
+                : "bg-gradient-to-b from-[#ffd54a] via-[#f5c518] to-[#d4a80f] text-[#231b00] hover:shadow-[0_6px_18px_-6px_rgba(245,197,24,0.4)] hover:-translate-y-px",
+          )}
+        >
+          {def.cta}
+        </button>
+      </div>
     </article>
   );
 }
 
+/**
+ * Three motifs, one family: gold line-work on a dark wash.
+ *
+ * "lounge" was a saturated green blob — a rounded rectangle with a 50% radius —
+ * sitting in the middle of the card. It read as a smear, not a poker table, and
+ * green is the money colour so it was off-role besides. All three are now drawn
+ * as SVG at a consistent stroke weight so the four cards look like a set.
+ */
 function SceneArt({ scene, muted }: { scene: "lounge" | "casino" | "arena"; muted?: boolean }) {
-  // Clean GGPoker tiles: near-black base with a restrained single-tone wash —
-  // no environmental neon depth.
-  const bg =
+  const wash =
     scene === "lounge"
-      ? "radial-gradient(70% 90% at 50% 100%, rgba(224,30,43,0.10), transparent 70%), linear-gradient(180deg,#0b0d0f,#111417 60%,#0b0d0f)"
+      ? "radial-gradient(75% 95% at 50% 100%, rgba(245,197,24,0.10), transparent 70%), linear-gradient(180deg,#0b0d0f,#12140f 60%,#0b0d0f)"
       : scene === "casino"
-        ? "radial-gradient(60% 80% at 50% 40%, rgba(245,197,24,0.10), transparent 70%), linear-gradient(180deg,#0b0d0f,#15130d 60%,#0b0d0f)"
-        : "radial-gradient(80% 70% at 50% 20%, rgba(34,197,94,0.10), transparent 70%), linear-gradient(180deg,#0b0d0f,#0d130f 60%,#0b0d0f)";
+        ? "radial-gradient(60% 80% at 50% 45%, rgba(245,197,24,0.11), transparent 70%), linear-gradient(180deg,#0b0d0f,#15130d 60%,#0b0d0f)"
+        : "radial-gradient(85% 75% at 50% 15%, rgba(245,197,24,0.09), transparent 70%), linear-gradient(180deg,#0b0d0f,#0f1210 60%,#0b0d0f)";
+
+  const G = "#d4af37";
 
   return (
-    <div className="absolute inset-0" style={{ background: bg, filter: muted ? "saturate(0.5)" : undefined }}>
-      {scene === "lounge" && (
-        <div
-          className="absolute left-1/2 top-1/2 h-16 w-28 -translate-x-1/2 -translate-y-1/2 rounded-[50%] border"
-          style={{
-            borderColor: "rgba(245,197,24,0.5)",
-            background: "radial-gradient(closest-side, rgba(28,125,78,0.85), rgba(10,125,67,0.5))",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.6), inset 0 0 16px rgba(0,0,0,0.5)",
-          }}
-        />
-      )}
-      {scene === "casino" && (
-        <div className="absolute inset-x-0 bottom-0 flex justify-center gap-1.5 pb-4">
-          {["#f5c518", "#ffd54a", "#22c55e", "#9aa0a6", "#f5c518"].map((c, i) => (
-            <span
-              key={i}
-              className="h-8 w-6 rounded-sm"
-              style={{ background: `linear-gradient(180deg, ${c}, rgba(0,0,0,0.45))` }}
-            />
-          ))}
-        </div>
-      )}
-      {scene === "arena" && (
-        <div className="absolute inset-0 flex items-end justify-center gap-1 pb-3">
-          {Array.from({ length: 9 }).map((_, i) => (
-            <span
-              key={i}
-              className="w-2 rounded-t bg-green/40"
-              style={{ height: `${20 + ((i * 37) % 60)}%` }}
-            />
-          ))}
-        </div>
-      )}
+    <div
+      className="absolute inset-0"
+      style={{ background: wash, filter: muted ? "saturate(0.4) brightness(0.8)" : undefined }}
+    >
+      <svg viewBox="0 0 160 100" className="absolute inset-0 h-full w-full" aria-hidden>
+        {scene === "lounge" && (
+          <g fill="none" stroke={G} strokeWidth="1.4">
+            {/* felt oval with a rail, and seats around it */}
+            <rect x="34" y="34" width="92" height="42" rx="21" opacity="0.9" />
+            <rect x="39" y="39" width="82" height="32" rx="16" opacity="0.35" />
+            {[
+              [44, 27], [80, 24], [116, 27],
+              [44, 83], [80, 86], [116, 83],
+            ].map(([cx, cy], i) => (
+              <circle key={i} cx={cx} cy={cy} r="5" opacity="0.75" />
+            ))}
+          </g>
+        )}
+
+        {scene === "casino" && (
+          <g>
+            {/* chip stacks, tallest in the middle */}
+            {[
+              [46, 6], [66, 9], [86, 12], [106, 8], [126, 5],
+            ].map(([x, n], i) => (
+              <g key={i}>
+                {Array.from({ length: n }).map((_, k) => (
+                  <ellipse
+                    key={k}
+                    cx={x}
+                    cy={78 - k * 4}
+                    rx="12"
+                    ry="3.6"
+                    fill="none"
+                    stroke={G}
+                    strokeWidth="1.2"
+                    opacity={0.35 + (k / n) * 0.5}
+                  />
+                ))}
+              </g>
+            ))}
+          </g>
+        )}
+
+        {scene === "arena" && (
+          <g fill="none" stroke={G} strokeWidth="1.4">
+            {/* a bracket collapsing to one winner */}
+            <path d="M20 22h16v18h16M20 58h16V40" opacity="0.6" />
+            <path d="M140 22h-16v18h-16M140 58h-16V40" opacity="0.6" />
+            <path d="M52 40h56" opacity="0.85" />
+            <circle cx="80" cy="40" r="9" opacity="0.9" />
+            <path d="M76 40l3 3 5-6" strokeWidth="1.6" opacity="0.9" />
+            {/* podium */}
+            <path d="M58 84h20V70H58zM82 84h20V64H82zM106 84h20V74h-20z" opacity="0.45" />
+          </g>
+        )}
+      </svg>
     </div>
   );
 }

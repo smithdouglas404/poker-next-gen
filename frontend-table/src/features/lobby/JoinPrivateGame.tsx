@@ -13,7 +13,7 @@ import {
 import { formatCents, useGame } from "@/features/game/GameProvider";
 import type { TableListItem } from "@/features/game/protocol";
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
-import { BTN_RED, GLASS_PANEL, HEADING_SM, cn } from "@/features/ui/tokens";
+import { BTN_GOLD, GLASS_PANEL, HEADING_SM, cn } from "@/features/ui/tokens";
 
 // Join Private Game modal — HRC "Join Table with Code" surface, GGPoker theme.
 //
@@ -456,7 +456,7 @@ export function JoinPrivateGame({ open, onClose }: { open: boolean; onClose: () 
             onClick={() => void handleJoin()}
             disabled={!preview || joining || !!preview?.demo}
             className={cn(
-              BTN_RED,
+              BTN_GOLD,
               "rounded-xl px-8 py-2.5 text-sm uppercase tracking-wide disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none",
             )}
           >

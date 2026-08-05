@@ -344,7 +344,7 @@ export default function TournamentsPage() {
       <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#262d38]">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
           <div className="flex items-center gap-8">
-            <Link href="/dashboard" className="font-display text-lg font-bold uppercase tracking-wider text-brand">
+            <Link href="/dashboard" className="font-display text-lg font-bold uppercase tracking-wider text-gold-lite">
               High Rollers
             </Link>
             <nav className="flex items-center gap-1">
@@ -355,7 +355,9 @@ export default function TournamentsPage() {
                   onClick={() => setTab(id)}
                   className={cn(
                     "rounded-lg px-4 py-2 text-sm font-semibold uppercase tracking-wide transition",
-                    tab === id ? "bg-brand text-white" : "text-neutral-400 hover:text-neutral-200",
+                    tab === id
+                      ? "bg-gradient-to-b from-[#ffd54a] via-[#f5c518] to-[#d4a80f] text-[#231b00]"
+                      : "text-neutral-400 hover:text-neutral-200",
                   )}
                 >
                   {id === "lobby" ? "Lobby" : id === "center" ? "Tournament Center" : "Leaderboard"}
@@ -372,7 +374,7 @@ export default function TournamentsPage() {
             {/* An unreachable server is NOT "no events scheduled" — say which it
                 is, so an empty schedule is never read as an outage or vice versa. */}
             {failed && !demo && (
-              <span className="rounded-full border border-brand/40 bg-brand/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-brand">
+              <span className="rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-gold-lite">
                 Schedule unavailable
               </span>
             )}

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { BTN_RED, GLASS_PANEL, HEADING_SM, cn } from "@/features/ui/tokens";
+import { BTN_GOLD, GLASS_PANEL, HEADING_SM, cn } from "@/features/ui/tokens";
 import { downloadFile } from "@/features/provably/verifier";
 import type { AuditEvent } from "@/features/provably/types";
 import { PlayingCard } from "./Card";
@@ -289,7 +289,7 @@ export function HandAudit({ target }: Props) {
             onClick={rerun}
             disabled={rerunning}
             className={cn(
-              BTN_RED,
+              BTN_GOLD,
               "rounded-xl px-5 py-3 text-xs font-bold uppercase tracking-wider disabled:opacity-50",
             )}
           >

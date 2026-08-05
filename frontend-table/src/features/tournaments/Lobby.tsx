@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { Button } from "@/features/ui";
-import { BTN_RED, GLASS_PANEL, GLASS_PANEL_HOVER, cn } from "@/features/ui/tokens";
+import { BTN_GOLD, GLASS_PANEL, GLASS_PANEL_HOVER, cn } from "@/features/ui/tokens";
 
 import { Eyebrow, KpiTile, RowIcon, Stat, Tag } from "./atoms";
 import { FocusRail } from "./FocusRail";
@@ -63,7 +63,7 @@ function HeroCard({
       className={cn(
         "group relative overflow-hidden rounded-xl border p-6 text-left transition-all duration-200",
         selected
-          ? "border-brand/60 shadow-[0_4px_18px_rgba(0,0,0,0.5)]"
+          ? "border-gold/60 shadow-[0_4px_18px_rgba(0,0,0,0.5)]"
           : "border-white/[0.06] hover:border-white/[0.14]",
       )}
       style={{ background: t.meta?.heroArt ?? "#262d38" }}
@@ -112,13 +112,13 @@ function HeroCard({
                 ? "cursor-default border border-green/40 bg-green/10 text-green"
                 : t.meta?.locked
                   ? "cursor-not-allowed border border-white/10 text-neutral-600"
-                  : BTN_RED,
+                  : BTN_GOLD,
               busy && "opacity-50",
             )}
           >
             {isRegistered ? "Registered ✓" : t.meta?.locked ? "Locked" : "Register Now"}
           </span>
-          <span className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 group-hover:text-brand">
+          <span className="text-[11px] uppercase tracking-[0.2em] text-neutral-500 group-hover:text-gold-lite">
             View Details →
           </span>
         </div>
@@ -155,7 +155,7 @@ function EventRow({
     <div
       className={cn(
         "flex items-center gap-4 rounded-xl border p-3.5 transition-all",
-        selected ? "border-brand/50 bg-brand/[0.06]" : "border-white/[0.06] bg-[#262d38] hover:border-white/[0.14]",
+        selected ? "border-gold/50 bg-gold/[0.06]" : "border-white/[0.06] bg-[#262d38] hover:border-white/[0.14]",
       )}
     >
       <RowIcon tone={tone} glyph={GLYPH[tone]} />
@@ -313,7 +313,7 @@ export function Lobby({
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 font-display text-sm font-bold uppercase tracking-[0.2em] text-white">
-              <span className="text-brand">≡</span> Ongoing &amp; Upcoming
+              <span className="text-gold-lite">≡</span> Ongoing &amp; Upcoming
             </h2>
             <div className="flex items-center gap-2">
               <div className="flex rounded-lg border border-white/10 bg-black/30 p-0.5">
@@ -324,7 +324,9 @@ export function Lobby({
                     onClick={() => setFilter(f)}
                     className={cn(
                       "rounded-md px-3 py-1 text-[11px] font-semibold uppercase tracking-wide transition",
-                      filter === f ? "bg-brand text-white" : "text-neutral-500 hover:text-neutral-300",
+                      filter === f
+                        ? "bg-gradient-to-b from-[#ffd54a] via-[#f5c518] to-[#d4a80f] text-[#231b00]"
+                        : "text-neutral-500 hover:text-neutral-300",
                     )}
                   >
                     {f === "all" ? "All" : f === "running" ? "Live" : f === "upcoming" ? "Soon" : "Sat"}
@@ -334,7 +336,7 @@ export function Lobby({
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value as SortKey)}
-                className="rounded-lg border border-white/10 bg-black/30 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-neutral-300 outline-none focus:border-brand/40"
+                className="rounded-lg border border-white/10 bg-black/30 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-neutral-300 outline-none focus:border-gold/40"
               >
                 <option value="time">Sort: Time</option>
                 <option value="prize">Sort: Prize</option>

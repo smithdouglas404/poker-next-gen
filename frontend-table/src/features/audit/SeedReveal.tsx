@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { BTN_RED, GLASS_PANEL, HEADING_SM, cn } from "@/features/ui/tokens";
+import { BTN_GOLD, GLASS_PANEL, HEADING_SM, cn } from "@/features/ui/tokens";
 import { downloadFile, proofBundle } from "@/features/provably/verifier";
 import { PlayingCard } from "./Card";
 import { auditVerifyHand } from "./auditRpc";
@@ -183,7 +183,7 @@ export function SeedReveal({ target }: Props) {
             onClick={reveal}
             disabled={busy}
             className={cn(
-              BTN_RED,
+              BTN_GOLD,
               "inline-flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold uppercase tracking-wider disabled:opacity-50",
             )}
           >
