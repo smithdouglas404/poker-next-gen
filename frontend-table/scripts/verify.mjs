@@ -106,7 +106,7 @@ console.log("\n━━ 2. END-TO-END (real stack) ━━");
 if (!stackUp) {
   const missing = [!pg && "postgres:5433", !nakama && "nakama:7350", !engine && "engine-math:8080"].filter(Boolean).join(", ");
   const why = STATIC_ONLY ? "--static" : `stack down: ${missing}`;
-  for (const n of ["seat lifecycle (join→sit→stand→settle)", "three-tier sit-down gate", "club loan settlement"]) {
+  for (const n of ["seat lifecycle (join→sit→stand→settle)", "full hand (blinds→streets→showdown→pot)", "three-tier sit-down gate", "club loan settlement"]) {
     record("e2e", n, "skip", why);
   }
 } else {
@@ -115,6 +115,9 @@ if (!stackUp) {
   // in a runtime plugin kills the process, so "assertions passed" and "the
   // server survived" are different questions.
   run("node scripts/table-sim/lifecycle-e2e.mjs", FRONTEND, "seat lifecycle (join→sit→stand→settle)", "e2e");
+  // Plays an actual hand: blinds, betting, streets, showdown, pot award, and
+  // chip conservation. Everything above only ever seated players.
+  run("node scripts/table-sim/handplay-e2e.mjs", FRONTEND, "full hand (blinds→streets→showdown→pot)", "e2e");
   run("node scripts/table-sim/guest-tiers-e2e.mjs", FRONTEND, "three-tier sit-down gate", "e2e");
   run("node scripts/table-sim/club-settlement-e2e.mjs", FRONTEND, "club loan settlement", "e2e");
 }
@@ -133,10 +136,10 @@ if (!stackUp) {
 console.log("\n━━ 3. RENDER (a screenshot nobody looks at is not verification — these ASSERT) ━━");
 const dev = STATIC_ONLY ? false : await up("http://localhost:3000/table");
 if (!dev) {
-  record("render", "table renders and is centred", "skip", STATIC_ONLY ? "--static" : "dev server not on :3000 (npm run dev)");
+  record("render", "screens render (table, landing, lobby, hub, tournaments)", "skip", STATIC_ONLY ? "--static" : "dev server not on :3000 (npm run dev)");
 } else {
   if (!existsSync(SHOTS)) mkdirSync(SHOTS, { recursive: true });
-  run(`VERIFY_SHOT_DIR='${SHOTS}' node scripts/verify-render.mjs`, FRONTEND, "table renders and is centred", "render");
+  run(`VERIFY_SHOT_DIR='${SHOTS}' node scripts/verify-render.mjs`, FRONTEND, "screens render (table, landing, lobby, hub, tournaments)", "render");
 }
 
 console.log("\n━━ 4. BUILD (last — it clobbers the dev server's .next) ━━");

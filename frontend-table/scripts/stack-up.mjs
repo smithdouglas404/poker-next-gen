@@ -80,9 +80,9 @@ async function waitFor(fn, seconds, label) {
   say(`  ! ${label} did not come up within ${seconds}s`);
   return false;
 }
-function detach(cmd, args, logfile) {
+function detach(cmd, args, logfile, env) {
   const out = openSync(logfile, "a");
-  const c = spawn(cmd, args, { detached: true, stdio: ["ignore", out, out] });
+  const c = spawn(cmd, args, { detached: true, stdio: ["ignore", out, out], env: { ...process.env, ...(env ?? {}) } });
   c.unref();
 }
 
@@ -150,8 +150,20 @@ if (await nakamaRuntimeReady()) {
     say(`FAIL nakama          plugin build: ${String(e.message).slice(0, 200)}`);
     missing.push("fix the plugin build");
   }
+  // ENGINE_MATH_URL IS NOT OPTIONAL.
+  //
+  // poker/enginemath/client.go falls back to `http://engine-math:8080` — a
+  // DOCKER-COMPOSE hostname that does not resolve when Nakama runs natively.
+  // Without this var the shuffle fails, StartHand returns an error, and
+  // autoStartHand quietly sets DealerDown and never deals. There is no client
+  // error and no log line at WARN: hands simply never begin.
+  //
+  // That was live in this script until handplay-e2e.mjs was written — every
+  // earlier harness only sat players down, so nothing ever noticed that dealing
+  // was dead. Golden rule 4 means there is no local shuffle fallback to mask it.
   detach(NAKAMA, ["--database.address", DB, "--runtime.path", MODULES, "--logger.level", "WARN",
-    "--console.port", "7351", "--socket.port", "7350"], `${LOGS}/nakama.log`);
+    "--console.port", "7351", "--socket.port", "7350"], `${LOGS}/nakama.log`,
+    { ENGINE_MATH_URL: "http://127.0.0.1:8080" });
   // Wait for the RUNTIME, not the socket — see nakamaRuntimeReady().
   const ok = await waitFor(nakamaRuntimeReady, 60, "nakama runtime");
   say(ok ? "ok   nakama          started on 7350, backend-core.so registered" : "FAIL nakama          runtime never registered — see /tmp/nakama.log");

@@ -545,9 +545,18 @@ Four phases, in this order:
 | phase | what it proves |
 |---|---|
 | 1 static | `tsc`, `check:table` (7 invariants), `go vet`, plugin builds |
-| 2 e2e | seat lifecycle, three-tier gate, club loan settlement — against the REAL stack |
-| 3 render | `/table` + `/table?demo=1` measured off the live DOM, not eyeballed |
+| 2 e2e | seat lifecycle, **a full hand**, three-tier gate, club loan settlement — against the REAL stack |
+| 3 render | `/table`, `?demo=1`, `/`, `/lobby`, `/clubs`, `/tournaments` measured off the live DOM |
 | 4 build | `next build` — LAST, because it clobbers a running dev server's `.next` |
+
+**`ENGINE_MATH_URL` is not optional when Nakama runs natively.**
+`poker/enginemath/client.go` falls back to `http://engine-math:8080`, a
+docker-compose hostname that does not resolve outside compose. Without the var
+the shuffle fails, `StartHand` errors, and `autoStartHand` quietly sets
+`DealerDown` — **no client error, no WARN log, hands simply never begin**
+(Golden rule 4: there is no local shuffle fallback to mask it). `stack-up.mjs`
+sets it. This was live in that script until `handplay-e2e.mjs` existed, because
+every earlier harness only sat players down and none ever dealt.
 
 **A SKIP IS NOT A PASS.** When the stack or dev server is down, those phases
 report `SKIP` with the reason and the summary says *"green, but INCOMPLETE"*.
@@ -570,6 +579,17 @@ stop.
    phantom seats. Every assertion is a bug that actually shipped.
 3. **No single command.** Stack setup was ~10 manual minutes, so it did not get
    run.
+4. **No hand was ever played.** Blinds, betting, street progression, showdown
+   and pot award were exercised by nothing that runs the real server.
+   `scripts/table-sim/handplay-e2e.mjs` drives two websocket clients through a
+   full hand and asserts on **server snapshots only** — never on numbers the
+   test computed. The assertion worth having is **chip conservation**: total
+   chips (stacks + pot) measured from the first snapshot must equal the last.
+   That catches side-pot and award bugs no single-function unit test would.
+   Its baseline is *measured, not assumed* — the first version asserted against
+   the buy-in it had requested and failed 200000 vs 400000 because the request
+   used `buy_in_cents` when the wire field is `buy_in`, so every player silently
+   took the table default. The test was wrong and the server was right.
 
 ### Local stack
 

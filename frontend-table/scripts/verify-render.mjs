@@ -103,6 +103,56 @@ check(!live.addBots, "no create-a-game control on the felt");
 check(live.sitHere === 0, "no phantom seats at a table that does not exist", `${live.sitHere}`);
 check(demo.avatars > 0, "demo table is populated", `${demo.avatars} avatars`);
 
+// ── the other screens ───────────────────────────────────────────────────────
+//
+// The table was the only page anything checked, which is how a landing page
+// with a "play here" CTA and a lobby reachable without a login both survived.
+// These are cheap: does the route render at all, and does it still obey the
+// rules the owner has had to repeat.
+async function page(path, name) {
+  const p = await ctx.newPage();
+  const errors = [];
+  p.on("pageerror", (e) => errors.push(String(e).slice(0, 120)));
+  const res = await p.goto(`http://localhost:3000${path}`, { waitUntil: "domcontentloaded", timeout: 120000 })
+    .catch(() => null);
+  await p.waitForTimeout(6000);
+  const m = await p.evaluate(() => {
+    const t = document.body.innerText;
+    return {
+      text: t,
+      chars: t.replace(/\s+/g, "").length,
+      // A page that renders its error state is not a page that rendered.
+      broken: /Application error|COULDN'T LOAD|Internal Server Error|This page could not be found/i.test(t),
+    };
+  });
+  await p.addStyleTag({ content: "nextjs-portal,[data-next-badge-root],[data-nextjs-toast]{display:none!important}" }).catch(() => {});
+  await p.screenshot({ path: `${OUT}/${name}.png` });
+  await p.close();
+  return { status: res?.status() ?? 0, ...m, errors };
+}
+
+const landing = await page("/", "verify-landing");
+check(landing.status === 200 && !landing.broken && landing.chars > 400, "landing page renders",
+  `${landing.status}, ${landing.chars} chars`);
+// CLAUDE.md > "Landing page — never a place to play". This shipped twice: an
+// "Enter a table" CTA straight to /table, and a /hub operator link.
+check(!/\/table/.test(landing.text) && !/Enter a table|Deal me in/i.test(landing.text),
+  "landing page offers NO way to join or play");
+check(!/Command Center/i.test(landing.text), "landing page does not link the operator hub");
+
+const lobby = await page("/lobby", "verify-lobby");
+// /lobby is behind auth — creating a game always requires a login. Either it
+// renders the builder for a signed-in user or it bounces; a 500 is neither.
+check(lobby.status !== 500 && !/Internal Server Error/i.test(lobby.text), "lobby does not 500",
+  `${lobby.status}`);
+
+const clubs = await page("/clubs", "verify-owner-hub");
+check(clubs.status === 200, "owner hub route responds", `${clubs.status}`);
+
+const tourneys = await page("/tournaments", "verify-tournaments");
+check(tourneys.status === 200 && !tourneys.broken, "tournaments page renders",
+  `${tourneys.status}, ${tourneys.chars} chars`);
+
 console.log(`    shots -> ${OUT}`);
 await b.close();
 process.exit(fails.length ? 1 : 0);
