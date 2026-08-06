@@ -42,9 +42,17 @@ export default function MembershipPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    // `?preview=1` was the only flag that fell back to the mirrored catalog, but
+    // the rest of the app reviews screens with `?demo=1`. On /membership?demo=1
+    // the tier list stayed empty and the pricing grid rendered ZERO cards under a
+    // "Choose your plan" heading — blank space where the product's prices go.
+    // Accepting both is data substitution, which is all `demo` is allowed to do.
     const preview =
       typeof window !== "undefined" &&
-      new URLSearchParams(window.location.search).get("preview") === "1";
+      (() => {
+        const q = new URLSearchParams(window.location.search);
+        return q.get("preview") === "1" || q.get("demo") === "1";
+      })();
     try {
       const [t, s, k, v] = await Promise.all([
         membershipApi.tiers(),
@@ -407,6 +415,24 @@ export default function MembershipPage() {
             animate="show"
             className="grid gap-4 md:grid-cols-3 xl:grid-cols-5"
           >
+            {/* A failed `membership_tiers` used to leave this grid empty, so the
+                heading above it sat over blank space and read as a broken page
+                rather than as a load failure. Say which it is. */}
+            {tiers.length === 0 && !loading && (
+              <div className="col-span-full rounded-xl border border-white/[0.06] bg-[#262d38] px-6 py-10 text-center">
+                <p className="text-sm font-semibold text-muted">Plans couldn&apos;t be loaded.</p>
+                <p className="mt-1 text-[12.5px] text-white/40">
+                  The membership catalog is served by the backend. Retry, or check back shortly.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void load()}
+                  className="mt-4 rounded-lg border border-gold/40 px-4 py-2 text-[12px] font-bold uppercase tracking-wider text-gold-lite transition hover:bg-gold/10"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
             {tiers.map((tier) => (
               // h-full + position-only layout so every card in the row ends at the same
               // height; a full `layout` would pin an explicit measured height instead.

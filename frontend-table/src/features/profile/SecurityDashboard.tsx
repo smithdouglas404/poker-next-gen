@@ -274,9 +274,15 @@ export function SecurityDashboard({ notify }: { notify: (msg: string, kind?: "ok
           </Link>
         </div>
 
-        {/* Linked social accounts — managed by Clerk (Google/Facebook/etc.).
-            Linking/unlinking happens in Clerk's secure account UI. */}
-        <p className="mt-5 text-[11px] uppercase tracking-[0.2em] text-neutral-500">Linked Social Accounts</p>
+        {/* This was headed "Linked Social Accounts" over two hardcoded badges,
+            so it read as "your Google and Facebook accounts ARE linked" on every
+            account, linked or not. Nothing here queries Clerk — no
+            useUser().externalAccounts, no provider list — so the state was
+            invented. Renamed to describe what it actually is: the providers
+            available, with linking handled in Clerk's own UI. */}
+        <p className="mt-5 text-[11px] uppercase tracking-[0.2em] text-neutral-500">
+          Social Sign-in Providers
+        </p>
         <div className="mt-2 flex items-center gap-2">
           {[
             { id: "google", label: "G", bg: "bg-white text-black" },
@@ -290,9 +296,12 @@ export function SecurityDashboard({ notify }: { notify: (msg: string, kind?: "ok
             href="/sign-in"
             className="ml-1 rounded-lg border border-white/15 px-3 py-1.5 text-xs font-semibold text-neutral-200 transition hover:border-white/30 hover:text-white"
           >
-            Manage social logins →
+            Manage in Clerk →
           </Link>
         </div>
+        <p className="mt-2 text-[11px] text-neutral-500">
+          Whether either is linked to this account is managed by Clerk, not shown here.
+        </p>
 
         {/* Preferences */}
         <p className="mt-5 text-[11px] uppercase tracking-[0.2em] text-neutral-500">Preferences</p>
@@ -357,7 +366,19 @@ export function SecurityDashboard({ notify }: { notify: (msg: string, kind?: "ok
 
       {/* Active sessions — full width */}
       <section className={cn(GLASS_PANEL, "p-5 lg:col-span-3")}>
-        <p className={cn(HEADING_SM, "text-gold/80")}>Active Sessions</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className={cn(HEADING_SM, "text-gold/80")}>Active Sessions</p>
+          {/* `sessions` is the hardcoded DEMO_SESSIONS array — there is no
+              session-list RPC behind it. It was rendering "Chrome · macOS ·
+              Las Vegas, US · active now" as though it were this account's real
+              device list, which is fabricated state (non-negotiable 3) on a
+              SECURITY screen, where a wrong device list is the one thing a
+              player would act on. The linked-wallet rows below already carry
+              exactly this disclosure; this panel needed the same. */}
+          <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.15em] text-gold-lite">
+            Example data
+          </span>
+        </div>
         <div className="mt-3 space-y-2">
           {sessions.map((s) => (
             <div key={s.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/30 px-4 py-3">
@@ -374,16 +395,17 @@ export function SecurityDashboard({ notify }: { notify: (msg: string, kind?: "ok
                   {s.location} · {s.lastActive === "now" ? "active now" : s.lastActive}
                 </p>
               </div>
-              {!s.current && (
-                <Link href="/profile/security" className="text-xs font-semibold uppercase tracking-wide text-gold-lite hover:text-red-300">
-                  Revoke
-                </Link>
-              )}
+              {/* No revoke control until there is a session RPC to call. This
+                  was a <Link> to /profile/security, which renders only the 2FA
+                  and Account-Recovery panels — no session manager — so the
+                  button led nowhere. A dead control is worse than none. */}
             </div>
           ))}
         </div>
         <p className="mt-3 text-[11px] text-neutral-500">
-          Sign out of individual sessions from the Security Center. Suspicious activity? Reset your password there.
+          Per-device sign-out is not wired yet — these rows are examples, not your
+          real sessions. If you suspect access you did not authorise, reset your
+          password and rotate 2FA from the panels above; both are live.
         </p>
       </section>
     </div>
