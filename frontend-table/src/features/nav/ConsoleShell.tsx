@@ -17,7 +17,15 @@ import { useState, type ReactNode } from "react";
 
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
-export type ConsoleNavStateItem = { id: string; label: string; icon?: ReactNode; group?: string };
+export type ConsoleNavStateItem = {
+  id: string;
+  label: string;
+  icon?: ReactNode;
+  group?: string;
+  /** Count of items waiting in this section. Omit or 0 renders nothing — a nav
+   *  badge that sits at "0" is a badge you stop reading. */
+  badge?: number;
+};
 export type ConsoleNavRouteItem = { href: string; label: string; icon?: ReactNode };
 export type ConsoleNav =
   | { mode: "state"; active: string; onSelect: (id: string) => void; items: ConsoleNavStateItem[] }
@@ -87,6 +95,7 @@ function NavItem({
   accent,
   grouped,
   showActiveBadge,
+  badge,
   onClick,
   href,
 }: {
@@ -96,6 +105,7 @@ function NavItem({
   accent: ConsoleAccent;
   grouped: boolean;
   showActiveBadge: boolean;
+  badge?: number;
   onClick?: () => void;
   href?: string;
 }) {
@@ -112,10 +122,23 @@ function NavItem({
           <span className="w-5 text-center opacity-80">{icon}</span>
         ))}
       <span className="font-medium">{label}</span>
-      {showActiveBadge && active && (
-        <span className="ml-auto hidden text-[9px] font-bold uppercase tracking-[0.2em] text-white/70 md:inline">
-          Active
+      {/* Gold, not red: a queue is attention, not danger (non-negotiable 5).
+          It outranks the "Active" label for the same slot — someone waiting is
+          news, "you are here" is not. */}
+      {typeof badge === "number" && badge > 0 ? (
+        <span
+          className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1.5 text-[11px] font-bold tabular-nums text-black"
+          aria-label={`${badge} waiting`}
+        >
+          {badge > 99 ? "99+" : badge}
         </span>
+      ) : (
+        showActiveBadge &&
+        active && (
+          <span className="ml-auto hidden text-[9px] font-bold uppercase tracking-[0.2em] text-white/70 md:inline">
+            Active
+          </span>
+        )
       )}
     </>
   );
@@ -190,6 +213,7 @@ function NavList({
                     accent={accent}
                     grouped
                     showActiveBadge={showActiveBadge}
+                    badge={n.badge}
                     onClick={() => nav.onSelect(n.id)}
                   />
                 ))}
@@ -210,6 +234,7 @@ function NavList({
           accent={accent}
           grouped={false}
           showActiveBadge={showActiveBadge}
+          badge={n.badge}
           onClick={() => nav.onSelect(n.id)}
         />
       ))}

@@ -43,6 +43,7 @@ import { demoRequested } from "@/features/ui/demoMode";
 import { FailedState } from "@/features/ui/EmptyState";
 import { compact, ownerApi, usdCompact } from "./ownerRpc";
 import { EmptyState, SectionTitle } from "./ui";
+import { useGuestApprovalCount } from "./useGuestApprovalCount";
 import type {
   AnalyticsSeries,
   ClubAnnouncement,
@@ -88,6 +89,10 @@ export function OwnerHub() {
   const [series, setSeries] = useState<AnalyticsSeries | null>(null);
 
   const [section, setSection] = useState<OwnerSection>("overview");
+  // Badges Member Registry while coded guests are stuck at the sit-down gate.
+  // Reads the same RPC the queue itself does, so the count and the list cannot
+  // disagree; 0 (and so no badge) whenever the read fails.
+  const guestsWaiting = useGuestApprovalCount(club?.id);
   const [toast, setToast] = useState<Toast | null>(null);
 
   const notify = useCallback((msg: string, kind: "ok" | "err" = "ok") => {
@@ -574,6 +579,7 @@ export function OwnerHub() {
       memberCount={memberCount}
       role={role}
       demo={demo}
+      guestsWaiting={guestsWaiting}
       onBrowse={() => setForceBrowse(true)}
     >
       {toast && (

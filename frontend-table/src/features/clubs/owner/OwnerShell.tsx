@@ -6,7 +6,7 @@
 // ConsoleShell. Brand lives in the top bar, so no sidebar brand block is passed.
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { ConsoleShell } from "@/features/nav/ConsoleShell";
 import { RAISED, cn } from "@/features/ui/tokens";
@@ -25,6 +25,7 @@ export function OwnerShell({
   memberCount,
   role,
   demo,
+  guestsWaiting = 0,
   onBrowse,
   children,
 }: {
@@ -36,10 +37,24 @@ export function OwnerShell({
   memberCount: number;
   role: string | null;
   demo: boolean;
+  /** Coded guests stuck at the sit-down gate. Badges Member Registry, which is
+   *  where GuestApprovals lives. */
+  guestsWaiting?: number;
   onBrowse?: () => void;
   children: ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // GuestApprovals renders inside the "members" section, so that is the row that
+  // carries the count. Without it the queue is invisible until you happen to
+  // click through — and the person it holds up is sitting on the felt waiting.
+  const navItems = useMemo(
+    () =>
+      guestsWaiting > 0
+        ? OWNER_SECTION_NAV.map((n) => (n.id === "members" ? { ...n, badge: guestsWaiting } : n))
+        : OWNER_SECTION_NAV,
+    [guestsWaiting],
+  );
 
   const topBar = (
     <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-[#262d38]">
@@ -126,7 +141,7 @@ export function OwnerShell({
 
   return (
     <ConsoleShell
-      nav={{ mode: "state", active: section, onSelect: (id) => onSection(id as OwnerSection), items: OWNER_SECTION_NAV }}
+      nav={{ mode: "state", active: section, onSelect: (id) => onSection(id as OwnerSection), items: navItems }}
       accent="redGradient"
       showActiveBadge
       topBar={topBar}
