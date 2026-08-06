@@ -224,7 +224,11 @@ export function Leaderboard({
           "flex flex-wrap items-stretch divide-white/10 border-gold/20 py-3 sm:divide-x",
         )}
       >
-        <TopStat label="Current Prize Pool" value={`₮${fullChips(Math.round(poolMinor / 100))}`} tone="gold" />
+        {/* This printed the prize pool as `₮450,000`. U+20AE is the MONGOLIAN
+            TUGRIK sign — almost certainly a mis-paste for a "T"-styled chip
+            glyph. The value is `poolMinor / 100`, i.e. already dollars, and
+            every other money figure in the app renders with `$`. */}
+        <TopStat label="Current Prize Pool" value={`$${fullChips(Math.round(poolMinor / 100))}`} tone="gold" />
         <TopStat label="Remaining Players" value={`${remaining} / ${field}`} tone="white" />
         <TopStat
           label="Blinds Level"

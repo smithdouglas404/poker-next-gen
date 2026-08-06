@@ -139,7 +139,7 @@ function ChatPanel() {
   return (
     <div className={cn(GLASS_PANEL, "flex flex-col p-4")}>
       <p className="flex items-center gap-2 font-display text-sm font-bold uppercase tracking-[0.2em] text-white">
-        <span className="text-brand">💬</span> Global Club Chat
+        <span className="text-gold-lite">•</span> Global Club Chat
       </p>
       <ul className="mt-3 max-h-48 space-y-2 overflow-y-auto pr-1">
         {msgs.map((m, i) => (
@@ -147,7 +147,7 @@ function ChatPanel() {
             <span
               className={cn(
                 "font-bold",
-                m.mine ? "text-green" : m.who === "System" ? "text-gold" : "text-brand",
+                m.mine ? "text-green" : m.who === "System" ? "text-gold" : "text-neutral-300",
               )}
             >
               {m.who}:{" "}
@@ -162,12 +162,12 @@ function ChatPanel() {
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
           placeholder="Type a message…"
-          className="min-w-0 flex-1 rounded-full border border-white/10 bg-black/40 px-3.5 py-2 text-[12px] text-neutral-200 outline-none placeholder:text-neutral-600 focus:border-brand/40"
+          className="min-w-0 flex-1 rounded-full border border-white/10 bg-black/40 px-3.5 py-2 text-[12px] text-neutral-200 outline-none placeholder:text-neutral-600 focus:border-gold/40"
         />
         <button
           type="button"
           onClick={send}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand text-white transition hover:bg-brand/80"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[#ffd54a] to-[#d4a80f] text-[#231b00] transition hover:brightness-110"
           aria-label="Send message"
         >
           ➤
@@ -313,7 +313,9 @@ export function OwnerCenter({
                   onClick={() => setBucket(b.id)}
                   className={cn(
                     "flex-1 rounded-lg px-3 py-2 text-sm font-semibold uppercase tracking-wide transition",
-                    bucket === b.id ? "bg-brand text-white" : "text-neutral-500 hover:text-neutral-300",
+                    bucket === b.id
+                      ? "bg-gradient-to-b from-[#ffd54a] via-[#f5c518] to-[#d4a80f] text-[#231b00]"
+                      : "text-neutral-500 hover:text-neutral-300",
                   )}
                 >
                   {b.label}
@@ -353,7 +355,7 @@ export function OwnerCenter({
                         onClick={() => setSelectedId(t.id)}
                         className={cn(
                           "cursor-pointer border-b border-white/5 transition last:border-b-0",
-                          selectedId === t.id ? "bg-brand/[0.08]" : "hover:bg-white/[0.03]",
+                          selectedId === t.id ? "bg-gold/[0.07]" : "hover:bg-white/[0.03]",
                         )}
                       >
                         <td className="px-4 py-3">
