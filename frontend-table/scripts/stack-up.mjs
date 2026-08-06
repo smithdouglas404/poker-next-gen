@@ -161,7 +161,12 @@ if (await nakamaRuntimeReady()) {
   // That was live in this script until handplay-e2e.mjs was written — every
   // earlier harness only sat players down, so nothing ever noticed that dealing
   // was dead. Golden rule 4 means there is no local shuffle fallback to mask it.
+  // Session lifetimes must MATCH docker-entrypoint.sh, or the local stack
+  // measures a client behaviour production does not have: Nakama's 60s default
+  // is inside nakama-js's 300s auto-refresh window, so every rpc costs a refresh
+  // too. Left unset here, that storm shows up locally and nowhere else.
   detach(NAKAMA, ["--database.address", DB, "--runtime.path", MODULES, "--logger.level", "WARN",
+    "--session.token_expiry_sec", "900", "--session.refresh_token_expiry_sec", "86400",
     "--console.port", "7351", "--socket.port", "7350"], `${LOGS}/nakama.log`,
     { ENGINE_MATH_URL: "http://127.0.0.1:8080" });
   // Wait for the RUNTIME, not the socket — see nakamaRuntimeReady().

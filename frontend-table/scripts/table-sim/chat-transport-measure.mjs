@@ -108,6 +108,17 @@ await ctx.addInitScript(
 // Count every club_chat_list the page issues, so the request volume is measured
 // rather than inferred from reading setInterval.
 let listCalls = 0;
+// Direct evidence that the renewal path RAN. "identity unchanged" alone could
+// just mean the token never expired during the window.
+let refreshCalls = 0;
+let refreshFailures = 0;
+const refreshAt = [];
+ctx.on("response", (r) => {
+  if (!r.url().includes("/session/refresh")) return;
+  refreshCalls += 1;
+  refreshAt.push(Date.now());
+  if (r.status() >= 400) refreshFailures += 1;
+});
 const listPayloads = new Set();
 ctx.on("request", (r) => {
   if (!r.url().includes("club_chat_list")) return;
@@ -190,7 +201,7 @@ async function measure(path, label, settleMs, tab) {
     const stillOwner = (await who()) === owner.user_id;
     extra.push({ ms: got, stillOwner });
     console.log(
-      `      sample ${i}: ${got === null ? "NEVER" : got + " ms"} ${stillOwner ? "" : "(session had already been swapped for a fresh anonymous device account)"}`,
+      `      sample ${i}: ${got === null ? "NEVER" : got + " ms"} · identity ${stillOwner ? "still the owner" : "*** SWAPPED to a fresh anonymous device account ***"}`,
     );
   }
   const watched = Date.now() - windowStart;
@@ -235,15 +246,25 @@ async function measure(path, label, settleMs, tab) {
 
 const results = [];
 for (const [path, label, tab] of [
-  ...(process.env.ONLY === "tournaments" ? [] : [["/clubs", "ownerhub", null]]),
+  ["/clubs", "ownerhub", null],
   ["/tournaments", "ownercenter", "Tournament Center"],
-]) {
+].filter(([, label]) => !process.env.ONLY || process.env.ONLY === label)) {
   const r = await measure(path, label, 20000, tab);
   console.log(
     `  measured ${path}: ${r.ms === null ? "NEVER" : `${r.ms} ms`} (on server ${r.onServer}, after reload ${r.afterReload}, ${r.listCalls} list calls)`,
   );
   if (r.polled.length) console.log(`    polled: ${r.polled.join(" | ").slice(0, 200)}`);
   console.log(`    panel held: ${r.panelText}`);
+  console.log(
+    `    session refreshes during run: ${refreshCalls} (${refreshFailures} failed) — 0 would mean the token never expired, so identity stability proves nothing`,
+  );
+  if (refreshAt.length > 1) {
+    const gaps = refreshAt.slice(1).map((t, i) => Math.round((t - refreshAt[i]) / 100) / 10);
+    console.log(`    refresh gaps (s): ${gaps.slice(0, 24).join(", ")}`);
+  }
+  refreshCalls = 0;
+  refreshFailures = 0;
+  refreshAt.length = 0;
   results.push(r);
 }
 await b.close();

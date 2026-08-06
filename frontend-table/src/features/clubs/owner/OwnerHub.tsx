@@ -95,6 +95,43 @@ export function OwnerHub() {
   const guestsWaiting = useGuestApprovalCount(club?.id);
   const [toast, setToast] = useState<Toast | null>(null);
 
+  // The rail used to load chat ONCE at bootstrap and refetch only when YOU sent
+  // something, so a second operator's message never arrived at all — measured:
+  // zero club_chat_list calls in 30s, the message confirmed on the server, and
+  // visible only after a reload. Poll it like the Tournament Center rail does.
+  //
+  // Paused while the tab is hidden. An idle rail left open all day was the bulk
+  // of the request volume (~12/min per open page), and a hidden tab has no
+  // reader to be stale for; the visibilitychange listener refetches on return so
+  // coming back never shows a gap.
+  useEffect(() => {
+    const clubId = club?.id;
+    if (demo || !clubId) return;
+    let cancelled = false;
+
+    const pull = async () => {
+      if (document.hidden) return;
+      try {
+        const r = await ownerApi.chatList(clubId);
+        // Same ordering as bootstrap and send: the server returns newest-first.
+        if (!cancelled) setChat((r.messages ?? []).slice().reverse());
+      } catch {
+        // Keep the last known thread rather than blanking it.
+      }
+    };
+
+    const timer = window.setInterval(pull, 5000);
+    const onVisible = () => {
+      if (!document.hidden) void pull();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [demo, club?.id]);
+
   const notify = useCallback((msg: string, kind: "ok" | "err" = "ok") => {
     setToast({ msg, kind });
     window.setTimeout(() => setToast(null), 3200);

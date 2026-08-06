@@ -56,9 +56,22 @@ if ! /nakama/nakama migrate up --database.address "${DB_ADDR}"; then
 fi
 
 echo "[backend-core] starting Nakama server..."
+# Session lifetimes. Nakama's defaults are 60s access / 3600s refresh, and it
+# WARNS about both on every boot; nothing set them, so production ran on them.
+#
+# 60s is shorter than nakama-js's own auto-refresh window
+# (DEFAULT_EXPIRED_TIMESPAN_MS = 300s), so the client re-refreshed the session on
+# EVERY rpc — two HTTP round trips per call, measured at ~1 refresh per request.
+# 900s puts the token comfortably outside that window, so a refresh happens
+# roughly every 10 minutes instead. 86400s of refresh keeps a same-day session
+# alive so "sign in again" stays rare without minting week-long bearer tokens.
+#
+# Both are env-overridable: tune without a code change.
 exec /nakama/nakama \
   --database.address "${DB_ADDR}" \
   --name "${NAKAMA_NODE_NAME:-nakama-node}" \
   --logger.level "${NAKAMA_LOG_LEVEL:-INFO}" \
   --runtime.path "${RUNTIME_PATH}" \
-  --runtime.http_key "${NAKAMA_HTTP_KEY:-defaultkey}"
+  --runtime.http_key "${NAKAMA_HTTP_KEY:-defaultkey}" \
+  --session.token_expiry_sec "${NAKAMA_TOKEN_EXPIRY_SEC:-900}" \
+  --session.refresh_token_expiry_sec "${NAKAMA_REFRESH_TOKEN_EXPIRY_SEC:-86400}"
