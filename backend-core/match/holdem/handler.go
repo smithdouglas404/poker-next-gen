@@ -2273,8 +2273,8 @@ func handleHostAction(ctx context.Context, logger runtime.Logger, db *sql.DB, di
 		s.HostClosed = true
 		narrate(dispatcher, s, "Host is closing the table…")
 	case "kick":
-		seat := s.Table.Seats[req.Seat]
-		if req.Seat >= 0 && req.Seat < poker.MaxSeats && seat != nil && !seat.IsBot {
+		seat := seatIdxSeat(s, req.Seat)
+		if seat != nil && !seat.IsBot {
 			// Same cashout-lock OpStandUp already enforces on a voluntary leave,
 			// applied here for the same reason. Without it: a seat kicked while
 			// SeatAllIn has Stack == 0 (their stake is in TotalContributed, in
@@ -4195,14 +4195,6 @@ func narrateAction(dispatcher runtime.MatchDispatcher, s *MatchState, seat int, 
 		text = name + " " + action
 	}
 	narrate(dispatcher, s, text)
-}
-
-func boardCodesSpaced(board []poker.Card) string {
-	parts := make([]string, 0, len(board))
-	for _, c := range board {
-		parts = append(parts, c.Code())
-	}
-	return strings.Join(parts, " ")
 }
 
 func sendError(dispatcher runtime.MatchDispatcher, p runtime.Presence, code, message string) {
