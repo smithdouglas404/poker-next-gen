@@ -8,23 +8,41 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { ConsoleShell, type ConsoleNavStateItem } from "@/features/nav/ConsoleShell";
+import {
+  IconAlert,
+  IconAnnounce,
+  IconAudit,
+  IconLedger,
+  IconMail,
+  IconMembers,
+  IconOperators,
+  IconOverview,
+  IconRevenue,
+  IconSettings,
+  IconTables,
+  IconTrophy,
+  IconWallet,
+} from "@/features/ui/icons";
 
 import type { AdminSection } from "./types";
 
+// One monochrome stroke family, tinted by the nav (gold when active). This was
+// `◎ ◈ ✦ ▤ ⚠ ❖ ✉ ◆ ♠ ★ ⚙ ⚖ ▦` — thirteen glyphs from four Unicode blocks at
+// four apparent weights, some of which the font renders in its own colour.
 const NAV: (ConsoleNavStateItem & { id: AdminSection })[] = [
-  { id: "overview", label: "Overview", icon: "◎", group: "Console" },
-  { id: "users", label: "Users", icon: "◈", group: "Console" },
-  { id: "kyc", label: "KYC Queue", icon: "✦", group: "Compliance" },
-  { id: "withdrawals", label: "Withdrawals", icon: "▤", group: "Compliance" },
-  { id: "anticheat", label: "Anti-Cheat", icon: "⚠", group: "Compliance" },
-  { id: "announcements", label: "Announcements", icon: "❖", group: "Operations" },
-  { id: "support", label: "Support", icon: "✉", group: "Operations" },
-  { id: "finance", label: "Settlements", icon: "◆", group: "Operations" },
-  { id: "cashgames", label: "Cash Games", icon: "♠", group: "Operations" },
-  { id: "rewards", label: "Rewards", icon: "★", group: "Operations" },
-  { id: "platform", label: "Platform", icon: "⚙", group: "System" },
-  { id: "ledger", label: "Ledger", icon: "⚖", group: "System" },
-  { id: "audit", label: "Audit Log", icon: "▦", group: "System" },
+  { id: "overview", label: "Overview", icon: <IconOverview />, group: "Console" },
+  { id: "users", label: "Users", icon: <IconMembers />, group: "Console" },
+  { id: "kyc", label: "KYC Queue", icon: <IconOperators />, group: "Compliance" },
+  { id: "withdrawals", label: "Withdrawals", icon: <IconWallet />, group: "Compliance" },
+  { id: "anticheat", label: "Anti-Cheat", icon: <IconAlert />, group: "Compliance" },
+  { id: "announcements", label: "Announcements", icon: <IconAnnounce />, group: "Operations" },
+  { id: "support", label: "Support", icon: <IconMail />, group: "Operations" },
+  { id: "finance", label: "Settlements", icon: <IconRevenue />, group: "Operations" },
+  { id: "cashgames", label: "Cash Games", icon: <IconTables />, group: "Operations" },
+  { id: "rewards", label: "Rewards", icon: <IconTrophy />, group: "Operations" },
+  { id: "platform", label: "Platform", icon: <IconSettings />, group: "System" },
+  { id: "ledger", label: "Ledger", icon: <IconLedger />, group: "System" },
+  { id: "audit", label: "Audit Log", icon: <IconAudit />, group: "System" },
 ];
 
 export function AdminShell({

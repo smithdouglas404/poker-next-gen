@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { GLASS_PANEL, cn } from "@/features/ui/tokens";
+import { GLASS_PANEL, WELL, cn } from "@/features/ui/tokens";
 
 import { blindLevels, leaderboardTop, seasonCurrent, tournamentStatus } from "./api";
 import { DEMO_BLINDS, DEMO_LEADERBOARD, demoStatus } from "./demo";
@@ -182,7 +182,7 @@ export function Leaderboard({
         </h1>
         <div className="flex flex-wrap items-center gap-3">
           {/* All-time vs bankroll-season scope */}
-          <div className="flex overflow-hidden rounded-lg border border-white/10 bg-[#262d38] text-[11px] font-bold uppercase tracking-wider">
+          <div className={cn(WELL, "flex overflow-hidden rounded-lg text-[11px] font-bold uppercase tracking-wider")}>
             {(["all", "season"] as const).map((sc) => (
               <button
                 key={sc}
@@ -200,7 +200,7 @@ export function Leaderboard({
           <select
             value={selected.id}
             onChange={(e) => onSelect(e.target.value)}
-            className="rounded-lg border border-white/10 bg-[#262d38] px-4 py-2 text-sm font-semibold text-neutral-200 outline-none focus:border-gold/40"
+            className={cn(WELL, "rounded-lg border border-white/10 px-4 py-2 text-sm font-semibold text-neutral-200 outline-none focus:border-gold/40")}
           >
             {tournaments.map((t) => (
               <option key={t.id} value={t.id}>

@@ -96,8 +96,11 @@ function Sidebar({ data }: { data: DashboardData }) {
                 href={n.href}
                 className={cn(
                   "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition",
+                  // Was a solid red gradient with a GOLD shadow already on it —
+                  // the same half-finished change as AppShell's nav pill. The
+                  // selected destination is gold (non-negotiable 5).
                   active
-                    ? "bg-gradient-to-r from-[#e01e2b] to-[#b3151f] text-white shadow-[0_6px_18px_-8px_rgba(245,197,24,0.5)]"
+                    ? "bg-gradient-to-r from-[#f5c518] to-[#d4a80f] text-[#231b00] shadow-[0_6px_18px_-8px_rgba(245,197,24,0.5)]"
                     : "text-muted hover:bg-white/[0.04] hover:text-white",
                 )}
               >

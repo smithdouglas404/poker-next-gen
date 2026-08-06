@@ -8,6 +8,7 @@
 // useClubDashboard (club_quick_stats + club_browse) — CLAUDE.md rules #3/#4 —
 // with a clearly-labelled DEMO fallback offline (rule #2).
 
+import { IconMembers, IconOverview, IconRevenue, IconTrophy } from "@/features/ui/icons";
 import { GLASS_PANEL, HEADING_LG, cn } from "@/features/ui/tokens";
 import { useClubDashboard, type ActivityItem, type FeaturedGame } from "../clubDashboard";
 
@@ -86,11 +87,13 @@ function ActivityRow({ item }: { item: ActivityItem }) {
 
 /* ---------------------------------- root ---------------------------------- */
 
+// Was `⌂ 🏆 👥 📊` — two of the four were full-colour emoji, so they rendered in
+// the vendor's palette and could not be tinted with the rest of the rail.
 const NAV = [
-  { icon: "⌂", label: "Home", active: true },
-  { icon: "🏆", label: "Tournaments" },
-  { icon: "👥", label: "Member Management" },
-  { icon: "📊", label: "Financial Reports" },
+  { icon: <IconOverview />, label: "Home", active: true },
+  { icon: <IconTrophy />, label: "Tournaments" },
+  { icon: <IconMembers />, label: "Member Management" },
+  { icon: <IconRevenue />, label: "Financial Reports" },
 ];
 
 export function GlobalDashboardOverlay({ demo, onClose }: { demo: boolean; onClose: () => void }) {
@@ -129,7 +132,7 @@ export function GlobalDashboardOverlay({ demo, onClose }: { demo: boolean; onClo
                 n.active ? "bg-white/[0.06] text-white" : "text-neutral-400",
               )}
             >
-              <span className="text-lg" aria-hidden>{n.icon}</span>
+              <span className="shrink-0" aria-hidden>{n.icon}</span>
               {n.label}
             </div>
           ))}

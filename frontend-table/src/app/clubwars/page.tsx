@@ -16,7 +16,7 @@ import {
 import { localToIso, relTime, socialApi } from "@/features/social/socialRpc";
 import type { Club, ClubWar, ClubWarHand, MeRoles } from "@/features/social/types";
 import { Button, Field, Input, Select } from "@/features/ui";
-import { cn } from "@/features/ui/tokens";
+import { WELL, cn } from "@/features/ui/tokens";
 
 export default function ClubWarsPage() {
   const { toast, notify } = useToast();
@@ -155,7 +155,7 @@ export default function ClubWarsPage() {
       <Toast toast={toast} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex gap-1 rounded-xl border border-white/[0.06] bg-[#262d38] p-1">
+        <div className={cn(WELL, "inline-flex gap-1 p-1")}>
           {filters.map((f) => (
             <button
               key={f.id || "all"}

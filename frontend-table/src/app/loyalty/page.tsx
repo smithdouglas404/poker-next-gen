@@ -20,7 +20,7 @@ import type {
   ReferralStatus,
 } from "@/features/loyalty/loyaltyRpc";
 import { loyaltyApi } from "@/features/loyalty/loyaltyRpc";
-import { cn } from "@/features/ui/tokens";
+import { WELL, cn } from "@/features/ui/tokens";
 
 type Tab = "overview" | "missions" | "battlepass" | "referrals";
 
@@ -256,7 +256,7 @@ export default function LoyaltyPage() {
             </section>
 
             {/* Tabs */}
-            <nav className="flex flex-wrap gap-1.5 rounded-2xl border border-white/[0.06] bg-[#262d38] p-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
+            <nav className={cn(WELL, "flex flex-wrap gap-1.5 rounded-2xl p-1.5")}>
               {TABS.map((t) => {
                 const active = tab === t.id;
                 const badge =

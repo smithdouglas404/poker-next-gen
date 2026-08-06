@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/features/ui/tokens";
+import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
 import { NumberTicker } from "./NumberTicker";
 import type { LoyaltyData } from "./loyaltyRpc";
@@ -89,7 +89,7 @@ export function LoyaltyHero({ data }: { data: LoyaltyData }) {
       </div>
 
       {/* Level ladder */}
-      <div className="rounded-2xl border border-white/[0.06] bg-[#262d38] p-5 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
+      <div className={cn(GLASS_PANEL, "rounded-2xl p-5")}>
         <Eyebrow tone="muted">Loyalty Ladder</Eyebrow>
         <div className="mt-3 space-y-1">
           {LEVELS.map((lvl) => {

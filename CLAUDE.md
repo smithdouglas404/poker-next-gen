@@ -77,7 +77,7 @@ the code, not an aspiration. Reference them through the Tailwind theme
 | `--surface-2` | `#313a46` | elevated: modals, hovered cards, popovers |
 | `--foreground` | `#f6f7f8` | primary text |
 | `--muted` | `#c2c8d0` | secondary text (WCAG AA >7:1 on the slate base) |
-| `--brand` | `#e01e2b` | GGPoker red — primary brand + destructive/all-in actions |
+| `--brand` | `#e01e2b` | GGPoker red — **destructive / danger / all-in ONLY**, never "primary" |
 | `--brand-bright` | `#ff2d3f` | bright red — neon/bloom, `toneMapped={false}` glows |
 | `--green` | `#22c55e` | money / success / call action |
 | `--green-deep` | `#0a7d43` | deep green — money gradients, positive fills |
@@ -85,10 +85,85 @@ the code, not an aspiration. Reference them through the Tailwind theme
 | `--gold-lite` | `#ffd54a` | gold highlight / gradient top |
 | `--cyan` | `#4a9eb0` | **demoted** — muted teal, verification/provably-fair accent ONLY (not a brand color) |
 
-GGPoker semantics in one line: **red = brand + danger, green = money, gold =
-rewards/premium, slate = chrome.** Cards are clean elevated `bg-surface` panels
-(not glassmorphism). Every one of the 60+ screens inherits this by using the tokens
-above — a screen that hardcodes off-palette hexes instead is a defect.
+GGPoker semantics in one line: **gold = primary + premium, red = DESTRUCTIVE AND
+DANGER ONLY, green = money, slate = chrome.** Cards are clean elevated
+`bg-surface` panels (not glassmorphism). Every one of the 60+ screens inherits
+this by using the tokens above — a screen that hardcodes off-palette hexes
+instead is a defect.
+
+> **Red used to be the brand, and that is why this line changed.** No hex moved —
+> `--brand` is still `#e01e2b`. What changed is its ROLE. `Button`'s `primary`
+> variant *was* `BTN_RED`, so every primary action in the app rendered in the
+> danger colour: join a table, register for a tournament, verify a hand, create a
+> private table, the "you are here" nav pill, the club's own crest. `danger`
+> itself had to settle for an outline to stay distinguishable from `primary`.
+> ~138 controls were recoloured to gold across two sweeps; red now survives only
+> where it means something — negative money, validation failure, expiry,
+> kick/ban, critical alerts, and all-in on the felt.
+>
+> **The last two were the "you are here" states, and they are why `role-red` has
+> a second arm.** `AppShell`'s active nav pill (`#ff2d3f` label over an
+> `#e01e2b`/10 fill) and `/dashboard`'s active nav row (a solid `#e01e2b` →
+> `#b3151f` gradient) each already carried a GOLD glow — the change had been
+> started and abandoned, on the rail every player sees on all 60+ screens.
+> Grepping for `BTN_RED` would never have found either.
+>
+> **The felt is unaffected and must stay that way.** `--brand-bright` remains the
+> all-in ring; `Seat.tsx` and `ImageTable.tsx` were not touched. Hierarchy is a
+> property of the MATERIAL RAMP below, not of the palette, which is precisely why
+> a role change this large moved the table by zero pixels (felt centre 800,
+> width 1166, asserted before and after every commit).
+
+### COMPOSITION — the material ramp and the scale (BINDING)
+
+The palette was never the problem. Every prior version of this contract was a
+colour-and-font spec, and none of them named a material, a type scale, a rail
+width or a row height — so nothing failed when the composition drifted. This
+section closes that hole and carries the same binding force as the palette.
+
+**Four surfaces, in a fixed order of visual weight. A surface is M1, M2, M3 or
+M4. There is no fifth panel style and no ad-hoc background.** All four live in
+`frontend-table/src/features/ui/tokens.ts`.
+
+| | Export | Surface | Use |
+|---|---|---|---|
+| **M1 PLATE** | `PLATE` | solid gold gradient, **BLACK** ink + black sparkline | KPI tiles ONLY. One group per screen. |
+| **M2 PANEL** | `PANEL` / `GLASS_PANEL` | `#262d38`, gold hairline, inner highlight | cards, charts, containers |
+| **M3 RAISED** | `RAISED` | `#313a46`, stronger border, lift | modals, popovers, hovered rows |
+| **M4 WELL** | `WELL` | inset dark | table bodies, list interiors, inputs |
+
+`GLASS_PANEL` **is** M2 — it keeps the historic name because 126 files import it,
+so redefining it restyles all of them at once. It is not glassmorphism and has
+not been since the bake-off.
+
+**Why M1 exists:** the app had exactly ONE material. A KPI tile, a chart card, a
+data table and a modal all weighed the same, so nothing led the eye — the bulk of
+the gap against the HRC reference comps. One solid-gold row per screen is the
+single change that makes a page read as designed.
+
+**Scale** (everything was ~35% too small; these are measured against the comps):
+`TEXT_KPI` 44/700/tabular-nums · `PAGE_TITLE` 34 over `GOLD_RULE` ·
+`PANEL_TITLE` 20 · `HEADING_LG` 20 (a SECTION heading, not a page title —
+check its call sites before resizing) · `TEXT_LABEL` 13 · `HEADING_SM` /
+`TEXT_EYEBROW` 11 uppercase (the SMALLEST type in the system, despite the name;
+49 files depend on that). Panel padding 28, row height 56, gutter 28. All money
+`tabular-nums`.
+
+**Shell:** rail 256 · content · `ActivityRail` 320 (alerts over club chat with a
+pinned composer). `ConsoleShell.tsx` is the one shell; `OwnerShell`,
+`OwnerPageShell` and `AdminShell` are presets over it. Add the third column
+there, never in a new shell.
+
+**Components** live in `features/ui/console.tsx`: `PageHeading`,
+`SectionHeading`, `StatusPill`, `FramedPanel`, `DataTable`, `IdentityCell`,
+`FormGrid`, `ToggleRow`, `PolicyNote`, `Modal`, `ActivityRail`. None of them
+fetch — data comes from the screen, so a control cannot reach the UI without a
+caller having wired it.
+
+**Icons** are one monochrome stroke set in `features/ui/icons.tsx`, 18px,
+`currentColor`. **No emoji in chrome.** The owner nav was `▦ ▤ ♛ ☰ ♦ 📣 📊 ▧ ⚙` —
+box-drawing glyphs beside two full-colour emoji, and the emoji rendered in the
+vendor's palette, so they were the only saturated non-brand colour on screen.
 
 The `body` background is fixed (`background-attachment: fixed`) and layers two faint radials over the base: red `rgba(224,30,43,0.06)` from top-center and gold `rgba(212,175,55,0.05)` from top-right. Reproduce, do not "improve."
 
@@ -284,9 +359,10 @@ Timeline/UI animation uses **GSAP** as the standard motion layer (chip flights, 
 ### Non-negotiables
 
 1. **One table renderer, and the felt is its only coordinate system.** Do not add a second table renderer, a `render_style` branch, or a graphics preset that switches between tables — that ambiguity is what made "the table" mean two different things for a full day. Everything on the felt is a percentage of the ONE measured felt rect (see "The felt-coordinate rule"). Never re-derive the table box from the viewport.
-2. **Glow = hierarchy.** Glow encodes importance and state (active seat, all-in, premium/gold, red primary) via `box-shadow`/`drop-shadow` on the DOM layer. It is restrained. Never use glow as ambient decoration — if everything glows, nothing does.
+2. **Glow = hierarchy.** Glow encodes importance and state (active seat, all-in, premium/gold, danger red) via `box-shadow`/`drop-shadow` on the DOM layer. It is restrained. Never use glow as ambient decoration — if everything glows, nothing does.
 3. **State never drifts.** The rendered UI is a pure projection of authoritative server state. No optimistic values that can disagree with the backend, no client-side "guesses" at stacks/pot/turn. Consistent with Golden rule 4 (no math fallbacks): the display reflects server truth or it shows nothing.
 4. **Every rendered control binds to a real RPC — no dead buttons.** If a control is on screen (fold/check/call/raise/all-in, presets, host controls, membership, deposits), it is wired to a registered `backend-core` RPC and reflects real capability/permission gating. Ship no placeholder or decorative buttons. `?demo=1` uses static demo data precisely because it is a preview — production surfaces must be live. A control that selects a code path which no longer exists is a dead button too: when a renderer or mode is deleted, delete the picker that chose it.
+5. **One material ramp, and red means danger.** A surface is M1, M2, M3 or M4 — there is no fifth panel style and no ad-hoc background (see COMPOSITION). Hierarchy comes from the ramp, never from recolouring: if a control is red it is destructive, failing, expired or all-in, and if it is none of those it is gold. This is a non-negotiable because the app spent months with `primary` = the danger colour, on every screen, and every check was blind to it.
 
 ## Landing page — never a place to play (BINDING)
 
@@ -491,17 +567,34 @@ inside a fenced block, where this file records what it deleted.)
 | 5 | `one-felt-box` | a second coordinate system (`FELT_BOUNDS` spread without `useFeltStyle()`, or any `computeTableLayout` caller) |
 | 6 | `demo-is-data-only` | `?demo=1` changing LAYOUT or VISIBILITY instead of only DATA |
 | 7 | `seat-ring-spread` | seats bunching on one side at any count 2–10 |
+| 8 | `hub-is-ops-only` | a PLAYER surface linking to `/hub`, the operator console |
+| 9 | `panel-tokens` | an off-ramp surface — a hand-rolled panel background instead of M1–M4 |
+| 10 | `type-scale` | a raw `text-[Npx]` ≥24 outside `tokens.ts` — how headings drifted 35% small |
+| 11 | `no-emoji-chrome` | an emoji in a NAV constant (`📣 📊` sat on every owner page) |
+| 12 | `role-red` | red on a control that is not destructive — `primary: BTN_RED`, or an ACTIVE/SELECTED state painted brand red |
 
 Two rules about this script:
 
 - **A check that has never failed is not a check.** When adding one, deliberately
-  reintroduce the bug, confirm it fails, then revert. Checks 6 and 7 were both
-  proved that way.
+  reintroduce the bug, confirm it fails, then revert. Checks 6 and 7 were proved
+  that way, and so were 9–12: `primary: BTN_RED` restored, a `BTN_RED` call site
+  on a non-destructive screen, a red ACTIVE nav state, `text-[34px]` pasted into
+  a page, a hand-rolled `bg-[#262d38]` panel, and `📊` put back into
+  `OWNER_SECTION_NAV`. Each failed with the file and line; each was reverted.
+- **Scope a check to what it actually guards, or it fails on things it shouldn't.**
+  `no-emoji-chrome`'s first cut flagged every `icon:`/`label:` line in `src` and
+  produced three false positives on its first run — the taunt bar (where the
+  emoji IS the message a player sends), the rewards category map and the Command
+  Center's. Emoji as player CONTENT is fine; emoji as NAVIGATION is the defect.
+  It now tracks the enclosing `const` and inspects nav constants only.
 - The `KNOWN` maps are for cases where fixing the code would demonstrably MOVE
   the design — not for silencing noise. `motion-transform`'s map is currently
   **empty**: its one entry (Seat.tsx bet chips) was resolved by measuring
   `style.transform` in the live DOM, finding `none`, and deleting a declaration
-  that had never applied — zero pixels moved.
+  that had never applied — zero pixels moved. `panel-tokens` has two entries,
+  both `CommandCenter.tsx`: the owner ruled the Command Center out of the
+  restyle, so composing `PANEL` there would change a screen they asked me not to
+  touch. That is the bar — an owner decision or a measured move, never noise.
 
 ### `?demo=1` may substitute DATA. It may never change LAYOUT or VISIBILITY.
 

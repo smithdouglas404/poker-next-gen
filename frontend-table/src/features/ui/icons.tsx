@@ -108,3 +108,50 @@ export const IconSettings = (p: P) => (
     <path d="M10 1.8v2M10 16.2v2M3.2 6.1l1.7 1M15.1 12.9l1.7 1M3.2 13.9l1.7-1M15.1 7.1l1.7-1" />
   </Svg>
 );
+
+// The platform admin console carried the same defect as the owner hub, one nav
+// over: `◎ ◈ ✦ ▤ ⚠ ❖ ✉ ◆ ♠ ★ ⚙ ⚖ ▦` — thirteen glyphs from four different
+// Unicode blocks, at four apparent weights, several of which the font renders
+// in colour. These five complete the set so both consoles draw from one family.
+
+/** Anti-cheat / flags — a warning triangle. */
+export const IconAlert = (p: P) => (
+  <Svg {...p}>
+    <path d="M10 3.2 18 16.2H2L10 3.2Z" />
+    <path d="M10 8.2v3.4M10 14.1h.01" />
+  </Svg>
+);
+
+/** Support — an envelope. */
+export const IconMail = (p: P) => (
+  <Svg {...p}>
+    <rect x="2.5" y="4.5" width="15" height="11" rx="2" />
+    <path d="m3.2 5.8 6.8 5 6.8-5" />
+  </Svg>
+);
+
+/** Withdrawals / wallet — a billfold with a clasp. */
+export const IconWallet = (p: P) => (
+  <Svg {...p}>
+    <rect x="2.5" y="5" width="15" height="10.5" rx="2" />
+    <path d="M2.5 8.5h15" />
+    <circle cx="14" cy="12" r="1.1" />
+  </Svg>
+);
+
+/** Ledger / settlements — a balance scale. */
+export const IconLedger = (p: P) => (
+  <Svg {...p}>
+    <path d="M10 3.2v13.6M6 16.8h8" />
+    <path d="M3.5 6.5h13" />
+    <path d="M3.5 6.5 1.8 11a2.4 2.4 0 0 0 3.4 0L3.5 6.5ZM16.5 6.5 14.8 11a2.4 2.4 0 0 0 3.4 0L16.5 6.5Z" />
+  </Svg>
+);
+
+/** Audit log — a document of ruled lines. */
+export const IconAudit = (p: P) => (
+  <Svg {...p}>
+    <rect x="3.5" y="2.5" width="13" height="15" rx="2" />
+    <path d="M6.5 6.5h7M6.5 10h7M6.5 13.5h4" />
+  </Svg>
+);

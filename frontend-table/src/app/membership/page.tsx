@@ -419,7 +419,7 @@ export default function MembershipPage() {
                 heading above it sat over blank space and read as a broken page
                 rather than as a load failure. Say which it is. */}
             {tiers.length === 0 && !loading && (
-              <div className="col-span-full rounded-xl border border-white/[0.06] bg-[#262d38] px-6 py-10 text-center">
+              <div className={cn(GLASS_PANEL, "col-span-full px-6 py-10 text-center")}>
                 <p className="text-sm font-semibold text-muted">Plans couldn&apos;t be loaded.</p>
                 <p className="mt-1 text-[12.5px] text-white/40">
                   The membership catalog is served by the backend. Retry, or check back shortly.

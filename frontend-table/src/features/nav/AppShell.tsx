@@ -9,7 +9,7 @@
 // DashboardLayout.tsx) is the reference for the structure — a fixed 220px rail
 // with a primary section, a collapsible "More" section, a global search, and a
 // balance footer. This is that structure rebuilt on our GGPoker tokens: slate
-// chrome, GG red for the active state, gold reserved for money.
+// chrome, GOLD for the active state, red kept for danger.
 //
 // Mounted once in app/layout.tsx, so all 60+ screens inherit it. Immersive and
 // pre-auth surfaces opt out via HIDE_ON.
@@ -118,15 +118,21 @@ function NavRow({ item, active }: { item: NavItem; active: boolean }) {
         transition={SPRINGS.snappy}
         className={cn(
           "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-medium transition-colors",
-          active ? "text-[#ff2d3f]" : "text-neutral-400 hover:bg-white/[0.05] hover:text-foreground",
+          active ? "text-gold-lite" : "text-neutral-400 hover:bg-white/[0.05] hover:text-foreground",
         )}
       >
         {active && (
           // layoutId gives the active pill a single shared identity, so it
           // SLIDES between rows on navigation instead of popping.
+          //
+          // This pill was red — border `#e01e2b`/30 over `#e01e2b`/10, red label,
+          // red dot — with a GOLD glow already on it, i.e. the change was started
+          // and never finished. "You are here" is the plainest hierarchy signal
+          // the app has and it rendered in the danger colour on all 60+ player
+          // screens (non-negotiable 5).
           <motion.div
             layoutId="shell-active"
-            className="absolute inset-0 rounded-lg border border-[#e01e2b]/30 bg-[#e01e2b]/10"
+            className="absolute inset-0 rounded-lg border border-[#f5c518]/30 bg-[#f5c518]/10"
             style={{ boxShadow: "0 0 16px rgba(245,197,24,0.12), inset 0 0 10px rgba(245,197,24,0.06)" }}
             transition={SPRINGS.snappy}
           />
@@ -134,7 +140,7 @@ function NavRow({ item, active }: { item: NavItem; active: boolean }) {
         <Icon className="relative z-10 h-4 w-4 shrink-0" />
         <span className="relative z-10 tracking-wide">{item.label}</span>
         {active && (
-          <span className="relative z-10 ml-auto h-1.5 w-1.5 rounded-full bg-[#ff2d3f] shadow-[0_0_6px_rgba(255,45,63,0.6)]" />
+          <span className="relative z-10 ml-auto h-1.5 w-1.5 rounded-full bg-gold shadow-[0_0_6px_rgba(245,197,24,0.6)]" />
         )}
       </motion.div>
     </Link>

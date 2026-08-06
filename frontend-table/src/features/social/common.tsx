@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
-import { GLASS_PANEL, cn } from "@/features/ui/tokens";
+import { GLASS_PANEL, WELL, cn } from "@/features/ui/tokens";
 
 // ---- Toast ----
 
@@ -104,7 +104,7 @@ export function SocialShell({
               ← Dashboard
             </Link>
           </div>
-          <nav className="mt-5 inline-flex gap-1 rounded-xl border border-white/[0.06] bg-[#262d38] p-1">
+          <nav className={cn(WELL, "mt-5 inline-flex gap-1 p-1")}>
             {TABS.map((t) => {
               const active = pathname === t.href;
               return (

@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 
 import { ConsoleShell } from "@/features/nav/ConsoleShell";
+import { RAISED, cn } from "@/features/ui/tokens";
 
 import { usd } from "./ownerRpc";
 import { OWNER_SECTION_NAV } from "./ownerNav";
@@ -95,7 +96,7 @@ export function OwnerShell({
               <span className="text-white/40">▾</span>
             </button>
             {menuOpen && (
-              <div className="absolute right-0 mt-2 w-44 overflow-hidden rounded-xl border border-white/[0.06] bg-[#262d38] py-1 text-sm shadow-[0_8px_24px_rgba(0,0,0,0.5)]">
+              <div className={cn(RAISED, "absolute right-0 mt-2 w-44 overflow-hidden rounded-xl py-1 text-sm")}>
                 <Link href="/hub" className="block px-4 py-2 text-white/75 hover:bg-white/5">
                   Command Center
                 </Link>

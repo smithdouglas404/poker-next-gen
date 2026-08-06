@@ -378,6 +378,145 @@ const rel = (p) => p.slice(FRONTEND.length + 1);
   }
 }
 
+// ─── 9. panel-tokens ─────────────────────────────────────────────────────────
+// The app had ONE panel material for months — a single string imported 126
+// times — so a KPI tile, a chart card, a data table and a modal all carried the
+// same weight and nothing led the eye. That is the bulk of the gap against the
+// reference comps, and no check could see it because every design contract this
+// repo has had was a colour-and-font spec.
+//
+// A surface is M1/M2/M3/M4 (CLAUDE.md > COMPOSITION). This catches a hand-rolled
+// panel: a rounded container painting --surface itself instead of composing
+// PLATE / PANEL / RAISED / WELL.
+{
+  // KNOWN is for surfaces where composing the token would MOVE a design the
+  // owner has ruled out of this restyle — not for silencing noise. The Command
+  // Center (Category H, screens 82–121) is excluded by the owner's instruction
+  // ("I already have a command center, and I like it"), so its two command
+  // cards keep the flat white/[0.06] hairline instead of gaining the gold one.
+  const KNOWN_PANEL = {
+    "src/features/commands/CommandCenter.tsx":
+      "Command Center is out of scope for the restyle by the owner's instruction; PANEL's gold hairline would visibly change it.",
+  };
+  const SURFACE_HEX = /bg-\[#(262d38|313a46)\]/;
+  const warnings = [];
+  for (const f of files) {
+    if (!/\.tsx$/.test(f)) continue;
+    const r = rel(f);
+    if (/features\/ui\/tokens|features\/(hrc|table|hud)\//.test(r)) continue;
+    const code = readFileSync(f, "utf8");
+    code.split("\n").forEach((line, i) => {
+      if (!SURFACE_HEX.test(line)) return;
+      if (!/rounded/.test(line)) return;
+      if (/GLASS_PANEL|PANEL|RAISED|WELL|PLATE/.test(line)) return;
+      if (KNOWN_PANEL[r]) { warnings.push(`${r}:${i + 1} — ${KNOWN_PANEL[r]}`); return; }
+      fail("panel-tokens", `${r}:${i + 1} paints a panel surface by hand — compose PANEL/RAISED/WELL from tokens.ts`);
+    });
+  }
+  if (warnings.length) {
+    console.warn("\nKNOWN panel-tokens exceptions (owner-excluded surfaces):");
+    for (const w of warnings) console.warn(`  ! ${w}`);
+    console.warn("");
+  }
+}
+
+// ─── 10. type-scale ───────────────────────────────────────────────────────────
+// Everything was ~35% smaller than the comps: KPI values 30px against 44, page
+// titles 18 against 34. It drifted because each screen picked its own size.
+{
+  const RAW = /text-\[(\d+(?:\.\d+)?)px\]/g;
+  const ALLOW = /features\/ui\/(tokens|console|icons)|features\/(hrc|table|hud)\//;
+  for (const f of files) {
+    if (!/\.tsx$/.test(f)) continue;
+    const r = rel(f);
+    if (ALLOW.test(r)) continue;
+    const code = readFileSync(f, "utf8");
+    code.split("\n").forEach((line, i) => {
+      for (const m of line.matchAll(RAW)) {
+        // Small type is legitimately per-screen. The drift that mattered was
+        // HEADINGS silently shrinking.
+        if (parseFloat(m[1]) < 24) continue;
+        fail("type-scale", `${r}:${i + 1} sets text-[${m[1]}px] directly — headings come from TEXT_KPI / PAGE_TITLE / PANEL_TITLE`);
+      }
+    });
+  }
+}
+
+// ─── 11. no-emoji-chrome ─────────────────────────────────────────────────────
+// The owner nav shipped `▦ ▤ ♛ ☰ ♦ 📣 📊 ▧ ⚙`. Emoji render in the vendor's own
+// palette, so those two were the only saturated non-brand colour on screen and
+// could not be tinted. Icons are monochrome SVG in features/ui/icons.tsx.
+//
+// SCOPE: NAVIGATION constants only, and that boundary is deliberate. A first cut
+// flagged every `icon:`/`label:` line in src and produced three false positives
+// on its first run — the taunt bar (`sound/library.ts`, where the emoji IS the
+// message a player sends), the rewards category icons, and the Command Center's
+// category map. Emoji as player content is not chrome. What is chrome is a nav
+// item list, so the check tracks the enclosing `const NAME` and only inspects
+// blocks whose name reads as navigation.
+{
+  const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
+  const NAV_CONST = /\b(?:const|let)\s+([A-Za-z_$][\w$]*)/;
+  const IS_NAV = /NAV|MENU|TABS?$|SECTIONS?$|LINKS?$|ROUTES?$|SIDEBAR/i;
+  for (const f of files) {
+    if (!/\.(tsx|ts)$/.test(f)) continue;
+    const r = rel(f);
+    if (/features\/(hrc|table|hud)\//.test(r)) continue;
+    const code = readFileSync(f, "utf8");
+    let holder = "";
+    code.split("\n").forEach((line, i) => {
+      const decl = line.match(NAV_CONST);
+      if (decl) holder = decl[1];
+      const inNavBlock = IS_NAV.test(holder) || /features\/nav\//.test(r);
+      if (!inNavBlock) return;
+      if (!/\b(icon|label)\b\s*:/i.test(line)) return;
+      if (!EMOJI.test(line)) return;
+      fail("no-emoji-chrome", `${r}:${i + 1} puts an emoji in the nav constant \`${holder}\` — use a stroke icon from features/ui/icons.tsx`);
+    });
+  }
+}
+
+// ─── 12. role-red ────────────────────────────────────────────────────────────
+// `Button`'s `primary` variant WAS BTN_RED, so every primary action in the app —
+// join, register, verify, create — rendered in the danger colour, and `danger`
+// itself had to settle for an outline to stay distinguishable. Red is
+// destructive/danger/all-in ONLY (CLAUDE.md non-negotiable 5).
+{
+  const uiIndex = join(SRC, "features/ui/index.tsx");
+  if (existsSync(uiIndex)) {
+    const m = readFileSync(uiIndex, "utf8").match(/primary:\s*(BTN_\w+)/);
+    if (!m) fail("role-red", "features/ui/index.tsx no longer declares a `primary:` variant — update this check with it");
+    else if (m[1] === "BTN_RED") fail("role-red", "features/ui/index.tsx maps `primary: BTN_RED` — primary is not danger (non-negotiable 5)");
+  }
+  const DESTRUCTIVE = /KickBan|Delete|Remove|Danger|ui\/index\.tsx/;
+  // The SECOND arm exists because the first would not have caught the worst
+  // instance. `BTN_RED` was never the whole defect: AppShell's active nav pill
+  // painted `#ff2d3f` text over an `#e01e2b`/10 fill — "you are here", the
+  // plainest hierarchy signal in the app, in the danger colour, on all 60+
+  // player screens. It carried a GOLD glow already, so the change had been
+  // started and abandoned. A selected/active state is never red.
+  const BRAND_RED = /(?:text|bg|border|from|via|to)-\[#(?:e01e2b|ff2d3f|b3151f)\]/;
+  const SELECTED = /\b(active|selected|isActive|current)\b\s*(?:\?|&&)/;
+  for (const f of files) {
+    if (!/\.tsx$/.test(f)) continue;
+    const r = rel(f);
+    if (DESTRUCTIVE.test(r) || /features\/(hrc|table|hud)\//.test(r)) continue;
+    const code = readFileSync(f, "utf8");
+    const lines = code.split("\n");
+    lines.forEach((line, i) => {
+      if (/\bBTN_RED\b/.test(line) && !/import|from ["']/.test(line)) {
+        fail("role-red", `${r}:${i + 1} uses BTN_RED — red is destructive only; use BTN_GOLD unless this destroys something`);
+      }
+      // A brand red on the selected branch of a conditional, or on the line
+      // immediately after one (the `active && (<motion.div className=…>` shape).
+      if (!BRAND_RED.test(line)) return;
+      const context = `${lines[i - 2] ?? ""}\n${lines[i - 1] ?? ""}\n${line}`;
+      if (!SELECTED.test(context)) return;
+      fail("role-red", `${r}:${i + 1} paints an ACTIVE/SELECTED state in brand red — "you are here" is gold; red means danger`);
+    });
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 const byCheck = new Map();
 for (const f of failures) {
@@ -386,7 +525,7 @@ for (const f of failures) {
 }
 
 if (failures.length === 0) {
-  console.log(`table invariants OK — ${files.length} files checked, 8/8 checks pass`);
+  console.log(`table invariants OK — ${files.length} files checked, 12/12 checks pass`);
   process.exit(0);
 }
 console.error(`\ntable invariants FAILED — ${failures.length} problem(s)\n`);
