@@ -106,8 +106,28 @@ export default function HandsPage() {
 
       <main className="mx-auto max-w-5xl px-6 py-10">
         {loading && <p className="text-sm text-muted">Loading your hands…</p>}
+        {/* A failed `audit_list` used to render one bare red line — "Failed to
+            fetch" — on an otherwise empty page, with no explanation and no way
+            back. The no-hands case two branches down already gets a full panel
+            with a next step; a failure deserves at least the same, because the
+            player cannot tell the two apart otherwise: both look like "there is
+            nothing here". */}
         {error && (
-          <p className="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-red-400">{error}</p>
+          <div className="rounded-2xl border border-white/10 bg-surface p-8 text-center">
+            <p className="text-lg font-semibold text-white">Couldn&apos;t load your hands</p>
+            <p className="mt-2 text-sm text-neutral-400">{error}</p>
+            <p className="mt-1 text-[12.5px] text-white/40">
+              Hand history is served by the audit chain. Your hands are not lost — this
+              is a read that failed.
+            </p>
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="mt-4 rounded-full border border-gold/40 px-6 py-2.5 text-sm font-bold uppercase tracking-wider text-gold-lite transition hover:bg-gold/10"
+            >
+              Retry
+            </button>
+          </div>
         )}
         {!loading && !error && hands.length === 0 && (
           <div className="rounded-2xl border border-white/10 bg-surface p-8 text-center">
