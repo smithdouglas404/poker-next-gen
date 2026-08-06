@@ -799,7 +799,7 @@ function SummaryRow({
             : tone === "gold"
               ? "text-gold"
               : tone === "brand"
-                ? "text-brand"
+                ? "text-gold-lite"
                 : "text-white",
         )}
       >

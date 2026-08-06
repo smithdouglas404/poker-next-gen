@@ -92,7 +92,7 @@ export function CreditRequests({ clubId, canManage }: { clubId?: string; canMana
                   type="button"
                   disabled={busy === r.id}
                   onClick={() => void review(r.id, false)}
-                  className="rounded-lg border border-brand/40 px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand/10 disabled:opacity-40"
+                  className="rounded-lg border border-gold/40 px-3 py-1.5 text-xs font-semibold text-gold-lite hover:bg-gold/10 disabled:opacity-40"
                 >
                   Deny
                 </button>

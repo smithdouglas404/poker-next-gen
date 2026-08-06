@@ -203,7 +203,7 @@ export function Dashboard({
 
         {/* Pending join requests */}
         {isConfigurer && (
-          <div className="rounded-xl border border-brand/30 bg-brand/[0.06] p-4">
+          <div className="rounded-xl border border-gold/30 bg-gold/[0.06] p-4">
             <CardHeader>Pending Join Requests</CardHeader>
             {requests.length === 0 ? (
               <p className="text-[12px] text-white/50">No pending requests.</p>

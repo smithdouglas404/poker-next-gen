@@ -86,7 +86,7 @@ function WalletRow({
           type="button"
           disabled={busy}
           onClick={() => onUnlink(w)}
-          className="shrink-0 rounded-lg border border-brand/40 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-brand transition hover:bg-brand/10 disabled:opacity-40"
+          className="shrink-0 rounded-lg border border-gold/40 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-brand transition hover:bg-brand/10 disabled:opacity-40"
         >
           {busy ? "Removing…" : "Unlink"}
         </button>

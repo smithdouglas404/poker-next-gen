@@ -108,7 +108,7 @@ export function GuestApprovals({ clubId, canManage }: { clubId?: string; canMana
                   type="button"
                   disabled={busy === r.id}
                   onClick={() => void decide(r, false)}
-                  className="rounded-lg border border-white/15 px-3 py-1.5 text-sm font-semibold text-muted transition hover:border-brand/50 hover:text-foreground disabled:opacity-50"
+                  className="rounded-lg border border-white/15 px-3 py-1.5 text-sm font-semibold text-muted transition hover:border-gold/50 hover:text-foreground disabled:opacity-50"
                 >
                   Deny
                 </button>

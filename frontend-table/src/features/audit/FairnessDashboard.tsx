@@ -204,7 +204,7 @@ export function FairnessDashboard({ onReveal }: { onReveal: (matchId: string, ha
                     ) : p.status === "ready_to_reveal" ? (
                       <button
                         onClick={() => onReveal(p.matchId, p.handNo)}
-                        className="text-xs font-bold uppercase tracking-wider text-brand underline decoration-brand/40 underline-offset-4 hover:decoration-brand"
+                        className="text-xs font-bold uppercase tracking-wider text-gold-lite underline decoration-brand/40 underline-offset-4 hover:decoration-brand"
                       >
                         Reveal Proof
                       </button>

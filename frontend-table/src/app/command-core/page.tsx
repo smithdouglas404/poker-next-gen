@@ -125,7 +125,7 @@ function CommandCorePageInner() {
         {/* Header */}
         <div className={cn(GLASS_PANEL, "mb-6 flex flex-wrap items-center justify-between gap-3 border-brand/20 p-4")}>
           <div>
-            <p className="font-display text-[11px] font-bold uppercase tracking-[0.35em] text-brand">High Rollers Club · Command Core</p>
+            <p className="font-display text-[11px] font-bold uppercase tracking-[0.35em] text-gold-lite">High Rollers Club · Command Core</p>
             <h1 className="mt-0.5 font-display text-xl font-bold uppercase tracking-wider text-white">Session Architect</h1>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1.5">
@@ -151,7 +151,7 @@ function CommandCorePageInner() {
                 <p className="mt-2 text-[11px] text-neutral-500">
                   USD is the settlement ledger; crypto funds via NOWPayments deposit/withdraw rails.
                 </p>
-                <Link href="/dashboard" className="mt-3 inline-block text-xs text-brand hover:underline">
+                <Link href="/dashboard" className="mt-3 inline-block text-xs text-gold-lite hover:underline">
                   Configure rake per club →
                 </Link>
               </div>

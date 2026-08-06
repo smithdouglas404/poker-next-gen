@@ -163,7 +163,7 @@ export default function ClubWarsPage() {
               onClick={() => setFilter(f.id)}
               className={cn(
                 "rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition",
-                filter === f.id ? "bg-brand/15 text-brand" : "text-neutral-400 hover:text-white",
+                filter === f.id ? "bg-gold/15 text-gold-lite" : "text-neutral-400 hover:text-white",
               )}
             >
               {f.label}

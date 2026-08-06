@@ -33,7 +33,7 @@ export function HandAuditDetail({ matchId, handNo }: Props) {
             >
               ←
             </Link>
-            <span className="font-display text-lg font-bold uppercase tracking-wider text-brand">
+            <span className="font-display text-lg font-bold uppercase tracking-wider text-gold-lite">
               Proof of Play
             </span>
           </div>

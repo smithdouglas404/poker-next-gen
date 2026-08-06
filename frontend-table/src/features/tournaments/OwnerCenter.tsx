@@ -539,7 +539,7 @@ export function OwnerCenter({
                     a.tone === "gold"
                       ? "border-gold/30 bg-gold/[0.06]"
                       : a.tone === "red"
-                        ? "border-brand/35 bg-brand/[0.07]"
+                        ? "border-gold/35 bg-gold/[0.07]"
                         : a.tone === "green"
                           ? "border-green/30 bg-green/[0.06]"
                           : "border-white/10 bg-white/[0.03]",

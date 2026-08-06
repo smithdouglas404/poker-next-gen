@@ -77,7 +77,7 @@ export function SeatSessions({ clubId, canManage }: { clubId?: string; canManage
                     </span>
                   )}
                   {r.hit_and_run && (
-                    <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[9px] uppercase tracking-wider text-brand">
+                    <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[9px] uppercase tracking-wider text-gold-lite">
                       hit &amp; run
                     </span>
                   )}

@@ -382,7 +382,7 @@ function HighStakes({ tables }: { tables: TableCard[] }) {
           <h3 className="font-display text-xl font-bold uppercase tracking-wide text-white">Active High Stakes</h3>
           <p className="text-xs uppercase tracking-widest text-neutral-500">Live data feed from exclusive suites</p>
         </div>
-        <Link href="/lobby" className="text-xs font-bold uppercase tracking-widest text-brand hover:text-brand/80">
+        <Link href="/lobby" className="text-xs font-bold uppercase tracking-widest text-gold-lite hover:text-brand/80">
           View All Tables
         </Link>
       </div>

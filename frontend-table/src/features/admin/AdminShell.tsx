@@ -47,7 +47,7 @@ export function AdminShell({
         </span>
         {online !== null ? `${online} online` : "—"}
       </span>
-      <Link href="/hub" className="text-brand/80 transition hover:text-brand">
+      <Link href="/hub" className="text-gold-lite/80 transition hover:text-gold-lite">
         ← Hub
       </Link>
     </div>

@@ -60,7 +60,7 @@ export default function KycPage() {
             "fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-xl border px-4 py-2.5 text-sm shadow-[0_4px_18px_rgba(0,0,0,0.5)]",
             toast.kind === "ok"
               ? "border-green/30 bg-green/15 text-green"
-              : "border-brand/40 bg-brand/15 text-[#ffb4b9]",
+              : "border-gold/40 bg-gold/15 text-[#ffb4b9]",
           )}
         >
           {toast.msg}
@@ -103,7 +103,7 @@ export default function KycPage() {
               className={cn(
                 "rounded-xl px-5 py-2 text-xs font-semibold uppercase tracking-[0.15em] transition",
                 tab === t.id
-                  ? "bg-brand text-white shadow-[0_6px_16px_-6px_rgba(224,30,43,0.4)]"
+                  ? "bg-gradient-to-b from-[#ffd54a] via-[#f5c518] to-[#d4a80f] text-[#231b00] shadow-[0_6px_16px_-6px_rgba(224,30,43,0.4)]"
                   : "text-neutral-400 hover:text-neutral-200",
               )}
             >

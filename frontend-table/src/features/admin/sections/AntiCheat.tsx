@@ -42,7 +42,7 @@ export function AntiCheat({ notify }: { notify: Notify }) {
             className={cn(
               "rounded-full border px-4 py-1.5 text-xs font-semibold uppercase tracking-wider transition",
               tab === t.id
-                ? "border-brand/40 bg-brand/[0.1] text-brand"
+                ? "border-gold/40 bg-gold/[0.1] text-gold-lite"
                 : "border-white/10 text-neutral-400 hover:bg-white/[0.03] hover:text-white",
             )}
           >

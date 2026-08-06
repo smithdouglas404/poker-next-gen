@@ -260,7 +260,7 @@ export function SeedReveal({ target }: Props) {
               </div>
               <button
                 onClick={downloadJson}
-                className="text-xs font-bold uppercase tracking-wider text-brand underline decoration-brand/40 underline-offset-4 hover:decoration-brand"
+                className="text-xs font-bold uppercase tracking-wider text-gold-lite underline decoration-brand/40 underline-offset-4 hover:decoration-brand"
               >
                 Download Full JSON Log
               </button>

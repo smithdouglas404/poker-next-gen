@@ -74,7 +74,7 @@ export function ComposePanel({
                     className={cn(
                       "rounded-full border px-3 py-1 text-xs transition",
                       active
-                        ? "border-brand/60 bg-brand/15 text-brand"
+                        ? "border-gold/60 bg-gold/15 text-gold-lite"
                         : "border-white/10 bg-white/[0.03] text-neutral-300 hover:border-white/25",
                     )}
                   >

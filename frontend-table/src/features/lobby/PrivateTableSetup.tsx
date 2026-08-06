@@ -419,7 +419,7 @@ export function PrivateTableSetup({
                   className={cn(
                     "rounded-xl border px-3 py-2 text-sm font-semibold transition",
                     i === blindIdx
-                      ? "border-brand/50 bg-brand/10 text-brand"
+                      ? "border-gold/50 bg-gold/10 text-gold-lite"
                       : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25",
                   )}
                 >
@@ -561,7 +561,7 @@ export function PrivateTableSetup({
                     "rounded-xl border px-3 py-2.5 text-left text-xs font-semibold transition",
                     "disabled:cursor-not-allowed disabled:opacity-40",
                     active
-                      ? "border-brand/50 bg-brand/10 text-brand"
+                      ? "border-gold/50 bg-gold/10 text-gold-lite"
                       : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25",
                   )}
                 >
@@ -795,7 +795,7 @@ export function PrivateTableSetup({
                   className={cn(
                     "rounded-xl border px-3 py-2 text-xs font-semibold transition",
                     d.mins === durationMins
-                      ? "border-brand/50 bg-brand/10 text-brand"
+                      ? "border-gold/50 bg-gold/10 text-gold-lite"
                       : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25",
                   )}
                 >
@@ -873,7 +873,7 @@ export function PrivateTableSetup({
               type="button"
               disabled={busy || matchmakerSearching}
               onClick={() => void findMatch()}
-              className="mt-2 w-full rounded-xl border border-brand/40 px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-brand transition hover:bg-brand/5 disabled:opacity-40"
+              className="mt-2 w-full rounded-xl border border-gold/40 px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-brand transition hover:bg-brand/5 disabled:opacity-40"
             >
               {matchmakerSearching ? "Searching…" : "Quick Match Instead"}
             </button>
@@ -966,7 +966,7 @@ function Segmented<T extends string>({
           className={cn(
             "rounded-xl border px-3 py-2.5 text-sm font-semibold transition",
             o.value === value
-              ? "border-brand/50 bg-brand/10 text-brand"
+              ? "border-gold/50 bg-gold/10 text-gold-lite"
               : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25",
           )}
         >

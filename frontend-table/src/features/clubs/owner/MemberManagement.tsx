@@ -125,12 +125,12 @@ export function MemberManagement({
               className={cn(
                 "rounded-full border px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] transition",
                 active
-                  ? "border-brand/50 bg-brand/10 text-brand"
+                  ? "border-gold/50 bg-gold/10 text-gold-lite"
                   : "border-white/10 text-white/50 hover:border-white/25 hover:text-white/80",
               )}
             >
               {t.label}
-              <span className={cn("ml-2", active ? "text-brand/80" : "text-white/35")}>{t.count}</span>
+              <span className={cn("ml-2", active ? "text-gold-lite/80" : "text-white/35")}>{t.count}</span>
             </button>
           );
         })}
@@ -317,7 +317,7 @@ export function MemberManagement({
                 className={cn(
                   "min-w-[28px] rounded-lg border px-2 py-1 transition",
                   i === page
-                    ? "border-brand/50 bg-brand/10 text-brand"
+                    ? "border-gold/50 bg-gold/10 text-gold-lite"
                     : "border-white/10 text-white/60 hover:border-white/25",
                 )}
               >

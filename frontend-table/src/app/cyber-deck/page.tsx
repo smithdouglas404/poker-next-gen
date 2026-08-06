@@ -164,13 +164,13 @@ function CyberDeckPageInner() {
         {/* Header */}
         <div className={cn(GLASS_PANEL, "mb-6 flex flex-wrap items-center justify-between gap-3 border-brand/20 p-4")}>
           <div>
-            <p className="font-display text-[11px] font-bold uppercase tracking-[0.35em] text-brand">High Rollers Club · Cyber-Deck</p>
+            <p className="font-display text-[11px] font-bold uppercase tracking-[0.35em] text-gold-lite">High Rollers Club · Cyber-Deck</p>
             <h1 className="mt-0.5 font-display text-xl font-bold uppercase tracking-wider text-white">Operator Console</h1>
           </div>
           <div className="flex items-center gap-2">
             <Chip label={`${tables.length} live tables`} />
             <Chip label={`${tours.length} running events`} />
-            <Link href="/command-core" className="text-xs text-brand hover:underline">
+            <Link href="/command-core" className="text-xs text-gold-lite hover:underline">
               + New session
             </Link>
           </div>
@@ -191,7 +191,7 @@ function CyberDeckPageInner() {
                   <div key={t.match_id} className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
                     <div className="flex items-center justify-between">
                       <p className="font-mono text-sm text-gold">{t.room_id ?? t.match_id.slice(0, 8)}</p>
-                      <span className="rounded-full border border-brand/30 bg-brand/[0.06] px-2 py-0.5 text-[10px] uppercase tracking-wider text-brand">
+                      <span className="rounded-full border border-gold/30 bg-gold/[0.06] px-2 py-0.5 text-[10px] uppercase tracking-wider text-gold-lite">
                         {t.status ?? "live"}
                       </span>
                     </div>
@@ -200,7 +200,7 @@ function CyberDeckPageInner() {
                       <span className="text-right">Seated {t.seated ?? 0}</span>
                       <span>Open seats {t.open_seats ?? 0}</span>
                       <span className="text-right">
-                        <Link href="/table" className="text-brand hover:underline">Manage →</Link>
+                        <Link href="/table" className="text-gold-lite hover:underline">Manage →</Link>
                       </span>
                     </div>
                   </div>
@@ -230,7 +230,7 @@ function CyberDeckPageInner() {
                       type="button"
                       disabled={balancing === t.id}
                       onClick={() => balance(t.id)}
-                      className="rounded-lg border border-brand/40 bg-brand/[0.08] px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-brand hover:bg-brand/[0.16] disabled:opacity-50"
+                      className="rounded-lg border border-gold/40 bg-gold/[0.08] px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-gold-lite hover:bg-gold/[0.16] disabled:opacity-50"
                     >
                       {balancing === t.id ? "Balancing…" : "⚖ Balance / Merge"}
                     </button>

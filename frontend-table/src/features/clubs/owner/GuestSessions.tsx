@@ -80,7 +80,7 @@ export function GuestSessions({ clubId, canManage }: { clubId?: string; canManag
                   <p className="flex items-center gap-2 truncate font-semibold text-white">
                     {g.username || g.user_id}
                     {g.overdue && (
-                      <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[9px] uppercase tracking-wider text-brand">
+                      <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[9px] uppercase tracking-wider text-gold-lite">
                         overdue
                       </span>
                     )}

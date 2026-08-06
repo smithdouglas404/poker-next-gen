@@ -70,7 +70,7 @@ export function LeaderboardPanel({
               className={cn(
                 "rounded-lg px-4 py-1.5 text-xs font-semibold uppercase tracking-wide transition",
                 metric === m.id
-                  ? "bg-brand/15 text-brand shadow-[0_0_16px_rgba(224,30,43,0.15)]"
+                  ? "bg-gold/15 text-gold-lite shadow-[0_0_16px_rgba(224,30,43,0.15)]"
                   : "text-neutral-400 hover:text-white",
               )}
             >

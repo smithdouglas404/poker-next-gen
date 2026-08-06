@@ -46,7 +46,7 @@ export function ShowdownVerifyCTA() {
         {state === "ok" ? (
           <span className="text-xs font-semibold text-green">Verified ✓ deck &amp; chain valid</span>
         ) : state === "bad" ? (
-          <span className="text-xs font-semibold text-brand">Verification issue — see full audit</span>
+          <span className="text-xs font-semibold text-gold-lite">Verification issue — see full audit</span>
         ) : (
           <button
             type="button"

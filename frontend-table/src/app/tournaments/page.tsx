@@ -392,7 +392,7 @@ export default function TournamentsPage() {
             "fixed left-1/2 top-20 z-50 -translate-x-1/2 rounded-xl border px-5 py-3 text-sm font-medium backdrop-blur-xl",
             toast.kind === "ok"
               ? "border-green/30 bg-green/10 text-green"
-              : "border-brand/40 bg-brand/10 text-[#ff9ba1]",
+              : "border-gold/40 bg-gold/10 text-[#ff9ba1]",
           )}
         >
           {toast.msg}

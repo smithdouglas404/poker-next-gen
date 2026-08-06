@@ -372,7 +372,7 @@ export function GameModeModal({ open, onClose }: { open: boolean; onClose: () =>
                         className={cn(
                           "rounded-xl border px-3 py-2 text-sm font-semibold transition",
                           i === blindIdx
-                            ? "border-brand/50 bg-brand/10 text-brand"
+                            ? "border-gold/50 bg-gold/10 text-gold-lite"
                             : "border-white/10 bg-white/[0.02] text-neutral-300 hover:border-white/25",
                         )}
                       >
@@ -577,7 +577,7 @@ function ModeCard({
       ? "hover:border-gold/50 hover:shadow-[0_4px_18px_rgba(0,0,0,0.5)]"
       : accent === "green"
         ? "hover:border-green/50 hover:shadow-[0_4px_18px_rgba(0,0,0,0.5)]"
-        : "hover:border-brand/50 hover:shadow-[0_4px_18px_rgba(0,0,0,0.5)]";
+        : "hover:border-gold/50 hover:shadow-[0_4px_18px_rgba(0,0,0,0.5)]";
   const dot =
     accent === "gold" ? "bg-gold" : accent === "green" ? "bg-green" : "bg-brand";
 

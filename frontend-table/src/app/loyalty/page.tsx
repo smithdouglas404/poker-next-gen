@@ -226,7 +226,7 @@ export default function LoyaltyPage() {
           </div>
           <Link
             href="/dashboard"
-            className="shrink-0 text-sm text-brand transition hover:text-brand/80"
+            className="shrink-0 text-sm text-gold-lite transition hover:text-gold"
           >
             ← Dashboard
           </Link>
