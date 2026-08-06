@@ -356,6 +356,16 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 	// Clerk (clerk.com) OAuth bridge: verify a Clerk session JWT passed to
 	// authenticateCustom and map it to a stable Nakama account. No-op unless
 	// CLERK_JWT_ISSUER is set, so device/email auth is unaffected when unused.
+	// SPIKE (see rpc/channel_authz.go): proves a room-channel join can be gated
+	// on real club membership without mirroring clubs into Nakama groups. Inert
+	// today — nothing in the app joins a Nakama channel.
+	if err := initializer.RegisterBeforeRt("ChannelJoin", rpc.BeforeChannelJoinClubGate); err != nil {
+		return err
+	}
+	// BOTH gates are required — the join hook alone left history readable.
+	if err := initializer.RegisterBeforeListChannelMessages(rpc.BeforeListChannelMessagesClubGate); err != nil {
+		return err
+	}
 	if err := initializer.RegisterBeforeAuthenticateCustom(rpc.ClerkBeforeAuthCustom); err != nil {
 		return err
 	}

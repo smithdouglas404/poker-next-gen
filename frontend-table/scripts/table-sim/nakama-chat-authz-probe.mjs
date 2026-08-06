@@ -76,4 +76,34 @@ if (joined) {
   console.log(`listChannelMessages as a non-member      : ${(history.messages ?? []).length} messages readable`);
 }
 await sock.disconnect(false);
+
+// ---- 3. Does the gate hold at the EDGES? ----
+// A join gate is only as good as the paths that skip the join. The channel id
+// is derivable from the club id (it looked like "2...<club_id>"), so a stranger
+// may not need to join at all to read history.
+console.log("\n--- residual surface ---");
+const ownerSock = client.createSocket(false, false);
+await ownerSock.connect(owner, true);
+let ownerJoined = null;
+try {
+  ownerJoined = await ownerSock.joinChat(clubId, CHANNEL_ROOM, true, false);
+  await ownerSock.writeChatMessage(ownerJoined.id, { text: "owner posting to own club" });
+} catch (e) {
+  ownerJoined = { __error: e?.message ?? JSON.stringify(e) };
+}
+console.log(`owner joins own club channel             : ${ownerJoined?.__error ? "REFUSED (FALSE POSITIVE) — " + ownerJoined.__error : "JOINED and posted — no false positive"}`);
+
+if (ownerJoined && !ownerJoined.__error) {
+  // Now the stranger, who was refused the join, tries to read it anyway using
+  // the channel id derived from the club id.
+  let leak = null;
+  try {
+    const h = await client.listChannelMessages(stranger, ownerJoined.id, 10);
+    leak = (h.messages ?? []).length;
+  } catch (e) {
+    leak = { __error: `${e?.status ?? "?"}` };
+  }
+  console.log(`stranger reads history WITHOUT joining   : ${typeof leak === "number" ? (leak > 0 ? "LEAKED " + leak + " messages" : "0 messages") : "REFUSED — " + leak.__error}`);
+}
+await ownerSock.disconnect(false);
 console.log("");
