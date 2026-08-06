@@ -303,7 +303,7 @@ function EntropyStream() {
         <div className="mx-2 h-px flex-1 bg-gradient-to-r from-white/5 via-white/20 to-white/5" />
         <div className="flex flex-col items-center">
           <div className="relative flex h-24 w-24 items-center justify-center rounded-full border border-white/10 bg-white/[0.03]">
-            <span className="font-display text-2xl font-bold text-brand">✦</span>
+            <span className="font-display text-2xl font-bold text-gold-lite">✦</span>
           </div>
           <div className="mt-3 text-center">
             <div className="font-display text-xs font-bold uppercase tracking-wider text-white">SHA-256 Commit</div>
@@ -379,7 +379,7 @@ function SystemHealthPanel({
             "rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider",
             health.operational
               ? "bg-green/15 text-green border border-green/30"
-              : "bg-brand/15 text-brand border border-brand/30",
+              : "bg-gold/15 text-gold-lite border border-gold/30",
           )}
         >
           {health.operational ? "Operational" : "Degraded"}

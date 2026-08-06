@@ -290,7 +290,7 @@ function LobbyContent() {
                   type="button"
                   disabled={busy || matchmakerSearching || !connected}
                   onClick={() => void run(() => findMatch())}
-                  className="mt-4 inline-flex w-fit rounded-xl border border-gold/40 px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-brand transition hover:bg-brand/5 disabled:opacity-40"
+                  className="mt-4 inline-flex w-fit rounded-xl border border-gold/40 px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-gold-lite transition hover:bg-gold/5 disabled:opacity-40"
                 >
                   {matchmakerSearching ? "Searching…" : "Find a Seat →"}
                 </button>

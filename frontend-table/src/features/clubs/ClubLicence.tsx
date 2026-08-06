@@ -91,7 +91,7 @@ export function ClubLicencePanel({ clubId }: { clubId: string }) {
         </>
       ) : (
         <>
-          <p className="mt-3 text-sm font-semibold text-brand">
+          <p className="mt-3 text-sm font-semibold text-gold-lite">
             This club cannot host cash games yet.
           </p>
           <p className="mt-1 text-[13px] leading-snug text-neutral-300">{lic?.reason}</p>

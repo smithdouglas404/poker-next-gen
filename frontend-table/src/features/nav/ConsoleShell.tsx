@@ -43,7 +43,7 @@ const ACTIVE_CLS: Record<ConsoleAccent, string> = {
     "relative border border-gold/40 bg-gold/[0.10] font-semibold text-gold-lite " +
     "before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-gold-lite",
   gold: "border border-gold/40 bg-gold/[0.08] font-semibold text-gold",
-  brand: "border border-brand/40 bg-brand/[0.1] text-brand",
+  brand: "border border-gold/40 bg-gold/[0.1] text-gold-lite",
 };
 const INACTIVE_CLS =
   "border border-transparent text-white/55 hover:bg-white/[0.04] hover:text-white/85";
@@ -64,7 +64,7 @@ function Brand({ brand }: { brand: ConsoleBrand }) {
             ? undefined
             : {
                 background: "linear-gradient(180deg,#ff2d3f,#b3151f)",
-                boxShadow: "0 4px 14px -4px rgba(224,30,43,0.4)",
+                boxShadow: "0 4px 14px -4px rgba(245,197,24,0.4)",
               }
         }
       >

@@ -221,7 +221,7 @@ export function HandAudit({ target }: Props) {
         {/* Chronology */}
         <div>
           <p className={cn(HEADING_SM, "mb-4 flex items-center gap-2 text-neutral-300")}>
-            <span className="h-2 w-2 rounded-full bg-brand" /> Hand Chronology
+            <span className="h-2 w-2 rounded-full bg-gold" /> Hand Chronology
           </p>
           <ol className="relative space-y-6 border-l border-white/10 pl-6">
             {data.chronology.map((street, i) => (
@@ -229,10 +229,10 @@ export function HandAudit({ target }: Props) {
                 <span
                   className={cn(
                     "absolute -left-[31px] top-1 h-3 w-3 rounded-full border-2",
-                    i === 0 ? "border-brand bg-brand/40" : "border-white/20 bg-background",
+                    i === 0 ? "border-gold bg-gold/40" : "border-white/20 bg-background",
                   )}
                 />
-                <div className={cn("text-[11px] font-bold uppercase tracking-wider", i === 0 ? "text-brand" : "text-neutral-400")}>
+                <div className={cn("text-[11px] font-bold uppercase tracking-wider", i === 0 ? "text-gold-lite" : "text-neutral-400")}>
                   {street.name}
                 </div>
                 <div className="mt-2 flex gap-2">

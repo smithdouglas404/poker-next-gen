@@ -68,7 +68,7 @@ export default function ProvablyFairPage() {
                   )}
                 >
                   {t.label}
-                  {tab === t.id && <span className="mt-1 block h-0.5 rounded-full bg-brand" />}
+                  {tab === t.id && <span className="mt-1 block h-0.5 rounded-full bg-gold" />}
                 </button>
               ))}
             </nav>

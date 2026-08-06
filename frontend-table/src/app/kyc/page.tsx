@@ -103,7 +103,7 @@ export default function KycPage() {
               className={cn(
                 "rounded-xl px-5 py-2 text-xs font-semibold uppercase tracking-[0.15em] transition",
                 tab === t.id
-                  ? "bg-gradient-to-b from-[#ffd54a] via-[#f5c518] to-[#d4a80f] text-[#231b00] shadow-[0_6px_16px_-6px_rgba(224,30,43,0.4)]"
+                  ? "bg-gradient-to-b from-[#ffd54a] via-[#f5c518] to-[#d4a80f] text-[#231b00] shadow-[0_6px_16px_-6px_rgba(245,197,24,0.4)]"
                   : "text-neutral-400 hover:text-neutral-200",
               )}
             >

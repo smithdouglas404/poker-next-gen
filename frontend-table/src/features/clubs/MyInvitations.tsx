@@ -49,7 +49,7 @@ function ExpiryNote({ expiresAt }: { expiresAt?: string | null }) {
   }
   if (days <= 0) {
     return (
-      <p className="mt-3 text-[11px] font-semibold text-brand">
+      <p className="mt-3 text-[11px] font-semibold text-gold-lite">
         This invitation has expired — ask the club to send a new one.
       </p>
     );
@@ -207,7 +207,7 @@ export function MyInvitations() {
         </p>
       )}
       {done && <p className="mt-2 text-[12px] font-semibold text-green">{done}</p>}
-      {error && <p className="mt-2 text-[12px] font-semibold text-brand">{error}</p>}
+      {error && <p className="mt-2 text-[12px] font-semibold text-gold-lite">{error}</p>}
 
       {invites.length > 0 && (
         <div className="mt-4 grid gap-4 sm:grid-cols-2">

@@ -97,7 +97,7 @@ export function GuestApprovals({ clubId, canManage }: { clubId?: string; canMana
                 </p>
                 {/* The signal actually worth reading before approving. */}
                 {r.same_device_seated > 0 && (
-                  <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-brand">
+                  <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-gold-lite">
                     ⚠ same device as {r.same_device_seated} other guest
                     {r.same_device_seated === 1 ? "" : "s"} at this club
                   </p>

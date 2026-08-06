@@ -186,7 +186,7 @@ function ProfileBody() {
             >
               {t.label}
               {tab === t.id && (
-                <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-brand shadow-[0_0_10px_rgba(224,30,43,0.5)]" />
+                <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-gold shadow-[0_0_10px_rgba(245,197,24,0.5)]" />
               )}
             </button>
           ))}

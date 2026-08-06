@@ -117,7 +117,7 @@ export function OwnerShell({
     <button
       type="button"
       onClick={onBrowse}
-      className="hidden text-left text-xs text-muted transition hover:text-brand md:inline-block"
+      className="hidden text-left text-xs text-muted transition hover:text-gold-lite md:inline-block"
     >
       Browse other clubs →
     </button>

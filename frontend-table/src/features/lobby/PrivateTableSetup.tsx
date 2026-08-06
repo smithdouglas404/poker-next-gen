@@ -506,7 +506,7 @@ export function PrivateTableSetup({
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
                   AI Bots
                 </span>
-                <span className="text-sm font-semibold text-brand">{bots}</span>
+                <span className="text-sm font-semibold text-gold-lite">{bots}</span>
               </div>
               <input
                 type="range"
@@ -667,7 +667,7 @@ export function PrivateTableSetup({
                       clock — so show the operator the UTC they are choosing
                       rather than letting them discover it at closing time. */}
                   {openWindow.error ? (
-                    <p className="text-[11px] font-semibold text-brand">{openWindow.error}</p>
+                    <p className="text-[11px] font-semibold text-gold-lite">{openWindow.error}</p>
                   ) : (
                     <p className="text-[11px] leading-snug text-neutral-500">
                       Enforced as <span className="font-semibold text-neutral-300">{openWindow.utcLabel}</span>
@@ -873,7 +873,7 @@ export function PrivateTableSetup({
               type="button"
               disabled={busy || matchmakerSearching}
               onClick={() => void findMatch()}
-              className="mt-2 w-full rounded-xl border border-gold/40 px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-brand transition hover:bg-brand/5 disabled:opacity-40"
+              className="mt-2 w-full rounded-xl border border-gold/40 px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-gold-lite transition hover:bg-gold/5 disabled:opacity-40"
             >
               {matchmakerSearching ? "Searching…" : "Quick Match Instead"}
             </button>

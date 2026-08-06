@@ -177,7 +177,7 @@ export function AnalyticsPanel({
           <div className={cn(GLASS_PANEL, GLASS_PANEL_HOVER, "mt-5 p-5")}>
             <div className="grid grid-cols-3 items-center gap-2 text-center">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.2em] text-brand/90">You</p>
+                <p className="text-[11px] uppercase tracking-[0.2em] text-gold-lite/90">You</p>
                 <p className="font-display text-3xl font-bold text-foreground">{h2h.my_wins}</p>
               </div>
               <div className="text-neutral-500">

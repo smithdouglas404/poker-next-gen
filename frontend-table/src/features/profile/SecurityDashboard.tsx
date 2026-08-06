@@ -86,7 +86,7 @@ function WalletRow({
           type="button"
           disabled={busy}
           onClick={() => onUnlink(w)}
-          className="shrink-0 rounded-lg border border-gold/40 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-brand transition hover:bg-brand/10 disabled:opacity-40"
+          className="shrink-0 rounded-lg border border-gold/40 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-gold-lite transition hover:bg-gold/10 disabled:opacity-40"
         >
           {busy ? "Removing…" : "Unlink"}
         </button>
@@ -375,7 +375,7 @@ export function SecurityDashboard({ notify }: { notify: (msg: string, kind?: "ok
                 </p>
               </div>
               {!s.current && (
-                <Link href="/profile/security" className="text-xs font-semibold uppercase tracking-wide text-brand hover:text-red-300">
+                <Link href="/profile/security" className="text-xs font-semibold uppercase tracking-wide text-gold-lite hover:text-red-300">
                   Revoke
                 </Link>
               )}

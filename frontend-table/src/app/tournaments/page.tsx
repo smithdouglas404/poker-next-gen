@@ -77,7 +77,7 @@ function enrich(t: Tournament, index: number): EnrichedTournament {
       heroArt: featured
         ? tagTone === "gold"
           ? "radial-gradient(120% 120% at 85% 0%, rgba(245,197,24,0.10), transparent 55%), #262d38"
-          : "radial-gradient(120% 120% at 15% 0%, rgba(224,30,43,0.10), transparent 55%), #262d38"
+          : "radial-gradient(120% 120% at 15% 0%, rgba(245,197,24,0.10), transparent 55%), #262d38"
         : undefined,
     },
   };

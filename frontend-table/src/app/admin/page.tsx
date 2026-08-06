@@ -78,7 +78,7 @@ export default function AdminPage() {
     return (
       <div className="flex min-h-screen items-center justify-center text-neutral-500">
         <div className="flex items-center gap-3">
-          <span className="h-2.5 w-2.5 animate-ping rounded-full bg-brand" />
+          <span className="h-2.5 w-2.5 animate-ping rounded-full bg-gold" />
           Verifying access…
         </div>
       </div>

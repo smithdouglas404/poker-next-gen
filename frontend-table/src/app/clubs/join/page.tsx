@@ -93,7 +93,7 @@ function JoinInner() {
           </button>
         </div>
 
-        {error && <p className="mt-3 text-sm text-brand">{error}</p>}
+        {error && <p className="mt-3 text-sm text-gold-lite">{error}</p>}
 
         {club && (
           <div className="mt-5 rounded-xl border border-white/10 bg-black/30 p-4">

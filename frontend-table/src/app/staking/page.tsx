@@ -124,7 +124,7 @@ export default function StakingPage() {
         </div>
 
         {error && (
-          <div className="mb-4 rounded-xl border border-brand/40 bg-brand/10 px-4 py-2 text-sm text-[#ff9ba1]">
+          <div className="mb-4 rounded-xl border border-gold/40 bg-gold/10 px-4 py-2 text-sm text-[#ff9ba1]">
             {error}
           </div>
         )}

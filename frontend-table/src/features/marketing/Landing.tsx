@@ -42,7 +42,7 @@ export function Landing() {
       <section className="relative px-6 pt-24 pb-20 text-center">
         <div className="pointer-events-none absolute inset-0 -z-10">
           <div className="absolute left-1/2 top-0 h-[420px] w-[820px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse,rgba(212,175,55,0.14),transparent_65%)]" />
-          <div className="absolute left-1/2 top-40 h-[360px] w-[720px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse,rgba(224,30,43,0.10),transparent_65%)]" />
+          <div className="absolute left-1/2 top-40 h-[360px] w-[720px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse,rgba(245,197,24,0.10),transparent_65%)]" />
         </div>
         <p className="font-display text-xs font-bold uppercase tracking-[0.35em] text-amber-300/80">
           High Rollers Club

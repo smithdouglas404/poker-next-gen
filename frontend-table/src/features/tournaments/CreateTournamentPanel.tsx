@@ -86,7 +86,7 @@ function TabBtn({
       className={cn(
         "flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold uppercase tracking-wide transition",
         is
-          ? "bg-brand text-white shadow-[0_6px_18px_-6px_rgba(224,30,43,0.4)]"
+          ? "bg-gradient-to-b from-[#ffd54a] via-[#f5c518] to-[#d4a80f] text-[#231b00] shadow-[0_6px_18px_-6px_rgba(245,197,24,0.4)]"
           : "text-neutral-400 hover:text-neutral-200",
       )}
     >
@@ -540,7 +540,7 @@ export function CreateTournamentPanel({
                     />
                   </Field>
                   {rakeTooHigh && (
-                    <p className="text-xs text-brand sm:col-span-2">
+                    <p className="text-xs text-gold-lite sm:col-span-2">
                       The ${draft.fee.toLocaleString()} entry fee plus {draft.adminFeePct}% admin fee take
                       the whole ${draft.buyIn.toLocaleString()} buy-in — there would be nothing left to
                       play for. The server rejects this too.
@@ -767,9 +767,9 @@ export function CreateTournamentPanel({
               {econ.overlayMinor > 0 ? ", and the club funds the overlay if the field falls short" : ""}.
             </p>
             <p className="mt-3 text-[11px] text-neutral-600">
-              Publishing calls <span className="text-brand">tournament_create</span> and seeds the ladder
-              via <span className="text-brand">blind_level_add</span> /{" "}
-              <span className="text-brand">prize_pool_add</span>.
+              Publishing calls <span className="text-gold-lite">tournament_create</span> and seeds the ladder
+              via <span className="text-gold-lite">blind_level_add</span> /{" "}
+              <span className="text-gold-lite">prize_pool_add</span>.
             </p>
           </div>
         </div>

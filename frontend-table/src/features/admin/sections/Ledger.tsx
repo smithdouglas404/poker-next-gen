@@ -183,13 +183,13 @@ export function Ledger({ notify }: { notify: Notify }) {
         </p>
 
         {failed && (
-          <p className="mt-3 text-[12px] font-semibold text-brand">
+          <p className="mt-3 text-[12px] font-semibold text-gold-lite">
             Couldn&apos;t reach the ledger. The books are in an unknown state — this is not a
             passing check.
           </p>
         )}
         {balanced === false && (
-          <p className="mt-3 text-[12px] font-semibold text-brand">
+          <p className="mt-3 text-[12px] font-semibold text-gold-lite">
             The ledger does not balance by {money(Math.abs(total))}. Open the largest accounts below
             and compare their entries against the wallet ledger.
           </p>

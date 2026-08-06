@@ -278,7 +278,7 @@ export function OperatorsEquity({
                     onClick={() => void removeSeat(op)}
                     disabled={disabled || removingId === op.user_id}
                     aria-label={`Remove ${op.username}'s seat`}
-                    className="rounded-md px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-white/40 transition hover:bg-brand/10 hover:text-brand disabled:opacity-30"
+                    className="rounded-md px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-white/40 transition hover:bg-gold/10 hover:text-gold-lite disabled:opacity-30"
                   >
                     {removingId === op.user_id ? "…" : "Remove"}
                   </button>
@@ -374,8 +374,8 @@ export function OperatorsEquity({
             onClick={doTransfer}
             disabled={disabled || transferBusy || !transferTo}
             className={cn(
-              "rounded-lg border border-brand/50 bg-brand/10 px-5 py-2.5 font-display text-sm font-bold uppercase tracking-wider text-brand transition",
-              "hover:bg-brand/20 disabled:opacity-40",
+              "rounded-lg border border-gold/50 bg-gold/10 px-5 py-2.5 font-display text-sm font-bold uppercase tracking-wider text-gold-lite transition",
+              "hover:bg-gold/20 disabled:opacity-40",
             )}
           >
             {transferBusy ? "Transferring…" : "Transfer club"}

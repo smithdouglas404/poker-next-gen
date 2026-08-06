@@ -59,7 +59,7 @@ export function BlindCurve({ blinds }: { blinds: BlindLevel[] }) {
         </div>
         <div>
           <p className="text-[10px] uppercase tracking-wider text-muted">Top blind</p>
-          <p className="text-2xl font-bold text-brand">{maxBB.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-gold-lite">{maxBB.toLocaleString()}</p>
         </div>
       </div>
 

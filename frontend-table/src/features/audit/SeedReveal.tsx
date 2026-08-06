@@ -164,7 +164,7 @@ export function SeedReveal({ target }: Props) {
         </div>
 
         {/* Locked server seed hash */}
-        <div className="mt-6 rounded-2xl border-l-2 border-brand/50 bg-white/[0.02] p-5">
+        <div className="mt-6 rounded-2xl border-l-2 border-gold/50 bg-white/[0.02] p-5">
           <div className="flex items-center justify-between">
             <span className={cn(HEADING_SM, "text-foreground")}>Server Seed Hash (committed pre-deal)</span>
             <span className="text-neutral-500">🔒</span>

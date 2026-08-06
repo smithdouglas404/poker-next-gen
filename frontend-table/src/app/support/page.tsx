@@ -220,7 +220,7 @@ export default function SupportPage() {
               />
             </Field>
 
-            {error && <p className="text-[12px] font-semibold text-brand">{error}</p>}
+            {error && <p className="text-[12px] font-semibold text-gold-lite">{error}</p>}
             {notice && <p className="text-[12px] font-semibold text-green">{notice}</p>}
 
             <button

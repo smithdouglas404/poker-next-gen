@@ -492,7 +492,7 @@ export function OwnerHub() {
             <button
               type="button"
               onClick={() => setForceBrowse(false)}
-              className="text-xs text-muted hover:text-brand"
+              className="text-xs text-muted hover:text-gold-lite"
             >
               ← Back to your club
             </button>

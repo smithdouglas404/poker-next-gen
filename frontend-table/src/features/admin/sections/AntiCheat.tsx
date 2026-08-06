@@ -144,7 +144,7 @@ function Antibot({ notify }: { notify: Notify }) {
               <Td>
                 <Badge tone={statusTone(r.risk)}>{r.risk}</Badge>
               </Td>
-              <Td className="font-display text-brand">{r.score.toFixed(2)}</Td>
+              <Td className="font-display text-gold-lite">{r.score.toFixed(2)}</Td>
               <Td className="text-neutral-400">{r.sample_size}</Td>
               <Td className="text-neutral-500">{relTime(r.updated_at)}</Td>
               <Td className="text-right">
@@ -305,7 +305,7 @@ function Collusion({ notify }: { notify: Notify }) {
             type="button"
             onClick={() => void scan()}
             disabled={scanning}
-            className="rounded-lg border border-brand/40 bg-brand/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-brand hover:bg-brand/20 disabled:opacity-40"
+            className="rounded-lg border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-gold-lite hover:bg-gold/20 disabled:opacity-40"
           >
             {scanning ? "Scanning…" : "Run scan"}
           </button>

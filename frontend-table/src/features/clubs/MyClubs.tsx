@@ -123,7 +123,7 @@ export function MyClubs() {
     <section className={cn(GLASS_PANEL, "p-5")}>
       <p className={cn(HEADING_SM, "text-gold/80")}>My Clubs</p>
       {notice && <p className="mt-2 text-[12px] font-semibold text-green">{notice}</p>}
-      {error && <p className="mt-2 text-[12px] font-semibold text-brand">{error}</p>}
+      {error && <p className="mt-2 text-[12px] font-semibold text-gold-lite">{error}</p>}
 
       <div className="mt-4 space-y-2">
         {clubs.map((c) => (

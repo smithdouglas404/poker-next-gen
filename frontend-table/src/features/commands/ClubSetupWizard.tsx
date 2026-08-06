@@ -135,7 +135,7 @@ export function ClubSetupWizard({
         ) : null}
 
         {error && (
-          <p className="mt-3 rounded-lg border border-brand/30 bg-brand/10 px-3 py-2 text-sm text-brand">
+          <p className="mt-3 rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-sm text-gold-lite">
             {error}
           </p>
         )}

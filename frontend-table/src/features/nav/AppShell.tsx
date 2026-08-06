@@ -127,7 +127,7 @@ function NavRow({ item, active }: { item: NavItem; active: boolean }) {
           <motion.div
             layoutId="shell-active"
             className="absolute inset-0 rounded-lg border border-[#e01e2b]/30 bg-[#e01e2b]/10"
-            style={{ boxShadow: "0 0 16px rgba(224,30,43,0.12), inset 0 0 10px rgba(224,30,43,0.06)" }}
+            style={{ boxShadow: "0 0 16px rgba(245,197,24,0.12), inset 0 0 10px rgba(245,197,24,0.06)" }}
             transition={SPRINGS.snappy}
           />
         )}

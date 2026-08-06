@@ -54,7 +54,7 @@ export function GuestApprovalBanner() {
       className="pointer-events-auto fixed left-1/2 top-24 z-50 w-[min(92vw,30rem)] -translate-x-1/2 rounded-2xl border p-4 text-center"
       style={{
         background: "rgba(10,10,12,0.92)",
-        borderColor: denied ? "rgba(224,30,43,0.5)" : "rgba(212,175,55,0.45)",
+        borderColor: denied ? "rgba(245,197,24,0.5)" : "rgba(212,175,55,0.45)",
         boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
       }}
       role="status"

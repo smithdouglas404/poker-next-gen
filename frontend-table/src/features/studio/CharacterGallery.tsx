@@ -80,7 +80,7 @@ export function CharacterGallery({
                 className={cn(
                   "rounded-xl border bg-black/30 p-3 transition",
                   isEquipped
-                    ? "border-brand/50 shadow-[0_2px_18px_-6px_rgba(224,30,43,0.35)]"
+                    ? "border-gold/50 shadow-[0_2px_18px_-6px_rgba(245,197,24,0.35)]"
                     : "border-white/[0.08] hover:border-white/20",
                 )}
               >

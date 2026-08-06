@@ -107,7 +107,7 @@ export default function HandsPage() {
       <main className="mx-auto max-w-5xl px-6 py-10">
         {loading && <p className="text-sm text-muted">Loading your hands…</p>}
         {error && (
-          <p className="rounded-xl border border-brand/30 bg-brand/10 px-4 py-3 text-sm text-red-400">{error}</p>
+          <p className="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-red-400">{error}</p>
         )}
         {!loading && !error && hands.length === 0 && (
           <div className="rounded-2xl border border-white/10 bg-surface p-8 text-center">
@@ -210,7 +210,7 @@ export default function HandsPage() {
                   className={`rounded-xl border p-4 ${
                     chainOk(verify)
                       ? "border-green/30 bg-green/[0.08]"
-                      : "border-brand/30 bg-brand/[0.08]"
+                      : "border-gold/30 bg-gold/[0.08]"
                   }`}
                 >
                   <p className={`text-sm font-semibold ${chainOk(verify) ? "text-green" : "text-red-400"}`}>

@@ -254,7 +254,7 @@ export default function TrainerPage() {
               </button>
             </div>
 
-            {error && <p className="mt-3 text-sm text-brand">{error}</p>}
+            {error && <p className="mt-3 text-sm text-gold-lite">{error}</p>}
 
             <div className="mt-4 space-y-3">
               {rank && (

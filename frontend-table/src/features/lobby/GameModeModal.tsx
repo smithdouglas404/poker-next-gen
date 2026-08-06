@@ -579,7 +579,7 @@ function ModeCard({
         ? "hover:border-green/50 hover:shadow-[0_4px_18px_rgba(0,0,0,0.5)]"
         : "hover:border-gold/50 hover:shadow-[0_4px_18px_rgba(0,0,0,0.5)]";
   const dot =
-    accent === "gold" ? "bg-gold" : accent === "green" ? "bg-green" : "bg-brand";
+    accent === "gold" ? "bg-gold" : accent === "green" ? "bg-green" : "bg-gold";
 
   return (
     <button

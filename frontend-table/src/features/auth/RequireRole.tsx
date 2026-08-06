@@ -65,7 +65,7 @@ export function RequireRole({
           <p className="text-sm text-white/60">Checking access…</p>
         ) : (
           <>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-brand/80">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-gold-lite/80">
               Restricted
             </p>
             <h1 className="mt-2 font-display text-2xl font-bold uppercase tracking-wide">

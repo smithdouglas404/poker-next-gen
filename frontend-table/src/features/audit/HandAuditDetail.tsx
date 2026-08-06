@@ -41,7 +41,7 @@ export function HandAuditDetail({ matchId, handNo }: Props) {
             <Link href="/dashboard" className="text-neutral-400 transition hover:text-white">
               Lobby
             </Link>
-            <Link href="/provably-fair" className="text-brand">
+            <Link href="/provably-fair" className="text-gold-lite">
               Fairness
             </Link>
             <Link

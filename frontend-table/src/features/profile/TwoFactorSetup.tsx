@@ -189,14 +189,14 @@ export function TwoFactorSetup({
               maxLength={12}
               placeholder="Authenticator or backup code"
               onChange={(e) => setCode(e.target.value.trim())}
-              className="w-full rounded-lg border border-white/10 bg-black/40 px-4 py-2.5 text-center text-sm text-white outline-none focus:border-brand/50"
+              className="w-full rounded-lg border border-white/10 bg-black/40 px-4 py-2.5 text-center text-sm text-white outline-none focus:border-gold/50"
             />
           </div>
           <button
             type="button"
             onClick={() => void disable()}
             disabled={busy || code.length < 6}
-            className="mx-auto block rounded-xl border border-brand/40 bg-brand/10 px-5 py-2.5 text-sm font-semibold uppercase tracking-wide text-[#ff9ba1] transition hover:bg-brand/20 disabled:opacity-40"
+            className="mx-auto block rounded-xl border border-gold/40 bg-gold/10 px-5 py-2.5 text-sm font-semibold uppercase tracking-wide text-[#ff9ba1] transition hover:bg-gold/20 disabled:opacity-40"
           >
             {busy ? "Disabling…" : "Disable 2FA"}
           </button>

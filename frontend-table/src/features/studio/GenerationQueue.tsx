@@ -46,7 +46,7 @@ export function GenerationQueue({
                   <div
                     className={cn(
                       "h-full rounded-full transition-all duration-500",
-                      failed ? "bg-brand" : done ? "bg-green" : "bg-gold",
+                      failed ? "bg-gold" : done ? "bg-green" : "bg-gold",
                     )}
                     style={{ width: `${failed ? 100 : job.progress}%` }}
                   />
@@ -56,7 +56,7 @@ export function GenerationQueue({
                   <span
                     className={cn(
                       "text-[10px] font-semibold uppercase tracking-wider",
-                      failed ? "text-brand" : done ? "text-green" : "text-muted",
+                      failed ? "text-gold-lite" : done ? "text-green" : "text-muted",
                     )}
                   >
                     {failed

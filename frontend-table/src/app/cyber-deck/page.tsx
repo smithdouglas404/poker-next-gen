@@ -159,10 +159,10 @@ function CyberDeckPageInner() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(1200px_600px_at_50%_-10%,rgba(224,30,43,0.06),transparent),radial-gradient(900px_500px_at_90%_0%,rgba(212,175,55,0.05),transparent)] bg-background text-foreground">
+    <div className="min-h-screen bg-[radial-gradient(1200px_600px_at_50%_-10%,rgba(245,197,24,0.06),transparent),radial-gradient(900px_500px_at_90%_0%,rgba(212,175,55,0.05),transparent)] bg-background text-foreground">
       <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
         {/* Header */}
-        <div className={cn(GLASS_PANEL, "mb-6 flex flex-wrap items-center justify-between gap-3 border-brand/20 p-4")}>
+        <div className={cn(GLASS_PANEL, "mb-6 flex flex-wrap items-center justify-between gap-3 border-gold/20 p-4")}>
           <div>
             <p className="font-display text-[11px] font-bold uppercase tracking-[0.35em] text-gold-lite">High Rollers Club · Cyber-Deck</p>
             <h1 className="mt-0.5 font-display text-xl font-bold uppercase tracking-wider text-white">Operator Console</h1>
@@ -177,7 +177,7 @@ function CyberDeckPageInner() {
         </div>
 
         {flash && (
-          <div className={cn(GLASS_PANEL, "mb-4 border-brand/20 px-4 py-2 text-sm text-neutral-200")}>{flash}</div>
+          <div className={cn(GLASS_PANEL, "mb-4 border-gold/20 px-4 py-2 text-sm text-neutral-200")}>{flash}</div>
         )}
 
         <div className="space-y-6">
@@ -269,7 +269,7 @@ function CyberDeckPageInner() {
                   value={announce}
                   onChange={(e) => setAnnounce(e.target.value)}
                   placeholder="Message broadcast to every table…"
-                  className="flex-1 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-brand/50"
+                  className="flex-1 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-gold/50"
                 />
                 <button
                   type="button"

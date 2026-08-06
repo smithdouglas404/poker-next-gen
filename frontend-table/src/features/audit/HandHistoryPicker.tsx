@@ -165,7 +165,7 @@ export function HandHistoryPicker() {
                       className={cn(
                         STATUS_CHIP,
                         r.anchored
-                          ? "border border-brand/30 bg-brand/10 text-brand"
+                          ? "border border-gold/30 bg-gold/10 text-gold-lite"
                           : "border border-white/10 bg-white/[0.03] text-neutral-500",
                       )}
                     >

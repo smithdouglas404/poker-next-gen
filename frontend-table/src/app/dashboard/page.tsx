@@ -80,7 +80,7 @@ function Sidebar({ data }: { data: DashboardData }) {
     <aside className="hidden w-64 shrink-0 flex-col justify-between border-r border-white/[0.06] px-6 py-8 lg:flex">
       <div>
         <div className="mb-12 flex items-center gap-3 px-2">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-b from-[#ff2d3f] to-[#b3151f] font-display text-sm font-bold text-white shadow-[0_4px_14px_-4px_rgba(224,30,43,0.5)]">
+          <span className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-b from-[#ff2d3f] to-[#b3151f] font-display text-sm font-bold text-white shadow-[0_4px_14px_-4px_rgba(245,197,24,0.5)]">
             GG
           </span>
           <span className="font-display text-xl font-bold uppercase tracking-[0.18em] text-foreground">
@@ -97,7 +97,7 @@ function Sidebar({ data }: { data: DashboardData }) {
                 className={cn(
                   "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition",
                   active
-                    ? "bg-gradient-to-r from-[#e01e2b] to-[#b3151f] text-white shadow-[0_6px_18px_-8px_rgba(224,30,43,0.5)]"
+                    ? "bg-gradient-to-r from-[#e01e2b] to-[#b3151f] text-white shadow-[0_6px_18px_-8px_rgba(245,197,24,0.5)]"
                     : "text-muted hover:bg-white/[0.04] hover:text-white",
                 )}
               >
@@ -364,7 +364,7 @@ function TableCardView({ card, index }: { card: TableCard; index: number }) {
             "mt-4 flex items-center justify-center rounded-xl px-4 py-2.5 text-xs font-semibold uppercase tracking-wide transition",
             card.full
               ? "cursor-default border border-white/10 text-neutral-500"
-              : "border border-brand/50 bg-brand/15 text-white hover:bg-brand/25",
+              : "border border-gold/50 bg-gold/15 text-white hover:bg-gold/25",
           )}
         >
           {card.full ? "Spectate Only" : "Enter Table"}
@@ -382,7 +382,7 @@ function HighStakes({ tables }: { tables: TableCard[] }) {
           <h3 className="font-display text-xl font-bold uppercase tracking-wide text-white">Active High Stakes</h3>
           <p className="text-xs uppercase tracking-widest text-neutral-500">Live data feed from exclusive suites</p>
         </div>
-        <Link href="/lobby" className="text-xs font-bold uppercase tracking-widest text-gold-lite hover:text-brand/80">
+        <Link href="/lobby" className="text-xs font-bold uppercase tracking-widest text-gold-lite hover:text-gold-lite/80">
           View All Tables
         </Link>
       </div>
@@ -453,7 +453,7 @@ function ActivityIcon({ kind }: { kind: ActivityRow["kind"] }) {
   const map = {
     credit: { ring: "border-green/30 text-green", glyph: "M12 5v14M5 12h14" },
     win: { ring: "border-gold/30 text-gold", glyph: "M7 4h10v4a5 5 0 0 1-10 0V4ZM9 20h6M12 13v4" },
-    loss: { ring: "border-brand/30 text-brand", glyph: "M12 8v5M12 16.5v.01M12 3 2 20h20L12 3Z" },
+    loss: { ring: "border-gold/30 text-gold-lite", glyph: "M12 8v5M12 16.5v.01M12 3 2 20h20L12 3Z" },
     neutral: { ring: "border-white/15 text-muted", glyph: "M5 12h14" },
   } as const;
   const m = map[kind];
@@ -488,7 +488,7 @@ function RecentActivity({ rows }: { rows: ActivityRow[] }) {
       )}
       <Link
         href="/wallet"
-        className="mt-6 border-t border-white/[0.06] pt-4 text-center text-[11px] font-bold uppercase tracking-[0.25em] text-neutral-500 transition hover:text-brand"
+        className="mt-6 border-t border-white/[0.06] pt-4 text-center text-[11px] font-bold uppercase tracking-[0.25em] text-neutral-500 transition hover:text-gold-lite"
       >
         Full History Log
       </Link>

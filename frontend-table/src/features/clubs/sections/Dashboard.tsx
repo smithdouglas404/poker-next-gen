@@ -173,7 +173,7 @@ export function Dashboard({
           <CardHeader
             badge={
               news.length > 0 && (
-                <span className="rounded-full bg-brand px-1.5 text-[10px] font-bold text-white">
+                <span className="rounded-full bg-gold px-1.5 text-[10px] font-bold text-white">
                   {news.length}
                 </span>
               )

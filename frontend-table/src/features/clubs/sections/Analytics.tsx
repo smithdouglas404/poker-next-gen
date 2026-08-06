@@ -100,7 +100,7 @@ export function Analytics({
                 onClick={() => setPeriod(p)}
                 className={cn(
                   "rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide transition",
-                  p === period ? "bg-brand/15 text-brand" : "text-white/40 hover:text-white/70",
+                  p === period ? "bg-gold/15 text-gold-lite" : "text-white/40 hover:text-white/70",
                 )}
               >
                 {p}
@@ -191,7 +191,7 @@ export function Analytics({
                     key={r.club_id}
                     className={cn(
                       "flex items-center justify-between rounded-lg px-3 py-2 text-sm",
-                      mine ? "border border-brand/30 bg-brand/[0.08]" : "bg-white/[0.02]",
+                      mine ? "border border-gold/30 bg-gold/[0.08]" : "bg-white/[0.02]",
                     )}
                   >
                     <span className="flex items-center gap-2">

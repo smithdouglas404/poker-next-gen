@@ -141,7 +141,7 @@ export function TableSettlements({ clubId, canManage }: { clubId?: string; canMa
                     <span className="mx-2 text-white/20">|</span>
                     Owed to players <span className="font-semibold text-green">{money(s.total_owed_to_players)}</span>
                     {!balanced && (
-                      <span className="ml-2 font-semibold uppercase tracking-[0.15em] text-brand">
+                      <span className="ml-2 font-semibold uppercase tracking-[0.15em] text-gold-lite">
                         ⚠ does not balance
                       </span>
                     )}

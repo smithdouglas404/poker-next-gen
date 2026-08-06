@@ -211,7 +211,7 @@ export function TournamentBuilderWizard({
                         const v = Math.round((Number(e.target.value) || 0) * 100); setPrizes((pr) => pr.map((r, j) => j === i ? { ...r, payout_bps: v } : r));
                       }} /></td>
                       <td className="px-2 py-1 text-right">
-                        <button type="button" onClick={() => setPrizes((pr) => pr.filter((_, j) => j !== i))} className="text-neutral-500 hover:text-brand">✕</button>
+                        <button type="button" onClick={() => setPrizes((pr) => pr.filter((_, j) => j !== i))} className="text-neutral-500 hover:text-gold-lite">✕</button>
                       </td>
                     </tr>
                   ))}
@@ -237,7 +237,7 @@ export function TournamentBuilderWizard({
           </div>
         )}
 
-        {error && <p className="mt-3 rounded-lg border border-brand/30 bg-brand/10 px-3 py-2 text-sm text-red-400">{error}</p>}
+        {error && <p className="mt-3 rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-sm text-red-400">{error}</p>}
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
           {step === 0 && <button type="button" disabled={busy || basicsErrors.length > 0} onClick={createTournament} className={gold}>Create &amp; continue</button>}

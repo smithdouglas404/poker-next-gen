@@ -219,7 +219,7 @@ function CommandCard({
     return (
       <Link
         href={linkHref!}
-        className="group rounded-2xl border border-white/[0.06] bg-[#262d38] p-5 transition hover:border-brand/40 hover:bg-white/[0.04]"
+        className="group rounded-2xl border border-white/[0.06] bg-[#262d38] p-5 transition hover:border-gold/40 hover:bg-white/[0.04]"
       >
         {inner}
       </Link>
@@ -231,7 +231,7 @@ function CommandCard({
       type="button"
       disabled={busy}
       onClick={() => onRun(command)}
-      className="group w-full rounded-2xl border border-white/[0.06] bg-[#262d38] p-5 text-left transition hover:border-brand/40 hover:bg-white/[0.04] disabled:opacity-60"
+      className="group w-full rounded-2xl border border-white/[0.06] bg-[#262d38] p-5 text-left transition hover:border-gold/40 hover:bg-white/[0.04] disabled:opacity-60"
     >
       {inner}
     </button>
@@ -701,7 +701,7 @@ function CommandCenterInner() {
                   className={`rounded-xl border p-4 ${
                     result.ok
                       ? "border-green/30 bg-green/[0.08]"
-                      : "border-brand/30 bg-brand/[0.08]"
+                      : "border-gold/30 bg-gold/[0.08]"
                   }`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -832,7 +832,7 @@ function CommandCenterInner() {
                     value={typedConfirm}
                     onChange={(e) => setTypedConfirm(e.target.value)}
                     placeholder={confirmWord}
-                    className="w-full rounded-xl border border-brand/40 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-brand"
+                    className="w-full rounded-xl border border-gold/40 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-gold"
                   />
                 </div>
               )}

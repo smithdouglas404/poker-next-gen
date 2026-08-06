@@ -174,8 +174,8 @@ export function PurchaseSuccessModal({
               player needs to know which item to retry, and that they were not
               charged for it. */}
           {partial && (
-            <div className="w-full rounded-xl border border-brand/35 bg-brand/[0.07] px-4 py-3 text-left">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand">
+            <div className="w-full rounded-xl border border-gold/35 bg-gold/[0.07] px-4 py-3 text-left">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gold-lite">
                 {failed.length === 1 ? "1 item didn't go through" : `${failed.length} items didn't go through`}
               </p>
               <ul className="mt-2 space-y-1.5">
