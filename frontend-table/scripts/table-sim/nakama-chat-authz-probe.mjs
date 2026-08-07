@@ -45,9 +45,16 @@ const stranger = await client.authenticateEmail(`authz_str_${Date.now()}@t.local
 console.log(`club ${clubId}`);
 console.log(`stranger ${stranger.user_id} (no membership of any kind)\n`);
 
+// ---- 0. The retired write path ----
+// club_chat_send still writes to poker_club_chat, which no live surface reads
+// since club chat moved to a Nakama channel. Silently accepting a write that
+// reaches nobody is worse than refusing it, so it refuses.
+const retired = await rpc(owner, "club_chat_send", { club_id: clubId, text: "should not land" });
+console.log(`club_chat_send as the OWNER    : ${retired.__error ? "REFUSED — " + retired.__error.slice(0, 150) : "ACCEPTED (RETIREMENT NOT ENFORCED) " + JSON.stringify(retired)}`);
+const stillReads = await rpc(owner, "club_chat_list", { club_id: clubId, limit: 10 });
+console.log(`club_chat_list as the OWNER    : ${stillReads.__error ? "BROKEN — " + stillReads.__error : "still serves history (" + (stillReads.messages?.length ?? 0) + " rows) — needed for the pre-move backlog"}`);
+
 // ---- 1. The bespoke path: what ships today ----
-const viaRpc = await rpc(stranger, "club_chat_send", { club_id: clubId, text: "stranger was here" });
-console.log(`club_chat_send as a non-member : ${viaRpc.__error ? "REFUSED — " + viaRpc.__error : "ACCEPTED " + JSON.stringify(viaRpc)}`);
 const readRpc = await rpc(stranger, "club_chat_list", { club_id: clubId, limit: 10 });
 console.log(`club_chat_list as a non-member : ${readRpc.__error ? "REFUSED — " + readRpc.__error : "ALLOWED, " + (readRpc.messages?.length ?? 0) + " messages"}`);
 

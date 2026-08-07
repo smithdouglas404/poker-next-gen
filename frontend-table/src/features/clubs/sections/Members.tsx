@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Field, Input, Select } from "@/features/ui";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
 
+import { sendToClub } from "@/features/chat/clubChannel";
 import { clubApi, money, relTime } from "../clubRpc";
 import { CardHeader, EmptyState, MemberAvatar, StatusDot, roleColor } from "../components";
 import type { ChatMessage, ClubMember, RosterRow } from "../types";
@@ -90,8 +91,8 @@ export function Members({
       const text = chatText.trim();
       setChatText("");
       try {
-        await clubApi.chatSend(clubId, text);
-        await loadChat();
+        // Club chat is a Nakama channel now; clubApi.chatSend is gone.
+        await sendToClub(clubId, text);
       } catch (e) {
         toast(e instanceof Error ? e.message : "Message failed", "err");
       } finally {

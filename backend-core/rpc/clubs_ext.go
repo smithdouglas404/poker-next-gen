@@ -1014,36 +1014,41 @@ func ClubEventCreate(ctx context.Context, logger runtime.Logger, db *sql.DB, nk 
 	return string(out), nil
 }
 
-// ClubChatSend appends a message to a club's chat. Members only.
+// ClubChatSend is RETIRED. It refuses, loudly, and says what to do instead.
+//
+// Club chat moved to a Nakama channel. This RPC still writes to
+// poker_club_chat, which NO live surface reads any more — so a caller that kept
+// using it would appear to succeed, the row would land in the database, and the
+// message would reach nobody. A write that silently goes nowhere is worse than
+// an error, because nothing about it looks wrong.
+//
+// It stays REGISTERED rather than being deleted from main.go on purpose: an
+// unregistered id returns a generic "RPC function not found", which tells a
+// caller nothing about where the messages went. This says it.
+//
+// The caller is logged at WARN with its user id, so a straggler shows up in the
+// server log rather than only in whatever client swallowed the error.
+//
+// Reading is unaffected — ClubChatList below still serves the pre-move history,
+// which is exactly why poker_club_chat is still populated and still read.
 func ClubChatSend(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
-	userID, err := callerID(ctx)
-	if err != nil {
-		return "", err
-	}
-	var req struct {
-		ClubID string `json:"club_id"`
-		Text   string `json:"text"`
-	}
-	if err := json.Unmarshal([]byte(payload), &req); err != nil || req.ClubID == "" || strings.TrimSpace(req.Text) == "" {
-		return "", runtime.NewError("club_id and text required", 3)
-	}
-	m, err := store.NewClubStore(db).GetMembership(ctx, req.ClubID, userID)
-	if err != nil {
-		return "", runtime.NewError(err.Error(), 13)
-	}
-	if m == nil {
-		return "", runtime.NewError("only club members can post to club chat", 7)
-	}
-	id, err := store.NewClubExtStore(db).SendChat(ctx, &store.ClubChatMessage{
-		ClubID: req.ClubID, UserID: userID, Username: m.Username, Text: req.Text,
-	})
-	if err != nil {
-		return "", runtime.NewError(err.Error(), 13)
-	}
-	return `{"ok":true,"id":"` + id + `"}`, nil
+	userID, _ := callerID(ctx)
+	logger.WithField("user_id", userID).
+		Warn("club_chat_send called after retirement — caller must post to the club's Nakama channel")
+	// 12 = UNIMPLEMENTED: the endpoint is gone, not the argument wrong.
+	return "", runtime.NewError(
+		"club_chat_send is retired: club chat is a Nakama channel now. Join the club's "+
+			"channel and use writeChatMessage (see frontend-table/src/features/chat/clubChannel.ts). "+
+			"Writes here reach nobody.", 12)
 }
 
 // ClubChatList returns a club's recent chat. Members only.
+//
+// STILL LIVE, and deliberately so. Everything written before the move to Nakama
+// channels lives in poker_club_chat and only there; clubChannel.ts reads this
+// once per join and merges it with the channel's own history, so a club's
+// existing conversation does not vanish on cutover. Read-only from here on —
+// its companion ClubChatSend is retired above.
 func ClubChatList(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	userID, err := callerID(ctx)
 	if err != nil {

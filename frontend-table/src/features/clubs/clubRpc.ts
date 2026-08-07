@@ -80,8 +80,11 @@ export const clubApi = {
 
   chatList: (clubId: string) =>
     call<{ messages?: ChatMessage[] }>("club_chat_list", { club_id: clubId, limit: 50 }),
-  chatSend: (clubId: string, text: string) =>
-    call<{ ok: boolean; id: string }>("club_chat_send", { club_id: clubId, text }),
+  /** chatSend is GONE. club_chat_send is retired server-side — club chat is a
+   *  Nakama channel now. Post with `sendToClub` from features/chat/clubChannel,
+   *  or `useClubChat().send`. Removing the wrapper makes a new call site a
+   *  compile error rather than a 501 nobody reads. chatList stays: it serves the
+   *  pre-move history that clubChannel merges in on join. */
 
   update: (
     clubId: string,
