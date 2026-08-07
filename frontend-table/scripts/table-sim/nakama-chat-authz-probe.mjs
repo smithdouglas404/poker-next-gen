@@ -104,6 +104,21 @@ if (ownerJoined && !ownerJoined.__error) {
     leak = { __error: `${e?.status ?? "?"}` };
   }
   console.log(`stranger reads history WITHOUT joining   : ${typeof leak === "number" ? (leak > 0 ? "LEAKED " + leak + " messages" : "0 messages") : "REFUSED — " + leak.__error}`);
+
+  // Third door: can the stranger WRITE to a channel id they never joined?
+  // Same shape as the listChannelMessages hole — a gate on join says nothing
+  // about the paths that skip it.
+  const strayWrite = client.createSocket(false, false);
+  await strayWrite.connect(stranger, true);
+  let sent = null;
+  try {
+    const ack = await strayWrite.writeChatMessage(ownerJoined.id, { text: "stranger writing without joining" });
+    sent = ack?.message_id ? "ACCEPTED " + String(ack.message_id).slice(0, 20) : "ACCEPTED";
+  } catch (e) {
+    sent = "REFUSED — " + (e?.message ?? JSON.stringify(e)).slice(0, 90);
+  }
+  console.log(`stranger writes WITHOUT joining          : ${sent}`);
+  await strayWrite.disconnect(false);
 }
 await ownerSock.disconnect(false);
 console.log("");

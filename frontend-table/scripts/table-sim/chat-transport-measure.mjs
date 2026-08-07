@@ -55,6 +55,21 @@ const rpc = async (s, n, p = {}) => {
     throw new Error(`${n} -> ${e?.status ?? "?"} ${JSON.stringify(body) ?? e?.message ?? e}`);
   }
 };
+const CHANNEL_ROOM = 1;
+// Club chat now rides a Nakama channel, so the out-of-band publisher has to be a
+// channel write too. Sending via club_chat_send would write to poker_club_chat,
+// which no live rail listens to any more — the page would show NEVER and the
+// harness, not the product, would be what was broken.
+let pubSocket = null;
+let pubChannel = null;
+async function publish(text) {
+  if (!pubSocket) {
+    pubSocket = client.createSocket(false, false);
+    await pubSocket.connect(owner, true);
+    pubChannel = await pubSocket.joinChat(clubId, CHANNEL_ROOM, true, false);
+  }
+  await pubSocket.writeChatMessage(pubChannel.id, { text });
+}
 const OP_CHAT_SEND = 5; // protocol/opcodes.go
 const OP_CHAT = 111;
 const SHOTS = "/tmp/claude-0/-home-user-poker-next-gen/392cc787-6489-50fa-8651-c53dd904e186/scratchpad";
@@ -163,7 +178,7 @@ async function measure(path, label, settleMs, tab) {
   const marker = `PROBE-${Date.now()}`;
   listCalls = 0;
   const windowStart = Date.now();
-  await rpc(owner, "club_chat_send", { club_id: clubId, text: marker });
+  await publish(marker);
   const sentAt = Date.now();
 
   const watch = async (m, from) => {
@@ -196,7 +211,7 @@ async function measure(path, label, settleMs, tab) {
     await p.waitForTimeout(7000);
     const m2 = `SAMPLE-${i}-${Date.now()}`;
     const at = Date.now();
-    await rpc(owner, "club_chat_send", { club_id: clubId, text: m2 });
+    await publish(m2);
     const got = await watch(m2, at);
     const stillOwner = (await who()) === owner.user_id;
     extra.push({ ms: got, stillOwner });
@@ -211,8 +226,15 @@ async function measure(path, label, settleMs, tab) {
 
   // Prove the message really is on the server, so "never appeared" can only mean
   // the page never asked — not that the send failed.
-  const server = await rpc(owner, "club_chat_list", { club_id: clubId, limit: 40 });
-  const onServer = (server.messages ?? []).some((m) => m.text === marker);
+  const hist = await client.listChannelMessages(owner, pubChannel.id, 20, false);
+  const onServer = (hist.messages ?? []).some((m) => {
+    try {
+      const c = typeof m.content === "string" ? JSON.parse(m.content) : m.content ?? {};
+      return c.text === marker;
+    } catch {
+      return false;
+    }
+  });
 
   // And prove a reload picks it up, which distinguishes "stale until reload"
   // from "broken".

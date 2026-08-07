@@ -44,6 +44,7 @@ import { FailedState } from "@/features/ui/EmptyState";
 import { compact, ownerApi, usdCompact } from "./ownerRpc";
 import { EmptyState, SectionTitle } from "./ui";
 import { useGuestApprovalCount } from "./useGuestApprovalCount";
+import { useClubChat } from "@/features/chat/useClubChat";
 import type {
   AnalyticsSeries,
   ClubAnnouncement,
@@ -93,44 +94,11 @@ export function OwnerHub() {
   // Reads the same RPC the queue itself does, so the count and the list cannot
   // disagree; 0 (and so no badge) whenever the read fails.
   const guestsWaiting = useGuestApprovalCount(club?.id);
+  // Club chat now rides a Nakama channel (features/chat). The felt's chat is
+  // untouched and stays on the match socket. Disabled in demo, which has no
+  // server to join — that substitutes DATA, never layout or visibility.
+  const clubChat = useClubChat(club?.id, !demo);
   const [toast, setToast] = useState<Toast | null>(null);
-
-  // The rail used to load chat ONCE at bootstrap and refetch only when YOU sent
-  // something, so a second operator's message never arrived at all — measured:
-  // zero club_chat_list calls in 30s, the message confirmed on the server, and
-  // visible only after a reload. Poll it like the Tournament Center rail does.
-  //
-  // Paused while the tab is hidden. An idle rail left open all day was the bulk
-  // of the request volume (~12/min per open page), and a hidden tab has no
-  // reader to be stale for; the visibilitychange listener refetches on return so
-  // coming back never shows a gap.
-  useEffect(() => {
-    const clubId = club?.id;
-    if (demo || !clubId) return;
-    let cancelled = false;
-
-    const pull = async () => {
-      if (document.hidden) return;
-      try {
-        const r = await ownerApi.chatList(clubId);
-        // Same ordering as bootstrap and send: the server returns newest-first.
-        if (!cancelled) setChat((r.messages ?? []).slice().reverse());
-      } catch {
-        // Keep the last known thread rather than blanking it.
-      }
-    };
-
-    const timer = window.setInterval(pull, 5000);
-    const onVisible = () => {
-      if (!document.hidden) void pull();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [demo, club?.id]);
 
   const notify = useCallback((msg: string, kind: "ok" | "err" = "ok") => {
     setToast({ msg, kind });
@@ -250,11 +218,10 @@ export function OwnerHub() {
       setRole(owned.role);
 
       // Load all owner data in parallel; individual failures degrade gracefully.
-      const [quickRes, ledgerRes, annRes, chatRes, rakeRes, seriesRes] = await Promise.allSettled([
+      const [quickRes, ledgerRes, annRes, rakeRes, seriesRes] = await Promise.allSettled([
         ownerApi.quickStats(owned.club.id),
         ownerApi.rakeLedger(owned.club.id),
         ownerApi.announcements(owned.club.id),
-        ownerApi.chatList(owned.club.id),
         ownerApi.rakeConfigGet(owned.club.id),
         ownerApi.analyticsSeries(owned.club.id, 30),
       ]);
@@ -263,7 +230,6 @@ export function OwnerHub() {
       if (quickRes.status === "fulfilled") setQuick(quickRes.value);
       if (ledgerRes.status === "fulfilled") setLedger(ledgerRes.value);
       if (annRes.status === "fulfilled") setAnnouncements(annRes.value.announcements ?? []);
-      if (chatRes.status === "fulfilled") setChat((chatRes.value.messages ?? []).slice().reverse());
       if (rakeRes.status === "fulfilled" && rakeRes.value?.club_id) setRakeConfig(rakeRes.value);
       if (seriesRes.status === "fulfilled" && seriesRes.value?.series) setSeries(seriesRes.value);
 
@@ -405,14 +371,14 @@ export function OwnerHub() {
         return;
       }
       try {
-        await ownerApi.chatSend(club.id, text);
-        const r = await ownerApi.chatList(club.id);
-        setChat((r.messages ?? []).slice().reverse());
+        // No optimistic append: the server echoes the message back over the
+        // channel, so the rail shows exactly what every other member sees.
+        await clubChat.send(text);
       } catch (e) {
         notify(e instanceof Error ? e.message : "Message failed", "err");
       }
     },
-    [demo, club, role, notify],
+    [demo, club, role, notify, clubChat],
   );
 
   const onBroadcast = useCallback(
@@ -647,7 +613,7 @@ export function OwnerHub() {
           rakeTotalCents={rakeTotalCents}
           avgPotCents={avgPotCents}
           sparks={overviewSparks}
-          chat={chat}
+          chat={demo ? chat : clubChat.messages}
           demo={demo}
           canManage={canManage}
           onSendChat={onSendChat}

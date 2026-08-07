@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useClubChat } from "@/features/chat/useClubChat";
 import { callSessionRpc } from "@/lib/nakama/sessionRpc";
 import { Button } from "@/features/ui";
 import { GLASS_PANEL, cn } from "@/features/ui/tokens";
@@ -75,15 +76,14 @@ function buildAlerts(
  *  RPCs against the operator's club (resolved from me_roles). Falls back to a
  *  clearly-labelled local thread only when the caller operates no club / offline. */
 function ChatPanel() {
-  const [msgs, setMsgs] = useState<{ who: string; body: string; mine?: boolean }[]>([]);
   const [draft, setDraft] = useState("");
   const [clubId, setClubId] = useState<string | null>(null);
-  const [live, setLive] = useState(false);
+  const [resolved, setResolved] = useState(false);
 
-  // Resolve the operator's club, then poll its chat.
+  // Resolve the operator's club once. The chat itself is a Nakama channel now,
+  // not a 5s poll of club_chat_list.
   useEffect(() => {
     let cancelled = false;
-    let timer: ReturnType<typeof setInterval> | null = null;
     void (async () => {
       let id: string | null = null;
       try {
@@ -98,44 +98,32 @@ function ChatPanel() {
       }
       if (cancelled) return;
       setClubId(id);
-      if (!id) {
-        setMsgs([{ who: "System", body: "Operate a club to use Global Club Chat." }]);
-        return;
-      }
-      const refresh = async () => {
-        try {
-          const r = (await callSessionRpc("club_chat_list", { club_id: id, limit: 40 })) as {
-            messages?: Array<{ username?: string; text?: string; user_id?: string }>;
-          };
-          if (cancelled) return;
-          setLive(true);
-          setMsgs(
-            (r.messages ?? []).map((m) => ({ who: m.username || "Member", body: m.text || "" })),
-          );
-        } catch {
-          /* transient */
-        }
-      };
-      await refresh();
-      timer = setInterval(refresh, 5000);
+      setResolved(true);
     })();
     return () => {
       cancelled = true;
-      if (timer) clearInterval(timer);
     };
   }, []);
 
+  const chat = useClubChat(clubId);
+
+  // The server echoes your own message back over the channel, so there is no
+  // optimistic copy that can disagree with what other members see. A failure is
+  // shown rather than dropped — the polled version swallowed every error.
   const send = () => {
     const body = draft.trim();
     if (!body) return;
     setDraft("");
-    if (clubId && live) {
-      setMsgs((m) => [...m, { who: "You", body, mine: true }]);
-      void callSessionRpc("club_chat_send", { club_id: clubId, text: body }).catch(() => {});
-    } else {
-      setMsgs((m) => [...m, { who: "You", body, mine: true }]);
-    }
+    void chat.send(body).catch(() => {});
   };
+
+  const msgs: { who: string; body: string; mine?: boolean }[] = clubId
+    ? chat.messages.map((m) => ({ who: m.username || "Member", body: m.text }))
+    : resolved
+      ? [{ who: "System", body: "Operate a club to use Global Club Chat." }]
+      : [];
+  if (chat.error) msgs.push({ who: "System", body: chat.error });
+
   return (
     <div className={cn(GLASS_PANEL, "flex flex-col p-4")}>
       <p className="flex items-center gap-2 font-display text-sm font-bold uppercase tracking-[0.2em] text-white">
